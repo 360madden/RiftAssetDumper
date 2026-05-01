@@ -1,0 +1,23 @@
+* text=auto
+
+*.cs text
+*.csproj text
+*.slnx text
+*.md text
+*.json text
+*.jsonl text
+*.txt text
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.dds binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ogg binary
+*.wav binary
+*.riff binary
+*.pak binary
+*.manifest binary
+assets.* binary

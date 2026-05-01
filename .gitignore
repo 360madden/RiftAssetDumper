@@ -1,0 +1,31 @@
+# local copied game data / generated extraction output
+Source/
+Extracted/
+Exports/
+
+# build output
+bin/
+obj/
+**/bin/
+**/obj/
+TestResults/
+coverage/
+
+# local IDE/editor noise
+.vs/
+.vscode/
+*.user
+*.suo
+*.rsuser
+
+# local logs/temp files
+*.log
+*.tmp
+*.bak
+
+# compressed/manual dumps should be intentionally added, not swept in
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz

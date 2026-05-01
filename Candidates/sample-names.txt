@@ -1,0 +1,4 @@
+# candidate examples; these are not expected to be correct yet
+assets/audio/audio_0.pak
+textures/example.dds
+art/texture/example.dds
