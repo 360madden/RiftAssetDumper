@@ -2452,24 +2452,38 @@ internal static class Program
             return value;
         }
 
-        static string redactUserSegment(string input) => Regex.Replace(
-            input,
-            @"(?i)([A-Z]:[\\/]+Users[\\/]+)([^\\/:\r\n]+)",
-            "$1<user>",
-            RegexOptions.CultureInvariant);
-
-        var redacted = redactUserSegment(value);
-
-        foreach (var variable in new[] { "USERPROFILE", "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
+        static string replacePathRoot(string input, string? path, string token)
         {
-            var path = Environment.GetEnvironmentVariable(variable);
             if (string.IsNullOrWhiteSpace(path))
             {
-                continue;
+                return input;
             }
 
-            redacted = redacted.Replace(path, redactUserSegment(path), StringComparison.OrdinalIgnoreCase);
+            var redactedInput = input;
+            foreach (var candidate in new[] { path.TrimEnd('\\', '/'), path.TrimEnd('\\', '/').Replace('\\', '/') }.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                var pattern = Regex.Escape(candidate) + @"(?=$|[\\/])";
+                redactedInput = Regex.Replace(
+                    redactedInput,
+                    pattern,
+                    token,
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            }
+
+            return redactedInput;
         }
+
+        var redacted = replacePathRoot(value, Environment.GetEnvironmentVariable("USERPROFILE"), "%USERPROFILE%");
+        redacted = Regex.Replace(
+            redacted,
+            @"(?i)([A-Z]:[\\/]+Users[\\/]+)([^\\/:\r\n]+)(?=$|[\\/])",
+            "$1%USERNAME%",
+            RegexOptions.CultureInvariant);
 
         return redacted;
     }

@@ -4,13 +4,19 @@ Read-only RIFT asset archive research workspace.
 
 ## Privacy and path redaction
 
-The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports:
+The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports. Paths under the current user's profile are emitted with an environment-variable placeholder:
 
 ```text
-C:\Users\<user>\...
+%USERPROFILE%\...
 ```
 
-Use `--no-redact-paths` only for private local debugging when exact local paths are needed. Keep redaction enabled for artifacts that might be committed, shared, or pasted into public issues.
+Other generic user-profile paths are emitted as:
+
+```text
+C:\Users\%USERNAME%\...
+```
+
+These placeholders preserve the path meaning without exposing the local account name. Use `--no-redact-paths` only for private local debugging when exact local paths are needed. Keep redaction enabled for artifacts that might be committed, shared, or pasted into public issues.
 
 ## Local source files
 
