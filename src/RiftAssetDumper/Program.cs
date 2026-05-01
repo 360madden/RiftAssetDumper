@@ -80,22 +80,22 @@ internal static class Program
             }
 
             var report = Probe(options.RootDirectory);
-            PrintReport(report);
+            PrintReport(report, options.RedactPaths);
 
             if (options.WriteJson)
             {
                 var jsonPath = Path.Combine(options.RootDirectory, "probe-report.json");
-                var json = JsonSerializer.Serialize(report, JsonOptions());
+                var json = JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths));
                 File.WriteAllText(jsonPath, json + Environment.NewLine, Encoding.UTF8);
                 Console.WriteLine();
-                Console.WriteLine($"Wrote JSON report: {jsonPath}");
+                Console.WriteLine($"Wrote JSON report: {DisplayPath(options, jsonPath)}");
             }
 
             return report.Errors.Count == 0 ? 0 : 2;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"ERROR: {ex.Message}");
+            Console.Error.WriteLine($"ERROR: {RedactSensitivePath(ex.Message, redactPaths: true)}");
             return 1;
         }
     }
@@ -444,9 +444,9 @@ internal static class Program
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    private static void PrintReport(ProbeReport report)
+    private static void PrintReport(ProbeReport report, bool redactPaths)
     {
-        Console.WriteLine($"RIFT asset probe root: {report.RootDirectory}");
+        Console.WriteLine($"RIFT asset probe root: {RedactSensitivePath(report.RootDirectory, redactPaths)}");
 
         Console.WriteLine();
         Console.WriteLine($"Manifests ({report.Manifests.Count}):");
@@ -469,7 +469,7 @@ internal static class Program
             }
             foreach (var warning in manifest.Warnings)
             {
-                Console.WriteLine($"  WARNING: {warning}");
+                Console.WriteLine($"  WARNING: {RedactSensitivePath(warning, redactPaths)}");
             }
         }
 
@@ -492,7 +492,7 @@ internal static class Program
             }
             foreach (var warning in archive.Warnings)
             {
-                Console.WriteLine($"  WARNING: {warning}");
+                Console.WriteLine($"  WARNING: {RedactSensitivePath(warning, redactPaths)}");
             }
         }
 
@@ -502,7 +502,7 @@ internal static class Program
             Console.WriteLine("Errors:");
             foreach (var error in report.Errors)
             {
-                Console.WriteLine($"- {error}");
+                Console.WriteLine($"- {RedactSensitivePath(error, redactPaths)}");
             }
         }
     }
@@ -515,7 +515,7 @@ internal static class Program
 
         if (!Directory.Exists(assetsDirectory))
         {
-            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {assetsDirectory}");
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
             return 1;
         }
 
@@ -527,9 +527,9 @@ internal static class Program
             string.IsNullOrWhiteSpace(options.UseRecoveredNamesPath) ? options.MinConfidence : Math.Max(options.MinConfidence, 80));
 
         Directory.CreateDirectory(outDirectory);
-        Console.WriteLine($"Extracting TWAD archive payloads from: {assetsDirectory}");
-        Console.WriteLine($"Manifest: {manifestPath}");
-        Console.WriteLine($"Output: {outDirectory}");
+        Console.WriteLine($"Extracting TWAD archive payloads from: {DisplayPath(options, assetsDirectory)}");
+        Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
+        Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
         Console.WriteLine($"Max per archive: {options.MaxPerArchive}");
         if (options.MaxTotal > 0)
         {
@@ -596,8 +596,8 @@ internal static class Program
                 ManifestPath: manifestPath,
                 Archives: archiveReports);
             var reportPath = Path.Combine(outDirectory, "extract-report.json");
-            File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions()) + Environment.NewLine, Encoding.UTF8);
-            Console.WriteLine($"Wrote extraction report: {reportPath}");
+            File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+            Console.WriteLine($"Wrote extraction report: {DisplayPath(options, reportPath)}");
         }
 
         return totalFailed == 0 ? 0 : 2;
@@ -609,13 +609,13 @@ internal static class Program
         var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
         if (!Directory.Exists(rootDirectory))
         {
-            Console.Error.WriteLine($"ERROR: root directory does not exist: {rootDirectory}");
+            Console.Error.WriteLine($"ERROR: root directory does not exist: {DisplayPath(options, rootDirectory)}");
             return 1;
         }
 
         if (!Directory.Exists(assetsDirectory))
         {
-            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {assetsDirectory}");
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
             return 1;
         }
 
@@ -624,7 +624,7 @@ internal static class Program
             .ToArray();
         if (manifestPaths.Length == 0)
         {
-            Console.Error.WriteLine($"ERROR: no *.manifest files found in {rootDirectory}");
+            Console.Error.WriteLine($"ERROR: no *.manifest files found in {DisplayPath(options, rootDirectory)}");
             return 1;
         }
 
@@ -633,7 +633,7 @@ internal static class Program
             .ToArray();
 
         Console.WriteLine($"Manifest/archive ID diagnostics");
-        Console.WriteLine($"Root: {rootDirectory}");
+        Console.WriteLine($"Root: {DisplayPath(options, rootDirectory)}");
         Console.WriteLine($"Archives: {archives.Length}");
         Console.WriteLine();
 
@@ -671,12 +671,12 @@ internal static class Program
             $"{Path.GetFileNameWithoutExtension(manifestPath)}.paks.jsonl");
 
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        WriteJsonLines(outPath, records);
+        WriteJsonLines(outPath, records, options.RedactPaths);
 
-        Console.WriteLine($"Manifest: {manifestPath}");
+        Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
         Console.WriteLine($"PAK rows: {lookup.Paks.Count:N0}");
         Console.WriteLine($"Written: {(options.Limit > 0 ? Math.Min(options.Limit, lookup.Paks.Count) : lookup.Paks.Count):N0}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -692,12 +692,12 @@ internal static class Program
             $"{Path.GetFileNameWithoutExtension(manifestPath)}.entries.jsonl");
 
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        WriteJsonLines(outPath, records);
+        WriteJsonLines(outPath, records, options.RedactPaths);
 
-        Console.WriteLine($"Manifest: {manifestPath}");
+        Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
         Console.WriteLine($"Entry rows: {lookup.Entries.Count:N0}");
         Console.WriteLine($"Written: {(options.Limit > 0 ? Math.Min(options.Limit, lookup.Entries.Count) : lookup.Entries.Count):N0}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -762,12 +762,12 @@ internal static class Program
             : ResolveOutputPath(rootDirectory, options.OutDirectory, $"{Path.GetFileNameWithoutExtension(manifestPath)}.name-matches.jsonl");
 
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        WriteJsonLines(outPath, matches);
+        WriteJsonLines(outPath, matches, options.RedactPaths);
 
-        Console.WriteLine($"Manifest: {manifestPath}");
+        Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
         Console.WriteLine($"Candidates: {names.Length:N0}");
         Console.WriteLine($"Matches: {matches.Count:N0}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -777,7 +777,7 @@ internal static class Program
         var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
         if (!Directory.Exists(assetsDirectory))
         {
-            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {assetsDirectory}");
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
             return 1;
         }
 
@@ -812,10 +812,10 @@ internal static class Program
             MaxPerArchive: options.MaxPerArchive,
             Filter: filter.Describe(),
             Archives: reports);
-        File.WriteAllText(outPath, JsonSerializer.Serialize(runReport, JsonOptions()) + Environment.NewLine, Encoding.UTF8);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(runReport, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
         Console.WriteLine();
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return reports.Any(static r => r.Failed > 0) ? 2 : 0;
     }
 
@@ -1013,14 +1013,14 @@ internal static class Program
         var outputRoot = Path.GetFullPath(options.RootDirectory);
         var outPath = ResolveOutputPath(outputRoot, options.OutDirectory, "compression-scan.json");
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions()) + Environment.NewLine, Encoding.UTF8);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
-        Console.WriteLine($"Root: {rootDirectory}");
-        Console.WriteLine($"Manifest: {manifestPath}");
+        Console.WriteLine($"Root: {DisplayPath(options, rootDirectory)}");
+        Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
         Console.WriteLine($"Manifest PAK compression: {FormatCounts(manifestCounts)}");
         Console.WriteLine($"Copied TWAD entry compression: {FormatCounts(archiveCounts)}");
         Console.WriteLine($"Copied TWAD non-null entries: {nonNullEntries:N0}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -1030,7 +1030,7 @@ internal static class Program
         var inputDirectory = Path.GetFullPath(options.InputPath ?? Path.Combine(rootDirectory, "..", "Extracted"));
         if (!Directory.Exists(inputDirectory))
         {
-            Console.Error.WriteLine($"ERROR: input directory does not exist: {inputDirectory}");
+            Console.Error.WriteLine($"ERROR: input directory does not exist: {DisplayPath(options, inputDirectory)}");
             return 1;
         }
 
@@ -1069,12 +1069,12 @@ internal static class Program
             .ToArray();
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "mined-names.jsonl");
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        WriteJsonLines(outPath, records);
+        WriteJsonLines(outPath, records, options.RedactPaths);
 
-        Console.WriteLine($"Input: {inputDirectory}");
+        Console.WriteLine($"Input: {DisplayPath(options, inputDirectory)}");
         Console.WriteLine($"Files scanned: {files.Length:N0}");
         Console.WriteLine($"Candidates: {records.Length:N0}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -1084,7 +1084,7 @@ internal static class Program
         var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
         if (!Directory.Exists(assetsDirectory))
         {
-            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {assetsDirectory}");
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
             return 1;
         }
 
@@ -1199,7 +1199,7 @@ internal static class Program
             Groups: groups.Values.OrderByDescending(static g => g.Count).ThenBy(static g => g.First16).ToList());
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "binary-signatures.json");
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions()) + Environment.NewLine, Encoding.UTF8);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
         Console.WriteLine($"Inspected bin payloads: {inspected:N0}");
         Console.WriteLine($"Groups: {report.Groups.Count:N0}");
@@ -1207,7 +1207,7 @@ internal static class Program
         {
             Console.WriteLine($"- {group.First16}: count={group.Count} size={group.MinSize:N0}..{group.MaxSize:N0} class={group.Samples.FirstOrDefault()?.Classification}");
         }
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
 
@@ -1264,13 +1264,13 @@ internal static class Program
 
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "binary-probe.json");
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions()) + Environment.NewLine, Encoding.UTF8);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
         Console.WriteLine($"Type: {report.Type}");
         Console.WriteLine($"Length: {report.Length:N0}");
         Console.WriteLine($"Classification: {report.Classification}");
         Console.WriteLine($"First16: {report.First16}");
-        Console.WriteLine($"Output: {outPath}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
     }
 
@@ -1892,12 +1892,17 @@ internal static class Program
             : resolved;
     }
 
-    private static void WriteJsonLines<T>(string path, IEnumerable<T> records)
+    private static void WriteJsonLines<T>(string path, IEnumerable<T> records, bool redactPaths = true)
     {
         var options = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
+        if (redactPaths)
+        {
+            options.Converters.Add(new RedactingStringJsonConverter());
+        }
+
         using var writer = new StreamWriter(path, append: false, Encoding.UTF8);
         foreach (var record in records)
         {
@@ -2413,6 +2418,8 @@ internal static class Program
         Console.WriteLine("                  Use recovered name JSONL during extraction");
         Console.WriteLine("  --lzma2-mode auto|xz-only|off");
         Console.WriteLine("                  LZMA2 behavior; raw LZMA2 remains reported as unhandled");
+        Console.WriteLine("  --no-redact-paths");
+        Console.WriteLine("                  Write/display full local paths instead of redacted user-profile paths");
         Console.WriteLine("  --max-total <n>");
         Console.WriteLine("                  Stop after this many total extracted files");
         Console.WriteLine("  --max-per-archive <n>");
@@ -2421,11 +2428,64 @@ internal static class Program
         Console.WriteLine("  --help          Show this help");
     }
 
-    private static JsonSerializerOptions JsonOptions() => new()
+    private static JsonSerializerOptions JsonOptions(bool redactPaths = true)
     {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        if (redactPaths)
+        {
+            options.Converters.Add(new RedactingStringJsonConverter());
+        }
+
+        return options;
+    }
+
+    private static string DisplayPath(AppOptions options, string value) => RedactSensitivePath(value, options.RedactPaths);
+
+    private static string RedactSensitivePath(string value, bool redactPaths)
+    {
+        if (!redactPaths || string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        static string redactUserSegment(string input) => Regex.Replace(
+            input,
+            @"(?i)([A-Z]:[\\/]+Users[\\/]+)([^\\/:\r\n]+)",
+            "$1<user>",
+            RegexOptions.CultureInvariant);
+
+        var redacted = redactUserSegment(value);
+
+        foreach (var variable in new[] { "USERPROFILE", "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
+        {
+            var path = Environment.GetEnvironmentVariable(variable);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            redacted = redacted.Replace(path, redactUserSegment(path), StringComparison.OrdinalIgnoreCase);
+        }
+
+        return redacted;
+    }
+
+    private sealed class RedactingStringJsonConverter : JsonConverter<string>
+    {
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return reader.GetString();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(RedactSensitivePath(value, redactPaths: true));
+        }
+    }
 
     private sealed record AppOptions(
         string Command,
@@ -2452,7 +2512,8 @@ internal static class Program
         bool RequireUnique,
         int MinConfidence,
         string? UseRecoveredNamesPath,
-        string Lzma2Mode)
+        string Lzma2Mode,
+        bool RedactPaths)
     {
         public static AppOptions Parse(string[] args)
         {
@@ -2483,6 +2544,7 @@ internal static class Program
             var minConfidence = 0;
             string? useRecoveredNamesPath = null;
             var lzma2Mode = "auto";
+            var redactPaths = true;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -2508,6 +2570,9 @@ internal static class Program
                         break;
                     case "--no-json":
                         writeJson = false;
+                        break;
+                    case "--no-redact-paths":
+                        redactPaths = false;
                         break;
                     case "--group-by-type":
                         groupByType = true;
@@ -2706,7 +2771,8 @@ internal static class Program
                 requireUnique,
                 minConfidence,
                 useRecoveredNamesPath,
-                lzma2Mode);
+                lzma2Mode,
+                redactPaths);
         }
 
         public int MaxTotalOrUnlimited() => MaxTotal > 0 ? MaxTotal : int.MaxValue;

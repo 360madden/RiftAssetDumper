@@ -2,6 +2,16 @@
 
 Read-only RIFT asset archive research workspace.
 
+## Privacy and path redaction
+
+The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports:
+
+```text
+C:\Users\<user>\...
+```
+
+Use `--no-redact-paths` only for private local debugging when exact local paths are needed. Keep redaction enabled for artifacts that might be committed, shared, or pasted into public issues.
+
 ## Local source files
 
 Copied game files live under:
