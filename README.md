@@ -474,6 +474,29 @@ Confidence: 100 for all matched rows
 Matched extension family: .dds
 ```
 
+Build a direct NIF model-to-texture manifest graph from those references:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- link-nif-textures --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl"
+```
+
+Current copied-data link result:
+
+```text
+NIF payloads: 5,111
+NIF references: 19,616
+Texture candidates: 9,489
+Recovered texture links: 9,434
+Unique models linked: 3,224
+Unique textures linked: 2,514
+```
+
+Sample link:
+
+```text
+model 21900d2ee4f931ca -> sky_cape_jule_skygradient.dds -> texture 607910464790649f
+```
+
 Validated recovered-name extraction smoke:
 
 ```powershell

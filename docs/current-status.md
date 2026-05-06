@@ -9,6 +9,7 @@ Date: 2026-05-06
 | Compression / LZMA2 | ✅ clarified | Full live `TWAD` archives use only compression `0` and `1`; manifest Table 0 still contains compression `2` logical PAK rows. |
 | Model format | ✅ major lead | Repeated `Gamebryo File Format` payloads were promoted to `.nif`, then parsed for block usage and NIF string-table references. |
 | Filename/path recovery | ✅ proven | NIF string tables yielded `7,063` unique candidates and `2,567` high-confidence manifest filename matches. |
+| Model dependency graph | ✅ new | NIF references now link `3,224` model assets to `2,514` texture manifest assets. |
 | Live-scale scanning | ✅ improved | Compression scan and binary probe paths now avoid loading huge `assets.###` files wholesale where possible. |
 
 ## Compression truth
@@ -89,6 +90,22 @@ NIF-reference filename recovery:
 | Matched algorithm | `fnv1` |
 | Matched extension family | `.dds` |
 
+NIF model-to-texture graph:
+
+| Step | Result |
+|---|---:|
+| NIF payloads scanned | 5,111 |
+| Texture candidates tested | 9,489 |
+| Recovered model→texture links | 9,434 |
+| Unique NIF models linked | 3,224 |
+| Unique texture manifest assets linked | 2,514 |
+
+Sample graph edge:
+
+```text
+model 21900d2ee4f931ca -> sky_cape_jule_skygradient.dds -> texture 607910464790649f
+```
+
 Validated recovered-name extraction smoke:
 
 ```text
@@ -157,6 +174,10 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- link-nif-textures --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl"
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Extracted\nif-name-recovery-smoke" --id 3c85b176865a1014 --use-recovered-names "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --max-total 1
 ```
 
@@ -164,6 +185,6 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 1. Treat NIF/Gamebryo as the primary model path.
 2. Test extracted `.nif` files against known NIF tooling/viewers.
-3. Promote the NIF-derived high-confidence matches into the normal `RecoveredNames/recovered-names.jsonl` workflow.
-4. Extend NIF mining beyond texture filenames into model/material/source reference families.
+3. Use `link-nif-textures` output to bulk-extract complete model texture sets by NIF asset ID.
+4. Promote the NIF-derived high-confidence matches into the normal `RecoveredNames/recovered-names.jsonl` workflow.
 5. Reframe LZMA2 as logical PAK reconstruction work, not TWAD entry extraction.

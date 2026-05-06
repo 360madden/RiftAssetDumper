@@ -94,6 +94,11 @@ internal static class Program
                 return MineNifReferences(options);
             }
 
+            if (options.Command == "link-nif-textures")
+            {
+                return LinkNifTextures(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -1665,6 +1670,150 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int LinkNifTextures(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var links = new List<NifTextureLinkRecord>();
+        var inspected = 0;
+        var nifCount = 0;
+        var referenceCount = 0;
+        var textureCandidateCount = 0;
+        var failed = 0;
+        var seenEdges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            if (nifCount >= options.MaxTotalOrUnlimited())
+            {
+                break;
+            }
+
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var modelManifestEntry);
+                if (!filter.EntryMatches(entry, modelManifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var reference in header.References)
+                    {
+                        referenceCount++;
+                        foreach (var candidate in BuildTextureCandidateVariants(reference.Value))
+                        {
+                            textureCandidateCount++;
+                            if (!TryMatchRecoveredNameCandidate(lookup, candidate.Candidate, out var textureEntry, out var hash, out var byteLength, out var collisionCount))
+                            {
+                                continue;
+                            }
+
+                            var edgeKey = $"{entry.IdPrefix}|{textureEntry.IdPrefix}|{candidate.Candidate}";
+                            if (!seenEdges.Add(edgeKey))
+                            {
+                                continue;
+                            }
+
+                            links.Add(new NifTextureLinkRecord(
+                                ModelArchiveName: archiveName,
+                                ModelEntryIndex: entry.Index,
+                                ModelIdPrefix: entry.IdPrefix,
+                                ModelManifestEntryIndex: modelManifestEntry?.Index,
+                                ModelFilenameFnv1Hash: modelManifestEntry?.FilenameFnv1Hash,
+                                ModelPakIndex: modelManifestEntry?.PakIndex,
+                                ModelPakOffset: modelManifestEntry?.PakOffset,
+                                NifVersion: header.VersionText,
+                                Reference: reference.Value,
+                                ReferenceStringIndex: reference.StringIndex,
+                                Candidate: candidate.Candidate,
+                                CandidateKind: candidate.Kind,
+                                Algorithm: "fnv1",
+                                Hash: hash,
+                                Length: byteLength,
+                                Confidence: 100,
+                                CollisionCount: collisionCount,
+                                TextureManifestEntryIndex: textureEntry.Index,
+                                TextureIdPrefix: textureEntry.IdPrefix,
+                                TextureFilenameFnv1Hash: textureEntry.FilenameFnv1Hash,
+                                TexturePakIndex: textureEntry.PakIndex,
+                                TexturePakOffset: textureEntry.PakOffset,
+                                TextureCompressedSize: textureEntry.CompressedSize,
+                                TextureSize: textureEntry.Size,
+                                TextureNameLength: textureEntry.NameLength));
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-texture-links.jsonl");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        var orderedLinks = links
+            .OrderBy(static l => l.ModelArchiveName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static l => l.ModelEntryIndex)
+            .ThenBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static l => l.TextureManifestEntryIndex);
+        WriteJsonLines(outPath, options.Limit > 0 ? orderedLinks.Take(options.Limit) : orderedLinks, options.RedactPaths);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NIF references: {referenceCount:N0}");
+        Console.WriteLine($"Texture candidates: {textureCandidateCount:N0}");
+        Console.WriteLine($"Recovered texture links: {links.Count:N0}");
+        Console.WriteLine($"Unique models linked: {links.Select(static l => l.ModelIdPrefix).Distinct(StringComparer.OrdinalIgnoreCase).Count():N0}");
+        Console.WriteLine($"Unique textures linked: {links.Select(static l => l.TextureIdPrefix).Distinct(StringComparer.OrdinalIgnoreCase).Count():N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
     private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
     {
         if (!string.IsNullOrWhiteSpace(options.InputPath))
@@ -2050,6 +2199,70 @@ internal static class Program
         }
 
         return normalized.TrimStart('/');
+    }
+
+    private static IEnumerable<TextureCandidate> BuildTextureCandidateVariants(string reference)
+    {
+        var normalized = NormalizeNifReferenceCandidate(reference);
+        if (!LooksLikeTextureReference(normalized))
+        {
+            yield break;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (seen.Add(normalized))
+        {
+            yield return new TextureCandidate(normalized, "normalized-reference");
+        }
+
+        var slash = normalized.LastIndexOf('/');
+        if (slash >= 0 && slash + 1 < normalized.Length)
+        {
+            var basename = normalized[(slash + 1)..];
+            if (seen.Add(basename))
+            {
+                yield return new TextureCandidate(basename, "basename");
+            }
+        }
+    }
+
+    private static bool LooksLikeTextureReference(string value)
+    {
+        return Regex.IsMatch(value, @"(?i)\.(?:dds|tga|png|jpg|jpeg)$", RegexOptions.CultureInvariant);
+    }
+
+    private static bool TryMatchRecoveredNameCandidate(
+        ManifestLookup lookup,
+        string candidate,
+        out ManifestEntryBrief entry,
+        out uint hash,
+        out int byteLength,
+        out int collisionCount)
+    {
+        hash = ComputeFnv1Hash(candidate);
+        byteLength = Encoding.UTF8.GetByteCount(candidate);
+        collisionCount = 0;
+        entry = null!;
+
+        if (!lookup.EntriesByFnv.TryGetValue(hash, out var hashMatches))
+        {
+            return false;
+        }
+
+        collisionCount = hashMatches.Count;
+        if (hashMatches.Count != 1)
+        {
+            return false;
+        }
+
+        var match = hashMatches[0];
+        if (match.NameLength is not null && match.NameLength.Value != byteLength)
+        {
+            return false;
+        }
+
+        entry = match;
+        return true;
     }
 
     private static string TruncateForConsole(string value, int maxLength)
@@ -3188,6 +3401,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -3390,6 +3604,7 @@ internal static class Program
                     case "probe-nif":
                     case "inventory-nif":
                     case "mine-nif-references":
+                    case "link-nif-textures":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -3762,6 +3977,8 @@ internal sealed record NifStringInfo(int Index, string Value);
 
 internal sealed record NifReferenceInfo(int StringIndex, string Value);
 
+internal sealed record TextureCandidate(string Candidate, string Kind);
+
 internal sealed record NifInventoryReport(
     string RootDirectory,
     string ManifestPath,
@@ -3834,6 +4051,33 @@ internal sealed record NifReferenceMineRecord(
     int StringIndex,
     string NifVersion,
     uint? NifStringCount);
+
+internal sealed record NifTextureLinkRecord(
+    string ModelArchiveName,
+    int ModelEntryIndex,
+    string ModelIdPrefix,
+    int? ModelManifestEntryIndex,
+    uint? ModelFilenameFnv1Hash,
+    ushort? ModelPakIndex,
+    uint? ModelPakOffset,
+    string NifVersion,
+    string Reference,
+    int ReferenceStringIndex,
+    string Candidate,
+    string CandidateKind,
+    string Algorithm,
+    uint Hash,
+    int Length,
+    int Confidence,
+    int CollisionCount,
+    int TextureManifestEntryIndex,
+    string TextureIdPrefix,
+    uint TextureFilenameFnv1Hash,
+    ushort TexturePakIndex,
+    uint TexturePakOffset,
+    uint TextureCompressedSize,
+    uint TextureSize,
+    ushort? TextureNameLength);
 
 internal sealed record ProbeReport(string RootDirectory)
 {
