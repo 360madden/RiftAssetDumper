@@ -222,6 +222,64 @@ Texture source spread:
 
 Why this matters: the dumper now moves from one-off model proofing to repeatable safe batch extraction of high-value model+texture bundles. The output is ready for external visual/NIF tooling validation while the live install remains read-only.
 
+## NIF block payload map proof 🔬
+
+`probe-nif` now emits a per-block payload map: block index, type, byte size, data offset, first bytes, numeric prefixes, candidate string indexes, and resolved string samples. This is the first concrete step from "NIF detected" toward evidence-based mesh/data-stream decoding.
+
+Validated rich-bundle model:
+
+| Metric | Value |
+|---|---:|
+| Model ID | `16ecac86a42d4d96` |
+| NIF blocks | `139` |
+| Block types | `16` |
+| Block data offset | `2756` |
+| Block data size total | `11242` |
+| Block data delta | `8` |
+| NiMesh blocks | `4` |
+| NiDataStream blocks | `36` |
+| NiSourceTexture blocks | `22` |
+
+Top block families:
+
+| Block type | Count |
+|---|---:|
+| `NiDataStream\u00011\u000119` | `32` |
+| `NiIntegerExtraData` | `32` |
+| `NiSourceTexture` | `22` |
+| `NiFloatsExtraData` | `16` |
+| `NiFloatExtraData` | `8` |
+| `NiMaterialProperty` | `5` |
+| `NiMesh` | `4` |
+
+Mesh block clues:
+
+| Block | Size | String clues |
+|---:|---:|---|
+| `#7` | `387` | `pCubeShape409:0`, `normalTexture`, `tint0`, `tint1` |
+| `#44` | `387` | `pCubeShape409:1`, `normalTexture`, `A_PTW_bricks_base_mossy_01_n.dds` |
+| `#79` | `387` | `pCubeShape409:2`, `normalTexture`, `glow2Texture` |
+| `#110` | `387` | `pCubeShape409:3`, `normalTexture`, `glow2Texture` |
+
+NiDataStream size families:
+
+| Size | Count |
+|---:|---:|
+| `41` | `1` |
+| `45` | `1` |
+| `61` | `3` |
+| `69` | `2` |
+| `77` | `5` |
+| `109` | `6` |
+| `125` | `1` |
+| `149` | `8` |
+| `209` | `1` |
+| `317` | `1` |
+| `389` | `3` |
+| `569` | `4` |
+
+Why this matters: the next geometry decoder can now work from exact `NiMesh` and `NiDataStream` block boundaries instead of guessing from whole-file binary signatures.
+
 ## Commands validated ✅
 
 ```powershell
@@ -244,10 +302,18 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3" --limit 3
 ```
 
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --input "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3\16ecac86a42d4d96\model\001234_m120931_fnv4ca650ce_pak1736_off1119528_16ecac86a42d4d96.nif" --out "C:\RIFT MODDING\Assets\Exports\probe-nif-blockmap-16ecac.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --out "C:\RIFT MODDING\Assets\Exports\probe-nif-blockmap-21900d.json"
+```
+
 ## Current safest next direction 🛡️
 
-1. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
-2. Expand batch extraction to `--limit 10` once visual/tool compatibility is confirmed.
-3. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
-4. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
+1. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
+2. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+3. Expand batch extraction to `--limit 10` once visual/tool compatibility is confirmed.
+4. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
 5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

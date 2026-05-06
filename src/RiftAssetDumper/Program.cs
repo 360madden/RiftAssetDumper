@@ -1405,6 +1405,15 @@ internal static class Program
         Console.WriteLine($"Block data: offset={header.BlockDataOffset} totalSize={header.TotalBlockDataSize} delta={header.BlockSizePayloadDelta}");
         Console.WriteLine($"Strings: {header.StringCount:N0}; references: {header.References.Count:N0}");
         Console.WriteLine($"Top block usage: {string.Join(", ", header.BlockTypes.OrderByDescending(static t => t.UsageCount).ThenBy(static t => t.Index).Take(8).Select(FormatBlockTypeUsage))}");
+        if (header.Blocks.Count > 0)
+        {
+            Console.WriteLine($"Block map samples: {string.Join(" | ", header.Blocks.Take(8).Select(static b => $"#{b.Index}:{b.TypeName} size={b.Size} off={b.DataOffset}"))}");
+            var stringLinkedBlocks = header.Blocks.Where(static b => b.StringSamples.Count > 0).Take(5).ToList();
+            if (stringLinkedBlocks.Count > 0)
+            {
+                Console.WriteLine($"String-linked blocks: {string.Join(" | ", stringLinkedBlocks.Select(static b => $"#{b.Index}:{b.TypeName}->{string.Join(",", b.StringSamples.Take(2).Select(static s => TruncateForConsole(s, 48)))}"))}");
+            }
+        }
         if (header.References.Count > 0)
         {
             Console.WriteLine($"Reference samples: {string.Join(" | ", header.References.Take(5).Select(static r => TruncateForConsole(r.Value, 96)))}");
@@ -2734,6 +2743,7 @@ internal static class Program
                 BlockTypes: [],
                 Strings: [],
                 References: [],
+                Blocks: [],
                 Warnings: [warning]);
         }
 
@@ -2794,6 +2804,7 @@ internal static class Program
         }
 
         var usageCounts = new int[blockTypeNames.Count];
+        var blockTypeIndices = new List<int>();
         var blockIndexTableParsed = false;
         if (blockCount > 1_000_000)
         {
@@ -2806,6 +2817,7 @@ internal static class Program
             if (offset + indexBytes <= data.Length)
             {
                 var allIndicesValid = true;
+                blockTypeIndices = new List<int>(blockCountInt);
                 for (var i = 0; i < blockCountInt; i++)
                 {
                     var typeIndex = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset + (i * 2), 2));
@@ -2816,6 +2828,7 @@ internal static class Program
                         break;
                     }
 
+                    blockTypeIndices.Add(typeIndex);
                     usageCounts[typeIndex]++;
                 }
 
@@ -2823,6 +2836,7 @@ internal static class Program
                 if (!allIndicesValid)
                 {
                     usageCounts = new int[blockTypeNames.Count];
+                    blockTypeIndices.Clear();
                 }
                 else
                 {
@@ -2838,6 +2852,7 @@ internal static class Program
         ulong? totalBlockDataSize = null;
         uint? minBlockDataSize = null;
         uint? maxBlockDataSize = null;
+        var blockSizes = new List<uint>();
         var blockSizeTableParsed = false;
         if (blockIndexTableParsed && blockCount <= 1_000_000)
         {
@@ -2848,9 +2863,11 @@ internal static class Program
                 ulong total = 0;
                 uint min = uint.MaxValue;
                 uint max = 0;
+                blockSizes = new List<uint>(blockCountInt);
                 for (var i = 0; i < blockCountInt; i++)
                 {
                     var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset + (i * 4), 4));
+                    blockSizes.Add(blockSize);
                     total += blockSize;
                     min = Math.Min(min, blockSize);
                     max = Math.Max(max, blockSize);
@@ -2949,6 +2966,7 @@ internal static class Program
         var blockTypes = blockTypeNames
             .Select(t => new NifBlockTypeInfo(t.Index, t.Name, t.DisplayName, t.Index < usageCounts.Length ? usageCounts[t.Index] : 0))
             .ToList();
+        var blockInfos = BuildNifBlockInfos(data, blockDataOffset, blockTypeIndices, blockSizes, blockTypeNames, strings);
 
         references = references
             .DistinctBy(static r => (r.StringIndex, r.Value), EqualityComparer<(int, string)>.Default)
@@ -2977,7 +2995,103 @@ internal static class Program
             BlockTypes: blockTypes,
             Strings: strings,
             References: references,
+            Blocks: blockInfos,
             Warnings: warnings);
+    }
+
+    private static List<NifBlockInfo> BuildNifBlockInfos(
+        ReadOnlySpan<byte> data,
+        int blockDataOffset,
+        List<int> blockTypeIndices,
+        List<uint> blockSizes,
+        List<(int Index, string Name, string DisplayName)> blockTypeNames,
+        List<NifStringInfo> strings)
+    {
+        var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
+        var blocks = new List<NifBlockInfo>(blockCount);
+        var offset = blockDataOffset;
+        for (var i = 0; i < blockCount; i++)
+        {
+            var size = blockSizes[i];
+            var safeSize = checked((int)Math.Min(size, (uint)Math.Max(0, data.Length - offset)));
+            var payload = safeSize > 0 ? data.Slice(offset, safeSize) : ReadOnlySpan<byte>.Empty;
+            var typeIndex = blockTypeIndices[i];
+            var typeName = typeIndex >= 0 && typeIndex < blockTypeNames.Count
+                ? blockTypeNames[typeIndex].DisplayName
+                : $"type-index-{typeIndex}";
+            var stringIndexCandidates = FindNifStringIndexCandidates(payload, strings.Count);
+            var stringSamples = stringIndexCandidates
+                .Take(8)
+                .Select(index => strings[index].Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToList();
+
+            blocks.Add(new NifBlockInfo(
+                Index: i,
+                TypeIndex: typeIndex,
+                TypeName: typeName,
+                Size: size,
+                DataOffset: offset,
+                First16: ToHex(payload[..Math.Min(16, payload.Length)]),
+                UInt32Prefix: ReadUInt32Prefix(payload, maxValues: 8),
+                Float32Prefix: ReadFloat32Prefix(payload, maxValues: 8),
+                StringIndexCandidates: stringIndexCandidates.Take(32).ToList(),
+                StringSamples: stringSamples));
+            offset += checked((int)Math.Min(size, int.MaxValue));
+            if (offset > data.Length)
+            {
+                break;
+            }
+        }
+
+        return blocks;
+    }
+
+    private static List<uint> ReadUInt32Prefix(ReadOnlySpan<byte> payload, int maxValues)
+    {
+        var count = Math.Min(maxValues, payload.Length / 4);
+        var values = new List<uint>(count);
+        for (var i = 0; i < count; i++)
+        {
+            values.Add(BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(i * 4, 4)));
+        }
+
+        return values;
+    }
+
+    private static List<float?> ReadFloat32Prefix(ReadOnlySpan<byte> payload, int maxValues)
+    {
+        var count = Math.Min(maxValues, payload.Length / 4);
+        var values = new List<float?>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var value = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(i * 4, 4)));
+            values.Add(float.IsFinite(value) ? value : null);
+        }
+
+        return values;
+    }
+
+    private static List<int> FindNifStringIndexCandidates(ReadOnlySpan<byte> payload, int stringCount)
+    {
+        var candidates = new List<int>();
+        if (stringCount <= 0)
+        {
+            return candidates;
+        }
+
+        var seen = new HashSet<int>();
+        for (var offset = 0; offset + 4 <= payload.Length; offset += 4)
+        {
+            var value = BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset, 4));
+            if (value >= 0 && value < stringCount && seen.Add(value))
+            {
+                candidates.Add(value);
+            }
+        }
+
+        return candidates;
     }
 
     private static string FormatNifVersion(uint version)
@@ -5066,9 +5180,22 @@ internal sealed record NifHeaderInfo(
     List<NifBlockTypeInfo> BlockTypes,
     List<NifStringInfo> Strings,
     List<NifReferenceInfo> References,
+    List<NifBlockInfo> Blocks,
     List<string> Warnings);
 
 internal sealed record NifBlockTypeInfo(int Index, string Name, string DisplayName, int UsageCount);
+
+internal sealed record NifBlockInfo(
+    int Index,
+    int TypeIndex,
+    string TypeName,
+    uint Size,
+    int DataOffset,
+    string First16,
+    List<uint> UInt32Prefix,
+    List<float?> Float32Prefix,
+    List<int> StringIndexCandidates,
+    List<string> StringSamples);
 
 internal sealed record NifStringInfo(int Index, string Value);
 

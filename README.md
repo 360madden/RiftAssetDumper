@@ -421,10 +421,39 @@ The NIF probe currently parses:
 - block count and block type table
 - per-block type usage counts
 - block-size table summary and payload delta evidence
+- per-block payload map with block index, type, data offset, size, first bytes, numeric prefixes, and string-index clues
 - NIF string table
 - path-like/source-art/texture references mined from the string table
 
 Important discovery: NIF string tables contain original source-art references and texture names. Example references from the validated sample include source `.ma` paths under `art/project/...` plus referenced `.dds` texture names. This is now one of the strongest leads for original name/path recovery.
+
+Validated richer block-map probe from a batch-extracted architectural bundle:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --input "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3\16ecac86a42d4d96\model\001234_m120931_fnv4ca650ce_pak1736_off1119528_16ecac86a42d4d96.nif" --out "C:\RIFT MODDING\Assets\Exports\probe-nif-blockmap-16ecac.json"
+```
+
+Current block-map evidence:
+
+```text
+Blocks: 139
+Block data: offset=2756 totalSize=11242 delta=8
+NiMesh blocks: 4
+NiDataStream blocks: 36
+NiSourceTexture blocks: 22
+NiDataStream size histogram: 41=1, 45=1, 61=3, 69=2, 77=5, 109=6, 125=1, 149=8, 209=1, 317=1, 389=3, 569=4
+```
+
+Example mesh block string clues:
+
+```text
+#7 NiMesh size=387 -> pCubeShape409:0, normalTexture, tint0, tint1
+#44 NiMesh size=387 -> pCubeShape409:1, normalTexture, A_PTW_bricks_base_mossy_01_n.dds
+#79 NiMesh size=387 -> pCubeShape409:2, normalTexture, glow2Texture
+#110 NiMesh size=387 -> pCubeShape409:3, normalTexture, glow2Texture
+```
+
+This is the first evidence-backed bridge from "NIF detected" to concrete model internals: exact block payload offsets, block sizes, mesh block identities, texture-linked strings, and repeated data-stream block families are now visible in JSON.
 
 Inventory all copied NIF payloads without writing extracted model files:
 
