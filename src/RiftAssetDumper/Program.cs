@@ -109,6 +109,11 @@ internal static class Program
                 return ExtractNifBundle(options);
             }
 
+            if (options.Command == "extract-nif-bundles")
+            {
+                return ExtractNifBundles(options);
+            }
+
             if (options.Command == "inventory-nif-bundles")
             {
                 return InventoryNifBundles(options);
@@ -1992,12 +1997,6 @@ internal static class Program
         var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
         var lookup = ReadManifestLookup(manifestPath);
         var modelId = options.IdFilter.Trim().ToLowerInvariant();
-        if (!lookup.Table1ById.TryGetValue(modelId, out var modelManifestEntry))
-        {
-            Console.Error.WriteLine($"ERROR: model ID was not found in manifest Table 1: {modelId}");
-            return 1;
-        }
-
         var links = ReadJsonLines<NifTextureLinkRecord>(linksPath)
             .Where(l => string.Equals(l.ModelIdPrefix, modelId, StringComparison.OrdinalIgnoreCase))
             .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
@@ -2006,18 +2005,207 @@ internal static class Program
             .ToList();
         var payloadLookup = BuildPayloadLookup(rootDirectory, options, links.Select(static l => l.TextureIdPrefix).Append(modelId));
 
+        NifBundleExtractReport report;
+        try
+        {
+            report = WriteNifBundle(rootDirectory, linksPath, outDirectory, modelId, links, lookup, payloadLookup, options);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"ERROR: {ex.Message}");
+            return 1;
+        }
+
+        Console.WriteLine($"Model: {modelId}");
+        Console.WriteLine($"NIF version: {report.Model.NifVersion}");
+        Console.WriteLine($"Indexed payload IDs: {report.IndexedPayloads:N0}");
+        Console.WriteLine($"Copied archives scanned: {report.CopiedArchivesScanned:N0}");
+        Console.WriteLine($"Live fallback archives scanned: {report.LiveFallbackArchivesScanned:N0}");
+        Console.WriteLine($"Texture links: {report.UniqueTextureLinks:N0}");
+        Console.WriteLine($"Textures written: {report.TextureWritten:N0}");
+        Console.WriteLine($"Textures written from copied archives: {report.TextureWrittenFromCopiedArchives:N0}");
+        Console.WriteLine($"Textures written from live fallback: {report.TextureWrittenFromLiveArchives:N0}");
+        Console.WriteLine($"Textures missing from copied archives: {report.TextureMissingFromCopiedArchives:N0}");
+        Console.WriteLine($"Textures missing from selected sources: {report.TextureMissingFromSelectedSources:N0}");
+        Console.WriteLine($"Texture type mismatches: {report.TextureTypeMismatches:N0}");
+        Console.WriteLine($"Texture failures: {report.TextureFailed:N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
+        Console.WriteLine($"Report: {DisplayPath(options, Path.Combine(outDirectory, "nif-bundle-report.json"))}");
+        return report.TextureFailed == 0 ? 0 : 2;
+    }
+
+    private static int ExtractNifBundles(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var outDirectory = Path.GetFullPath(options.OutDirectory ?? Path.Combine(rootDirectory, "..", "Extracted", "nif-bundles-batch"));
+        var linksPath = string.IsNullOrWhiteSpace(options.InputPath)
+            ? Path.GetFullPath(Path.Combine(rootDirectory, "..", "Exports", "nif-texture-links.jsonl"))
+            : Path.GetFullPath(options.InputPath);
+        if (!File.Exists(linksPath))
+        {
+            Console.Error.WriteLine($"ERROR: link JSONL does not exist: {DisplayPath(options, linksPath)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var requestedLimit = options.Limit > 0 ? options.Limit : 10;
+        var allLinks = ReadJsonLines<NifTextureLinkRecord>(linksPath).ToList();
+        var selected = allLinks
+            .Where(l => string.IsNullOrWhiteSpace(options.IdFilter) || string.Equals(l.ModelIdPrefix, options.IdFilter, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(static l => l.ModelIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Select(static g =>
+            {
+                var uniqueLinks = g
+                    .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
+                    .Select(static textureGroup => textureGroup.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).First())
+                    .OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return new NifBundleBatchSelection(g.Key, uniqueLinks, uniqueLinks.Count, g.Count());
+            })
+            .OrderByDescending(static s => s.UniqueTextureCount)
+            .ThenByDescending(static s => s.LinkCount)
+            .ThenBy(static s => s.ModelIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Take(requestedLimit)
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            Console.Error.WriteLine("ERROR: no NIF bundle candidates matched the selected filters.");
+            return 1;
+        }
+
+        var targetIds = selected
+            .Select(static s => s.ModelIdPrefix)
+            .Concat(selected.SelectMany(static s => s.Links.Select(static l => l.TextureIdPrefix)));
+        var payloadLookup = BuildPayloadLookup(rootDirectory, options, targetIds);
+        Directory.CreateDirectory(outDirectory);
+
+        var samples = new List<NifBundleBatchExtractSample>();
+        var modelAttempted = 0;
+        var modelWritten = 0;
+        var completeBundles = 0;
+        var failedBundles = 0;
+
+        foreach (var selection in selected)
+        {
+            modelAttempted++;
+            var bundleOutDirectory = Path.Combine(outDirectory, selection.ModelIdPrefix);
+            try
+            {
+                var bundleReport = WriteNifBundle(rootDirectory, linksPath, bundleOutDirectory, selection.ModelIdPrefix, selection.Links, lookup, payloadLookup, options);
+                modelWritten++;
+                var isComplete = bundleReport.TextureMissingFromSelectedSources == 0 &&
+                    bundleReport.TextureTypeMismatches == 0 &&
+                    bundleReport.TextureFailed == 0;
+                if (isComplete)
+                {
+                    completeBundles++;
+                }
+
+                samples.Add(new NifBundleBatchExtractSample(
+                    ModelIdPrefix: selection.ModelIdPrefix,
+                    RelativeOutputDirectory: Path.GetRelativePath(outDirectory, bundleOutDirectory),
+                    ModelArchiveName: bundleReport.Model.ArchiveName,
+                    ModelSourceKind: bundleReport.Model.SourceKind,
+                    UniqueTextureLinks: bundleReport.UniqueTextureLinks,
+                    TexturesWritten: bundleReport.TextureWritten,
+                    TexturesWrittenFromCopiedArchives: bundleReport.TextureWrittenFromCopiedArchives,
+                    TexturesWrittenFromLiveArchives: bundleReport.TextureWrittenFromLiveArchives,
+                    TexturesMissingFromCopiedArchives: bundleReport.TextureMissingFromCopiedArchives,
+                    TexturesMissingFromSelectedSources: bundleReport.TextureMissingFromSelectedSources,
+                    TextureTypeMismatches: bundleReport.TextureTypeMismatches,
+                    TextureFailures: bundleReport.TextureFailed,
+                    IsComplete: isComplete,
+                    Error: null));
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or InvalidDataException)
+            {
+                failedBundles++;
+                samples.Add(new NifBundleBatchExtractSample(
+                    ModelIdPrefix: selection.ModelIdPrefix,
+                    RelativeOutputDirectory: Path.GetRelativePath(outDirectory, bundleOutDirectory),
+                    ModelArchiveName: null,
+                    ModelSourceKind: null,
+                    UniqueTextureLinks: selection.UniqueTextureCount,
+                    TexturesWritten: 0,
+                    TexturesWrittenFromCopiedArchives: 0,
+                    TexturesWrittenFromLiveArchives: 0,
+                    TexturesMissingFromCopiedArchives: 0,
+                    TexturesMissingFromSelectedSources: selection.UniqueTextureCount,
+                    TextureTypeMismatches: 0,
+                    TextureFailures: 1,
+                    IsComplete: false,
+                    Error: ex.Message));
+            }
+        }
+
+        var report = new NifBundleBatchExtractReport(
+            RootDirectory: rootDirectory,
+            LinksPath: linksPath,
+            OutputDirectory: outDirectory,
+            RequestedModelLimit: requestedLimit,
+            SelectedModels: selected.Count,
+            IndexedPayloads: payloadLookup.IndexedPayloads,
+            CopiedArchivesScanned: payloadLookup.CopiedArchivesScanned,
+            LiveFallbackArchivesScanned: payloadLookup.LiveArchivesScanned,
+            ModelsAttempted: modelAttempted,
+            ModelsWritten: modelWritten,
+            CompleteBundles: completeBundles,
+            FailedBundles: failedBundles,
+            TotalTextureLinks: samples.Sum(static s => s.UniqueTextureLinks),
+            TotalTexturesWritten: samples.Sum(static s => s.TexturesWritten),
+            TotalTexturesWrittenFromCopiedArchives: samples.Sum(static s => s.TexturesWrittenFromCopiedArchives),
+            TotalTexturesWrittenFromLiveArchives: samples.Sum(static s => s.TexturesWrittenFromLiveArchives),
+            TotalTexturesMissingFromSelectedSources: samples.Sum(static s => s.TexturesMissingFromSelectedSources),
+            Samples: samples);
+
+        var reportPath = Path.Combine(outDirectory, "nif-bundles-report.json");
+        File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Selected models: {selected.Count:N0}");
+        Console.WriteLine($"Indexed payload IDs: {payloadLookup.IndexedPayloads:N0}");
+        Console.WriteLine($"Copied archives scanned: {payloadLookup.CopiedArchivesScanned:N0}");
+        Console.WriteLine($"Live fallback archives scanned: {payloadLookup.LiveArchivesScanned:N0}");
+        Console.WriteLine($"Models attempted: {modelAttempted:N0}");
+        Console.WriteLine($"Models written: {modelWritten:N0}");
+        Console.WriteLine($"Complete bundles: {completeBundles:N0}");
+        Console.WriteLine($"Failed bundles: {failedBundles:N0}");
+        Console.WriteLine($"Texture links: {report.TotalTextureLinks:N0}");
+        Console.WriteLine($"Textures written: {report.TotalTexturesWritten:N0}");
+        Console.WriteLine($"Textures written from copied archives: {report.TotalTexturesWrittenFromCopiedArchives:N0}");
+        Console.WriteLine($"Textures written from live fallback: {report.TotalTexturesWrittenFromLiveArchives:N0}");
+        Console.WriteLine($"Textures missing from selected sources: {report.TotalTexturesMissingFromSelectedSources:N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
+        Console.WriteLine($"Report: {DisplayPath(options, reportPath)}");
+        return failedBundles == 0 ? 0 : 2;
+    }
+
+    private static NifBundleExtractReport WriteNifBundle(
+        string rootDirectory,
+        string linksPath,
+        string outDirectory,
+        string modelId,
+        List<NifTextureLinkRecord> links,
+        ManifestLookup lookup,
+        ArchivePayloadLookup payloadLookup,
+        AppOptions options)
+    {
+        if (!lookup.Table1ById.TryGetValue(modelId, out var modelManifestEntry))
+        {
+            throw new InvalidOperationException($"model ID was not found in manifest Table 1: {modelId}");
+        }
+
         var foundModel = payloadLookup.Find(modelId, options.Lzma2Mode);
         if (foundModel is null)
         {
-            Console.Error.WriteLine($"ERROR: model payload was not found in selected archive sources: {modelId}");
-            return 1;
+            throw new InvalidOperationException($"model payload was not found in selected archive sources: {modelId}");
         }
 
         var modelDetected = DetectFileType(foundModel.Payload);
         if (modelDetected.Extension != "nif")
         {
-            Console.Error.WriteLine($"ERROR: model payload is detected as '{modelDetected.Extension}', not 'nif'.");
-            return 1;
+            throw new InvalidOperationException($"model payload is detected as '{modelDetected.Extension}', not 'nif'.");
         }
 
         Directory.CreateDirectory(outDirectory);
@@ -2133,23 +2321,7 @@ internal static class Program
             Textures: samples);
         var reportPath = Path.Combine(outDirectory, "nif-bundle-report.json");
         File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
-
-        Console.WriteLine($"Model: {modelId}");
-        Console.WriteLine($"NIF version: {modelHeader.VersionText}");
-        Console.WriteLine($"Indexed payload IDs: {payloadLookup.IndexedPayloads:N0}");
-        Console.WriteLine($"Copied archives scanned: {payloadLookup.CopiedArchivesScanned:N0}");
-        Console.WriteLine($"Live fallback archives scanned: {payloadLookup.LiveArchivesScanned:N0}");
-        Console.WriteLine($"Texture links: {links.Count:N0}");
-        Console.WriteLine($"Textures written: {written:N0}");
-        Console.WriteLine($"Textures written from copied archives: {writtenFromCopied:N0}");
-        Console.WriteLine($"Textures written from live fallback: {writtenFromLive:N0}");
-        Console.WriteLine($"Textures missing from copied archives: {missingFromCopied:N0}");
-        Console.WriteLine($"Textures missing from selected sources: {missingFromSelectedSources:N0}");
-        Console.WriteLine($"Texture type mismatches: {typeMismatch:N0}");
-        Console.WriteLine($"Texture failures: {failed:N0}");
-        Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
-        Console.WriteLine($"Report: {DisplayPath(options, reportPath)}");
-        return failed == 0 ? 0 : 2;
+        return report;
     }
 
     private static int InventoryNifBundles(AppOptions options)
@@ -4268,6 +4440,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-nif-bundle --root <SourceFolder> --input <links.jsonl> --id <16hex>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-nif-bundles --root <SourceFolder> --live-root <RiftLiveFolder> --input <links.jsonl> --limit 10");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-bundles --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- plan-nif-bundle-archives --root <SourceFolder> --live-root <RiftLiveFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
@@ -4475,6 +4648,7 @@ internal static class Program
                     case "link-nif-textures":
                     case "extract-linked-textures":
                     case "extract-nif-bundle":
+                    case "extract-nif-bundles":
                     case "inventory-nif-bundles":
                     case "plan-nif-bundle-archives":
                         command = arg;
@@ -5066,6 +5240,48 @@ internal sealed record NifBundleModelSample(
     uint? StringCount,
     string SourceKind,
     string RelativePath);
+
+internal sealed record NifBundleBatchSelection(
+    string ModelIdPrefix,
+    List<NifTextureLinkRecord> Links,
+    int UniqueTextureCount,
+    int LinkCount);
+
+internal sealed record NifBundleBatchExtractReport(
+    string RootDirectory,
+    string LinksPath,
+    string OutputDirectory,
+    int RequestedModelLimit,
+    int SelectedModels,
+    int IndexedPayloads,
+    int CopiedArchivesScanned,
+    int LiveFallbackArchivesScanned,
+    int ModelsAttempted,
+    int ModelsWritten,
+    int CompleteBundles,
+    int FailedBundles,
+    int TotalTextureLinks,
+    int TotalTexturesWritten,
+    int TotalTexturesWrittenFromCopiedArchives,
+    int TotalTexturesWrittenFromLiveArchives,
+    int TotalTexturesMissingFromSelectedSources,
+    List<NifBundleBatchExtractSample> Samples);
+
+internal sealed record NifBundleBatchExtractSample(
+    string ModelIdPrefix,
+    string RelativeOutputDirectory,
+    string? ModelArchiveName,
+    string? ModelSourceKind,
+    int UniqueTextureLinks,
+    int TexturesWritten,
+    int TexturesWrittenFromCopiedArchives,
+    int TexturesWrittenFromLiveArchives,
+    int TexturesMissingFromCopiedArchives,
+    int TexturesMissingFromSelectedSources,
+    int TextureTypeMismatches,
+    int TextureFailures,
+    bool IsComplete,
+    string? Error);
 
 internal sealed record NifBundleInventoryReport(
     string RootDirectory,

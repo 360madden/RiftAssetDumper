@@ -608,6 +608,35 @@ Textures missing from selected sources: 0
 Texture source archives: assets.152=9, assets.187=6, assets.129=4, assets.196=2, assets.171=1
 ```
 
+Batch extraction can now pull the richest linked NIF bundles in one run:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3" --limit 3
+```
+
+Validated top-3 rich bundle batch:
+
+```text
+Selected models: 3
+Indexed payload IDs: 41
+Copied archives scanned: 27
+Live fallback archives scanned: 244
+Complete bundles: 3
+Texture links: 54
+Textures written: 54
+Textures written from live fallback: 54
+Textures missing from selected sources: 0
+Output files: 3 .nif, 54 .dds, 4 .json reports
+```
+
+Selected model IDs:
+
+```text
+16ecac86a42d4d96 -> 22 textures
+121c431473f2cc7e -> 16 textures
+1342fd262740063b -> 16 textures
+```
+
 Validated recovered-name extraction smoke:
 
 ```powershell

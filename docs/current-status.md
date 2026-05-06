@@ -173,6 +173,55 @@ Texture source archives:
 
 Why this matters: the graph is now usable for richer model bundles, not just one-texture smoke tests. A copied model from `assets.053` was paired with 22 recovered live textures spread across five live archive chunks.
 
+## Batch rich-bundle extraction proof 📦
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3" --limit 3
+```
+
+Validated top-3 rich linked models:
+
+| Metric | Value |
+|---|---:|
+| Selected models | `3` |
+| Indexed payload IDs | `41` |
+| Copied archives scanned once | `27` |
+| Live fallback archives scanned once | `244` |
+| Complete bundles | `3` |
+| Texture links | `54` |
+| Textures written | `54` |
+| Textures from live fallback | `54` |
+| Missing from selected sources | `0` |
+| Output model files | `3` |
+| Output DDS textures | `54` |
+
+Selected models:
+
+| Model ID | Linked textures | Result |
+|---|---:|---|
+| `16ecac86a42d4d96` | `22` | complete |
+| `121c431473f2cc7e` | `16` | complete |
+| `1342fd262740063b` | `16` | complete |
+
+Texture source spread:
+
+| Archive | Texture count |
+|---|---:|
+| `assets.201` | `12` |
+| `assets.152` | `9` |
+| `assets.130` | `8` |
+| `assets.187` | `6` |
+| `assets.194` | `6` |
+| `assets.129` | `4` |
+| `assets.153` | `4` |
+| `assets.002` | `2` |
+| `assets.196` | `2` |
+| `assets.171` | `1` |
+
+Why this matters: the dumper now moves from one-off model proofing to repeatable safe batch extraction of high-value model+texture bundles. The output is ready for external visual/NIF tooling validation while the live install remains read-only.
+
 ## Commands validated ✅
 
 ```powershell
@@ -191,10 +240,14 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 16ecac86a42d4d96 --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-16ecac-live-fallback"
 ```
 
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3" --limit 3
+```
+
 ## Current safest next direction 🛡️
 
-1. Use live-read fallback for targeted bundle proofing before copying large archive chunks.
-2. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
-3. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
-4. Extract a few newly complete bundles and validate them in external NIF/Gamebryo tooling.
+1. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+2. Expand batch extraction to `--limit 10` once visual/tool compatibility is confirmed.
+3. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
+4. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
 5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
