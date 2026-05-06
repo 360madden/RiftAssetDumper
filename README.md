@@ -445,6 +445,49 @@ Minor version family also seen: 20.3.0.9
 
 The largest repeated NIF layout groups are small Gamebryo meshes with consistent `NiNode`, `NiStringExtraData`, material/property, `NiMesh`, and `NiDataStream` families. `inventory-nif` stores sample asset IDs, manifest rows, PAK indexes, block usage, string counts, and reference samples for each group.
 
+Export NIF references as normalized candidate names for `match-names`:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- mine-nif-references --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt"
+```
+
+Current copied-data result:
+
+```text
+Reference records: 19,616
+Unique candidates: 7,063
+```
+
+Run those candidates through the manifest filename hash matcher:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- match-names --root "C:\RIFT MODDING\Assets\Source" --names-file "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --algorithm both --only-length-match --require-unique
+```
+
+Current copied-data match result:
+
+```text
+Candidates: 7,063
+Matches: 2,567
+Algorithm: FNV1
+Confidence: 100 for all matched rows
+Matched extension family: .dds
+```
+
+Validated recovered-name extraction smoke:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Extracted\nif-name-recovery-smoke" --id 3c85b176865a1014 --use-recovered-names "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --max-total 1
+```
+
+Result:
+
+```text
+recovered\d_id_lava_boat_02_g.dds
+```
+
+This proves the NIF-reference pipeline can recover real manifest filename hashes and write recovered filenames without breaking the existing manifest-aware fallback naming.
+
 ## Group extracted output by detected type
 
 Use `--group-by-type` with extraction to organize dumps under `<out>\<type>\<archive>\...` instead of only `<out>\<archive>\...`.

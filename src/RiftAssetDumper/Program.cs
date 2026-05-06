@@ -89,6 +89,11 @@ internal static class Program
                 return InventoryNif(options);
             }
 
+            if (options.Command == "mine-nif-references")
+            {
+                return MineNifReferences(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -1536,6 +1541,130 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int MineNifReferences(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var records = new List<NifReferenceMineRecord>();
+        var uniqueCandidates = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            if (nifCount >= options.MaxTotalOrUnlimited())
+            {
+                break;
+            }
+
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var reference in header.References)
+                    {
+                        var candidate = NormalizeNifReferenceCandidate(reference.Value);
+                        if (candidate.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        uniqueCandidates.Add(candidate);
+                        records.Add(new NifReferenceMineRecord(
+                            Reference: reference.Value,
+                            Candidate: candidate,
+                            ArchiveName: archiveName,
+                            EntryIndex: entry.Index,
+                            IdPrefix: entry.IdPrefix,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            FilenameFnv1Hash: manifestEntry?.FilenameFnv1Hash,
+                            PakIndex: manifestEntry?.PakIndex,
+                            PakOffset: manifestEntry?.PakOffset,
+                            StringIndex: reference.StringIndex,
+                            NifVersion: header.VersionText,
+                            NifStringCount: header.StringCount));
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-references.jsonl");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        if (string.Equals(Path.GetExtension(outPath), ".txt", StringComparison.OrdinalIgnoreCase))
+        {
+            File.WriteAllLines(outPath, uniqueCandidates, Encoding.UTF8);
+        }
+        else
+        {
+            var orderedRecords = records
+                .OrderBy(static r => r.Candidate, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static r => r.ArchiveName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static r => r.EntryIndex)
+                .ThenBy(static r => r.StringIndex);
+            WriteJsonLines(outPath, options.Limit > 0 ? orderedRecords.Take(options.Limit) : orderedRecords, options.RedactPaths);
+        }
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"Reference records: {records.Count:N0}");
+        Console.WriteLine($"Unique candidates: {uniqueCandidates.Count:N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
     private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
     {
         if (!string.IsNullOrWhiteSpace(options.InputPath))
@@ -1906,6 +2035,21 @@ internal static class Program
         return value.Trim()
             .Trim('"', '\'')
             .TrimEnd('.', ',', ';', ')', ']', '}');
+    }
+
+    private static string NormalizeNifReferenceCandidate(string value)
+    {
+        var normalized = NormalizeAssetName(value);
+        foreach (var sourceRoot in new[] { "z:/twn/", "c:/perforce/twn/" })
+        {
+            if (normalized.StartsWith(sourceRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized[sourceRoot.Length..];
+                break;
+            }
+        }
+
+        return normalized.TrimStart('/');
     }
 
     private static string TruncateForConsole(string value, int maxLength)
@@ -3043,6 +3187,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-binary --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -3244,6 +3389,7 @@ internal static class Program
                     case "probe-binary":
                     case "probe-nif":
                     case "inventory-nif":
+                    case "mine-nif-references":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -3674,6 +3820,20 @@ internal sealed record NifReferenceSample(
     string IdPrefix,
     int StringIndex,
     string Value);
+
+internal sealed record NifReferenceMineRecord(
+    string Reference,
+    string Candidate,
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    uint? FilenameFnv1Hash,
+    ushort? PakIndex,
+    uint? PakOffset,
+    int StringIndex,
+    string NifVersion,
+    uint? NifStringCount);
 
 internal sealed record ProbeReport(string RootDirectory)
 {

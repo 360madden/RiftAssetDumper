@@ -8,7 +8,7 @@ Date: 2026-05-06
 |---|---:|---|
 | Compression / LZMA2 | ✅ clarified | Full live `TWAD` archives use only compression `0` and `1`; manifest Table 0 still contains compression `2` logical PAK rows. |
 | Model format | ✅ major lead | Repeated `Gamebryo File Format` payloads were promoted to `.nif`, then parsed for block usage and NIF string-table references. |
-| Filename/path recovery | ✅ new strongest lead | NIF string tables expose source-art paths and referenced texture names; copied sample yielded `19,616` mined references. |
+| Filename/path recovery | ✅ proven | NIF string tables yielded `7,063` unique candidates and `2,567` high-confidence manifest filename matches. |
 | Live-scale scanning | ✅ improved | Compression scan and binary probe paths now avoid loading huge `assets.###` files wholesale where possible. |
 
 ## Compression truth
@@ -79,6 +79,24 @@ Full copied-set NIF inventory:
 | Dominant NIF version | `20.6.0.0` |
 | Additional observed version family | `20.3.0.9` |
 
+NIF-reference filename recovery:
+
+| Step | Result |
+|---|---:|
+| NIF reference records exported | 19,616 |
+| Unique normalized candidates | 7,063 |
+| Manifest hash matches with `--only-length-match --require-unique` | 2,567 |
+| Matched algorithm | `fnv1` |
+| Matched extension family | `.dds` |
+
+Validated recovered-name extraction smoke:
+
+```text
+id=3c85b176865a1014 -> recovered\d_id_lava_boat_02_g.dds
+```
+
+This is the first local proof that embedded model references can recover real manifest filename hashes and drive safe recovered-name extraction.
+
 After promoting Gamebryo files to `.nif`, the unknown-binary inventory still shows a repeated geometry-like family:
 
 ```text
@@ -130,10 +148,22 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\inventory-nif-copied-full.json"
 ```
 
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- mine-nif-references --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- match-names --root "C:\RIFT MODDING\Assets\Source" --names-file "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --algorithm both --only-length-match --require-unique
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Extracted\nif-name-recovery-smoke" --id 3c85b176865a1014 --use-recovered-names "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --max-total 1
+```
+
 ## Next best technical direction
 
 1. Treat NIF/Gamebryo as the primary model path.
 2. Test extracted `.nif` files against known NIF tooling/viewers.
-3. Feed mined NIF references into `match-names` as a real candidate set.
-4. Inventory NIF reference folder families by archive/PAK index.
+3. Promote the NIF-derived high-confidence matches into the normal `RecoveredNames/recovered-names.jsonl` workflow.
+4. Extend NIF mining beyond texture filenames into model/material/source reference families.
 5. Reframe LZMA2 as logical PAK reconstruction work, not TWAD entry extraction.
