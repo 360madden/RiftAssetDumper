@@ -952,50 +952,7 @@ internal static class Program
                 }
 
                 archiveCount++;
-                var bytes = File.ReadAllBytes(archivePath);
-                if (bytes.Length < ArchiveHeaderSize || Encoding.ASCII.GetString(bytes, 0, 4) != "TWAD")
-                {
-                    continue;
-                }
-
-                var tableOffset = checked((int)ReadUInt32(bytes, 8));
-                var maxEntries = checked((int)Math.Min(ReadUInt32(bytes, 12), int.MaxValue));
-                for (var i = 0; i < maxEntries; i++)
-                {
-                    var entryOffset = tableOffset + i * ArchiveEntrySize;
-                    if (entryOffset + ArchiveEntrySize > bytes.Length)
-                    {
-                        break;
-                    }
-
-                    var entry = ReadArchiveEntry(bytes, entryOffset, i);
-                    if (entry.IsNull)
-                    {
-                        continue;
-                    }
-
-                    nonNullEntries++;
-                    var key = entry.Compression.ToString();
-                    IncrementCount(archiveCounts, key);
-                    if (!archiveSamples.ContainsKey(key))
-                    {
-                        var firstBytes = "";
-                        if (entry.Offset < bytes.Length && entry.Size > 0)
-                        {
-                            var available = bytes.Length - checked((int)entry.Offset);
-                            var length = checked((int)Math.Min(Math.Min(entry.Size, 16), (uint)available));
-                            firstBytes = ToHex(bytes.AsSpan(checked((int)entry.Offset), length));
-                        }
-
-                        archiveSamples.Add(key, new CompressionArchiveSample(
-                            archiveName,
-                            i,
-                            entry.Compression,
-                            entry.Offset,
-                            entry.Size,
-                            firstBytes));
-                    }
-                }
+                ScanArchiveCompression(archivePath, archiveCounts, archiveSamples, ref nonNullEntries);
             }
         }
 
@@ -1022,6 +979,115 @@ internal static class Program
         Console.WriteLine($"Copied TWAD non-null entries: {nonNullEntries:N0}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
+    }
+
+    private static List<ArchiveEntrySample>? ReadArchiveEntryTable(FileStream stream)
+    {
+        if (stream.Length < ArchiveHeaderSize)
+        {
+            return null;
+        }
+
+        stream.Position = 0;
+        Span<byte> header = stackalloc byte[ArchiveHeaderSize];
+        stream.ReadExactly(header);
+        if (Encoding.ASCII.GetString(header[..4]) != "TWAD")
+        {
+            return null;
+        }
+
+        var tableOffset = BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(8, 4));
+        var maxEntries = checked((int)Math.Min(BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(12, 4)), int.MaxValue));
+        if (tableOffset >= stream.Length || maxEntries <= 0)
+        {
+            return [];
+        }
+
+        var readableTableBytes = Math.Min((long)maxEntries * ArchiveEntrySize, stream.Length - tableOffset);
+        var readableEntries = checked((int)(readableTableBytes / ArchiveEntrySize));
+        if (readableEntries <= 0)
+        {
+            return [];
+        }
+
+        var tableBytes = new byte[readableEntries * ArchiveEntrySize];
+        stream.Position = tableOffset;
+        stream.ReadExactly(tableBytes);
+        var entries = new List<ArchiveEntrySample>(readableEntries);
+        for (var i = 0; i < readableEntries; i++)
+        {
+            entries.Add(ReadArchiveEntry(tableBytes, i * ArchiveEntrySize, i));
+        }
+
+        return entries;
+    }
+
+    private static byte[] ReadArchivePayload(FileStream stream, ArchiveEntrySample entry, string archiveName)
+    {
+        if ((long)entry.Offset + entry.Size > stream.Length)
+        {
+            throw new InvalidDataException($"Entry {entry.Index} in {archiveName} extends past EOF.");
+        }
+
+        var packed = new byte[checked((int)entry.Size)];
+        stream.Position = entry.Offset;
+        stream.ReadExactly(packed);
+        return packed;
+    }
+
+    private static void ScanArchiveCompression(
+        string archivePath,
+        Dictionary<string, int> archiveCounts,
+        Dictionary<string, CompressionArchiveSample> archiveSamples,
+        ref int nonNullEntries)
+    {
+        var archiveName = Path.GetFileName(archivePath);
+        using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+        if (stream.Length < ArchiveHeaderSize)
+        {
+            return;
+        }
+
+        var entries = ReadArchiveEntryTable(stream);
+        if (entries is null)
+        {
+            return;
+        }
+
+        foreach (var entry in entries)
+        {
+            if (entry.IsNull)
+            {
+                continue;
+            }
+
+            nonNullEntries++;
+            var key = entry.Compression.ToString();
+            IncrementCount(archiveCounts, key);
+            if (archiveSamples.ContainsKey(key))
+            {
+                continue;
+            }
+
+            var firstBytes = "";
+            if (entry.Size > 0 && entry.Offset < stream.Length)
+            {
+                var available = stream.Length - entry.Offset;
+                var length = checked((int)Math.Min(Math.Min(entry.Size, 16), available));
+                var sample = new byte[length];
+                stream.Position = entry.Offset;
+                stream.ReadExactly(sample);
+                firstBytes = ToHex(sample);
+            }
+
+            archiveSamples.Add(key, new CompressionArchiveSample(
+                archiveName,
+                entry.Index,
+                entry.Compression,
+                entry.Offset,
+                entry.Size,
+                firstBytes));
+        }
     }
 
     private static int MineStrings(AppOptions options)
@@ -1103,23 +1169,20 @@ internal static class Program
                 continue;
             }
 
-            var bytes = File.ReadAllBytes(archivePath);
-            if (bytes.Length < ArchiveHeaderSize || Encoding.ASCII.GetString(bytes, 0, 4) != "TWAD")
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
             {
                 continue;
             }
 
-            var tableOffset = checked((int)ReadUInt32(bytes, 8));
-            var maxEntries = checked((int)Math.Min(ReadUInt32(bytes, 12), int.MaxValue));
-            for (var i = 0; i < maxEntries && inspected < options.MaxTotalOrUnlimited(); i++)
+            foreach (var entry in entries)
             {
-                var entryOffset = tableOffset + i * ArchiveEntrySize;
-                if (entryOffset + ArchiveEntrySize > bytes.Length)
+                if (inspected >= options.MaxTotalOrUnlimited())
                 {
                     break;
                 }
 
-                var entry = ReadArchiveEntry(bytes, entryOffset, i);
                 if (entry.IsNull)
                 {
                     continue;
@@ -1133,12 +1196,7 @@ internal static class Program
 
                 try
                 {
-                    if (entry.Offset + entry.Size > bytes.Length)
-                    {
-                        throw new InvalidDataException("entry extends past EOF");
-                    }
-
-                    var packed = bytes.AsSpan(checked((int)entry.Offset), checked((int)entry.Size)).ToArray();
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
                     var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
                     var detected = DetectFileType(payload.Bytes);
                     if (detected.Extension != "bin" || !filter.TypeMatches("bin"))
@@ -1175,7 +1233,7 @@ internal static class Program
                     {
                         group.Samples.Add(new BinarySignatureSample(
                             archiveName,
-                            i,
+                            entry.Index,
                             entry.IdPrefix,
                             payload.Bytes.Length,
                             manifestEntry?.Index,
@@ -1393,36 +1451,23 @@ internal static class Program
                 continue;
             }
 
-            var bytes = File.ReadAllBytes(archivePath);
-            if (bytes.Length < ArchiveHeaderSize || Encoding.ASCII.GetString(bytes, 0, 4) != "TWAD")
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
             {
                 continue;
             }
 
-            var tableOffset = checked((int)ReadUInt32(bytes, 8));
-            var maxEntries = checked((int)Math.Min(ReadUInt32(bytes, 12), int.MaxValue));
-            for (var i = 0; i < maxEntries; i++)
+            foreach (var entry in entries)
             {
-                var entryOffset = tableOffset + i * ArchiveEntrySize;
-                if (entryOffset + ArchiveEntrySize > bytes.Length)
-                {
-                    break;
-                }
-
-                var entry = ReadArchiveEntry(bytes, entryOffset, i);
                 if (entry.IsNull || !string.Equals(entry.IdPrefix, idPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                if (entry.Offset + entry.Size > bytes.Length)
-                {
-                    throw new InvalidDataException($"Entry {i} in {archiveName} extends past EOF.");
-                }
-
-                var packed = bytes.AsSpan(checked((int)entry.Offset), checked((int)entry.Size)).ToArray();
+                var packed = ReadArchivePayload(stream, entry, archiveName);
                 var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
-                return new FoundPayload(archiveName, i, payload.Bytes);
+                return new FoundPayload(archiveName, entry.Index, payload.Bytes);
             }
         }
 
@@ -2312,12 +2357,47 @@ internal static class Program
             return new DetectedFileType("riff", RiffType: riffType);
         }
 
+        if (StartsWithAscii(data, "Gamebryo File Format"))
+        {
+            return new DetectedFileType("nif", Format: ReadAsciiLine(data, maxLength: 128));
+        }
+
         if (LooksText(data))
         {
             return new DetectedFileType("txt");
         }
 
         return new DetectedFileType("bin");
+    }
+
+    private static bool StartsWithAscii(ReadOnlySpan<byte> data, string value)
+    {
+        if (data.Length < value.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (data[i] != value[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string ReadAsciiLine(ReadOnlySpan<byte> data, int maxLength)
+    {
+        var length = 0;
+        var limit = Math.Min(data.Length, maxLength);
+        while (length < limit && data[length] is not (0 or 10 or 13))
+        {
+            length++;
+        }
+
+        return Encoding.ASCII.GetString(data[..length]);
     }
 
     private static string? TryReadDdsFormat(ReadOnlySpan<byte> data)

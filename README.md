@@ -191,6 +191,25 @@ Copied TWAD non-null entries: 40,203
 
 `scan-compression` also records one sample per compression kind, including copied-archive offsets and first bytes. If pointed at a live install with `--live-root`, it scans read-only; write the report to this workspace with `--out` instead of writing into the game install.
 
+`scan-compression` uses streaming TWAD table reads, so it can inspect the full live install without reading every multi-GB archive payload into memory.
+
+Full live install scan, read-only:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- scan-compression --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --out "C:\RIFT MODDING\Assets\Exports\live-compression-scan.json"
+```
+
+Current live-install truth:
+
+```text
+Live TWAD archive files scanned: 244
+Live TWAD non-null entries: 263,957
+Live TWAD entry compression: 0=22422, 1=241535
+Manifest PAK compression: 0=736, 2=1340
+```
+
+Important conclusion: compression `2` has now been confirmed in manifest Table 0 logical PAK rows, but not in copied or full-live `TWAD` archive entries. The LZMA2 path should therefore focus on logical PAK/manifest layer reconstruction, not ordinary `assets.###` entry extraction.
+
 ## Current validated status
 
 - The copied manifests are valid `TWAM` files.
@@ -203,6 +222,7 @@ Copied TWAD non-null entries: 40,203
 - Manifest-aware extraction records manifest row, FNV1 filename hash, PAK index, PAK offset, sizes, and SHA evidence in filenames/report records.
 - LZMA2 is guarded: XZ-framed payloads are supported through SharpCompress, and raw/unproven LZMA2 is reported instead of guessed.
 - Original filename recovery now has hash matching, confidence controls, JSONL output, and safe recovered-name extraction wiring. No real original paths have been recovered from placeholder candidates yet.
+- Gamebryo/NIF model payloads are detected from the `Gamebryo File Format, Version 20.6.0.0` header and extracted with `.nif` extension.
 - Geometry/model work is at evidence-gathering stage: binary signatures can be inventoried and one asset can be probed, but no OBJ/model export is claimed supported.
 
 ## Filename hash/name recovery helpers
@@ -306,6 +326,7 @@ png
 jpg
 ogg
 lzma2
+nif
 ```
 
 ## Binary/model/geometry evidence tools
@@ -341,6 +362,41 @@ First16: 000000000000c0410000000002000000
 ```
 
 The probe report includes first 64 bytes, little-endian `uint32`/`int32`/`float32` interpretations, and stride candidates. Classifications are intentionally conservative (`bin.signature.*`, `structured-bin-candidate`, `geometry-candidate`, etc.). No geometry/OBJ export is supported yet.
+
+### Gamebryo/NIF model discovery
+
+A larger copied-archive binary inventory found repeated Gamebryo model headers:
+
+```text
+47616d656272796f2046696c6520466f -> "Gamebryo File Fo"
+```
+
+Validated sample:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-archives --root "C:\RIFT MODDING\Assets\Source" --archive 32 --type nif --max-per-archive 3 --out "C:\RIFT MODDING\Assets\Exports\inventory-archive032-nif.json"
+```
+
+Current result:
+
+```text
+assets.032: entries=205 inspected=3 failed=0 types=[nif=3]
+Format: Gamebryo File Format, Version 20.6.0.0
+```
+
+Targeted extraction now writes `.nif`:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --max-total 1 --out "C:\RIFT MODDING\Assets\Extracted\nif-detection-regression"
+```
+
+Example output:
+
+```text
+000202_m275055_fnvae05f146_pak0373_off36798_21900d2ee4f931ca.nif
+```
+
+This is the strongest model-format lead so far. Next model work should target NIF/Gamebryo structure and external NIF tooling compatibility before inventing a custom geometry decoder.
 
 ## Group extracted output by detected type
 
