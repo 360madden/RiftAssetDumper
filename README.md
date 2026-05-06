@@ -513,6 +513,21 @@ recovered\mushr3_g.dds
 recovered\mushr3_s.dds
 ```
 
+Extract a complete NIF bundle: model file plus linked textures:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id cc1dff6de7d25ed1 --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-cc1dff"
+```
+
+Validated copied-data NIF bundle:
+
+```text
+model\001104_m253891_fnva0a67ee3_pak0311_off1393297_cc1dff6de7d25ed1.nif
+textures\recovered\mushr3_c.dds
+textures\recovered\mushr3_g.dds
+textures\recovered\mushr3_s.dds
+```
+
 Validated recovered-name extraction smoke:
 
 ```powershell
