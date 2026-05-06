@@ -528,6 +528,24 @@ textures\recovered\mushr3_g.dds
 textures\recovered\mushr3_s.dds
 ```
 
+Inventory which linked NIF bundles are complete in the current copied archive set:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-inventory.json"
+```
+
+Current copied-data completeness:
+
+```text
+Graph models: 3,224
+Complete bundles: 6
+Incomplete bundles: 3,218
+Present texture refs: 66
+Missing texture refs: 9,293
+```
+
+Meaning: the model→texture graph is rich, but the current copied archive subset only contains a small number of complete model+texture bundles. Copying/scanning the missing texture archives should unlock many more complete bundles.
+
 Validated recovered-name extraction smoke:
 
 ```powershell

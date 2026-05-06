@@ -109,6 +109,11 @@ internal static class Program
                 return ExtractNifBundle(options);
             }
 
+            if (options.Command == "inventory-nif-bundles")
+            {
+                return InventoryNifBundles(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -2077,6 +2082,91 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int InventoryNifBundles(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var linksPath = string.IsNullOrWhiteSpace(options.InputPath)
+            ? Path.GetFullPath(Path.Combine(rootDirectory, "..", "Exports", "nif-texture-links.jsonl"))
+            : Path.GetFullPath(options.InputPath);
+        if (!File.Exists(linksPath))
+        {
+            Console.Error.WriteLine($"ERROR: link JSONL does not exist: {DisplayPath(options, linksPath)}");
+            return 1;
+        }
+
+        var copiedIds = ReadCopiedArchiveIds(rootDirectory);
+        var links = ReadJsonLines<NifTextureLinkRecord>(linksPath).ToList();
+        var samples = links
+            .GroupBy(static l => l.ModelIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var orderedLinks = g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).ToList();
+                var uniqueTextureIds = orderedLinks.Select(static l => l.TextureIdPrefix).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var presentTextureIds = uniqueTextureIds.Where(copiedIds.Contains).ToList();
+                var missingTextureIds = uniqueTextureIds.Where(id => !copiedIds.Contains(id)).ToList();
+                return new NifBundleInventorySample(
+                    ModelIdPrefix: g.Key,
+                    ModelArchiveName: orderedLinks[0].ModelArchiveName,
+                    ModelEntryIndex: orderedLinks[0].ModelEntryIndex,
+                    ModelManifestEntryIndex: orderedLinks[0].ModelManifestEntryIndex,
+                    ModelPakIndex: orderedLinks[0].ModelPakIndex,
+                    ModelPresentInCopiedArchives: copiedIds.Contains(g.Key),
+                    LinkCount: orderedLinks.Count,
+                    UniqueTextureCount: uniqueTextureIds.Count,
+                    PresentTextureCount: presentTextureIds.Count,
+                    MissingTextureCount: missingTextureIds.Count,
+                    IsComplete: copiedIds.Contains(g.Key) && missingTextureIds.Count == 0,
+                    PresentTextureSamples: orderedLinks
+                        .Where(l => copiedIds.Contains(l.TextureIdPrefix))
+                        .Select(static l => l.Candidate)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(10)
+                        .ToList(),
+                    MissingTextureSamples: orderedLinks
+                        .Where(l => !copiedIds.Contains(l.TextureIdPrefix))
+                        .Select(static l => l.Candidate)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(10)
+                        .ToList());
+            })
+            .OrderByDescending(static s => s.IsComplete)
+            .ThenByDescending(static s => s.PresentTextureCount)
+            .ThenBy(static s => s.ModelArchiveName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static s => s.ModelEntryIndex)
+            .ToList();
+
+        var complete = samples.Count(static s => s.IsComplete);
+        var modelPresent = samples.Count(static s => s.ModelPresentInCopiedArchives);
+        var report = new NifBundleInventoryReport(
+            RootDirectory: rootDirectory,
+            LinksPath: linksPath,
+            CopiedAssetIds: copiedIds.Count,
+            GraphLinks: links.Count,
+            GraphModels: samples.Count,
+            ModelsPresentInCopiedArchives: modelPresent,
+            CompleteBundles: complete,
+            IncompleteBundles: samples.Count - complete,
+            TotalUniqueTextureRefs: samples.Sum(static s => s.UniqueTextureCount),
+            PresentTextureRefs: samples.Sum(static s => s.PresentTextureCount),
+            MissingTextureRefs: samples.Sum(static s => s.MissingTextureCount),
+            Samples: options.Limit > 0 ? samples.Take(options.Limit).ToList() : samples);
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-bundle-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Graph links: {links.Count:N0}");
+        Console.WriteLine($"Graph models: {samples.Count:N0}");
+        Console.WriteLine($"Copied asset IDs: {copiedIds.Count:N0}");
+        Console.WriteLine($"Models present in copied archives: {modelPresent:N0}");
+        Console.WriteLine($"Complete bundles: {complete:N0}");
+        Console.WriteLine($"Incomplete bundles: {samples.Count - complete:N0}");
+        Console.WriteLine($"Present texture refs: {report.PresentTextureRefs:N0}");
+        Console.WriteLine($"Missing texture refs: {report.MissingTextureRefs:N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return 0;
+    }
+
     private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
     {
         if (!string.IsNullOrWhiteSpace(options.InputPath))
@@ -3173,6 +3263,36 @@ internal static class Program
         }
     }
 
+    private static HashSet<string> ReadCopiedArchiveIds(string rootDirectory)
+    {
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            return ids;
+        }
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (!entry.IsNull)
+                {
+                    ids.Add(entry.IdPrefix);
+                }
+            }
+        }
+
+        return ids;
+    }
+
     private static ManifestLookup ReadManifestLookup(string manifestPath)
     {
         var bytes = File.ReadAllBytes(manifestPath);
@@ -3682,6 +3802,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-nif-bundle --root <SourceFolder> --input <links.jsonl> --id <16hex>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-bundles --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -3887,6 +4008,7 @@ internal static class Program
                     case "link-nif-textures":
                     case "extract-linked-textures":
                     case "extract-nif-bundle":
+                    case "inventory-nif-bundles":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -4411,6 +4533,35 @@ internal sealed record NifBundleModelSample(
     uint? BlockCount,
     uint? StringCount,
     string RelativePath);
+
+internal sealed record NifBundleInventoryReport(
+    string RootDirectory,
+    string LinksPath,
+    int CopiedAssetIds,
+    int GraphLinks,
+    int GraphModels,
+    int ModelsPresentInCopiedArchives,
+    int CompleteBundles,
+    int IncompleteBundles,
+    int TotalUniqueTextureRefs,
+    int PresentTextureRefs,
+    int MissingTextureRefs,
+    List<NifBundleInventorySample> Samples);
+
+internal sealed record NifBundleInventorySample(
+    string ModelIdPrefix,
+    string ModelArchiveName,
+    int ModelEntryIndex,
+    int? ModelManifestEntryIndex,
+    ushort? ModelPakIndex,
+    bool ModelPresentInCopiedArchives,
+    int LinkCount,
+    int UniqueTextureCount,
+    int PresentTextureCount,
+    int MissingTextureCount,
+    bool IsComplete,
+    List<string> PresentTextureSamples,
+    List<string> MissingTextureSamples);
 
 internal sealed record ProbeReport(string RootDirectory)
 {
