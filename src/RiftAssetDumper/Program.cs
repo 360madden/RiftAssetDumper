@@ -79,6 +79,16 @@ internal static class Program
                 return ProbeBinary(options);
             }
 
+            if (options.Command == "probe-nif")
+            {
+                return ProbeNif(options);
+            }
+
+            if (options.Command == "inventory-nif")
+            {
+                return InventoryNif(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -1332,6 +1342,579 @@ internal static class Program
         return 0;
     }
 
+    private static int ProbeNif(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var (payload, source) = LoadPayloadForProbe(options, rootDirectory);
+        var detected = DetectFileType(payload);
+        if (detected.Extension != "nif")
+        {
+            Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+            return 1;
+        }
+
+        var header = ParseNifHeader(payload);
+        var report = new NifProbeReport(
+            Source: source,
+            Length: payload.Length,
+            First64: ToHex(payload.AsSpan(0, Math.Min(64, payload.Length))),
+            Header: header);
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-probe.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"NIF: {header.HeaderString}");
+        Console.WriteLine($"Version: {header.VersionText} ({header.VersionHex}) endian={(header.IsLittleEndian ? "little" : "big/unknown")} userVersion={header.UserVersion}");
+        Console.WriteLine($"Blocks: {header.BlockCount:N0}; block types: {header.BlockTypeCount:N0}; parsed types: {header.BlockTypes.Count:N0}");
+        Console.WriteLine($"Block data: offset={header.BlockDataOffset} totalSize={header.TotalBlockDataSize} delta={header.BlockSizePayloadDelta}");
+        Console.WriteLine($"Strings: {header.StringCount:N0}; references: {header.References.Count:N0}");
+        Console.WriteLine($"Top block usage: {string.Join(", ", header.BlockTypes.OrderByDescending(static t => t.UsageCount).ThenBy(static t => t.Index).Take(8).Select(FormatBlockTypeUsage))}");
+        if (header.References.Count > 0)
+        {
+            Console.WriteLine($"Reference samples: {string.Join(" | ", header.References.Take(5).Select(static r => TruncateForConsole(r.Value, 96)))}");
+        }
+        if (header.Warnings.Count > 0)
+        {
+            Console.WriteLine($"Warnings: {string.Join("; ", header.Warnings)}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return header.Warnings.Count == 0 ? 0 : 2;
+    }
+
+    private static int InventoryNif(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var groups = new Dictionary<string, NifInventoryGroup>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    var key = $"{header.VersionText}|{string.Join('|', header.BlockTypes.Select(static t => $"{t.Name}:{t.UsageCount}"))}";
+                    if (!groups.TryGetValue(key, out var group))
+                    {
+                        group = new NifInventoryGroup(
+                            VersionText: header.VersionText,
+                            VersionHex: header.VersionHex,
+                            HeaderString: header.HeaderString,
+                            BlockTypeCount: header.BlockTypeCount,
+                            BlockTypes: header.BlockTypes.Select(static t => t.DisplayName).ToList(),
+                            BlockTypeUsage: header.BlockTypes
+                                .Where(static t => t.UsageCount > 0)
+                                .ToDictionary(static t => t.DisplayName, static t => t.UsageCount, StringComparer.OrdinalIgnoreCase),
+                            Count: 0,
+                            MinSize: payload.Bytes.Length,
+                            MaxSize: payload.Bytes.Length,
+                            MinStringCount: checked((int)(header.StringCount ?? 0)),
+                            MaxStringCount: checked((int)(header.StringCount ?? 0)),
+                            ReferenceCount: 0,
+                            Samples: [],
+                            ReferenceSamples: []);
+                        groups.Add(key, group);
+                    }
+
+                    group.Count++;
+                    group.MinSize = Math.Min(group.MinSize, payload.Bytes.Length);
+                    group.MaxSize = Math.Max(group.MaxSize, payload.Bytes.Length);
+                    var stringCount = checked((int)(header.StringCount ?? 0));
+                    group.MinStringCount = Math.Min(group.MinStringCount, stringCount);
+                    group.MaxStringCount = Math.Max(group.MaxStringCount, stringCount);
+                    group.ReferenceCount += header.References.Count;
+                    if (group.Samples.Count < 10)
+                    {
+                        group.Samples.Add(new NifInventorySample(
+                            archiveName,
+                            entry.Index,
+                            entry.IdPrefix,
+                            payload.Bytes.Length,
+                            manifestEntry?.Index,
+                            manifestEntry?.FilenameFnv1Hash,
+                            manifestEntry?.PakIndex,
+                            header.BlockCount,
+                            header.StringCount,
+                            header.References.Count));
+                    }
+
+                    foreach (var reference in header.References)
+                    {
+                        if (group.ReferenceSamples.Count >= 20)
+                        {
+                            break;
+                        }
+
+                        group.ReferenceSamples.Add(new NifReferenceSample(
+                            archiveName,
+                            entry.Index,
+                            entry.IdPrefix,
+                            reference.StringIndex,
+                            reference.Value));
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        var report = new NifInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            Groups: groups.Values.OrderByDescending(static g => g.Count).ThenBy(static g => g.VersionText).ToList());
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"Groups: {report.Groups.Count:N0}");
+        foreach (var group in report.Groups.Take(10))
+        {
+            Console.WriteLine($"- {group.VersionText}: count={group.Count:N0} size={group.MinSize:N0}..{group.MaxSize:N0} blockTypes={group.BlockTypeCount:N0} strings={group.MinStringCount:N0}..{group.MaxStringCount:N0} refs={group.ReferenceCount:N0} first={string.Join(", ", group.BlockTypes.Take(5))}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
+    private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
+    {
+        if (!string.IsNullOrWhiteSpace(options.InputPath))
+        {
+            var inputPath = Path.GetFullPath(options.InputPath);
+            return (File.ReadAllBytes(inputPath), new BinaryAssetSource(InputPath: inputPath));
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var target = ResolveTargetEntry(options, lookup);
+        var found = FindPayloadForId(rootDirectory, lookup, target.IdPrefix, options)
+            ?? throw new InvalidOperationException($"target asset {target.IdPrefix} was not found in copied archives.");
+
+        return (found.Payload, new BinaryAssetSource(
+            ArchiveName: found.ArchiveName,
+            EntryIndex: found.EntryIndex,
+            IdPrefix: target.IdPrefix,
+            ManifestEntryIndex: target.Index,
+            FilenameFnv1Hash: target.FilenameFnv1Hash,
+            PakIndex: target.PakIndex,
+            PakOffset: target.PakOffset));
+    }
+
+    private static NifHeaderInfo ParseNifHeader(byte[] payload)
+    {
+        var warnings = new List<string>();
+        var data = payload.AsSpan();
+        var searchLength = Math.Min(data.Length, 256);
+        var newline = data[..searchLength].IndexOf((byte)'\n');
+
+        static NifHeaderInfo InvalidHeader(string headerString, int parsedBytes, string warning)
+        {
+            return new NifHeaderInfo(
+                HeaderString: headerString,
+                Version: null,
+                VersionHex: null,
+                VersionText: "unknown",
+                Endian: null,
+                IsLittleEndian: false,
+                UserVersion: null,
+                BlockCount: null,
+                BlockTypeCount: null,
+                HeaderBytesParsed: parsedBytes,
+                BlockDataOffset: null,
+                TotalBlockDataSize: null,
+                MinBlockDataSize: null,
+                MaxBlockDataSize: null,
+                RemainingAfterBlockDataOffset: null,
+                BlockSizePayloadDelta: null,
+                StringCount: null,
+                MaxStringLength: null,
+                GroupCount: null,
+                BlockTypes: [],
+                Strings: [],
+                References: [],
+                Warnings: [warning]);
+        }
+
+        if (newline < 0)
+        {
+            return InvalidHeader("", 0, "NIF header line terminator was not found in first 256 bytes.");
+        }
+
+        var headerString = Encoding.ASCII.GetString(data[..newline]).TrimEnd('\r', '\0');
+        var offset = newline + 1;
+        if (offset + 15 > data.Length)
+        {
+            return InvalidHeader(headerString, offset, "NIF header is truncated before version/endian/block-count fields.");
+        }
+
+        var version = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        offset += 4;
+        var endian = data[offset++];
+        var isLittleEndian = endian == 1;
+        if (!isLittleEndian)
+        {
+            warnings.Add($"Unexpected endian marker {endian}; parser currently assumes little-endian RIFT samples.");
+        }
+
+        var userVersion = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        offset += 4;
+        var blockCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+        offset += 4;
+        var blockTypeCount = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset, 2));
+        offset += 2;
+
+        var blockTypeNames = new List<(int Index, string Name, string DisplayName)>(blockTypeCount);
+        for (var i = 0; i < blockTypeCount; i++)
+        {
+            if (offset + 4 > data.Length)
+            {
+                warnings.Add($"Block type table ended before length field for type {i}.");
+                break;
+            }
+
+            var length = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+            offset += 4;
+            if (length > 1024)
+            {
+                warnings.Add($"Block type {i} length {length} is implausibly large.");
+                break;
+            }
+
+            if (offset + length > data.Length)
+            {
+                warnings.Add($"Block type {i} length {length} extends past payload end.");
+                break;
+            }
+
+            var name = Encoding.ASCII.GetString(data.Slice(offset, checked((int)length)));
+            offset += checked((int)length);
+            blockTypeNames.Add((i, name, EscapeControlChars(name)));
+        }
+
+        var usageCounts = new int[blockTypeNames.Count];
+        var blockIndexTableParsed = false;
+        if (blockCount > 1_000_000)
+        {
+            warnings.Add($"Block count {blockCount:N0} is too large for the lightweight NIF header probe.");
+        }
+        else if (blockTypeNames.Count == blockTypeCount)
+        {
+            var blockCountInt = checked((int)blockCount);
+            var indexBytes = checked(blockCountInt * 2);
+            if (offset + indexBytes <= data.Length)
+            {
+                var allIndicesValid = true;
+                for (var i = 0; i < blockCountInt; i++)
+                {
+                    var typeIndex = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset + (i * 2), 2));
+                    if (typeIndex >= usageCounts.Length)
+                    {
+                        allIndicesValid = false;
+                        warnings.Add($"Block {i} references out-of-range block type index {typeIndex}.");
+                        break;
+                    }
+
+                    usageCounts[typeIndex]++;
+                }
+
+                offset += indexBytes;
+                if (!allIndicesValid)
+                {
+                    usageCounts = new int[blockTypeNames.Count];
+                }
+                else
+                {
+                    blockIndexTableParsed = true;
+                }
+            }
+            else
+            {
+                warnings.Add("NIF header ended before the block type index table.");
+            }
+        }
+
+        ulong? totalBlockDataSize = null;
+        uint? minBlockDataSize = null;
+        uint? maxBlockDataSize = null;
+        var blockSizeTableParsed = false;
+        if (blockIndexTableParsed && blockCount <= 1_000_000)
+        {
+            var blockCountInt = checked((int)blockCount);
+            var blockSizeBytes = checked(blockCountInt * 4);
+            if (offset + blockSizeBytes <= data.Length)
+            {
+                ulong total = 0;
+                uint min = uint.MaxValue;
+                uint max = 0;
+                for (var i = 0; i < blockCountInt; i++)
+                {
+                    var blockSize = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset + (i * 4), 4));
+                    total += blockSize;
+                    min = Math.Min(min, blockSize);
+                    max = Math.Max(max, blockSize);
+                }
+
+                offset += blockSizeBytes;
+                totalBlockDataSize = total;
+                minBlockDataSize = blockCountInt > 0 ? min : 0;
+                maxBlockDataSize = blockCountInt > 0 ? max : 0;
+                blockSizeTableParsed = true;
+            }
+            else
+            {
+                warnings.Add("NIF header ended before the block size table.");
+            }
+        }
+        else if (!blockIndexTableParsed)
+        {
+            warnings.Add("Skipping block size and string table parsing because the block type index table was not parsed.");
+        }
+
+        uint? stringCount = null;
+        uint? maxStringLength = null;
+        var strings = new List<NifStringInfo>();
+        var references = new List<NifReferenceInfo>();
+        if (blockSizeTableParsed && offset + 8 <= data.Length)
+        {
+            stringCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+            offset += 4;
+            maxStringLength = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+            offset += 4;
+
+            if (stringCount > 1_000_000)
+            {
+                warnings.Add($"NIF string count {stringCount:N0} is too large for the lightweight probe.");
+                stringCount = null;
+                maxStringLength = null;
+            }
+            else
+            {
+                for (var i = 0; i < stringCount; i++)
+                {
+                    if (offset + 4 > data.Length)
+                    {
+                        warnings.Add($"String table ended before length field for string {i}.");
+                        break;
+                    }
+
+                    var length = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+                    offset += 4;
+                    if (length > 1_000_000)
+                    {
+                        warnings.Add($"String {i} length {length:N0} is too large for the lightweight probe.");
+                        break;
+                    }
+
+                    if (offset + length > data.Length)
+                    {
+                        warnings.Add($"String {i} length {length:N0} extends past payload end.");
+                        break;
+                    }
+
+                    var value = DecodeNifString(data.Slice(offset, checked((int)length)));
+                    offset += checked((int)length);
+                    var stringInfo = new NifStringInfo(checked((int)i), value);
+                    strings.Add(stringInfo);
+                    references.AddRange(ExtractNifReferences(stringInfo));
+                }
+            }
+        }
+        else if (blockSizeTableParsed)
+        {
+            warnings.Add("NIF header ended before the string table count fields.");
+        }
+
+        uint? groupCount = null;
+        if (blockSizeTableParsed && offset + 4 <= data.Length)
+        {
+            var candidateGroupCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
+            if (candidateGroupCount <= 1_000_000 && (ulong)offset + 4UL + (candidateGroupCount * 4UL) <= (ulong)data.Length)
+            {
+                groupCount = candidateGroupCount;
+                offset += 4 + checked((int)(candidateGroupCount * 4));
+            }
+            else
+            {
+                warnings.Add($"NIF group count candidate {candidateGroupCount:N0} is implausible at offset {offset}.");
+            }
+        }
+
+        var blockDataOffset = offset;
+        var remainingAfterBlockDataOffset = data.Length - blockDataOffset;
+        long? blockSizePayloadDelta = totalBlockDataSize is null
+            ? null
+            : remainingAfterBlockDataOffset - checked((long)totalBlockDataSize.Value);
+        var blockTypes = blockTypeNames
+            .Select(t => new NifBlockTypeInfo(t.Index, t.Name, t.DisplayName, t.Index < usageCounts.Length ? usageCounts[t.Index] : 0))
+            .ToList();
+
+        references = references
+            .DistinctBy(static r => (r.StringIndex, r.Value), EqualityComparer<(int, string)>.Default)
+            .ToList();
+
+        return new NifHeaderInfo(
+            HeaderString: headerString,
+            Version: version,
+            VersionHex: $"0x{version:x8}",
+            VersionText: FormatNifVersion(version),
+            Endian: endian,
+            IsLittleEndian: isLittleEndian,
+            UserVersion: userVersion,
+            BlockCount: blockCount,
+            BlockTypeCount: blockTypeCount,
+            HeaderBytesParsed: offset,
+            BlockDataOffset: blockDataOffset,
+            TotalBlockDataSize: totalBlockDataSize,
+            MinBlockDataSize: minBlockDataSize,
+            MaxBlockDataSize: maxBlockDataSize,
+            RemainingAfterBlockDataOffset: remainingAfterBlockDataOffset,
+            BlockSizePayloadDelta: blockSizePayloadDelta,
+            StringCount: stringCount,
+            MaxStringLength: maxStringLength,
+            GroupCount: groupCount,
+            BlockTypes: blockTypes,
+            Strings: strings,
+            References: references,
+            Warnings: warnings);
+    }
+
+    private static string FormatNifVersion(uint version)
+    {
+        return $"{(version >> 24) & 0xff}.{(version >> 16) & 0xff}.{(version >> 8) & 0xff}.{version & 0xff}";
+    }
+
+    private static string FormatBlockTypeUsage(NifBlockTypeInfo blockType)
+    {
+        return blockType.UsageCount > 0
+            ? $"{blockType.DisplayName} x{blockType.UsageCount:N0}"
+            : blockType.DisplayName;
+    }
+
+    private static string EscapeControlChars(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            if (char.IsControl(ch))
+            {
+                builder.Append(CultureInvariantControlEscape(ch));
+                continue;
+            }
+
+            builder.Append(ch);
+        }
+
+        return builder.ToString();
+    }
+
+    private static string CultureInvariantControlEscape(char ch)
+    {
+        return "\\u" + ((int)ch).ToString("x4", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string DecodeNifString(ReadOnlySpan<byte> bytes)
+    {
+        return Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+    }
+
+    private static IEnumerable<NifReferenceInfo> ExtractNifReferences(NifStringInfo stringInfo)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pattern in new[]
+        {
+            @"(?i)\b[A-Z]:[\\/][^\r\n<>|]+?(?=\s*>>|\s*$)",
+            @"(?i)\b(?:assets?|art|textures?|models?|audio|vfx|interface)[\\/][^\s<>|""']+",
+            @"(?i)\b[\w./\\:-]+\.(?:dds|nif|kf|kfm|ma|mb|xml|lua|ogg|wav|png|jpg|jpeg|tga|mesh|anim)\b"
+        })
+        {
+            foreach (Match match in Regex.Matches(stringInfo.Value, pattern, RegexOptions.CultureInvariant))
+            {
+                var candidate = CleanNifReference(match.Value);
+                if (candidate.Length == 0 || !seen.Add(candidate))
+                {
+                    continue;
+                }
+
+                yield return new NifReferenceInfo(stringInfo.Index, candidate);
+            }
+        }
+    }
+
+    private static string CleanNifReference(string value)
+    {
+        return value.Trim()
+            .Trim('"', '\'')
+            .TrimEnd('.', ',', ';', ')', ']', '}');
+    }
+
+    private static string TruncateForConsole(string value, int maxLength)
+    {
+        return value.Length <= maxLength
+            ? value
+            : value[..Math.Max(0, maxLength - 1)] + "…";
+    }
+
     private static IEnumerable<string> ExtractAsciiRuns(byte[] bytes, int minLength)
     {
         var builder = new StringBuilder();
@@ -2458,6 +3041,8 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-strings --input <ExtractedFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-binary-signatures --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-binary --root <SourceFolder> --id <16hex>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -2468,7 +3053,7 @@ internal static class Program
         Console.WriteLine("  --root <path>   Folder containing assets64.manifest and Assets/assets.###");
         Console.WriteLine("  --live-root <path>");
         Console.WriteLine("                  Live RIFT root to scan read-only for scan-compression");
-        Console.WriteLine("  --input <path>  Input file/folder for mine-strings or probe-binary");
+        Console.WriteLine("  --input <path>  Input file/folder for mine-strings, probe-binary, or probe-nif");
         Console.WriteLine("  --manifest <path>");
         Console.WriteLine("                  Manifest to use. Defaults to assets64.manifest under --root");
         Console.WriteLine("  --out <path>    Output folder/file depending on command");
@@ -2478,7 +3063,7 @@ internal static class Program
         Console.WriteLine("  --id <16hex>    Only extract one asset ID prefix");
         Console.WriteLine("  --fnv <uint|0xhex>");
         Console.WriteLine("                  Only extract entries with this filename FNV1 hash");
-        Console.WriteLine("  --type <kind>   Only write/inspect detected type such as dds, riff, txt, bin, lzma2");
+        Console.WriteLine("  --type <kind>   Only write/inspect detected type such as dds, riff, txt, bin, nif, lzma2");
         Console.WriteLine("  --group-by-type");
         Console.WriteLine("                  Write extracted files under <out>/<type>/<archive>/...");
         Console.WriteLine("  --manifest-index <n>");
@@ -2657,6 +3242,8 @@ internal static class Program
                     case "mine-strings":
                     case "inventory-binary-signatures":
                     case "probe-binary":
+                    case "probe-nif":
+                    case "inventory-nif":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -2991,6 +3578,102 @@ internal sealed record BinaryProbeReport(
     List<int> Int32Values,
     List<float> Float32Values,
     List<StrideCandidate> StrideCandidates);
+
+internal sealed record NifProbeReport(
+    BinaryAssetSource Source,
+    int Length,
+    string First64,
+    NifHeaderInfo Header);
+
+internal sealed record NifHeaderInfo(
+    string HeaderString,
+    uint? Version,
+    string? VersionHex,
+    string VersionText,
+    byte? Endian,
+    bool IsLittleEndian,
+    uint? UserVersion,
+    uint? BlockCount,
+    ushort? BlockTypeCount,
+    int HeaderBytesParsed,
+    int? BlockDataOffset,
+    ulong? TotalBlockDataSize,
+    uint? MinBlockDataSize,
+    uint? MaxBlockDataSize,
+    int? RemainingAfterBlockDataOffset,
+    long? BlockSizePayloadDelta,
+    uint? StringCount,
+    uint? MaxStringLength,
+    uint? GroupCount,
+    List<NifBlockTypeInfo> BlockTypes,
+    List<NifStringInfo> Strings,
+    List<NifReferenceInfo> References,
+    List<string> Warnings);
+
+internal sealed record NifBlockTypeInfo(int Index, string Name, string DisplayName, int UsageCount);
+
+internal sealed record NifStringInfo(int Index, string Value);
+
+internal sealed record NifReferenceInfo(int StringIndex, string Value);
+
+internal sealed record NifInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    List<NifInventoryGroup> Groups);
+
+internal sealed class NifInventoryGroup(
+    string VersionText,
+    string? VersionHex,
+    string HeaderString,
+    ushort? BlockTypeCount,
+    List<string> BlockTypes,
+    Dictionary<string, int> BlockTypeUsage,
+    int Count,
+    int MinSize,
+    int MaxSize,
+    int MinStringCount,
+    int MaxStringCount,
+    int ReferenceCount,
+    List<NifInventorySample> Samples,
+    List<NifReferenceSample> ReferenceSamples)
+{
+    public string VersionText { get; } = VersionText;
+    public string? VersionHex { get; } = VersionHex;
+    public string HeaderString { get; } = HeaderString;
+    public ushort? BlockTypeCount { get; } = BlockTypeCount;
+    public List<string> BlockTypes { get; } = BlockTypes;
+    public Dictionary<string, int> BlockTypeUsage { get; } = BlockTypeUsage;
+    public int Count { get; set; } = Count;
+    public int MinSize { get; set; } = MinSize;
+    public int MaxSize { get; set; } = MaxSize;
+    public int MinStringCount { get; set; } = MinStringCount;
+    public int MaxStringCount { get; set; } = MaxStringCount;
+    public int ReferenceCount { get; set; } = ReferenceCount;
+    public List<NifInventorySample> Samples { get; } = Samples;
+    public List<NifReferenceSample> ReferenceSamples { get; } = ReferenceSamples;
+}
+
+internal sealed record NifInventorySample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int Size,
+    int? ManifestEntryIndex,
+    uint? FilenameFnv1Hash,
+    ushort? PakIndex,
+    uint? BlockCount,
+    uint? StringCount,
+    int ReferenceCount);
+
+internal sealed record NifReferenceSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int StringIndex,
+    string Value);
 
 internal sealed record ProbeReport(string RootDirectory)
 {

@@ -398,6 +398,53 @@ Example output:
 
 This is the strongest model-format lead so far. Next model work should target NIF/Gamebryo structure and external NIF tooling compatibility before inventing a custom geometry decoder.
 
+### NIF probe and inventory
+
+Probe one NIF/Gamebryo payload by asset ID, manifest index, FNV hash, or direct file path:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --out "C:\RIFT MODDING\Assets\Exports\probe-nif-21900d.json"
+```
+
+Validated sample:
+
+```text
+NIF: Gamebryo File Format, Version 20.6.0.0
+Blocks: 29; block types: 16; parsed types: 16
+Strings: 24; references: 4
+Top block usage: NiDataStream\u00011\u000119 x6, NiFloatExtraData x3, NiIntegerExtraData x3
+```
+
+The NIF probe currently parses:
+
+- header line, version, endian marker, user version
+- block count and block type table
+- per-block type usage counts
+- block-size table summary and payload delta evidence
+- NIF string table
+- path-like/source-art/texture references mined from the string table
+
+Important discovery: NIF string tables contain original source-art references and texture names. Example references from the validated sample include source `.ma` paths under `art/project/...` plus referenced `.dds` texture names. This is now one of the strongest leads for original name/path recovery.
+
+Inventory all copied NIF payloads without writing extracted model files:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\inventory-nif-copied-full.json"
+```
+
+Current copied-data NIF inventory:
+
+```text
+Inspected payloads: 40,203
+NIF payloads: 5,111
+Layout groups: 817
+Total mined references: 19,616
+Dominant version: 20.6.0.0
+Minor version family also seen: 20.3.0.9
+```
+
+The largest repeated NIF layout groups are small Gamebryo meshes with consistent `NiNode`, `NiStringExtraData`, material/property, `NiMesh`, and `NiDataStream` families. `inventory-nif` stores sample asset IDs, manifest rows, PAK indexes, block usage, string counts, and reference samples for each group.
+
 ## Group extracted output by detected type
 
 Use `--group-by-type` with extraction to organize dumps under `<out>\<type>\<archive>\...` instead of only `<out>\<archive>\...`.
