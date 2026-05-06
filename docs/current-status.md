@@ -106,6 +106,14 @@ Sample graph edge:
 model 21900d2ee4f931ca -> sky_cape_jule_skygradient.dds -> texture 607910464790649f
 ```
 
+Validated linked-texture extraction bundle:
+
+```text
+model cc1dff6de7d25ed1 -> recovered\mushr3_c.dds
+model cc1dff6de7d25ed1 -> recovered\mushr3_g.dds
+model cc1dff6de7d25ed1 -> recovered\mushr3_s.dds
+```
+
 Validated recovered-name extraction smoke:
 
 ```text
@@ -178,6 +186,10 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-linked-textures --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id cc1dff6de7d25ed1 --out "C:\RIFT MODDING\Assets\Extracted\linked-textures-cc1dff"
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Extracted\nif-name-recovery-smoke" --id 3c85b176865a1014 --use-recovered-names "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --max-total 1
 ```
 
@@ -185,6 +197,6 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 1. Treat NIF/Gamebryo as the primary model path.
 2. Test extracted `.nif` files against known NIF tooling/viewers.
-3. Use `link-nif-textures` output to bulk-extract complete model texture sets by NIF asset ID.
+3. Use linked texture bundles to visually validate model/texture pairings in external viewers.
 4. Promote the NIF-derived high-confidence matches into the normal `RecoveredNames/recovered-names.jsonl` workflow.
 5. Reframe LZMA2 as logical PAK reconstruction work, not TWAD entry extraction.

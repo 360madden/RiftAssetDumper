@@ -99,6 +99,11 @@ internal static class Program
                 return LinkNifTextures(options);
             }
 
+            if (options.Command == "extract-linked-textures")
+            {
+                return ExtractLinkedTextures(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -1814,6 +1819,111 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int ExtractLinkedTextures(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var outDirectory = Path.GetFullPath(options.OutDirectory ?? Path.Combine(rootDirectory, "..", "Extracted", "linked-textures"));
+        var linksPath = string.IsNullOrWhiteSpace(options.InputPath)
+            ? Path.GetFullPath(Path.Combine(rootDirectory, "..", "Exports", "nif-texture-links.jsonl"))
+            : Path.GetFullPath(options.InputPath);
+        if (!File.Exists(linksPath))
+        {
+            Console.Error.WriteLine($"ERROR: link JSONL does not exist: {DisplayPath(options, linksPath)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var links = ReadJsonLines<NifTextureLinkRecord>(linksPath)
+            .Where(l => string.IsNullOrWhiteSpace(options.IdFilter) || string.Equals(l.ModelIdPrefix, options.IdFilter, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Select(static g => g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).First())
+            .OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        Directory.CreateDirectory(outDirectory);
+        var samples = new List<LinkedTextureExtractSample>();
+        var attempted = 0;
+        var written = 0;
+        var missing = 0;
+        var typeMismatch = 0;
+        var failed = 0;
+
+        foreach (var link in links)
+        {
+            if (options.MaxTotal > 0 && written >= options.MaxTotal)
+            {
+                break;
+            }
+
+            attempted++;
+            try
+            {
+                var found = FindPayloadForId(rootDirectory, lookup, link.TextureIdPrefix, options);
+                if (found is null)
+                {
+                    missing++;
+                    continue;
+                }
+
+                var detected = DetectFileType(found.Payload);
+                if (!RecoveredNameMatchesDetectedType(link.Candidate, detected.Extension))
+                {
+                    typeMismatch++;
+                    continue;
+                }
+
+                var outputPath = BuildRecoveredOutputPath(outDirectory, link.Candidate, link.TextureIdPrefix, detected.Extension);
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                File.WriteAllBytes(outputPath, found.Payload);
+                written++;
+                if (samples.Count < 50)
+                {
+                    samples.Add(new LinkedTextureExtractSample(
+                        ModelIdPrefix: link.ModelIdPrefix,
+                        TextureIdPrefix: link.TextureIdPrefix,
+                        Candidate: link.Candidate,
+                        ArchiveName: found.ArchiveName,
+                        EntryIndex: found.EntryIndex,
+                        Type: detected.Extension,
+                        Width: detected.Width,
+                        Height: detected.Height,
+                        Format: detected.Format,
+                        RelativePath: Path.GetRelativePath(outDirectory, outputPath)));
+                }
+            }
+            catch
+            {
+                failed++;
+            }
+        }
+
+        var report = new LinkedTextureExtractReport(
+            RootDirectory: rootDirectory,
+            LinksPath: linksPath,
+            OutputDirectory: outDirectory,
+            ModelIdFilter: options.IdFilter,
+            UniqueTextureLinks: links.Count,
+            Attempted: attempted,
+            Written: written,
+            MissingFromCopiedArchives: missing,
+            TypeMismatches: typeMismatch,
+            Failed: failed,
+            Samples: samples);
+        var reportPath = Path.Combine(outDirectory, "linked-texture-extract-report.json");
+        File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Links: {links.Count:N0}");
+        Console.WriteLine($"Attempted: {attempted:N0}");
+        Console.WriteLine($"Written: {written:N0}");
+        Console.WriteLine($"Missing from copied archives: {missing:N0}");
+        Console.WriteLine($"Type mismatches: {typeMismatch:N0}");
+        Console.WriteLine($"Failed: {failed:N0}");
+        Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
+        Console.WriteLine($"Report: {DisplayPath(options, reportPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
     private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
     {
         if (!string.IsNullOrWhiteSpace(options.InputPath))
@@ -2895,6 +3005,21 @@ internal static class Program
         }
     }
 
+    private static IEnumerable<T> ReadJsonLines<T>(string path)
+    {
+        foreach (var line in File.ReadLines(path, Encoding.UTF8))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            yield return JsonSerializer.Deserialize<T>(trimmed)
+                ?? throw new InvalidDataException($"Failed to parse JSONL record from {path}.");
+        }
+    }
+
     private static ManifestLookup ReadManifestLookup(string manifestPath)
     {
         var bytes = File.ReadAllBytes(manifestPath);
@@ -3402,6 +3527,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -3605,6 +3731,7 @@ internal static class Program
                     case "inventory-nif":
                     case "mine-nif-references":
                     case "link-nif-textures":
+                    case "extract-linked-textures":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -4078,6 +4205,31 @@ internal sealed record NifTextureLinkRecord(
     uint TextureCompressedSize,
     uint TextureSize,
     ushort? TextureNameLength);
+
+internal sealed record LinkedTextureExtractReport(
+    string RootDirectory,
+    string LinksPath,
+    string OutputDirectory,
+    string? ModelIdFilter,
+    int UniqueTextureLinks,
+    int Attempted,
+    int Written,
+    int MissingFromCopiedArchives,
+    int TypeMismatches,
+    int Failed,
+    List<LinkedTextureExtractSample> Samples);
+
+internal sealed record LinkedTextureExtractSample(
+    string ModelIdPrefix,
+    string TextureIdPrefix,
+    string Candidate,
+    string ArchiveName,
+    int EntryIndex,
+    string Type,
+    int? Width,
+    int? Height,
+    string? Format,
+    string RelativePath);
 
 internal sealed record ProbeReport(string RootDirectory)
 {

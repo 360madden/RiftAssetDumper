@@ -497,6 +497,22 @@ Sample link:
 model 21900d2ee4f931ca -> sky_cape_jule_skygradient.dds -> texture 607910464790649f
 ```
 
+Extract a texture bundle from the graph for one linked NIF model:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-linked-textures --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id cc1dff6de7d25ed1 --out "C:\RIFT MODDING\Assets\Extracted\linked-textures-cc1dff"
+```
+
+Validated copied-data bundle:
+
+```text
+Links: 3
+Written: 3
+recovered\mushr3_c.dds
+recovered\mushr3_g.dds
+recovered\mushr3_s.dds
+```
+
 Validated recovered-name extraction smoke:
 
 ```powershell
