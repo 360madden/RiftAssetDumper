@@ -143,6 +143,36 @@ textures\recovered\diffuse_blank.dds
 
 Why this matters: the tool can now complete selected model+texture bundles immediately without first copying entire high-yield archive chunks into `Source\Assets`.
 
+## Larger indexed live-fallback bundle proof 🧱
+
+Live fallback extraction now builds a one-pass payload index for the requested IDs. That prevents repeated archive-table scans when a model references many textures.
+
+Validated larger model:
+
+| Field | Value |
+|---|---:|
+| Model ID | `16ecac86a42d4d96` |
+| Indexed payload IDs | `23` |
+| Copied archives scanned once | `27` |
+| Live fallback archives scanned once | `244` |
+| Texture links | `22` |
+| Textures written | `22` |
+| Textures from copied archives | `0` |
+| Textures from live fallback | `22` |
+| Missing from selected sources | `0` |
+
+Texture source archives:
+
+| Archive | Texture count |
+|---|---:|
+| `assets.152` | `9` |
+| `assets.187` | `6` |
+| `assets.129` | `4` |
+| `assets.196` | `2` |
+| `assets.171` | `1` |
+
+Why this matters: the graph is now usable for richer model bundles, not just one-texture smoke tests. A copied model from `assets.053` was paired with 22 recovered live textures spread across five live archive chunks.
+
 ## Commands validated ✅
 
 ```powershell
@@ -155,6 +185,10 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 ```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 011267450ef6781f --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-011267-live-fallback"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 16ecac86a42d4d96 --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-16ecac-live-fallback"
 ```
 
 ## Current safest next direction 🛡️

@@ -1847,14 +1847,13 @@ internal static class Program
             return 1;
         }
 
-        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
-        var lookup = ReadManifestLookup(manifestPath);
         var links = ReadJsonLines<NifTextureLinkRecord>(linksPath)
             .Where(l => string.IsNullOrWhiteSpace(options.IdFilter) || string.Equals(l.ModelIdPrefix, options.IdFilter, StringComparison.OrdinalIgnoreCase))
             .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
             .Select(static g => g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).First())
             .OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var payloadLookup = BuildPayloadLookup(rootDirectory, options, links.Select(static l => l.TextureIdPrefix));
 
         Directory.CreateDirectory(outDirectory);
         var samples = new List<LinkedTextureExtractSample>();
@@ -1877,7 +1876,7 @@ internal static class Program
             attempted++;
             try
             {
-                var found = FindPayloadForId(rootDirectory, lookup, link.TextureIdPrefix, options);
+                var found = payloadLookup.Find(link.TextureIdPrefix, options.Lzma2Mode);
                 if (found is null)
                 {
                     missingFromCopied++;
@@ -1938,6 +1937,9 @@ internal static class Program
             LinksPath: linksPath,
             OutputDirectory: outDirectory,
             ModelIdFilter: options.IdFilter,
+            IndexedPayloads: payloadLookup.IndexedPayloads,
+            CopiedArchivesScanned: payloadLookup.CopiedArchivesScanned,
+            LiveFallbackArchivesScanned: payloadLookup.LiveArchivesScanned,
             UniqueTextureLinks: links.Count,
             Attempted: attempted,
             Written: written,
@@ -1951,6 +1953,9 @@ internal static class Program
         var reportPath = Path.Combine(outDirectory, "linked-texture-extract-report.json");
         File.WriteAllText(reportPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
+        Console.WriteLine($"Indexed payload IDs: {payloadLookup.IndexedPayloads:N0}");
+        Console.WriteLine($"Copied archives scanned: {payloadLookup.CopiedArchivesScanned:N0}");
+        Console.WriteLine($"Live fallback archives scanned: {payloadLookup.LiveArchivesScanned:N0}");
         Console.WriteLine($"Links: {links.Count:N0}");
         Console.WriteLine($"Attempted: {attempted:N0}");
         Console.WriteLine($"Written: {written:N0}");
@@ -1993,7 +1998,15 @@ internal static class Program
             return 1;
         }
 
-        var foundModel = FindPayloadForId(rootDirectory, lookup, modelId, options);
+        var links = ReadJsonLines<NifTextureLinkRecord>(linksPath)
+            .Where(l => string.Equals(l.ModelIdPrefix, modelId, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Select(static g => g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).First())
+            .OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var payloadLookup = BuildPayloadLookup(rootDirectory, options, links.Select(static l => l.TextureIdPrefix).Append(modelId));
+
+        var foundModel = payloadLookup.Find(modelId, options.Lzma2Mode);
         if (foundModel is null)
         {
             Console.Error.WriteLine($"ERROR: model payload was not found in selected archive sources: {modelId}");
@@ -2015,13 +2028,6 @@ internal static class Program
         File.WriteAllBytes(modelPath, foundModel.Payload);
         var modelHeader = ParseNifHeader(foundModel.Payload);
 
-        var links = ReadJsonLines<NifTextureLinkRecord>(linksPath)
-            .Where(l => string.Equals(l.ModelIdPrefix, modelId, StringComparison.OrdinalIgnoreCase))
-            .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
-            .Select(static g => g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).First())
-            .OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
         var textureRoot = Path.Combine(outDirectory, "textures");
         Directory.CreateDirectory(textureRoot);
         var samples = new List<LinkedTextureExtractSample>();
@@ -2039,7 +2045,7 @@ internal static class Program
             attempted++;
             try
             {
-                var found = FindPayloadForId(rootDirectory, lookup, link.TextureIdPrefix, options);
+                var found = payloadLookup.Find(link.TextureIdPrefix, options.Lzma2Mode);
                 if (found is null)
                 {
                     missingFromCopied++;
@@ -2112,6 +2118,9 @@ internal static class Program
                 StringCount: modelHeader.StringCount,
                 SourceKind: foundModel.SourceKind,
                 RelativePath: Path.GetRelativePath(outDirectory, modelPath)),
+            IndexedPayloads: payloadLookup.IndexedPayloads,
+            CopiedArchivesScanned: payloadLookup.CopiedArchivesScanned,
+            LiveFallbackArchivesScanned: payloadLookup.LiveArchivesScanned,
             UniqueTextureLinks: links.Count,
             TextureAttempted: attempted,
             TextureWritten: written,
@@ -2127,6 +2136,9 @@ internal static class Program
 
         Console.WriteLine($"Model: {modelId}");
         Console.WriteLine($"NIF version: {modelHeader.VersionText}");
+        Console.WriteLine($"Indexed payload IDs: {payloadLookup.IndexedPayloads:N0}");
+        Console.WriteLine($"Copied archives scanned: {payloadLookup.CopiedArchivesScanned:N0}");
+        Console.WriteLine($"Live fallback archives scanned: {payloadLookup.LiveArchivesScanned:N0}");
         Console.WriteLine($"Texture links: {links.Count:N0}");
         Console.WriteLine($"Textures written: {written:N0}");
         Console.WriteLine($"Textures written from copied archives: {writtenFromCopied:N0}");
@@ -3084,6 +3096,96 @@ internal static class Program
         return FindPayloadForIdInRoot(liveRoot, idPrefix, archiveFilter, options, sourceKind: "live");
     }
 
+    private static ArchivePayloadLookup BuildPayloadLookup(string rootDirectory, AppOptions options, IEnumerable<string> targetIds)
+    {
+        var targets = targetIds
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .Select(static id => id.Trim().ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var lookup = new ArchivePayloadLookup();
+        if (targets.Count == 0)
+        {
+            return lookup;
+        }
+
+        var archiveFilter = NormalizeArchiveFilter(options.ArchiveFilter);
+        AddPayloadLocations(lookup, Path.GetFullPath(rootDirectory), targets, archiveFilter, sourceKind: "copied");
+
+        if (string.IsNullOrWhiteSpace(options.LiveRoot))
+        {
+            return lookup;
+        }
+
+        var liveRoot = Path.GetFullPath(options.LiveRoot);
+        var copiedAssetsDirectory = ResolveAssetsDirectory(Path.GetFullPath(rootDirectory));
+        var liveAssetsDirectory = ResolveAssetsDirectory(liveRoot);
+        if (PathsEqual(copiedAssetsDirectory, liveAssetsDirectory))
+        {
+            return lookup;
+        }
+
+        AddPayloadLocations(lookup, liveRoot, targets, archiveFilter, sourceKind: "live");
+        return lookup;
+    }
+
+    private static void AddPayloadLocations(
+        ArchivePayloadLookup lookup,
+        string rootDirectory,
+        HashSet<string> targetIds,
+        string? archiveFilter,
+        string sourceKind)
+    {
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            return;
+        }
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (archiveFilter is not null && !string.Equals(archiveName, archiveFilter, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(sourceKind, "live", StringComparison.OrdinalIgnoreCase))
+            {
+                lookup.LiveArchivesScanned++;
+            }
+            else
+            {
+                lookup.CopiedArchivesScanned++;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (entry.IsNull || !targetIds.Contains(entry.IdPrefix) || lookup.Contains(entry.IdPrefix))
+                {
+                    continue;
+                }
+
+                lookup.Add(new ArchivePayloadLocation(
+                    IdPrefix: entry.IdPrefix,
+                    ArchivePath: archivePath,
+                    ArchiveName: archiveName,
+                    EntryIndex: entry.Index,
+                    Offset: entry.Offset,
+                    Size: entry.Size,
+                    Compression: entry.Compression,
+                    Sha1: entry.Sha1,
+                    SourceKind: sourceKind));
+            }
+        }
+    }
+
     private static FoundPayload? FindPayloadForIdInRoot(string rootDirectory, string idPrefix, string? archiveFilter, AppOptions options, string sourceKind)
     {
         var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
@@ -3949,7 +4051,7 @@ internal static class Program
         }
     }
 
-    private static PayloadDecodeResult DecompressPayload(ushort compression, byte[] packed, string expectedPackedSha, string expectedUnpackedPrefix, string lzma2Mode)
+    internal static PayloadDecodeResult DecompressPayload(ushort compression, byte[] packed, string expectedPackedSha, string expectedUnpackedPrefix, string lzma2Mode)
     {
         var packedSha = ComputeSha1Hex(packed);
         if (!StringComparer.OrdinalIgnoreCase.Equals(packedSha, expectedPackedSha))
@@ -4687,6 +4789,55 @@ internal sealed record FoundPayload(
     byte[] Payload,
     string SourceKind);
 
+internal sealed class ArchivePayloadLookup
+{
+    private readonly Dictionary<string, ArchivePayloadLocation> locations = new(StringComparer.OrdinalIgnoreCase);
+
+    public int CopiedArchivesScanned { get; set; }
+
+    public int LiveArchivesScanned { get; set; }
+
+    public int IndexedPayloads => locations.Count;
+
+    public bool Contains(string idPrefix) => locations.ContainsKey(idPrefix);
+
+    public void Add(ArchivePayloadLocation location)
+    {
+        locations.TryAdd(location.IdPrefix, location);
+    }
+
+    public FoundPayload? Find(string idPrefix, string lzma2Mode)
+    {
+        if (!locations.TryGetValue(idPrefix, out var location))
+        {
+            return null;
+        }
+
+        using var stream = new FileStream(location.ArchivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+        if ((long)location.Offset + location.Size > stream.Length)
+        {
+            throw new InvalidDataException($"Entry {location.EntryIndex} in {location.ArchiveName} extends past EOF.");
+        }
+
+        var packed = new byte[checked((int)location.Size)];
+        stream.Position = location.Offset;
+        stream.ReadExactly(packed);
+        var payload = Program.DecompressPayload(location.Compression, packed, location.Sha1, location.IdPrefix, lzma2Mode);
+        return new FoundPayload(location.ArchiveName, location.EntryIndex, payload.Bytes, location.SourceKind);
+    }
+}
+
+internal sealed record ArchivePayloadLocation(
+    string IdPrefix,
+    string ArchivePath,
+    string ArchiveName,
+    int EntryIndex,
+    uint Offset,
+    uint Size,
+    ushort Compression,
+    string Sha1,
+    string SourceKind);
+
 internal sealed record BinaryProbeData(
     string First4,
     string First8,
@@ -4856,6 +5007,9 @@ internal sealed record LinkedTextureExtractReport(
     string LinksPath,
     string OutputDirectory,
     string? ModelIdFilter,
+    int IndexedPayloads,
+    int CopiedArchivesScanned,
+    int LiveFallbackArchivesScanned,
     int UniqueTextureLinks,
     int Attempted,
     int Written,
@@ -4885,6 +5039,9 @@ internal sealed record NifBundleExtractReport(
     string LinksPath,
     string OutputDirectory,
     NifBundleModelSample Model,
+    int IndexedPayloads,
+    int CopiedArchivesScanned,
+    int LiveFallbackArchivesScanned,
     int UniqueTextureLinks,
     int TextureAttempted,
     int TextureWritten,

@@ -587,6 +587,27 @@ textures\recovered\diffuse_blank.dds
 
 This turns the archive planner into immediate extraction value: a bundle that was incomplete with copied data only can now be completed by reading the needed texture payload directly from the live install.
 
+The live fallback path now builds a one-pass payload index for the requested model/texture IDs instead of rescanning archive tables for each linked texture. This enabled a larger architectural bundle smoke without copying any additional archive chunks:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 16ecac86a42d4d96 --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-16ecac-live-fallback"
+```
+
+Validated larger live-fallback bundle:
+
+```text
+Indexed payload IDs: 23
+Copied archives scanned: 27
+Live fallback archives scanned: 244
+Texture links: 22
+Textures written: 22
+Textures written from copied archives: 0
+Textures written from live fallback: 22
+Textures missing from copied archives: 22
+Textures missing from selected sources: 0
+Texture source archives: assets.152=9, assets.187=6, assets.129=4, assets.196=2, assets.171=1
+```
+
 Validated recovered-name extraction smoke:
 
 ```powershell
