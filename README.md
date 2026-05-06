@@ -546,6 +546,26 @@ Missing texture refs: 9,293
 
 Meaning: the model→texture graph is rich, but the current copied archive subset only contains a small number of complete model+texture bundles. Copying/scanning the missing texture archives should unlock many more complete bundles.
 
+Plan the exact live archive chunks needed to complete missing NIF texture bundles, without copying anything from the live install:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- plan-nif-bundle-archives --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-archive-plan.json" --limit 200
+```
+
+Current live-read-only plan:
+
+```text
+Archives scanned: 244
+Missing texture assets: 2,494
+Found missing texture assets in live archives: 2,494
+Archive recommendations: 132
+Top archive: assets.002 covers 26 missing texture assets, affects 605 models, completes 339 bundles alone
+Greedy selected archives: 132
+Cumulative completed bundles after greedy plan: 3,218
+```
+
+This is the current highest-leverage archive-copy map: the generated JSON ranks which `assets.###` chunks contain missing NIF-linked textures and shows how many additional complete model+texture bundles each chunk unlocks. It is intentionally read-only against the live RIFT install.
+
 Validated recovered-name extraction smoke:
 
 ```powershell

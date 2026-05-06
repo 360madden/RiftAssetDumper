@@ -1,120 +1,71 @@
-# Current Status — High-impact discoveries
+# Current Status — High-impact RIFT asset discoveries 🚀
 
 Date: 2026-05-06
 
-## TL;DR
+## TL;DR 🧭
 
-| Lane | Status | Discovery |
+| Lane | Status | Current truth |
 |---|---:|---|
-| Compression / LZMA2 | ✅ clarified | Full live `TWAD` archives use only compression `0` and `1`; manifest Table 0 still contains compression `2` logical PAK rows. |
-| Model format | ✅ major lead | Repeated `Gamebryo File Format` payloads were promoted to `.nif`, then parsed for block usage and NIF string-table references. |
-| Filename/path recovery | ✅ proven | NIF string tables yielded `7,063` unique candidates and `2,567` high-confidence manifest filename matches. |
-| Model dependency graph | ✅ new | NIF references now link `3,224` model assets to `2,514` texture manifest assets. |
-| Live-scale scanning | ✅ improved | Compression scan and binary probe paths now avoid loading huge `assets.###` files wholesale where possible. |
+| Compression / LZMA2 | ✅ clarified | Full live `TWAD` archive entries still use only compression `0` and `1`; compression `2` remains a manifest Table 0 logical PAK-layer problem. |
+| Model format | ✅ major lead | Repeated Gamebryo payloads are now detected/extracted as `.nif` and parsed for NIF header/block/string-table evidence. |
+| Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
+| Model→texture graph | ✅ working | NIF references link `3,224` model assets to `2,514` unique texture manifest assets. |
+| Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
 
-## Compression truth
+## Compression truth 🧊
 
-| Scope | Files / rows | Compression counts |
+| Scope | Count | Compression counts |
 |---|---:|---|
-| Copied `TWAD` entries | 40,203 non-null entries | `0=203`, `1=40000`, `2=0` |
-| Full live `TWAD` entries | 263,957 non-null entries across 244 archives | `0=22422`, `1=241535`, `2=0` |
-| Manifest Table 0 logical PAK rows | 2,076 rows | `0=736`, `2=1340` |
+| Copied `TWAD` entries | `40,203` non-null entries | `0=203`, `1=40000`, `2=0` |
+| Full live `TWAD` entries | `263,957` non-null entries across `244` archives | `0=22422`, `1=241535`, `2=0` |
+| Manifest Table 0 logical PAK rows | `2,076` rows | `0=736`, `2=1340` |
 
-Conclusion: LZMA2 is still real, but the available evidence points to the logical PAK/manifest layer, not per-entry `TWAD` payloads.
+Conclusion: LZMA2 is real in the manifest/PAK layer, but not in ordinary copied or full-live `TWAD` entry payloads seen so far. Do not claim raw LZMA2 extraction until a validated payload path is proven with size/SHA checks.
 
-## Gamebryo / NIF discovery
+## Gamebryo / NIF model discovery 🧩
 
-Large binary signature inventory over copied archives found this repeated header:
+Large binary inventories found repeated Gamebryo model headers and promoted those payloads from generic `.bin` to `.nif`.
 
-```text
-47616d656272796f2046696c6520466f
-```
-
-ASCII:
-
-```text
-Gamebryo File Fo
-```
-
-Validated full header:
-
-```text
-Gamebryo File Format, Version 20.6.0.0
-```
-
-The dumper now classifies this payload family as:
-
-```text
-nif
-```
-
-New NIF probe/inventory support parses the Gamebryo header beyond magic-byte detection:
-
-| Parsed field | Evidence now captured |
-|---|---|
-| Version/endian/user version | `20.6.0.0`, little-endian, user version `0` in the validated sample |
-| Block layout | block count, block type table, per-type usage counts |
-| String table | string count, max string length, raw strings |
-| References | path-like source-art names and texture filenames mined from NIF strings |
-
-Validated probe sample:
-
-```text
-NIF: Gamebryo File Format, Version 20.6.0.0
-Blocks: 29; block types: 16; parsed types: 16
-Block data: offset=1149 totalSize=10916 delta=8
-Strings: 24; references: 4
-Top block usage: NiDataStream\u00011\u000119 x6, NiFloatExtraData x3, NiIntegerExtraData x3
-```
-
-Big recovery lead: the NIF string table includes source-art references such as `art/project/.../*.ma` and texture names such as `*.dds`. These are not yet proven to be the manifest's exact original packed names, but they are real embedded names from the model payloads and should seed the filename-recovery candidate pipeline.
-
-Full copied-set NIF inventory:
-
-| Metric | Value |
+| NIF inventory metric | Value |
 |---|---:|
-| Inspected copied payloads | 40,203 |
-| NIF payloads | 5,111 |
-| NIF layout groups | 817 |
-| Mined NIF references | 19,616 |
-| Dominant NIF version | `20.6.0.0` |
+| Copied payloads inspected | `40,203` |
+| NIF payloads | `5,111` |
+| NIF layout groups | `817` |
+| Mined NIF references | `19,616` |
+| Dominant version | `20.6.0.0` |
 | Additional observed version family | `20.3.0.9` |
 
-NIF-reference filename recovery:
+The NIF parser now captures header/version/endian, block counts, block type usage, block-size evidence, string tables, and path-like/source-art/texture references from NIF strings.
 
-| Step | Result |
+## Filename/path recovery lead 🧵
+
+NIF string tables contain embedded source-art paths and texture names. Those names are now used as manifest hash candidates.
+
+| Recovery step | Result |
 |---|---:|
-| NIF reference records exported | 19,616 |
-| Unique normalized candidates | 7,063 |
-| Manifest hash matches with `--only-length-match --require-unique` | 2,567 |
-| Matched algorithm | `fnv1` |
-| Matched extension family | `.dds` |
+| NIF reference records exported | `19,616` |
+| Unique normalized candidates | `7,063` |
+| High-confidence manifest filename matches | `2,567` |
+| Matching algorithm observed | `fnv1` |
+| Dominant matched extension | `.dds` |
 
-NIF model-to-texture graph:
+Important interpretation: these are embedded model references that match manifest filename hashes, so this is stronger than placeholder dictionary guessing. The original full packed path is still not universally recovered, but texture filenames are now evidence-backed.
 
-| Step | Result |
+## Model→texture graph and bundle status 🧱
+
+| Graph / bundle metric | Value |
 |---|---:|
-| NIF payloads scanned | 5,111 |
-| Texture candidates tested | 9,489 |
-| Recovered model→texture links | 9,434 |
-| Unique NIF models linked | 3,224 |
-| Unique texture manifest assets linked | 2,514 |
+| NIF payloads scanned for graph | `5,111` |
+| Texture candidates tested | `9,489` |
+| Recovered model→texture links | `9,434` |
+| Unique linked NIF models | `3,224` |
+| Unique linked texture manifest assets | `2,514` |
+| Complete bundles in current copied archives | `6` |
+| Incomplete bundles in current copied archives | `3,218` |
+| Present texture refs in copied archives | `66` |
+| Missing texture refs in copied archives | `9,293` |
 
-Sample graph edge:
-
-```text
-model 21900d2ee4f931ca -> sky_cape_jule_skygradient.dds -> texture 607910464790649f
-```
-
-Validated linked-texture extraction bundle:
-
-```text
-model cc1dff6de7d25ed1 -> recovered\mushr3_c.dds
-model cc1dff6de7d25ed1 -> recovered\mushr3_g.dds
-model cc1dff6de7d25ed1 -> recovered\mushr3_s.dds
-```
-
-Validated complete NIF bundle:
+Validated example complete bundle:
 
 ```text
 model\001104_m253891_fnva0a67ee3_pak0311_off1393297_cc1dff6de7d25ed1.nif
@@ -123,109 +74,60 @@ textures\recovered\mushr3_g.dds
 textures\recovered\mushr3_s.dds
 ```
 
-Copied-set bundle completeness:
+## New archive-completion planner 🎯
 
-| Metric | Value |
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- plan-nif-bundle-archives --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-archive-plan.json" --limit 200
+```
+
+Validated live-read-only result:
+
+| Planner metric | Value |
 |---|---:|
-| Graph models | 3,224 |
-| Complete bundles in copied archives | 6 |
-| Incomplete bundles in copied archives | 3,218 |
-| Present texture refs | 66 |
-| Missing texture refs | 9,293 |
+| Live archives scanned | `244` |
+| Graph links | `9,434` |
+| Graph models | `3,224` |
+| Copied asset IDs | `40,203` |
+| Missing unique texture assets | `2,494` |
+| Missing texture assets found in live archives | `2,494` |
+| Missing texture assets not found in live archives | `0` |
+| Recommended archive chunks | `132` |
+| Greedy selected archives with `--limit 200` | `132` |
+| Bundles completed after full greedy plan | `3,218` |
 
-Interpretation: the NIF graph links thousands of model/texture relationships, but the current copied archive subset only contains a few fully complete bundles. The next practical unlock is identifying/copying the missing texture-bearing `assets.###` chunks.
+Top archive recommendations:
 
-Validated recovered-name extraction smoke:
+| Rank | Archive | Missing texture assets | Texture links | Affected models | Bundles completed by archive alone |
+|---:|---|---:|---:|---:|---:|
+| 1 | `assets.002` | `26` | `846` | `605` | `339` |
+| 2 | `assets.125` | `63` | `459` | `212` | `155` |
+| 3 | `assets.107` | `70` | `320` | `147` | `126` |
+| 4 | `assets.153` | `78` | `321` | `169` | `105` |
+| 5 | `assets.166` | `39` | `303` | `183` | `94` |
+| 6 | `assets.165` | `125` | `297` | `91` | `67` |
+| 7 | `assets.101` | `68` | `97` | `86` | `52` |
+| 8 | `assets.135` | `46` | `111` | `57` | `51` |
+| 9 | `assets.025` | `85` | `179` | `154` | `42` |
+| 10 | `assets.131` | `45` | `292` | `105` | `38` |
 
-```text
-id=3c85b176865a1014 -> recovered\d_id_lava_boat_02_g.dds
-```
+Why this matters: the copied set does not need blind archive expansion anymore. The planner identifies exactly which live archive chunks contain the missing NIF-linked textures and predicts bundle-completion gain before anything is copied.
 
-This is the first local proof that embedded model references can recover real manifest filename hashes and drive safe recovered-name extraction.
-
-After promoting Gamebryo files to `.nif`, the unknown-binary inventory still shows a repeated geometry-like family:
-
-```text
-57e0e05710c0c0100000000007000000
-```
-
-Current copied-archive sample count in the first 5,000 unknown `.bin` payloads:
-
-```text
-geometry-candidate count=202
-size range=1,440..15,536
-```
-
-Validated sample:
-
-| Field | Value |
-|---|---|
-| Archive | `assets.032` |
-| Entry | `202` |
-| ID prefix | `21900d2ee4f931ca` |
-| Manifest row | `275055` |
-| FNV | `0xae05f146` |
-| PAK index | `373` |
-| Output extension | `.nif` |
-
-## Commands validated
+## Commands validated ✅
 
 ```powershell
 dotnet build "C:\RIFT MODDING\Assets\RiftAssetDumper.slnx" --nologo
 ```
 
 ```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- scan-compression --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --out "C:\RIFT MODDING\Assets\Exports\live-compression-scan.json"
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- plan-nif-bundle-archives --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-archive-plan.json" --limit 200
 ```
 
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-archives --root "C:\RIFT MODDING\Assets\Source" --archive 32 --type nif --max-per-archive 3 --out "C:\RIFT MODDING\Assets\Exports\inventory-archive032-nif.json"
-```
+## Current safest next direction 🛡️
 
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --max-total 1 --out "C:\RIFT MODDING\Assets\Extracted\nif-detection-regression"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --out "C:\RIFT MODDING\Assets\Exports\probe-nif-21900d.json"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\inventory-nif-copied-full.json"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- mine-nif-references --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- match-names --root "C:\RIFT MODDING\Assets\Source" --names-file "C:\RIFT MODDING\Assets\Exports\nif-reference-candidates.txt" --out "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --algorithm both --only-length-match --require-unique
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- link-nif-textures --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-linked-textures --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id cc1dff6de7d25ed1 --out "C:\RIFT MODDING\Assets\Extracted\linked-textures-cc1dff"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id cc1dff6de7d25ed1 --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-cc1dff"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-bundles --root "C:\RIFT MODDING\Assets\Source" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-inventory.json"
-```
-
-```powershell
-dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-archives --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Extracted\nif-name-recovery-smoke" --id 3c85b176865a1014 --use-recovered-names "C:\RIFT MODDING\Assets\Exports\nif-reference-name-matches.jsonl" --max-total 1
-```
-
-## Next best technical direction
-
-1. Treat NIF/Gamebryo as the primary model path.
-2. Test extracted `.nif` files against known NIF tooling/viewers.
-3. Use `nif-bundle-inventory.json` to prioritize missing texture archive chunks.
-4. Use complete linked bundles to visually validate model/texture pairings in external viewers.
-5. Reframe LZMA2 as logical PAK reconstruction work, not TWAD entry extraction.
+1. Copy only the highest-yield archive chunks locally, starting with `assets.002`, `assets.125`, `assets.107`, `assets.153`, and `assets.166`.
+2. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
+3. Extract a few newly complete bundles and validate them in external NIF/Gamebryo tooling.
+4. Keep live install access read-only unless intentionally copying selected `assets.###` chunks into local ignored `Source\Assets`.
+5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

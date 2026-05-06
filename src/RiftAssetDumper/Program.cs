@@ -114,6 +114,11 @@ internal static class Program
                 return InventoryNifBundles(options);
             }
 
+            if (options.Command == "plan-nif-bundle-archives")
+            {
+                return PlanNifBundleArchives(options);
+            }
+
             var report = Probe(options.RootDirectory);
             PrintReport(report, options.RedactPaths);
 
@@ -2167,6 +2172,274 @@ internal static class Program
         return 0;
     }
 
+    private static int PlanNifBundleArchives(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var linksPath = string.IsNullOrWhiteSpace(options.InputPath)
+            ? Path.GetFullPath(Path.Combine(rootDirectory, "..", "Exports", "nif-texture-links.jsonl"))
+            : Path.GetFullPath(options.InputPath);
+        if (!File.Exists(linksPath))
+        {
+            Console.Error.WriteLine($"ERROR: link JSONL does not exist: {DisplayPath(options, linksPath)}");
+            return 1;
+        }
+
+        var copiedIds = ReadCopiedArchiveIds(rootDirectory);
+        var links = ReadJsonLines<NifTextureLinkRecord>(linksPath).ToList();
+        var modelGroups = links
+            .GroupBy(static l => l.ModelIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var orderedLinks = g.OrderBy(static l => l.Candidate, StringComparer.OrdinalIgnoreCase).ToList();
+                var uniqueTextureIds = orderedLinks.Select(static l => l.TextureIdPrefix).Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var missingTextureIds = uniqueTextureIds.Where(id => !copiedIds.Contains(id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                return new NifBundleArchiveModelState(
+                    ModelIdPrefix: g.Key,
+                    IsModelPresentInCopiedArchives: copiedIds.Contains(g.Key),
+                    MissingTextureIds: missingTextureIds,
+                    CandidateSamples: orderedLinks
+                        .Where(l => missingTextureIds.Contains(l.TextureIdPrefix))
+                        .Select(static l => l.Candidate)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(10)
+                        .ToList());
+            })
+            .ToList();
+
+        var missingTextureIds = modelGroups
+            .SelectMany(static m => m.MissingTextureIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var textureLinkCounts = links
+            .Where(l => missingTextureIds.Contains(l.TextureIdPrefix))
+            .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static g => g.Key, static g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        var textureCandidates = links
+            .Where(l => missingTextureIds.Contains(l.TextureIdPrefix))
+            .GroupBy(static l => l.TextureIdPrefix, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static g => g.Key,
+                static g => g.Select(static l => l.Candidate).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static c => c, StringComparer.OrdinalIgnoreCase).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var scanRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(options.LiveRoot) ? rootDirectory : options.LiveRoot);
+        var liveAssetsDirectory = ResolveAssetsDirectory(scanRoot);
+        if (!Directory.Exists(liveAssetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: live/candidate assets directory does not exist: {DisplayPath(options, liveAssetsDirectory)}");
+            return 1;
+        }
+
+        var archiveFilter = NormalizeArchiveFilter(options.ArchiveFilter);
+        var archiveToMissingTextureIds = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var missingTextureToArchiveNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var archivesScanned = 0;
+        var entriesScanned = 0;
+        var matchedEntries = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(liveAssetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (archiveFilter is not null && !string.Equals(archiveName, archiveFilter, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            archivesScanned++;
+            foreach (var entry in entries)
+            {
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                entriesScanned++;
+                if (!missingTextureIds.Contains(entry.IdPrefix))
+                {
+                    continue;
+                }
+
+                matchedEntries++;
+                if (!archiveToMissingTextureIds.TryGetValue(archiveName, out var archiveTextureIds))
+                {
+                    archiveTextureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    archiveToMissingTextureIds.Add(archiveName, archiveTextureIds);
+                }
+
+                archiveTextureIds.Add(entry.IdPrefix);
+                if (!missingTextureToArchiveNames.TryGetValue(entry.IdPrefix, out var archiveNames))
+                {
+                    archiveNames = [];
+                    missingTextureToArchiveNames.Add(entry.IdPrefix, archiveNames);
+                }
+
+                if (!archiveNames.Contains(archiveName, StringComparer.OrdinalIgnoreCase))
+                {
+                    archiveNames.Add(archiveName);
+                }
+            }
+        }
+
+        var foundTextureIds = missingTextureToArchiveNames.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var notFoundTextureIds = missingTextureIds.Where(id => !foundTextureIds.Contains(id)).OrderBy(static id => id, StringComparer.OrdinalIgnoreCase).ToList();
+        var recommendations = archiveToMissingTextureIds
+            .Select(kvp =>
+            {
+                var archiveName = kvp.Key;
+                var archiveTextureIds = kvp.Value;
+                var affectedModels = modelGroups.Count(m => m.MissingTextureIds.Overlaps(archiveTextureIds));
+                var completesBundlesAlone = modelGroups.Count(m => m.IsModelPresentInCopiedArchives && m.MissingTextureIds.Count > 0 && m.MissingTextureIds.IsSubsetOf(archiveTextureIds));
+                var sampleNames = archiveTextureIds
+                    .SelectMany(id => textureCandidates.TryGetValue(id, out var candidates) ? candidates : [])
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(static c => c, StringComparer.OrdinalIgnoreCase)
+                    .Take(10)
+                    .ToList();
+
+                return new NifBundleArchiveRecommendation(
+                    ArchiveName: archiveName,
+                    MissingTextureAssets: archiveTextureIds.Count,
+                    MissingTextureLinks: archiveTextureIds.Sum(id => textureLinkCounts.TryGetValue(id, out var count) ? count : 0),
+                    AffectedModels: affectedModels,
+                    CompletesBundlesAlone: completesBundlesAlone,
+                    SampleTextureIds: archiveTextureIds.OrderBy(static id => id, StringComparer.OrdinalIgnoreCase).Take(10).ToList(),
+                    SampleTextureNames: sampleNames);
+            })
+            .OrderByDescending(static r => r.CompletesBundlesAlone)
+            .ThenByDescending(static r => r.MissingTextureAssets)
+            .ThenByDescending(static r => r.MissingTextureLinks)
+            .ThenBy(static r => r.ArchiveName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var greedyPlan = BuildNifBundleArchiveGreedyPlan(modelGroups, archiveToMissingTextureIds, textureCandidates, options.Limit > 0 ? options.Limit : 25);
+        var report = new NifBundleArchivePlanReport(
+            RootDirectory: rootDirectory,
+            LinksPath: linksPath,
+            LiveRoot: scanRoot,
+            LiveAssetsDirectory: liveAssetsDirectory,
+            ArchivesScanned: archivesScanned,
+            ArchiveEntriesScanned: entriesScanned,
+            MatchingArchiveEntries: matchedEntries,
+            CopiedAssetIds: copiedIds.Count,
+            GraphLinks: links.Count,
+            GraphModels: modelGroups.Count,
+            ModelsPresentInCopiedArchives: modelGroups.Count(static m => m.IsModelPresentInCopiedArchives),
+            MissingTextureAssetIds: missingTextureIds.Count,
+            MissingTextureAssetIdsFoundInLive: foundTextureIds.Count,
+            MissingTextureAssetIdsNotFoundInLive: notFoundTextureIds.Count,
+            ArchiveRecommendations: recommendations,
+            GreedyPlan: greedyPlan,
+            MissingTextureIdsNotFoundInLiveSamples: notFoundTextureIds.Take(50).ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-bundle-archive-plan.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Graph links: {links.Count:N0}");
+        Console.WriteLine($"Graph models: {modelGroups.Count:N0}");
+        Console.WriteLine($"Copied asset IDs: {copiedIds.Count:N0}");
+        Console.WriteLine($"Missing texture assets: {missingTextureIds.Count:N0}");
+        Console.WriteLine($"Live/candidate assets directory: {DisplayPath(options, liveAssetsDirectory)}");
+        Console.WriteLine($"Archives scanned: {archivesScanned:N0}");
+        Console.WriteLine($"Found missing texture assets in live archives: {foundTextureIds.Count:N0}");
+        Console.WriteLine($"Missing texture assets not found in live archives: {notFoundTextureIds.Count:N0}");
+        Console.WriteLine($"Archive recommendations: {recommendations.Count:N0}");
+        if (recommendations.Count > 0)
+        {
+            var top = recommendations[0];
+            Console.WriteLine($"Top archive: {top.ArchiveName} covers {top.MissingTextureAssets:N0} missing texture assets, affects {top.AffectedModels:N0} models, completes {top.CompletesBundlesAlone:N0} bundles alone");
+        }
+
+        if (greedyPlan.Count > 0)
+        {
+            var firstStep = greedyPlan[0];
+            Console.WriteLine($"Greedy first step: {firstStep.ArchiveName} adds {firstStep.NewTextureAssets:N0} texture assets and completes {firstStep.NewlyCompletedBundles:N0} bundles");
+            Console.WriteLine($"Greedy selected archives: {greedyPlan.Count:N0}; cumulative completed bundles: {greedyPlan[^1].CumulativeCompletedBundles:N0}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return 0;
+    }
+
+    private static List<NifBundleArchiveGreedyStep> BuildNifBundleArchiveGreedyPlan(
+        List<NifBundleArchiveModelState> modelGroups,
+        Dictionary<string, HashSet<string>> archiveToMissingTextureIds,
+        Dictionary<string, List<string>> textureCandidates,
+        int maxSteps)
+    {
+        var remainingArchives = archiveToMissingTextureIds.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var selectedTextureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var completedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var eligibleMissingModels = modelGroups
+            .Where(static m => m.IsModelPresentInCopiedArchives && m.MissingTextureIds.Count > 0)
+            .ToList();
+        var plan = new List<NifBundleArchiveGreedyStep>();
+
+        while (remainingArchives.Count > 0 && plan.Count < maxSteps)
+        {
+            var best = remainingArchives
+                .Select(archiveName =>
+                {
+                    var newTextureIds = archiveToMissingTextureIds[archiveName]
+                        .Where(id => !selectedTextureIds.Contains(id))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var newlyCompleted = eligibleMissingModels.Count(m =>
+                        !completedModels.Contains(m.ModelIdPrefix) &&
+                        m.MissingTextureIds.All(id => selectedTextureIds.Contains(id) || newTextureIds.Contains(id)));
+                    return new { ArchiveName = archiveName, NewTextureIds = newTextureIds, NewlyCompleted = newlyCompleted };
+                })
+                .Where(static c => c.NewTextureIds.Count > 0)
+                .OrderByDescending(static c => c.NewlyCompleted)
+                .ThenByDescending(static c => c.NewTextureIds.Count)
+                .ThenBy(static c => c.ArchiveName, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            if (best is null)
+            {
+                break;
+            }
+
+            foreach (var textureId in best.NewTextureIds)
+            {
+                selectedTextureIds.Add(textureId);
+            }
+
+            foreach (var model in eligibleMissingModels)
+            {
+                if (!completedModels.Contains(model.ModelIdPrefix) &&
+                    model.MissingTextureIds.All(selectedTextureIds.Contains))
+                {
+                    completedModels.Add(model.ModelIdPrefix);
+                }
+            }
+
+            var sampleNames = best.NewTextureIds
+                .SelectMany(id => textureCandidates.TryGetValue(id, out var candidates) ? candidates : [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static c => c, StringComparer.OrdinalIgnoreCase)
+                .Take(10)
+                .ToList();
+            plan.Add(new NifBundleArchiveGreedyStep(
+                Step: plan.Count + 1,
+                ArchiveName: best.ArchiveName,
+                NewTextureAssets: best.NewTextureIds.Count,
+                NewlyCompletedBundles: best.NewlyCompleted,
+                CumulativeCompletedBundles: completedModels.Count,
+                RemainingIncompleteBundles: eligibleMissingModels.Count - completedModels.Count,
+                SampleTextureNames: sampleNames));
+            remainingArchives.Remove(best.ArchiveName);
+        }
+
+        return plan;
+    }
+
     private static (byte[] Payload, BinaryAssetSource Source) LoadPayloadForProbe(AppOptions options, string rootDirectory)
     {
         if (!string.IsNullOrWhiteSpace(options.InputPath))
@@ -3803,6 +4076,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-nif-bundle --root <SourceFolder> --input <links.jsonl> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-bundles --root <SourceFolder> --input <links.jsonl>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- plan-nif-bundle-archives --root <SourceFolder> --live-root <RiftLiveFolder> --input <links.jsonl>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-archives --root <SourceFolder> --out <OutFolder> --max-per-archive 10");
         Console.WriteLine();
         Console.WriteLine("Defaults:");
@@ -3812,7 +4086,7 @@ internal static class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --root <path>   Folder containing assets64.manifest and Assets/assets.###");
         Console.WriteLine("  --live-root <path>");
-        Console.WriteLine("                  Live RIFT root to scan read-only for scan-compression");
+        Console.WriteLine("                  Live RIFT root to scan read-only for scan-compression or NIF archive planning");
         Console.WriteLine("  --input <path>  Input file/folder for mine-strings, probe-binary, or probe-nif");
         Console.WriteLine("  --manifest <path>");
         Console.WriteLine("                  Manifest to use. Defaults to assets64.manifest under --root");
@@ -4009,6 +4283,7 @@ internal static class Program
                     case "extract-linked-textures":
                     case "extract-nif-bundle":
                     case "inventory-nif-bundles":
+                    case "plan-nif-bundle-archives":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -4562,6 +4837,49 @@ internal sealed record NifBundleInventorySample(
     bool IsComplete,
     List<string> PresentTextureSamples,
     List<string> MissingTextureSamples);
+
+internal sealed record NifBundleArchiveModelState(
+    string ModelIdPrefix,
+    bool IsModelPresentInCopiedArchives,
+    HashSet<string> MissingTextureIds,
+    List<string> CandidateSamples);
+
+internal sealed record NifBundleArchivePlanReport(
+    string RootDirectory,
+    string LinksPath,
+    string LiveRoot,
+    string LiveAssetsDirectory,
+    int ArchivesScanned,
+    int ArchiveEntriesScanned,
+    int MatchingArchiveEntries,
+    int CopiedAssetIds,
+    int GraphLinks,
+    int GraphModels,
+    int ModelsPresentInCopiedArchives,
+    int MissingTextureAssetIds,
+    int MissingTextureAssetIdsFoundInLive,
+    int MissingTextureAssetIdsNotFoundInLive,
+    List<NifBundleArchiveRecommendation> ArchiveRecommendations,
+    List<NifBundleArchiveGreedyStep> GreedyPlan,
+    List<string> MissingTextureIdsNotFoundInLiveSamples);
+
+internal sealed record NifBundleArchiveRecommendation(
+    string ArchiveName,
+    int MissingTextureAssets,
+    int MissingTextureLinks,
+    int AffectedModels,
+    int CompletesBundlesAlone,
+    List<string> SampleTextureIds,
+    List<string> SampleTextureNames);
+
+internal sealed record NifBundleArchiveGreedyStep(
+    int Step,
+    string ArchiveName,
+    int NewTextureAssets,
+    int NewlyCompletedBundles,
+    int CumulativeCompletedBundles,
+    int RemainingIncompleteBundles,
+    List<string> SampleTextureNames);
 
 internal sealed record ProbeReport(string RootDirectory)
 {
