@@ -114,6 +114,35 @@ Top archive recommendations:
 
 Why this matters: the copied set does not need blind archive expansion anymore. The planner identifies exactly which live archive chunks contain the missing NIF-linked textures and predicts bundle-completion gain before anything is copied.
 
+## Live-read fallback extraction proof 🧪
+
+Targeted NIF bundle extraction now uses `--live-root` as a read-only fallback source for linked textures that are missing from the copied local archive subset.
+
+Validated model:
+
+| Field | Value |
+|---|---|
+| Model ID | `011267450ef6781f` |
+| Copied-only result | `0/1` linked textures written |
+| Live-fallback result | `1/1` linked textures written |
+| Texture source | live fallback |
+| Recovered texture path | `textures\recovered\diffuse_blank.dds` |
+
+Output proof:
+
+```text
+Texture links: 1
+Textures written: 1
+Textures written from copied archives: 0
+Textures written from live fallback: 1
+Textures missing from copied archives: 1
+Textures missing from selected sources: 0
+model\000920_m177820_fnv70a506db_pak1434_off309027_011267450ef6781f.nif
+textures\recovered\diffuse_blank.dds
+```
+
+Why this matters: the tool can now complete selected model+texture bundles immediately without first copying entire high-yield archive chunks into `Source\Assets`.
+
 ## Commands validated ✅
 
 ```powershell
@@ -124,10 +153,14 @@ dotnet build "C:\RIFT MODDING\Assets\RiftAssetDumper.slnx" --nologo
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- plan-nif-bundle-archives --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --out "C:\RIFT MODDING\Assets\Exports\nif-bundle-archive-plan.json" --limit 200
 ```
 
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 011267450ef6781f --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-011267-live-fallback"
+```
+
 ## Current safest next direction 🛡️
 
-1. Copy only the highest-yield archive chunks locally, starting with `assets.002`, `assets.125`, `assets.107`, `assets.153`, and `assets.166`.
-2. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
-3. Extract a few newly complete bundles and validate them in external NIF/Gamebryo tooling.
-4. Keep live install access read-only unless intentionally copying selected `assets.###` chunks into local ignored `Source\Assets`.
+1. Use live-read fallback for targeted bundle proofing before copying large archive chunks.
+2. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
+3. Re-run `inventory-nif-bundles` after each copy batch to verify predicted bundle-completion gains.
+4. Extract a few newly complete bundles and validate them in external NIF/Gamebryo tooling.
 5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

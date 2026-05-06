@@ -1860,7 +1860,10 @@ internal static class Program
         var samples = new List<LinkedTextureExtractSample>();
         var attempted = 0;
         var written = 0;
-        var missing = 0;
+        var writtenFromCopied = 0;
+        var writtenFromLive = 0;
+        var missingFromCopied = 0;
+        var missingFromSelectedSources = 0;
         var typeMismatch = 0;
         var failed = 0;
 
@@ -1877,8 +1880,15 @@ internal static class Program
                 var found = FindPayloadForId(rootDirectory, lookup, link.TextureIdPrefix, options);
                 if (found is null)
                 {
-                    missing++;
+                    missingFromCopied++;
+                    missingFromSelectedSources++;
                     continue;
+                }
+
+                var foundInLiveFallback = string.Equals(found.SourceKind, "live", StringComparison.OrdinalIgnoreCase);
+                if (foundInLiveFallback)
+                {
+                    missingFromCopied++;
                 }
 
                 var detected = DetectFileType(found.Payload);
@@ -1892,6 +1902,15 @@ internal static class Program
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 File.WriteAllBytes(outputPath, found.Payload);
                 written++;
+                if (foundInLiveFallback)
+                {
+                    writtenFromLive++;
+                }
+                else
+                {
+                    writtenFromCopied++;
+                }
+
                 if (samples.Count < 50)
                 {
                     samples.Add(new LinkedTextureExtractSample(
@@ -1900,6 +1919,7 @@ internal static class Program
                         Candidate: link.Candidate,
                         ArchiveName: found.ArchiveName,
                         EntryIndex: found.EntryIndex,
+                        SourceKind: found.SourceKind,
                         Type: detected.Extension,
                         Width: detected.Width,
                         Height: detected.Height,
@@ -1921,7 +1941,10 @@ internal static class Program
             UniqueTextureLinks: links.Count,
             Attempted: attempted,
             Written: written,
-            MissingFromCopiedArchives: missing,
+            WrittenFromCopiedArchives: writtenFromCopied,
+            WrittenFromLiveArchives: writtenFromLive,
+            MissingFromCopiedArchives: missingFromCopied,
+            MissingFromSelectedSources: missingFromSelectedSources,
             TypeMismatches: typeMismatch,
             Failed: failed,
             Samples: samples);
@@ -1931,7 +1954,10 @@ internal static class Program
         Console.WriteLine($"Links: {links.Count:N0}");
         Console.WriteLine($"Attempted: {attempted:N0}");
         Console.WriteLine($"Written: {written:N0}");
-        Console.WriteLine($"Missing from copied archives: {missing:N0}");
+        Console.WriteLine($"Written from copied archives: {writtenFromCopied:N0}");
+        Console.WriteLine($"Written from live fallback: {writtenFromLive:N0}");
+        Console.WriteLine($"Missing from copied archives: {missingFromCopied:N0}");
+        Console.WriteLine($"Missing from selected sources: {missingFromSelectedSources:N0}");
         Console.WriteLine($"Type mismatches: {typeMismatch:N0}");
         Console.WriteLine($"Failed: {failed:N0}");
         Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
@@ -1970,7 +1996,7 @@ internal static class Program
         var foundModel = FindPayloadForId(rootDirectory, lookup, modelId, options);
         if (foundModel is null)
         {
-            Console.Error.WriteLine($"ERROR: model payload was not found in copied archives: {modelId}");
+            Console.Error.WriteLine($"ERROR: model payload was not found in selected archive sources: {modelId}");
             return 1;
         }
 
@@ -2001,7 +2027,10 @@ internal static class Program
         var samples = new List<LinkedTextureExtractSample>();
         var attempted = 0;
         var written = 0;
-        var missing = 0;
+        var writtenFromCopied = 0;
+        var writtenFromLive = 0;
+        var missingFromCopied = 0;
+        var missingFromSelectedSources = 0;
         var typeMismatch = 0;
         var failed = 0;
 
@@ -2013,8 +2042,15 @@ internal static class Program
                 var found = FindPayloadForId(rootDirectory, lookup, link.TextureIdPrefix, options);
                 if (found is null)
                 {
-                    missing++;
+                    missingFromCopied++;
+                    missingFromSelectedSources++;
                     continue;
+                }
+
+                var foundInLiveFallback = string.Equals(found.SourceKind, "live", StringComparison.OrdinalIgnoreCase);
+                if (foundInLiveFallback)
+                {
+                    missingFromCopied++;
                 }
 
                 var detected = DetectFileType(found.Payload);
@@ -2028,6 +2064,15 @@ internal static class Program
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 File.WriteAllBytes(outputPath, found.Payload);
                 written++;
+                if (foundInLiveFallback)
+                {
+                    writtenFromLive++;
+                }
+                else
+                {
+                    writtenFromCopied++;
+                }
+
                 if (samples.Count < 100)
                 {
                     samples.Add(new LinkedTextureExtractSample(
@@ -2036,6 +2081,7 @@ internal static class Program
                         Candidate: link.Candidate,
                         ArchiveName: found.ArchiveName,
                         EntryIndex: found.EntryIndex,
+                        SourceKind: found.SourceKind,
                         Type: detected.Extension,
                         Width: detected.Width,
                         Height: detected.Height,
@@ -2064,11 +2110,15 @@ internal static class Program
                 NifVersion: modelHeader.VersionText,
                 BlockCount: modelHeader.BlockCount,
                 StringCount: modelHeader.StringCount,
+                SourceKind: foundModel.SourceKind,
                 RelativePath: Path.GetRelativePath(outDirectory, modelPath)),
             UniqueTextureLinks: links.Count,
             TextureAttempted: attempted,
             TextureWritten: written,
-            TextureMissingFromCopiedArchives: missing,
+            TextureWrittenFromCopiedArchives: writtenFromCopied,
+            TextureWrittenFromLiveArchives: writtenFromLive,
+            TextureMissingFromCopiedArchives: missingFromCopied,
+            TextureMissingFromSelectedSources: missingFromSelectedSources,
             TextureTypeMismatches: typeMismatch,
             TextureFailed: failed,
             Textures: samples);
@@ -2079,7 +2129,10 @@ internal static class Program
         Console.WriteLine($"NIF version: {modelHeader.VersionText}");
         Console.WriteLine($"Texture links: {links.Count:N0}");
         Console.WriteLine($"Textures written: {written:N0}");
-        Console.WriteLine($"Textures missing from copied archives: {missing:N0}");
+        Console.WriteLine($"Textures written from copied archives: {writtenFromCopied:N0}");
+        Console.WriteLine($"Textures written from live fallback: {writtenFromLive:N0}");
+        Console.WriteLine($"Textures missing from copied archives: {missingFromCopied:N0}");
+        Console.WriteLine($"Textures missing from selected sources: {missingFromSelectedSources:N0}");
         Console.WriteLine($"Texture type mismatches: {typeMismatch:N0}");
         Console.WriteLine($"Texture failures: {failed:N0}");
         Console.WriteLine($"Output: {DisplayPath(options, outDirectory)}");
@@ -2452,11 +2505,12 @@ internal static class Program
         var lookup = ReadManifestLookup(manifestPath);
         var target = ResolveTargetEntry(options, lookup);
         var found = FindPayloadForId(rootDirectory, lookup, target.IdPrefix, options)
-            ?? throw new InvalidOperationException($"target asset {target.IdPrefix} was not found in copied archives.");
+            ?? throw new InvalidOperationException($"target asset {target.IdPrefix} was not found in selected archive sources.");
 
         return (found.Payload, new BinaryAssetSource(
             ArchiveName: found.ArchiveName,
             EntryIndex: found.EntryIndex,
+            SourceKind: found.SourceKind,
             IdPrefix: target.IdPrefix,
             ManifestEntryIndex: target.Index,
             FilenameFnv1Hash: target.FilenameFnv1Hash,
@@ -3007,8 +3061,37 @@ internal static class Program
 
     private static FoundPayload? FindPayloadForId(string rootDirectory, ManifestLookup lookup, string idPrefix, AppOptions options)
     {
-        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
         var archiveFilter = NormalizeArchiveFilter(options.ArchiveFilter);
+        var found = FindPayloadForIdInRoot(rootDirectory, idPrefix, archiveFilter, options, sourceKind: "copied");
+        if (found is not null)
+        {
+            return found;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.LiveRoot))
+        {
+            return null;
+        }
+
+        var liveRoot = Path.GetFullPath(options.LiveRoot);
+        var copiedAssetsDirectory = ResolveAssetsDirectory(Path.GetFullPath(rootDirectory));
+        var liveAssetsDirectory = ResolveAssetsDirectory(liveRoot);
+        if (PathsEqual(copiedAssetsDirectory, liveAssetsDirectory))
+        {
+            return null;
+        }
+
+        return FindPayloadForIdInRoot(liveRoot, idPrefix, archiveFilter, options, sourceKind: "live");
+    }
+
+    private static FoundPayload? FindPayloadForIdInRoot(string rootDirectory, string idPrefix, string? archiveFilter, AppOptions options, string sourceKind)
+    {
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            return null;
+        }
+
         foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
         {
             var archiveName = Path.GetFileName(archivePath);
@@ -3033,11 +3116,19 @@ internal static class Program
 
                 var packed = ReadArchivePayload(stream, entry, archiveName);
                 var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
-                return new FoundPayload(archiveName, entry.Index, payload.Bytes);
+                return new FoundPayload(archiveName, entry.Index, payload.Bytes, sourceKind);
             }
         }
 
         return null;
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        return string.Equals(
+            Path.GetFullPath(left).TrimEnd('\\', '/'),
+            Path.GetFullPath(right).TrimEnd('\\', '/'),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static BinaryProbeData BuildBinaryProbe(byte[] payload)
@@ -4086,7 +4177,7 @@ internal static class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --root <path>   Folder containing assets64.manifest and Assets/assets.###");
         Console.WriteLine("  --live-root <path>");
-        Console.WriteLine("                  Live RIFT root to scan read-only for scan-compression or NIF archive planning");
+        Console.WriteLine("                  Live RIFT root to scan/read fallback for compression, NIF planning, or targeted bundle extraction");
         Console.WriteLine("  --input <path>  Input file/folder for mine-strings, probe-binary, or probe-nif");
         Console.WriteLine("  --manifest <path>");
         Console.WriteLine("                  Manifest to use. Defaults to assets64.manifest under --root");
@@ -4587,12 +4678,14 @@ internal sealed record BinaryAssetSource(
     int? ManifestEntryIndex = null,
     uint? FilenameFnv1Hash = null,
     ushort? PakIndex = null,
-    uint? PakOffset = null);
+    uint? PakOffset = null,
+    string? SourceKind = null);
 
 internal sealed record FoundPayload(
     string ArchiveName,
     int EntryIndex,
-    byte[] Payload);
+    byte[] Payload,
+    string SourceKind);
 
 internal sealed record BinaryProbeData(
     string First4,
@@ -4766,7 +4859,10 @@ internal sealed record LinkedTextureExtractReport(
     int UniqueTextureLinks,
     int Attempted,
     int Written,
+    int WrittenFromCopiedArchives,
+    int WrittenFromLiveArchives,
     int MissingFromCopiedArchives,
+    int MissingFromSelectedSources,
     int TypeMismatches,
     int Failed,
     List<LinkedTextureExtractSample> Samples);
@@ -4777,6 +4873,7 @@ internal sealed record LinkedTextureExtractSample(
     string Candidate,
     string ArchiveName,
     int EntryIndex,
+    string SourceKind,
     string Type,
     int? Width,
     int? Height,
@@ -4791,7 +4888,10 @@ internal sealed record NifBundleExtractReport(
     int UniqueTextureLinks,
     int TextureAttempted,
     int TextureWritten,
+    int TextureWrittenFromCopiedArchives,
+    int TextureWrittenFromLiveArchives,
     int TextureMissingFromCopiedArchives,
+    int TextureMissingFromSelectedSources,
     int TextureTypeMismatches,
     int TextureFailed,
     List<LinkedTextureExtractSample> Textures);
@@ -4807,6 +4907,7 @@ internal sealed record NifBundleModelSample(
     string NifVersion,
     uint? BlockCount,
     uint? StringCount,
+    string SourceKind,
     string RelativePath);
 
 internal sealed record NifBundleInventoryReport(

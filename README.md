@@ -566,6 +566,27 @@ Cumulative completed bundles after greedy plan: 3,218
 
 This is the current highest-leverage archive-copy map: the generated JSON ranks which `assets.###` chunks contain missing NIF-linked textures and shows how many additional complete model+texture bundles each chunk unlocks. It is intentionally read-only against the live RIFT install.
 
+Targeted NIF bundle extraction can now use `--live-root` as a read-only fallback for missing linked textures, without copying full live archive chunks into `Source\Assets`:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- extract-nif-bundle --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --input "C:\RIFT MODDING\Assets\Exports\nif-texture-links.jsonl" --id 011267450ef6781f --out "C:\RIFT MODDING\Assets\Extracted\nif-bundle-011267-live-fallback"
+```
+
+Validated newly completed bundle:
+
+```text
+Texture links: 1
+Textures written: 1
+Textures written from copied archives: 0
+Textures written from live fallback: 1
+Textures missing from copied archives: 1
+Textures missing from selected sources: 0
+model\000920_m177820_fnv70a506db_pak1434_off309027_011267450ef6781f.nif
+textures\recovered\diffuse_blank.dds
+```
+
+This turns the archive planner into immediate extraction value: a bundle that was incomplete with copied data only can now be completed by reading the needed texture payload directly from the live install.
+
 Validated recovered-name extraction smoke:
 
 ```powershell
