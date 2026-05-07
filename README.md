@@ -629,6 +629,26 @@ uint16 big-endian:    1,2,2,1,3,4,5,6
 
 This gives an evidence-backed lead that at least some compact/index-like stream bodies read more naturally as big-endian 16-bit values. Keep it as a lead until correlated with mesh vertex counts and triangle layout.
 
+Inventory that byte-order lead across all copied NIF stream bodies:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-endianness --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-endianness-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+Even-length stream bodies: 31,777
+mixed-u16-body: 24,272
+big-endian-u16-lead: 5,551
+ambiguous-small-u16: 1,800
+little-endian-u16-lead: 154
+Top big-endian signature:
+  payload=72 first16=00010002000200010003000400050006 count=352
+```
+
+This promotes big-endian `uint16` from a one-sample clue to a ranked copied-set lead. It is still not final index semantics until mesh vertex-count and triangle-layout checks agree.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell

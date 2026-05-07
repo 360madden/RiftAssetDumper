@@ -490,6 +490,46 @@ uint16 big-endian        = 1,2,2,1,3,4,5,6
 
 Why this matters: the new body probe makes byte order visible instead of assuming little-endian for every stream body. The `#23` sample has an index-like big-endian `uint16` prefix, but this remains a lead until matched against mesh vertex counts and triangle layout.
 
+## Full copied-set stream endianness inventory 🔁
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-endianness --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-endianness-inventory.json" --limit 100
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| NiDataStream blocks | `31,777` |
+| Valid stream bodies | `31,777` |
+| Even-length stream bodies | `31,777` |
+| Invalid stream bodies | `0` |
+
+Endianness classes:
+
+| Class | Count | Avg big-endian low-value ratio | Avg little-endian low-value ratio | Top payload sizes |
+|---|---:|---:|---:|---|
+| `mixed-u16-body` | `24,272` | `0.14` | `0.18` | `288×995`, `192×907`, `96×607` |
+| `big-endian-u16-lead` | `5,551` | `1.00` | `0.48` | `72×467`, `144×327`, `12×181`, `48×180`, `120×180` |
+| `ambiguous-small-u16` | `1,800` | `0.86` | `0.86` | `288×594`, `48×174`, `8×112` |
+| `little-endian-u16-lead` | `154` | `0.62` | `1.00` | `48×70`, `36×16`, `288×16` |
+
+Top big-endian signatures:
+
+| Payload bytes | Count | NIF payloads | First 16 body bytes |
+|---:|---:|---:|---|
+| `72` | `352` | `341` | `00010002000200010003000400050006` |
+| `12` | `168` | `159` | `000100020002000100030001` |
+| `144` | `161` | `161` | `00010002000200010003000400050006` |
+| `1620` | `92` | `92` | `00010002000200010003000200030004` |
+| `192` | `77` | `77` | `00010002000200010003000400050006` |
+
+Why this matters: big-endian `uint16` is now a copied-set-ranked lead affecting `5,551` stream bodies, especially compact/index-like payload sizes. It is still a lead, not final index-buffer proof, until checked against mesh vertex counts and triangle divisibility.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -612,15 +652,20 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-endianness --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-endianness-inventory.json" --limit 100
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
 ```
 
 ## Current safest next direction 🛡️
 
 1. Decode only declared stream bodies after the proven 29-byte `NiDataStream` header.
-2. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
-3. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
-4. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
-5. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
-6. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
-7. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+2. Prioritize `big-endian-u16-lead` stream bodies for index/triangle plausibility checks.
+3. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
+4. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
+5. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
+6. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
+7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+8. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

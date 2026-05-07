@@ -120,6 +120,11 @@ internal static class Program
                 return InventoryNifStreamBodies(options);
             }
 
+            if (options.Command == "inventory-nif-stream-endianness")
+            {
+                return InventoryNifStreamEndianness(options);
+            }
+
             if (options.Command == "mine-nif-references")
             {
                 return MineNifReferences(options);
@@ -2742,6 +2747,228 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int InventoryNifStreamEndianness(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var classGroups = new Dictionary<string, NifStreamEndianClassAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var signatureGroups = new Dictionary<string, NifStreamEndianSignatureAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var dataStreamBlocks = 0;
+        var validStreamBodies = 0;
+        var evenLengthBodies = 0;
+        var invalidStreamBodies = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var block in header.Blocks.Where(static b => b.TypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        dataStreamBlocks++;
+                        var blockPayload = SliceNifBlockPayload(payload.Bytes, block);
+                        if (blockPayload.Length < 4)
+                        {
+                            invalidStreamBodies++;
+                            continue;
+                        }
+
+                        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                        if (declaredPayloadBytes > blockPayload.Length)
+                        {
+                            invalidStreamBodies++;
+                            continue;
+                        }
+
+                        validStreamBodies++;
+                        var bodyOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
+                        var body = blockPayload.Slice(bodyOffset, checked((int)declaredPayloadBytes));
+                        if (body.Length % 2 != 0)
+                        {
+                            continue;
+                        }
+
+                        evenLengthBodies++;
+                        var stats = AnalyzeNifStreamEndian(body);
+                        var sample = new NifStreamEndianSample(
+                            ArchiveName: archiveName,
+                            EntryIndex: entry.Index,
+                            IdPrefix: entry.IdPrefix,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            BlockIndex: block.Index,
+                            TypeName: block.TypeName,
+                            BlockSize: block.Size,
+                            HeaderBytes: bodyOffset,
+                            DeclaredPayloadBytes: declaredPayloadBytes,
+                            PayloadFirst16: stats.First16,
+                            Stats: stats);
+
+                        if (!classGroups.TryGetValue(stats.Classification, out var classGroup))
+                        {
+                            classGroup = new NifStreamEndianClassAccumulator(stats.Classification);
+                            classGroups.Add(stats.Classification, classGroup);
+                        }
+
+                        classGroup.Count++;
+                        classGroup.PayloadSizeCounts[declaredPayloadBytes] = classGroup.PayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes) + 1;
+                        classGroup.BlockSizeCounts[block.Size] = classGroup.BlockSizeCounts.GetValueOrDefault(block.Size) + 1;
+                        classGroup.BigEndianLowValueRatioTotal += stats.BigEndianLowValueRatio;
+                        classGroup.LittleEndianLowValueRatioTotal += stats.LittleEndianLowValueRatio;
+                        if (classGroup.Samples.Count < 16)
+                        {
+                            classGroup.Samples.Add(sample);
+                        }
+
+                        var signatureKey = $"{stats.Classification}|{declaredPayloadBytes}|{stats.First16}";
+                        if (!signatureGroups.TryGetValue(signatureKey, out var signatureGroup))
+                        {
+                            signatureGroup = new NifStreamEndianSignatureAccumulator(stats.Classification, declaredPayloadBytes, stats.First16);
+                            signatureGroups.Add(signatureKey, signatureGroup);
+                        }
+
+                        signatureGroup.Count++;
+                        signatureGroup.NifIds.Add(entry.IdPrefix);
+                        if (signatureGroup.Samples.Count < 16)
+                        {
+                            signatureGroup.Samples.Add(sample);
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static List<NifSizeCount> topSizeCounts(Dictionary<uint, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key)
+                .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        static NifStreamEndianClassGroup toClassRecord(NifStreamEndianClassAccumulator group)
+        {
+            return new NifStreamEndianClassGroup(
+                Classification: group.Classification,
+                Count: group.Count,
+                AverageBigEndianLowValueRatio: group.Count == 0 ? 0 : Math.Round(group.BigEndianLowValueRatioTotal / group.Count, 4),
+                AverageLittleEndianLowValueRatio: group.Count == 0 ? 0 : Math.Round(group.LittleEndianLowValueRatioTotal / group.Count, 4),
+                PayloadSizes: topSizeCounts(group.PayloadSizeCounts),
+                BlockSizes: topSizeCounts(group.BlockSizeCounts),
+                Samples: group.Samples);
+        }
+
+        static NifStreamEndianSignatureGroup toSignatureRecord(NifStreamEndianSignatureAccumulator group)
+        {
+            return new NifStreamEndianSignatureGroup(
+                Classification: group.Classification,
+                DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+                PayloadFirst16: group.PayloadFirst16,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                Samples: group.Samples);
+        }
+
+        var signatureRecords = signatureGroups.Values
+            .Select(toSignatureRecord)
+            .OrderByDescending(static g => g.Count)
+            .ThenBy(static g => g.Classification, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static g => g.DeclaredPayloadBytes)
+            .ThenBy(static g => g.PayloadFirst16, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var report = new NifStreamEndiannessInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            DataStreamBlocks: dataStreamBlocks,
+            ValidStreamBodies: validStreamBodies,
+            EvenLengthBodies: evenLengthBodies,
+            InvalidStreamBodies: invalidStreamBodies,
+            ClassGroups: classGroups.Values
+                .Select(toClassRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.Classification, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            TopBigEndianSignatures: signatureRecords
+                .Where(static g => g.Classification.Contains("big-endian", StringComparison.OrdinalIgnoreCase))
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopSignatures: signatureRecords.Take(options.Limit > 0 ? options.Limit : 100).ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-stream-endianness-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NiDataStream blocks: {dataStreamBlocks:N0}");
+        Console.WriteLine($"Valid stream bodies: {validStreamBodies:N0}");
+        Console.WriteLine($"Even-length stream bodies: {evenLengthBodies:N0}");
+        Console.WriteLine($"Invalid stream bodies: {invalidStreamBodies:N0}");
+        Console.WriteLine($"Endianness classes: {string.Join(", ", report.ClassGroups.Take(8).Select(static g => $"{g.Classification}={g.Count:N0}"))}");
+        Console.WriteLine($"Top big-endian signatures: {string.Join(" | ", report.TopBigEndianSignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
     private static int MineNifReferences(AppOptions options)
     {
         var rootDirectory = Path.GetFullPath(options.RootDirectory);
@@ -4548,6 +4775,155 @@ internal static class Program
             Classification: classification);
     }
 
+    private static NifStreamEndianStats AnalyzeNifStreamEndian(ReadOnlySpan<byte> body)
+    {
+        var first16 = ToHex(body[..Math.Min(16, body.Length)]);
+        var pairCount = body.Length / 2;
+        var littleValues = new List<ushort>(Math.Min(pairCount, 32));
+        var bigValues = new List<ushort>(Math.Min(pairCount, 32));
+        var littleDistinct = new HashSet<ushort>();
+        var bigDistinct = new HashSet<ushort>();
+        ushort littleMax = 0;
+        ushort bigMax = 0;
+        var littleLowValueCount = 0;
+        var bigLowValueCount = 0;
+        var littleMultipleOf256Count = 0;
+        var bigMultipleOf256Count = 0;
+        const ushort lowValueThreshold = 4096;
+
+        for (var i = 0; i < pairCount; i++)
+        {
+            var pair = body.Slice(i * 2, 2);
+            var little = BinaryPrimitives.ReadUInt16LittleEndian(pair);
+            var big = BinaryPrimitives.ReadUInt16BigEndian(pair);
+            if (littleValues.Count < 32)
+            {
+                littleValues.Add(little);
+                bigValues.Add(big);
+            }
+
+            littleDistinct.Add(little);
+            bigDistinct.Add(big);
+            littleMax = Math.Max(littleMax, little);
+            bigMax = Math.Max(bigMax, big);
+            if (little <= lowValueThreshold)
+            {
+                littleLowValueCount++;
+            }
+
+            if (big <= lowValueThreshold)
+            {
+                bigLowValueCount++;
+            }
+
+            if (little != 0 && little % 256 == 0)
+            {
+                littleMultipleOf256Count++;
+            }
+
+            if (big != 0 && big % 256 == 0)
+            {
+                bigMultipleOf256Count++;
+            }
+        }
+
+        var littleLowRatio = pairCount == 0 ? 0 : littleLowValueCount / (double)pairCount;
+        var bigLowRatio = pairCount == 0 ? 0 : bigLowValueCount / (double)pairCount;
+        var littleMultipleRatio = pairCount == 0 ? 0 : littleMultipleOf256Count / (double)pairCount;
+        var bigMultipleRatio = pairCount == 0 ? 0 : bigMultipleOf256Count / (double)pairCount;
+        var classification = ClassifyNifStreamEndian(
+            body,
+            pairCount,
+            littleMax,
+            bigMax,
+            littleLowRatio,
+            bigLowRatio,
+            littleMultipleRatio,
+            bigMultipleRatio,
+            littleDistinct.Count,
+            bigDistinct.Count);
+
+        return new NifStreamEndianStats(
+            ByteLength: body.Length,
+            First16: first16,
+            PairCount: pairCount,
+            LowValueThreshold: lowValueThreshold,
+            LittleEndianPrefix: littleValues,
+            BigEndianPrefix: bigValues,
+            LittleEndianMax: littleMax,
+            BigEndianMax: bigMax,
+            LittleEndianDistinct: littleDistinct.Count,
+            BigEndianDistinct: bigDistinct.Count,
+            LittleEndianLowValueCount: littleLowValueCount,
+            BigEndianLowValueCount: bigLowValueCount,
+            LittleEndianLowValueRatio: Math.Round(littleLowRatio, 4),
+            BigEndianLowValueRatio: Math.Round(bigLowRatio, 4),
+            LittleEndianMultipleOf256Count: littleMultipleOf256Count,
+            BigEndianMultipleOf256Count: bigMultipleOf256Count,
+            LittleEndianMultipleOf256Ratio: Math.Round(littleMultipleRatio, 4),
+            BigEndianMultipleOf256Ratio: Math.Round(bigMultipleRatio, 4),
+            Classification: classification);
+    }
+
+    private static string ClassifyNifStreamEndian(
+        ReadOnlySpan<byte> body,
+        int pairCount,
+        ushort littleMax,
+        ushort bigMax,
+        double littleLowRatio,
+        double bigLowRatio,
+        double littleMultipleRatio,
+        double bigMultipleRatio,
+        int littleDistinct,
+        int bigDistinct)
+    {
+        if (pairCount == 0)
+        {
+            return "empty-u16-body";
+        }
+
+        var allZero = true;
+        var allFf = true;
+        foreach (var value in body)
+        {
+            allZero &= value == 0;
+            allFf &= value == 0xff;
+            if (!allZero && !allFf)
+            {
+                break;
+            }
+        }
+
+        if (allZero)
+        {
+            return "all-zero-u16-body";
+        }
+
+        if (allFf)
+        {
+            return "sentinel-ffff-u16-body";
+        }
+
+        var bigRangeAdvantage = bigMax > 0 && littleMax >= bigMax * 8;
+        var littleRangeAdvantage = littleMax > 0 && bigMax >= littleMax * 8;
+        if (bigLowRatio >= 0.80 && (littleLowRatio <= 0.35 || bigRangeAdvantage || littleMultipleRatio >= 0.50) && bigDistinct > 2)
+        {
+            return "big-endian-u16-lead";
+        }
+
+        if (littleLowRatio >= 0.80 && (bigLowRatio <= 0.35 || littleRangeAdvantage || bigMultipleRatio >= 0.50) && littleDistinct > 2)
+        {
+            return "little-endian-u16-lead";
+        }
+
+        if (bigLowRatio >= 0.80 && littleLowRatio >= 0.80)
+        {
+            return "ambiguous-small-u16";
+        }
+
+        return "mixed-u16-body";
+    }
+
     private static string ClassifyNifStreamBody(
         int byteLength,
         int nonZeroBytes,
@@ -6119,6 +6495,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-mesh-streams --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-headers --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-bodies --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-endianness --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
@@ -6341,6 +6718,7 @@ internal static class Program
                     case "inventory-nif-mesh-streams":
                     case "inventory-nif-stream-headers":
                     case "inventory-nif-stream-bodies":
+                    case "inventory-nif-stream-endianness":
                     case "mine-nif-references":
                     case "link-nif-textures":
                     case "extract-linked-textures":
@@ -7242,6 +7620,92 @@ internal sealed record NifStreamBodyStats(
     int UInt32Distinct,
     uint UInt32Max,
     List<StrideCandidate> PayloadStrideCandidates,
+    string Classification);
+
+internal sealed class NifStreamEndianClassAccumulator(string classification)
+{
+    public string Classification { get; } = classification;
+    public int Count { get; set; }
+    public double BigEndianLowValueRatioTotal { get; set; }
+    public double LittleEndianLowValueRatioTotal { get; set; }
+    public Dictionary<uint, int> PayloadSizeCounts { get; } = [];
+    public Dictionary<uint, int> BlockSizeCounts { get; } = [];
+    public List<NifStreamEndianSample> Samples { get; } = [];
+}
+
+internal sealed class NifStreamEndianSignatureAccumulator(string classification, uint declaredPayloadBytes, string payloadFirst16)
+{
+    public string Classification { get; } = classification;
+    public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public string PayloadFirst16 { get; } = payloadFirst16;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifStreamEndianSample> Samples { get; } = [];
+}
+
+internal sealed record NifStreamEndiannessInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int DataStreamBlocks,
+    int ValidStreamBodies,
+    int EvenLengthBodies,
+    int InvalidStreamBodies,
+    List<NifStreamEndianClassGroup> ClassGroups,
+    List<NifStreamEndianSignatureGroup> TopBigEndianSignatures,
+    List<NifStreamEndianSignatureGroup> TopSignatures);
+
+internal sealed record NifStreamEndianClassGroup(
+    string Classification,
+    int Count,
+    double AverageBigEndianLowValueRatio,
+    double AverageLittleEndianLowValueRatio,
+    List<NifSizeCount> PayloadSizes,
+    List<NifSizeCount> BlockSizes,
+    List<NifStreamEndianSample> Samples);
+
+internal sealed record NifStreamEndianSignatureGroup(
+    string Classification,
+    uint DeclaredPayloadBytes,
+    string PayloadFirst16,
+    int Count,
+    int NifPayloads,
+    List<NifStreamEndianSample> Samples);
+
+internal sealed record NifStreamEndianSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int BlockIndex,
+    string TypeName,
+    uint BlockSize,
+    int HeaderBytes,
+    uint DeclaredPayloadBytes,
+    string PayloadFirst16,
+    NifStreamEndianStats Stats);
+
+internal sealed record NifStreamEndianStats(
+    int ByteLength,
+    string First16,
+    int PairCount,
+    ushort LowValueThreshold,
+    List<ushort> LittleEndianPrefix,
+    List<ushort> BigEndianPrefix,
+    ushort LittleEndianMax,
+    ushort BigEndianMax,
+    int LittleEndianDistinct,
+    int BigEndianDistinct,
+    int LittleEndianLowValueCount,
+    int BigEndianLowValueCount,
+    double LittleEndianLowValueRatio,
+    double BigEndianLowValueRatio,
+    int LittleEndianMultipleOf256Count,
+    int BigEndianMultipleOf256Count,
+    double LittleEndianMultipleOf256Ratio,
+    double BigEndianMultipleOf256Ratio,
     string Classification);
 
 internal sealed record NifReferenceSample(
