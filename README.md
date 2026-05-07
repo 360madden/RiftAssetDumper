@@ -613,9 +613,10 @@ Mesh #6 size=325
 Pairings:
   index @292/#23 -> @216/#25 vertexCount=24 coverage=1.00
   index @292/#23 -> @300/#29 vertexCount=24 coverage=1.00
+Mesh payload windows matching paired vertex count: 0
 ```
 
-This creates the one-mesh proof packet needed before attempting any experimental geometry export. Current interpretation for the top family: `payload=72` is a big-endian strip-like index lead, `payload=288` is a byte-rotated normal `float3` lead, and `payload=192` is a byte-rotated UV `float2` lead. Position data is still not proven.
+This creates the one-mesh proof packet needed before attempting any experimental geometry export. Current interpretation for the top family: `payload=72` is a big-endian strip-like index lead, `payload=288` is a byte-rotated normal `float3` lead, and `payload=192` is a byte-rotated UV `float2` lead. Position data is still not proven, and the mesh payload itself did not expose a simple matching float window in this sample.
 
 Probe the target data streams for one NIF mesh:
 

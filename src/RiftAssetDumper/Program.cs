@@ -1625,6 +1625,9 @@ internal static class Program
             var meshPayload = SliceNifBlockPayload(payload, meshBlock);
             var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
             var pairings = FindNifMeshProbePairings(streamSummaries);
+            var payloadWindows = FindNifMeshPayloadRoleWindows(
+                meshPayload,
+                pairings.Select(static p => p.VertexCount).Distinct().OrderBy(static c => c).ToList());
             meshes.Add(new NifMeshProbe(
                 MeshBlockIndex: meshBlock.Index,
                 MeshSize: meshBlock.Size,
@@ -1635,7 +1638,8 @@ internal static class Program
                 Float32Prefix: meshBlock.Float32Prefix,
                 StringSamples: meshBlock.StringSamples,
                 Streams: streamSummaries,
-                Pairings: pairings));
+                Pairings: pairings,
+                PayloadWindows: payloadWindows));
         }
 
         if (options.MeshBlockFilter is not null && meshes.Count == 0)
@@ -1666,6 +1670,11 @@ internal static class Program
             foreach (var pairing in mesh.Pairings.Take(5))
             {
                 Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} confidence={pairing.Confidence}");
+            }
+
+            foreach (var window in mesh.PayloadWindows.Take(3))
+            {
+                Console.WriteLine($"  mesh-payload window @{window.PayloadOffset} bytes={window.ByteLength} role={window.Role} vertexCount={window.VertexCount} confidence={window.Confidence} first16={window.First16}");
             }
         }
 
@@ -6253,6 +6262,87 @@ internal static class Program
             .ToList();
     }
 
+    private static List<NifMeshPayloadRoleWindow> FindNifMeshPayloadRoleWindows(ReadOnlySpan<byte> meshPayload, List<int> vertexCounts)
+    {
+        var windows = new List<NifMeshPayloadRoleWindow>();
+        if (meshPayload.Length == 0 || vertexCounts.Count == 0)
+        {
+            return windows;
+        }
+
+        foreach (var vertexCount in vertexCounts.Where(static count => count > 0).Take(8))
+        {
+            foreach (var components in new[] { 3, 2 })
+            {
+                var byteLength = checked(vertexCount * components * 4);
+                if (byteLength <= 0 || byteLength > meshPayload.Length)
+                {
+                    continue;
+                }
+
+                foreach (var transform in new[] { NifFloatByteTransform.RotateRight1, NifFloatByteTransform.LittleEndian })
+                {
+                    for (var offset = 0; offset + byteLength <= meshPayload.Length; offset++)
+                    {
+                        var window = meshPayload.Slice(offset, byteLength);
+                        var stats = AnalyzeNifFloatVectors(window, components, transform);
+                        if (stats.FiniteVectorRatio < 0.95 || stats.PlausibleValueRatio < 0.95 || stats.NonZeroVectorRatio < 0.50)
+                        {
+                            continue;
+                        }
+
+                        string? role = null;
+                        var confidence = 0;
+                        if (components == 3 && stats.NearUnitVectorRatio >= 0.75)
+                        {
+                            role = $"normal-float3-{FormatNifFloatTransformSuffix(transform)}-payload-window";
+                            confidence = 75;
+                        }
+                        else if (components == 3 && stats.MaxExtent >= 0.0001)
+                        {
+                            role = $"position-float3-{FormatNifFloatTransformSuffix(transform)}-payload-window";
+                            confidence = 65;
+                        }
+                        else if (components == 2 && stats.UvRangeRatio >= 0.80)
+                        {
+                            role = $"uv-float2-{FormatNifFloatTransformSuffix(transform)}-payload-window";
+                            confidence = 60;
+                        }
+
+                        if (role is null)
+                        {
+                            continue;
+                        }
+
+                        windows.Add(new NifMeshPayloadRoleWindow(
+                            PayloadOffset: offset,
+                            ByteLength: byteLength,
+                            VertexCount: vertexCount,
+                            Components: components,
+                            Transform: transform.ToString(),
+                            Role: role,
+                            Confidence: confidence,
+                            First16: ToHex(window[..Math.Min(16, window.Length)]),
+                            Stats: stats));
+                    }
+                }
+            }
+        }
+
+        return windows
+            .OrderByDescending(static w => w.Confidence)
+            .ThenBy(static w => w.PayloadOffset)
+            .ThenBy(static w => w.ByteLength)
+            .Take(32)
+            .ToList();
+    }
+
+    private static string FormatNifFloatTransformSuffix(NifFloatByteTransform transform) => transform switch
+    {
+        NifFloatByteTransform.RotateRight1 => "ror1",
+        _ => "le"
+    };
+
     private static string ClassifyNifIndexCandidate(NifStreamEndianStats endianStats, NifUInt16BeIndexStats indexStats)
     {
         if (indexStats.PairCount == 0)
@@ -8568,7 +8658,8 @@ internal sealed record NifMeshProbe(
     List<float?> Float32Prefix,
     List<string> StringSamples,
     List<NifMeshBoundStreamSummary> Streams,
-    List<NifMeshProbePairing> Pairings);
+    List<NifMeshProbePairing> Pairings,
+    List<NifMeshPayloadRoleWindow> PayloadWindows);
 
 internal sealed record NifMeshProbePairing(
     int IndexMeshPayloadOffset,
@@ -8584,6 +8675,17 @@ internal sealed record NifMeshProbePairing(
     int VertexCount,
     double IndexCoverageRatio,
     int Confidence);
+
+internal sealed record NifMeshPayloadRoleWindow(
+    int PayloadOffset,
+    int ByteLength,
+    int VertexCount,
+    int Components,
+    string Transform,
+    string Role,
+    int Confidence,
+    string First16,
+    NifFloatVectorStats Stats);
 
 internal sealed record NifStreamBodyProbeReport(
     BinaryAssetSource Source,

@@ -449,7 +449,13 @@ Pairing proof:
 | `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `95` |
 | `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `90` |
 
-Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing.
+Mesh payload scan:
+
+| Probe | Result |
+|---|---:|
+| Rotate-right-1 / little-endian float2/float3 payload windows matching paired vertex count | `0` |
+
+Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing. The mesh payload window scan did not find a simple inline position window for this sample, so the next search should inspect other block types/fields or repeated `position-float3-ror1-lead` families.
 
 ## NIF data-stream header proof 🔎
 
