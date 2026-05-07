@@ -464,6 +464,32 @@ Top repeated body signatures:
 
 Why this matters: stream analysis now operates on the declared body only, not the 29-byte header. The coarse classes are intentionally conservative compatibility hints for ranking; they do not yet prove vertex/index/UV roles.
 
+## Targeted stream-body interpretation probe 🔍
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-stream-body --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --stream-block 23 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-stream-body-c841-23.json"
+```
+
+Validated sample probes:
+
+| Asset | Stream block | Block size | Payload bytes | Header bytes | Body first 16 | Best current clue |
+|---|---:|---:|---:|---:|---|---|
+| `c841eb9a0ed1c95e` | `#23` | `101` | `72` | `29` | `00010002000200010003000400050006` | Big-endian `uint16` prefix reads `1,2,2,1,3,4,5,6` |
+| `c841eb9a0ed1c95e` | `#25` | `317` | `288` | `29` | `000000000000000000803f0000000000` | Stride candidates include `12×24`, `24×12`, `32×9` |
+| `f8062ab36ac1c9a9` | `#13` | `317` | `288` | `29` | `55003e9b847d3fa67eb1bdbe93c3bb0d` | Dense mixed numeric body; same payload/header family |
+
+Important lead:
+
+```text
+stream #23 body first16 = 00010002000200010003000400050006
+uint16 little-endian     = 256,512,512,256,768,1024,1280,1536
+uint16 big-endian        = 1,2,2,1,3,4,5,6
+```
+
+Why this matters: the new body probe makes byte order visible instead of assuming little-endian for every stream body. The `#23` sample has an index-like big-endian `uint16` prefix, but this remains a lead until matched against mesh vertex counts and triangle layout.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -574,14 +600,27 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-stream-body --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --stream-block 23 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-stream-body-c841-23.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-stream-body --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --stream-block 25 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-stream-body-c841-25.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-stream-body --root "C:\RIFT MODDING\Assets\Source" --id f8062ab36ac1c9a9 --stream-block 13 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-stream-body-f806-13.json"
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
 ```
 
 ## Current safest next direction 🛡️
 
 1. Decode only declared stream bodies after the proven 29-byte `NiDataStream` header.
-2. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
-3. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
-4. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
-5. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
-6. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+2. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
+3. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
+4. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
+5. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
+6. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+7. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

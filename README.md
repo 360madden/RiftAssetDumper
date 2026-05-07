@@ -612,6 +612,23 @@ Top body signatures:
 
 The body inventory reports coarse compatibility classes such as `uint16-compatible-body`, `float32-compatible-body`, and `strided-body`. These are ranking hints only; they are not final stream roles.
 
+Probe one declared stream body with side-by-side interpretations:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-stream-body --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --stream-block 23 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-stream-body-c841-23.json"
+```
+
+Current targeted body proof:
+
+```text
+c841eb9a0ed1c95e stream #23 payload=72 header=29
+body first16: 00010002000200010003000400050006
+uint16 little-endian: 256,512,512,256,768,1024,1280,1536
+uint16 big-endian:    1,2,2,1,3,4,5,6
+```
+
+This gives an evidence-backed lead that at least some compact/index-like stream bodies read more naturally as big-endian 16-bit values. Keep it as a lead until correlated with mesh vertex counts and triangle layout.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell
