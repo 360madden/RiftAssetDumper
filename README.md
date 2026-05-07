@@ -588,11 +588,15 @@ Candidate stream links: 11,564
 Valid declared stream bodies: 11,564
 Pair-compatible meshes: 2,076
 Pair-compatible links: 4,468
+Attribute-compatible meshes: 52
+Attribute-compatible sets: 52
 Top roles:
   uv-float2-ror1-lead=4,633
   normal-float3-ror1-lead=4,167
   index-u16be-strip-lead=2,101
 Top pairing: meshSize=325 count=134 index-u16be-strip-lead -> normal-float3-ror1-lead, vertexCount=24, maxIndex=23
+Top attribute set: meshSize=305 count=6 position=192 normal=192 uv=128 vertexCount=16 topology=implicit-strip-or-quad-candidate
+Top attribute topology: implicit-strip-or-quad-candidate vertexCount=16 count=7 stripTriangles=14 quads=4
 ```
 
 This is the first full copied-set mesh-binding proof that candidate index streams can be paired with same-mesh stream bodies where `maxIndex < vertexCount`. The former coarse `uint16-compatible-body` families now mostly decode as per-float byte-rotated streams: rotate each 4-byte word right by 1 byte to expose normal-like `float3` and UV-like `float2` values.
@@ -632,9 +636,10 @@ Mesh #7 size=305
 @196 -> #22 payload=192 role=normal-float3-ror1-lead
 @280 -> #26 payload=128 role=uv-float2-ror1-lead
 Attribute set: position + normal + UV, vertexCount=16
+Topology: implicit-strip-or-quad-candidate, strip/fan=14 triangles, quad=4, triangle-list rejected
 ```
 
-This gives a second geometry lane: complete unindexed/separately-indexed attribute sets. The exporter remains blocked until topology/index rules are proven.
+This gives a second geometry lane: complete unindexed/separately-indexed attribute sets with structural topology candidates. The exporter remains blocked until strip/fan vs quad/separate-index rules are proven; the topology label is evidence for the next probe, not renderable-geometry support.
 
 Probe the target data streams for one NIF mesh:
 

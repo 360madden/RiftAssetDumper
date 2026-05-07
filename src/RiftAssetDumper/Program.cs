@@ -1681,7 +1681,7 @@ internal static class Program
 
             foreach (var attributeSet in mesh.AttributeSets.Take(3))
             {
-                Console.WriteLine($"  attributes position@{attributeSet.PositionMeshPayloadOffset}/#{attributeSet.PositionBlockIndex} normal@{attributeSet.NormalMeshPayloadOffset}/#{attributeSet.NormalBlockIndex} uv@{attributeSet.UvMeshPayloadOffset}/#{attributeSet.UvBlockIndex} vertexCount={attributeSet.VertexCount} confidence={attributeSet.Confidence}");
+                Console.WriteLine($"  attributes position@{attributeSet.PositionMeshPayloadOffset}/#{attributeSet.PositionBlockIndex} normal@{attributeSet.NormalMeshPayloadOffset}/#{attributeSet.NormalBlockIndex} uv@{attributeSet.UvMeshPayloadOffset}/#{attributeSet.UvBlockIndex} vertexCount={attributeSet.VertexCount} confidence={attributeSet.Confidence} topology={FormatNifAttributeTopologySummary(attributeSet.Topology)}");
             }
 
             foreach (var window in mesh.PayloadWindows.Take(3))
@@ -2394,6 +2394,7 @@ internal static class Program
         var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
         var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeSetGroups = new Dictionary<string, NifMeshAttributeSetAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var attributeTopologyGroups = new Dictionary<string, NifAttributeTopologyAccumulator>(StringComparer.OrdinalIgnoreCase);
         var inspected = 0;
         var nifCount = 0;
         var failed = 0;
@@ -2600,7 +2601,7 @@ internal static class Program
 
                         foreach (var attributeSet in attributeSets)
                         {
-                            var key = $"meshSize={meshBlock.Size}|position@{attributeSet.PositionMeshPayloadOffset}:payload={attributeSet.PositionDeclaredPayloadBytes}|normal@{attributeSet.NormalMeshPayloadOffset}:payload={attributeSet.NormalDeclaredPayloadBytes}|uv@{attributeSet.UvMeshPayloadOffset}:payload={attributeSet.UvDeclaredPayloadBytes}|count={attributeSet.VertexCount}";
+                            var key = $"meshSize={meshBlock.Size}|position@{attributeSet.PositionMeshPayloadOffset}:payload={attributeSet.PositionDeclaredPayloadBytes}|normal@{attributeSet.NormalMeshPayloadOffset}:payload={attributeSet.NormalDeclaredPayloadBytes}|uv@{attributeSet.UvMeshPayloadOffset}:payload={attributeSet.UvDeclaredPayloadBytes}|count={attributeSet.VertexCount}|topology={attributeSet.Topology.PrimaryTopology}";
                             if (!attributeSetGroups.TryGetValue(key, out var attributeSetGroup))
                             {
                                 attributeSetGroup = new NifMeshAttributeSetAccumulator(
@@ -2609,7 +2610,8 @@ internal static class Program
                                     attributeSet.PositionDeclaredPayloadBytes,
                                     attributeSet.NormalDeclaredPayloadBytes,
                                     attributeSet.UvDeclaredPayloadBytes,
-                                    attributeSet.VertexCount);
+                                    attributeSet.VertexCount,
+                                    attributeSet.Topology);
                                 attributeSetGroups.Add(key, attributeSetGroup);
                             }
 
@@ -2619,6 +2621,26 @@ internal static class Program
                             if (attributeSetGroup.Samples.Count < 16)
                             {
                                 attributeSetGroup.Samples.Add(attributeSet);
+                            }
+
+                            var topologyKey = $"{attributeSet.Topology.PrimaryTopology}|vertexCount={attributeSet.VertexCount}|list={attributeSet.Topology.TriangleListTriangleCount}|strip={attributeSet.Topology.TriangleStripTriangleCount}|quad={attributeSet.Topology.QuadListQuadCount}";
+                            if (!attributeTopologyGroups.TryGetValue(topologyKey, out var topologyGroup))
+                            {
+                                topologyGroup = new NifAttributeTopologyAccumulator(
+                                    attributeSet.Topology.PrimaryTopology,
+                                    attributeSet.VertexCount,
+                                    attributeSet.Topology.TriangleListTriangleCount,
+                                    attributeSet.Topology.TriangleStripTriangleCount,
+                                    attributeSet.Topology.QuadListQuadCount);
+                                attributeTopologyGroups.Add(topologyKey, topologyGroup);
+                            }
+
+                            topologyGroup.Count++;
+                            topologyGroup.NifIds.Add(entry.IdPrefix);
+                            topologyGroup.ConfidenceTotal += attributeSet.Topology.Confidence;
+                            if (topologyGroup.Samples.Count < 16)
+                            {
+                                topologyGroup.Samples.Add(attributeSet);
                             }
                         }
 
@@ -2718,7 +2740,22 @@ internal static class Program
                 NormalDeclaredPayloadBytes: group.NormalDeclaredPayloadBytes,
                 UvDeclaredPayloadBytes: group.UvDeclaredPayloadBytes,
                 VertexCount: group.VertexCount,
+                Topology: group.Topology,
                 AverageConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
+                Samples: group.Samples);
+        }
+
+        static NifAttributeTopologyGroup toAttributeTopologyRecord(NifAttributeTopologyAccumulator group)
+        {
+            return new NifAttributeTopologyGroup(
+                Topology: group.Topology,
+                VertexCount: group.VertexCount,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                TriangleListTriangleCount: group.TriangleListTriangleCount,
+                TriangleStripTriangleCount: group.TriangleStripTriangleCount,
+                QuadListQuadCount: group.QuadListQuadCount,
+                AverageTopologyConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
                 Samples: group.Samples);
         }
 
@@ -2766,6 +2803,14 @@ internal static class Program
                 .ThenBy(static g => g.MeshSize)
                 .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
                 .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopAttributeTopologies: attributeTopologyGroups.Values
+                .Select(toAttributeTopologyRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.AverageTopologyConfidence)
+                .ThenBy(static g => g.VertexCount)
+                .ThenBy(static g => g.Topology, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
                 .ToList());
 
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-binding-inventory.json");
@@ -2785,7 +2830,8 @@ internal static class Program
         Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
         Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
         Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.IndexRole}->{g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
-        Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount}"))}");
+        Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
+        Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -6364,6 +6410,7 @@ internal static class Program
             .Where(static s => s.VertexCount is > 0)
             .ToList();
         var sets = new List<NifMeshAttributeSetSample>();
+        var hasBoundIndexCandidate = streams.Any(static s => s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase));
 
         foreach (var position in positions)
         {
@@ -6377,6 +6424,7 @@ internal static class Program
                     }
 
                     var confidence = Math.Min(position.Stream.RoleStats.Confidence, Math.Min(normal.Stream.RoleStats.Confidence, uv.Stream.RoleStats.Confidence));
+                    var topology = AnalyzeNifAttributeTopology(position.VertexCount!.Value, hasBoundIndexCandidate);
                     sets.Add(new NifMeshAttributeSetSample(
                         ArchiveName: archiveName,
                         EntryIndex: entry?.Index,
@@ -6386,6 +6434,7 @@ internal static class Program
                         MeshSize: meshBlock.Size,
                         VertexCount: position.VertexCount!.Value,
                         Confidence: confidence,
+                        Topology: topology,
                         PositionMeshPayloadOffset: position.Stream.MeshPayloadOffset,
                         PositionBlockIndex: position.Stream.TargetBlockIndex,
                         PositionDeclaredPayloadBytes: position.Stream.DeclaredPayloadBytes,
@@ -6409,6 +6458,103 @@ internal static class Program
             .ThenBy(static s => s.UvMeshPayloadOffset)
             .Take(16)
             .ToList();
+    }
+
+    private static NifAttributeTopologyStats AnalyzeNifAttributeTopology(int vertexCount, bool hasBoundIndexCandidate)
+    {
+        var evidence = new List<string> { $"vertex-count={vertexCount.ToString(CultureInfo.InvariantCulture)}" };
+        if (hasBoundIndexCandidate)
+        {
+            evidence.Add("bound-index-candidate-present");
+        }
+        else
+        {
+            evidence.Add("no-bound-index-candidate");
+        }
+
+        var triangleListCandidate = vertexCount >= 3 && vertexCount % 3 == 0;
+        int? triangleListTriangles = triangleListCandidate ? vertexCount / 3 : null;
+        if (triangleListCandidate)
+        {
+            evidence.Add($"triangle-list-consistent:triangles={(vertexCount / 3).ToString(CultureInfo.InvariantCulture)}");
+        }
+        else
+        {
+            evidence.Add("triangle-list-rejected:vertex-count-not-divisible-by-3");
+        }
+
+        var triangleStripCandidate = vertexCount >= 3;
+        int? triangleStripTriangles = triangleStripCandidate ? vertexCount - 2 : null;
+        if (triangleStripCandidate)
+        {
+            evidence.Add($"triangle-strip-or-fan-consistent:triangles={(vertexCount - 2).ToString(CultureInfo.InvariantCulture)}");
+        }
+        else
+        {
+            evidence.Add("triangle-strip-or-fan-rejected:vertex-count-less-than-3");
+        }
+
+        var quadListCandidate = vertexCount >= 4 && vertexCount % 4 == 0;
+        int? quadListQuads = quadListCandidate ? vertexCount / 4 : null;
+        if (quadListCandidate)
+        {
+            evidence.Add($"quad-list-consistent:quads={(vertexCount / 4).ToString(CultureInfo.InvariantCulture)}");
+        }
+        else
+        {
+            evidence.Add("quad-list-rejected:vertex-count-not-divisible-by-4");
+        }
+
+        string primaryTopology;
+        int confidence;
+        if (hasBoundIndexCandidate)
+        {
+            primaryTopology = "explicit-index-candidate-present";
+            confidence = 25;
+        }
+        else if (triangleListCandidate && quadListCandidate)
+        {
+            primaryTopology = "implicit-triangle-list-or-quad-candidate";
+            confidence = 35;
+        }
+        else if (quadListCandidate)
+        {
+            primaryTopology = "implicit-strip-or-quad-candidate";
+            confidence = 35;
+        }
+        else if (triangleListCandidate)
+        {
+            primaryTopology = "implicit-triangle-list-candidate";
+            confidence = 40;
+        }
+        else if (triangleStripCandidate)
+        {
+            primaryTopology = "implicit-triangle-strip-or-fan-candidate";
+            confidence = 35;
+        }
+        else
+        {
+            primaryTopology = "implicit-order-unknown";
+            confidence = 0;
+        }
+
+        evidence.Add("topology-is-structural-candidate-not-export-proof");
+        return new NifAttributeTopologyStats(
+            PrimaryTopology: primaryTopology,
+            Confidence: confidence,
+            TriangleListCandidate: triangleListCandidate,
+            TriangleListTriangleCount: triangleListTriangles,
+            TriangleStripCandidate: triangleStripCandidate,
+            TriangleStripTriangleCount: triangleStripTriangles,
+            QuadListCandidate: quadListCandidate,
+            QuadListQuadCount: quadListQuads,
+            HasBoundIndexCandidate: hasBoundIndexCandidate,
+            Evidence: evidence);
+    }
+
+    private static string FormatNifAttributeTopologySummary(NifAttributeTopologyStats topology)
+    {
+        return $"{topology.PrimaryTopology} c={topology.Confidence} list={topology.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={topology.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={topology.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}";
     }
 
     private static int? GetPrimaryRoleVertexCount(NifMeshBoundStreamSummary stream)
@@ -9196,7 +9342,8 @@ internal sealed class NifMeshAttributeSetAccumulator(
     uint? positionDeclaredPayloadBytes,
     uint? normalDeclaredPayloadBytes,
     uint? uvDeclaredPayloadBytes,
-    int vertexCount)
+    int vertexCount,
+    NifAttributeTopologyStats topology)
 {
     public string Pattern { get; } = pattern;
     public uint MeshSize { get; } = meshSize;
@@ -9204,6 +9351,25 @@ internal sealed class NifMeshAttributeSetAccumulator(
     public uint? NormalDeclaredPayloadBytes { get; } = normalDeclaredPayloadBytes;
     public uint? UvDeclaredPayloadBytes { get; } = uvDeclaredPayloadBytes;
     public int VertexCount { get; } = vertexCount;
+    public NifAttributeTopologyStats Topology { get; } = topology;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public double ConfidenceTotal { get; set; }
+    public List<NifMeshAttributeSetSample> Samples { get; } = [];
+}
+
+internal sealed class NifAttributeTopologyAccumulator(
+    string topology,
+    int vertexCount,
+    int? triangleListTriangleCount,
+    int? triangleStripTriangleCount,
+    int? quadListQuadCount)
+{
+    public string Topology { get; } = topology;
+    public int VertexCount { get; } = vertexCount;
+    public int? TriangleListTriangleCount { get; } = triangleListTriangleCount;
+    public int? TriangleStripTriangleCount { get; } = triangleStripTriangleCount;
+    public int? QuadListQuadCount { get; } = quadListQuadCount;
     public int Count { get; set; }
     public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
     public double ConfidenceTotal { get; set; }
@@ -9228,7 +9394,8 @@ internal sealed record NifMeshBindingInventoryReport(
     List<NifMeshBindingRoleGroup> RoleGroups,
     List<NifMeshBindingPatternGroup> TopPatterns,
     List<NifMeshBindingPairingGroup> TopPairings,
-    List<NifMeshAttributeSetGroup> TopAttributeSets);
+    List<NifMeshAttributeSetGroup> TopAttributeSets,
+    List<NifAttributeTopologyGroup> TopAttributeTopologies);
 
 internal sealed record NifMeshBindingRoleGroup(
     string Role,
@@ -9271,7 +9438,19 @@ internal sealed record NifMeshAttributeSetGroup(
     uint? NormalDeclaredPayloadBytes,
     uint? UvDeclaredPayloadBytes,
     int VertexCount,
+    NifAttributeTopologyStats Topology,
     double AverageConfidence,
+    List<NifMeshAttributeSetSample> Samples);
+
+internal sealed record NifAttributeTopologyGroup(
+    string Topology,
+    int VertexCount,
+    int Count,
+    int NifPayloads,
+    int? TriangleListTriangleCount,
+    int? TriangleStripTriangleCount,
+    int? QuadListQuadCount,
+    double AverageTopologyConfidence,
     List<NifMeshAttributeSetSample> Samples);
 
 internal sealed record NifMeshBindingStreamSample(
@@ -9337,6 +9516,7 @@ internal sealed record NifMeshAttributeSetSample(
     uint MeshSize,
     int VertexCount,
     int Confidence,
+    NifAttributeTopologyStats Topology,
     int PositionMeshPayloadOffset,
     int PositionBlockIndex,
     uint? PositionDeclaredPayloadBytes,
@@ -9349,6 +9529,18 @@ internal sealed record NifMeshAttributeSetSample(
     int UvBlockIndex,
     uint? UvDeclaredPayloadBytes,
     string UvRole);
+
+internal sealed record NifAttributeTopologyStats(
+    string PrimaryTopology,
+    int Confidence,
+    bool TriangleListCandidate,
+    int? TriangleListTriangleCount,
+    bool TriangleStripCandidate,
+    int? TriangleStripTriangleCount,
+    bool QuadListCandidate,
+    int? QuadListQuadCount,
+    bool HasBoundIndexCandidate,
+    List<string> Evidence);
 
 internal sealed record NifMeshStreamRoleStats(
     string PrimaryRole,

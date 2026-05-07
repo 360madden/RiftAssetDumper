@@ -34,6 +34,9 @@ format guess → speculative decoder → plausible-looking bad output → debugg
 | Big-endian triangle-aligned bodies | `5,481` | Many compact streams divide into index triples |
 | Triangle-strip less-degenerate bodies | `9,712` | Strong strip/fan/restart-style topology lead |
 | Top compact signature | `payload=72`, `count=352`, first16 `00010002000200010003000400050006` | Highest-repeat small index-family target |
+| Same-mesh index/vertex pairings | `4,468` across `2,076` meshes | Index streams can be paired with normal/UV streams where `maxIndex < vertexCount` |
+| Complete attribute sets | `52` across `52` meshes | Separate lane with position + normal + UV streams |
+| Top attribute topology | `v=16`, `count=7`, strip/fan=`14`, quad=`4` | Strongest attribute-only topology candidate, still not export proof |
 
 Interpretation: the current best geometry lead is **mesh stream binding**, not direct OBJ export. We need to prove which `NiMesh` payload fields point at which `NiDataStream` bodies, then assign stream roles.
 
@@ -229,7 +232,7 @@ Design target: this script should become the optionized local workbench for disc
 | 4 | Mesh probe | `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
 | 5 | Shifted/encoded role refinement | Rotate-right-1 float probes for coarse stream roles | `uint16-compatible-body` splits into normal/UV/position byte-rotated labels |
 | 6 | Position source discovery | Probe `NiMesh` payload bytes and repeated position-bearing stream families | Indexed top family has index + normal + UV leads; separate attribute-set lane has position + normal + UV |
-| 7 | Attribute-set topology proof | Determine whether position/normal/UV-only meshes are unindexed, implicit strips, or separately indexed | At least one complete attribute family has a ranked topology interpretation |
+| 7 | Attribute-set topology proof | Determine whether position/normal/UV-only meshes are unindexed, implicit strips, or separately indexed | ✅ Delivered: top `v=16` family ranks as `implicit-strip-or-quad-candidate`; not export proof |
 | 8 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
 | 9 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
 | 10 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |

@@ -13,6 +13,7 @@ Date: 2026-05-07
 | Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
 | Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,468` same-mesh index/vertex-count-compatible links. |
 | Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
+| Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
 
 ## Approved operating mode 🚀
 
@@ -418,13 +419,23 @@ Top pair-compatible patterns:
 
 Top position/normal/UV attribute-compatible patterns:
 
-| Mesh size | Count | Position payload | Normal payload | UV payload | Vertex count |
-|---:|---:|---:|---:|---:|---:|
-| `305` | `6` | `192` | `192` | `128` | `16` |
-| `297` | `2` | `1536` | `1536` | `1024` | `128` |
-| `321` | `2` | `612` | `612` | `408` | `51` |
-| `329` | `2` | `276` | `276` | `184` | `23` |
-| `329` | `2` | `432` | `432` | `288` | `36` |
+| Mesh size | Count | Position payload | Normal payload | UV payload | Vertex count | Topology lead |
+|---:|---:|---:|---:|---:|---:|---|
+| `305` | `6` | `192` | `192` | `128` | `16` | `implicit-strip-or-quad-candidate` |
+| `297` | `2` | `1536` | `1536` | `1024` | `128` | `explicit-index-candidate-present` |
+| `321` | `2` | `612` | `612` | `408` | `51` | `implicit-triangle-list-candidate` |
+| `329` | `2` | `276` | `276` | `184` | `23` | `implicit-triangle-strip-or-fan-candidate` |
+| `329` | `2` | `432` | `432` | `288` | `36` | `implicit-triangle-list-or-quad-candidate` |
+
+Top attribute topology groups:
+
+| Topology lead | Vertex count | Count | Triangle-list tris | Strip/fan tris | Quad count |
+|---|---:|---:|---:|---:|---:|
+| `implicit-strip-or-quad-candidate` | `16` | `7` | `-` | `14` | `4` |
+| `implicit-triangle-strip-or-fan-candidate` | `23` | `3` | `-` | `21` | `-` |
+| `implicit-triangle-list-candidate` | `51` | `2` | `17` | `49` | `-` |
+| `implicit-triangle-list-candidate` | `93` | `2` | `31` | `91` | `-` |
+| `implicit-triangle-strip-or-fan-candidate` | `14` | `2` | `-` | `12` | `-` |
 
 Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility, then promoted a byte-order lead. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, `@216` as rotate-right-1 normal `float3`, and `@300` as rotate-right-1 UV `float2`. Position data is still not proven.
 
@@ -495,7 +506,17 @@ Attribute streams:
 | `@196` | `#22?` | `192` | `normal-float3-ror1-lead` | `16` |
 | `@280` | `#26?` | `128` | `uv-float2-ror1-lead` | `16` |
 
-Why this matters: geometry discovery now has a second validated lane besides index pairings: unindexed or separately-indexed meshes with complete position/normal/UV attribute sets. The missing piece for renderable export is still topology/index interpretation for these attribute-only meshes, or position discovery for the top indexed `meshSize=325` family.
+Topology scoring:
+
+| Probe | Result |
+|---|---|
+| Primary topology lead | `implicit-strip-or-quad-candidate` |
+| Triangle list | Rejected because `16` is not divisible by `3` |
+| Triangle strip/fan | Candidate with `14` triangles |
+| Quad list | Candidate with `4` quads |
+| Confidence | `35` structural-only; **not export proof** |
+
+Why this matters: geometry discovery now has a second validated lane besides index pairings: unindexed or separately-indexed meshes with complete position/normal/UV attribute sets. The missing piece for renderable export is now narrower: distinguish strip/fan vs quad or find a separate topology stream for these attribute-only meshes, while separately continuing position discovery for the top indexed `meshSize=325` family.
 
 ## NIF data-stream header proof 🔎
 
@@ -876,10 +897,12 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ## Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
-2. Find the position source for the `meshSize=325` family; normals and UVs are now strong rotate-right-1 leads, but positions remain unproven.
-3. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
-4. Add byte-shift/endian/stride role probes for the `NiMesh` block payload itself and nearby non-stream fields.
-5. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
-6. Add mesh-level topology scoring for strip/list/fan/restart candidates.
-7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
-8. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+2. For the attribute-set lane, distinguish `implicit-strip-or-quad-candidate` by mining the adjacent `strided-body` streams and mesh payload fields.
+3. Find the position source for the `meshSize=325` indexed family; normals and UVs are strong rotate-right-1 leads, but positions remain unproven.
+4. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
+5. Add byte-shift/endian/stride role probes for the `NiMesh` block payload itself and nearby non-stream fields.
+6. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
+7. Add index-family topology scoring directly to mesh-binding pair reports.
+8. Add a disabled experimental exporter only after one lane has positions, normals, UVs, and topology/index proof.
+9. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
+10. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
