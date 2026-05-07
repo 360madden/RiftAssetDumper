@@ -301,6 +301,47 @@ Validated smaller copied model:
 
 Why this matters: repeated offsets such as `@236`, `@312`, and `@320` are now concrete fields to reverse next, while ambiguity flags prevent over-claiming guessed references as proven mesh topology.
 
+## Copied-set mesh-stream candidate inventory 📈
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-streams --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-stream-inventory.json" --limit 100
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| NiMesh blocks | `5,507` |
+| Mesh blocks with candidates | `5,507` |
+| Candidate stream links | `11,564` |
+| Ambiguous candidate links | `3,809` |
+
+Top candidate offsets:
+
+| Offset | Count | Ambiguous | Top target sizes | Top mesh sizes |
+|---:|---:|---:|---|---|
+| `@168` | `1,811` | `0` | `317×84`, `269×80`, `413×64`, `245×59` | `214×973`, `193×732`, `235×106` |
+| `@276` | `642` | `233` | `413×62`, `53×40`, `557×29`, `101×25` | `301×364`, `309×205`, `385×31` |
+| `@280` | `523` | `109` | `61×66`, `221×34`, `157×20`, `413×19` | `305×419`, `326×46`, `389×22` |
+| `@300` | `514` | `89` | `221×145`, `173×37`, `509×26`, `445×22` | `325×329`, `346×93`, `333×45` |
+| `@196` | `505` | `88` | `77×66`, `317×27`, `221×21`, `605×19` | `305×419`, `326×46`, `263×23` |
+
+Top repeated stream-reference patterns:
+
+| Mesh size | Count | Pattern |
+|---:|---:|---|
+| `325` | `138` | `@216:size=317`, `@292:size=101?`, `@300:size=221` |
+| `235` | `82` | `@168:size=317` |
+| `235` | `80` | `@168:size=269` |
+| `193` | `64` | `@168:size=413` |
+| `321` | `60` | `@212:size=317`, `@288:size=101?`, `@296:size=221` |
+
+Why this matters: every copied `NiMesh` block now has at least one stream candidate. The most repeated, non-ambiguous lead is `@168`, and the most repeated multi-stream families identify concrete mesh/data-stream layouts to reverse before attempting OBJ export.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -384,6 +425,10 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 ```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --out "C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-streams-21900d.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-streams --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-stream-inventory.json" --limit 100
 ```
 
 ```powershell

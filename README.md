@@ -529,6 +529,26 @@ Mesh #6 -> @212:#24 size=1673, @288:#22? size=1649, @296:#28 size=1125
 
 The repeated `NiMesh` payload offsets around `@236`, `@312`, and `@320` are now the next best concrete fields to decode.
 
+Inventory candidate mesh-stream links across all copied NIF payloads:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-streams --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-stream-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+NIF payloads: 5,111
+NiMesh blocks: 5,507
+Mesh blocks with candidates: 5,507
+Candidate stream links: 11,564
+Ambiguous candidate links: 3,809
+Top offsets: @168=1,811, @276=642, @280=523, @300=514, @196=505
+Top pattern: meshSize=325 count=138 @216:size=317|@292:size=101?|@300:size=221
+```
+
+This makes `@168` the strongest copied-set lead for small repeated meshes, while the `meshSize=325` and `meshSize=321` three-stream patterns look like good next targets for vertex/index/attribute role inference.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell

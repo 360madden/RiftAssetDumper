@@ -94,6 +94,11 @@ internal static class Program
                 return InventoryNifBlocks(options);
             }
 
+            if (options.Command == "inventory-nif-mesh-streams")
+            {
+                return InventoryNifMeshStreams(options);
+            }
+
             if (options.Command == "mine-nif-references")
             {
                 return MineNifReferences(options);
@@ -1782,6 +1787,224 @@ internal static class Program
         Console.WriteLine($"Top block types: {string.Join(", ", report.BlockTypes.Take(8).Select(static g => $"{g.TypeName}={g.BlockCount:N0}"))}");
         Console.WriteLine($"Top mesh families: {string.Join(", ", report.MeshFamilies.Take(5).Select(static f => $"size={f.Size} count={f.Count:N0}"))}");
         Console.WriteLine($"Top data stream families: {string.Join(", ", report.DataStreamFamilies.Take(5).Select(static f => $"{f.TypeName}/size={f.Size} count={f.Count:N0}"))}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
+    private static int InventoryNifMeshStreams(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var offsetGroups = new Dictionary<int, NifMeshStreamOffsetAccumulator>();
+        var patternGroups = new Dictionary<string, NifMeshStreamPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var meshBlockCount = 0;
+        var candidateLinkCount = 0;
+        var ambiguousCandidateLinkCount = 0;
+        var meshBlocksWithCandidates = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var meshBlock in header.Blocks.Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        meshBlockCount++;
+                        var candidates = meshBlock.DataStreamReferenceCandidates
+                            .OrderBy(static c => c.PayloadOffset)
+                            .ThenBy(static c => c.TargetBlockIndex)
+                            .ToList();
+                        if (candidates.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        meshBlocksWithCandidates++;
+                        var patternKey = string.Join("|", candidates.Take(16).Select(static c => $"@{c.PayloadOffset}:size={c.TargetSize}{(c.MaybeStringIndex ? "?" : string.Empty)}"));
+                        if (!patternGroups.TryGetValue(patternKey, out var patternGroup))
+                        {
+                            patternGroup = new NifMeshStreamPatternAccumulator(patternKey, meshBlock.Size, meshBlock.First16);
+                            patternGroups.Add(patternKey, patternGroup);
+                        }
+
+                        patternGroup.Count++;
+                        patternGroup.NifIds.Add(entry.IdPrefix);
+
+                        foreach (var candidate in candidates)
+                        {
+                            candidateLinkCount++;
+                            if (candidate.MaybeStringIndex)
+                            {
+                                ambiguousCandidateLinkCount++;
+                            }
+
+                            var sample = new NifMeshStreamSample(
+                                ArchiveName: archiveName,
+                                EntryIndex: entry.Index,
+                                IdPrefix: entry.IdPrefix,
+                                ManifestEntryIndex: manifestEntry?.Index,
+                                MeshBlockIndex: meshBlock.Index,
+                                MeshSize: meshBlock.Size,
+                                MeshFirst16: meshBlock.First16,
+                                PayloadOffset: candidate.PayloadOffset,
+                                TargetBlockIndex: candidate.TargetBlockIndex,
+                                TargetTypeName: candidate.TargetTypeName,
+                                TargetSize: candidate.TargetSize,
+                                TargetFirst16: candidate.TargetFirst16,
+                                MaybeStringIndex: candidate.MaybeStringIndex,
+                                StringValue: candidate.StringValue);
+
+                            if (patternGroup.Samples.Count < 12)
+                            {
+                                patternGroup.Samples.Add(sample);
+                            }
+
+                            if (!offsetGroups.TryGetValue(candidate.PayloadOffset, out var offsetGroup))
+                            {
+                                offsetGroup = new NifMeshStreamOffsetAccumulator(candidate.PayloadOffset);
+                                offsetGroups.Add(candidate.PayloadOffset, offsetGroup);
+                            }
+
+                            offsetGroup.Count++;
+                            if (candidate.MaybeStringIndex)
+                            {
+                                offsetGroup.AmbiguousCount++;
+                            }
+
+                            offsetGroup.TargetSizeCounts[candidate.TargetSize] = offsetGroup.TargetSizeCounts.GetValueOrDefault(candidate.TargetSize) + 1;
+                            offsetGroup.MeshSizeCounts[meshBlock.Size] = offsetGroup.MeshSizeCounts.GetValueOrDefault(meshBlock.Size) + 1;
+                            if (offsetGroup.Samples.Count < 12)
+                            {
+                                offsetGroup.Samples.Add(sample);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static NifMeshStreamOffsetGroup toOffsetRecord(NifMeshStreamOffsetAccumulator group)
+        {
+            return new NifMeshStreamOffsetGroup(
+                PayloadOffset: group.PayloadOffset,
+                Count: group.Count,
+                AmbiguousCount: group.AmbiguousCount,
+                TargetSizes: group.TargetSizeCounts
+                    .OrderByDescending(static kvp => kvp.Value)
+                    .ThenBy(static kvp => kvp.Key)
+                    .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                    .ToList(),
+                MeshSizes: group.MeshSizeCounts
+                    .OrderByDescending(static kvp => kvp.Value)
+                    .ThenBy(static kvp => kvp.Key)
+                    .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                    .ToList(),
+                Samples: group.Samples);
+        }
+
+        static NifMeshStreamPatternGroup toPatternRecord(NifMeshStreamPatternAccumulator group)
+        {
+            return new NifMeshStreamPatternGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                MeshFirst16: group.MeshFirst16,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                Samples: group.Samples);
+        }
+
+        var report = new NifMeshStreamInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            MeshBlocks: meshBlockCount,
+            MeshBlocksWithCandidates: meshBlocksWithCandidates,
+            CandidateLinks: candidateLinkCount,
+            AmbiguousCandidateLinks: ambiguousCandidateLinkCount,
+            OffsetGroups: offsetGroups.Values
+                .Select(toOffsetRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.PayloadOffset)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopPatterns: patternGroups.Values
+                .Select(toPatternRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-stream-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NiMesh blocks: {meshBlockCount:N0}");
+        Console.WriteLine($"Mesh blocks with candidates: {meshBlocksWithCandidates:N0}");
+        Console.WriteLine($"Candidate stream links: {candidateLinkCount:N0}");
+        Console.WriteLine($"Ambiguous candidate links: {ambiguousCandidateLinkCount:N0}");
+        Console.WriteLine($"Top offsets: {string.Join(", ", report.OffsetGroups.Take(8).Select(static g => $"@{g.PayloadOffset}={g.Count:N0}"))}");
+        Console.WriteLine($"Top patterns: {string.Join(" | ", report.TopPatterns.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.Pattern}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -4819,6 +5042,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-mesh-streams --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
@@ -5028,6 +5252,7 @@ internal static class Program
                     case "probe-nif":
                     case "inventory-nif":
                     case "inventory-nif-blocks":
+                    case "inventory-nif-mesh-streams":
                     case "mine-nif-references":
                     case "link-nif-textures":
                     case "extract-linked-textures":
@@ -5597,6 +5822,73 @@ internal sealed record NifBlockInventorySample(
     uint Size,
     string First16,
     List<string> StringSamples);
+
+internal sealed class NifMeshStreamOffsetAccumulator(int payloadOffset)
+{
+    public int PayloadOffset { get; } = payloadOffset;
+    public int Count { get; set; }
+    public int AmbiguousCount { get; set; }
+    public Dictionary<uint, int> TargetSizeCounts { get; } = [];
+    public Dictionary<uint, int> MeshSizeCounts { get; } = [];
+    public List<NifMeshStreamSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshStreamPatternAccumulator(string pattern, uint meshSize, string meshFirst16)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public string MeshFirst16 { get; } = meshFirst16;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifMeshStreamSample> Samples { get; } = [];
+}
+
+internal sealed record NifMeshStreamInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int MeshBlocks,
+    int MeshBlocksWithCandidates,
+    int CandidateLinks,
+    int AmbiguousCandidateLinks,
+    List<NifMeshStreamOffsetGroup> OffsetGroups,
+    List<NifMeshStreamPatternGroup> TopPatterns);
+
+internal sealed record NifMeshStreamOffsetGroup(
+    int PayloadOffset,
+    int Count,
+    int AmbiguousCount,
+    List<NifSizeCount> TargetSizes,
+    List<NifSizeCount> MeshSizes,
+    List<NifMeshStreamSample> Samples);
+
+internal sealed record NifMeshStreamPatternGroup(
+    string Pattern,
+    uint MeshSize,
+    string MeshFirst16,
+    int Count,
+    int NifPayloads,
+    List<NifMeshStreamSample> Samples);
+
+internal sealed record NifSizeCount(uint Size, int Count);
+
+internal sealed record NifMeshStreamSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    string MeshFirst16,
+    int PayloadOffset,
+    int TargetBlockIndex,
+    string TargetTypeName,
+    uint TargetSize,
+    string TargetFirst16,
+    bool MaybeStringIndex,
+    string? StringValue);
 
 internal sealed record NifReferenceSample(
     string ArchiveName,
