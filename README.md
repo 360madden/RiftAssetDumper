@@ -618,6 +618,24 @@ Mesh payload windows matching paired vertex count: 0
 
 This creates the one-mesh proof packet needed before attempting any experimental geometry export. Current interpretation for the top family: `payload=72` is a big-endian strip-like index lead, `payload=288` is a byte-rotated normal `float3` lead, and `payload=192` is a byte-rotated UV `float2` lead. Position data is still not proven, and the mesh payload itself did not expose a simple matching float window in this sample.
 
+Probe a complete position/normal/UV attribute set:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id 75d5a06d7c0de1dd -MeshBlock 7
+```
+
+Validated sample:
+
+```text
+Mesh #7 size=305
+@188 -> #21 payload=192 role=position-float3-ror1-lead
+@196 -> #22 payload=192 role=normal-float3-ror1-lead
+@280 -> #26 payload=128 role=uv-float2-ror1-lead
+Attribute set: position + normal + UV, vertexCount=16
+```
+
+This gives a second geometry lane: complete unindexed/separately-indexed attribute sets. The exporter remains blocked until topology/index rules are proven.
+
 Probe the target data streams for one NIF mesh:
 
 ```powershell

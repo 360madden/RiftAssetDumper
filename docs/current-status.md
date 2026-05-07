@@ -392,6 +392,8 @@ Validated full copied-set result:
 | Invalid declared stream bodies | `0` |
 | Pair-compatible meshes | `2,076` |
 | Pair-compatible links | `4,468` |
+| Attribute-compatible meshes | `52` |
+| Attribute-compatible sets | `52` |
 
 Top stream roles:
 
@@ -413,6 +415,16 @@ Top pair-compatible patterns:
 | `321` | `60` | `@288 payload=72 index-u16be-strip-lead` | `@212 payload=288 normal-float3-ror1-lead` | `24` | `23` | `1.00` |
 | `305` | `57` | `@272 payload=12 index-u16be-strip-lead` | `@280 payload=32 uv-float2-ror1-lead` | `4` | `3` | `1.00` |
 | `301` | `50` | `@268 payload=144 index-u16be-strip-lead` | `@276 payload=384 uv-float2-ror1-lead` | `48` | `47` | `1.00` |
+
+Top position/normal/UV attribute-compatible patterns:
+
+| Mesh size | Count | Position payload | Normal payload | UV payload | Vertex count |
+|---:|---:|---:|---:|---:|---:|
+| `305` | `6` | `192` | `192` | `128` | `16` |
+| `297` | `2` | `1536` | `1536` | `1024` | `128` |
+| `321` | `2` | `612` | `612` | `408` | `51` |
+| `329` | `2` | `276` | `276` | `184` | `23` |
+| `329` | `2` | `432` | `432` | `288` | `36` |
 
 Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility, then promoted a byte-order lead. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, `@216` as rotate-right-1 normal `float3`, and `@300` as rotate-right-1 UV `float2`. Position data is still not proven.
 
@@ -456,6 +468,34 @@ Mesh payload scan:
 | Rotate-right-1 / little-endian float2/float3 payload windows matching paired vertex count | `0` |
 
 Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing. The mesh payload window scan did not find a simple inline position window for this sample, so the next search should inspect other block types/fields or repeated `position-float3-ror1-lead` families.
+
+## Position/normal/UV attribute-set proof 🧱
+
+Command:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id 75d5a06d7c0de1dd -MeshBlock 7
+```
+
+Validated sample:
+
+| Field | Value |
+|---|---|
+| Asset ID | `75d5a06d7c0de1dd` |
+| Mesh block | `#7` |
+| Mesh size | `305` |
+| Attribute sets | `1` |
+| Pairings | `0` |
+
+Attribute streams:
+
+| Mesh offset | Stream block | Payload bytes | Role | Vertex count |
+|---:|---:|---:|---|---:|
+| `@188` | `#21?` | `192` | `position-float3-ror1-lead` | `16` |
+| `@196` | `#22?` | `192` | `normal-float3-ror1-lead` | `16` |
+| `@280` | `#26?` | `128` | `uv-float2-ror1-lead` | `16` |
+
+Why this matters: geometry discovery now has a second validated lane besides index pairings: unindexed or separately-indexed meshes with complete position/normal/UV attribute sets. The missing piece for renderable export is still topology/index interpretation for these attribute-only meshes, or position discovery for the top indexed `meshSize=325` family.
 
 ## NIF data-stream header proof 🔎
 

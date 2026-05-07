@@ -228,10 +228,11 @@ Design target: this script should become the optionized local workbench for disc
 | 3 | Stream role inventory refinement | Improve role scoring for referenced streams only | Top patterns label likely index/position/normal/UV streams with confidence flags |
 | 4 | Mesh probe | `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
 | 5 | Shifted/encoded role refinement | Rotate-right-1 float probes for coarse stream roles | `uint16-compatible-body` splits into normal/UV/position byte-rotated labels |
-| 6 | Position source discovery | Probe `NiMesh` payload bytes and nearby non-stream fields | Top family has index + normal + UV + position candidates |
-| 7 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
-| 8 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
-| 9 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
+| 6 | Position source discovery | Probe `NiMesh` payload bytes and repeated position-bearing stream families | Indexed top family has index + normal + UV leads; separate attribute-set lane has position + normal + UV |
+| 7 | Attribute-set topology proof | Determine whether position/normal/UV-only meshes are unindexed, implicit strips, or separately indexed | At least one complete attribute family has a ranked topology interpretation |
+| 8 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
+| 9 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
+| 10 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
 
 ## Definition of done for each milestone ✅
 

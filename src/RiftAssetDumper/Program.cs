@@ -1625,9 +1625,14 @@ internal static class Program
             var meshPayload = SliceNifBlockPayload(payload, meshBlock);
             var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
             var pairings = FindNifMeshProbePairings(streamSummaries);
+            var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
             var payloadWindows = FindNifMeshPayloadRoleWindows(
                 meshPayload,
-                pairings.Select(static p => p.VertexCount).Distinct().OrderBy(static c => c).ToList());
+                pairings.Select(static p => p.VertexCount)
+                    .Concat(attributeSets.Select(static s => s.VertexCount))
+                    .Distinct()
+                    .OrderBy(static c => c)
+                    .ToList());
             meshes.Add(new NifMeshProbe(
                 MeshBlockIndex: meshBlock.Index,
                 MeshSize: meshBlock.Size,
@@ -1639,6 +1644,7 @@ internal static class Program
                 StringSamples: meshBlock.StringSamples,
                 Streams: streamSummaries,
                 Pairings: pairings,
+                AttributeSets: attributeSets,
                 PayloadWindows: payloadWindows));
         }
 
@@ -1656,6 +1662,7 @@ internal static class Program
             MeshesEmitted: meshes.Count,
             CandidateLinks: meshes.Sum(static m => m.Streams.Count),
             Pairings: meshes.Sum(static m => m.Pairings.Count),
+            AttributeSets: meshes.Sum(static m => m.AttributeSets.Count),
             HeaderWarnings: header.Warnings,
             Meshes: meshes);
 
@@ -1663,13 +1670,18 @@ internal static class Program
         Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
         File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
-        Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0}");
+        Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} attributeSets={report.AttributeSets:N0}");
         foreach (var mesh in meshes.Take(8))
         {
             Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
             foreach (var pairing in mesh.Pairings.Take(5))
             {
                 Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} confidence={pairing.Confidence}");
+            }
+
+            foreach (var attributeSet in mesh.AttributeSets.Take(3))
+            {
+                Console.WriteLine($"  attributes position@{attributeSet.PositionMeshPayloadOffset}/#{attributeSet.PositionBlockIndex} normal@{attributeSet.NormalMeshPayloadOffset}/#{attributeSet.NormalBlockIndex} uv@{attributeSet.UvMeshPayloadOffset}/#{attributeSet.UvBlockIndex} vertexCount={attributeSet.VertexCount} confidence={attributeSet.Confidence}");
             }
 
             foreach (var window in mesh.PayloadWindows.Take(3))
@@ -2381,6 +2393,7 @@ internal static class Program
         var roleGroups = new Dictionary<string, NifMeshBindingRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
         var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
         var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var attributeSetGroups = new Dictionary<string, NifMeshAttributeSetAccumulator>(StringComparer.OrdinalIgnoreCase);
         var inspected = 0;
         var nifCount = 0;
         var failed = 0;
@@ -2391,6 +2404,8 @@ internal static class Program
         var invalidDeclaredStreamBodies = 0;
         var pairCompatibleMeshes = 0;
         var pairCompatibleLinks = 0;
+        var attributeCompatibleMeshes = 0;
+        var attributeCompatibleSets = 0;
 
         foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
         {
@@ -2537,10 +2552,22 @@ internal static class Program
                             manifestEntry,
                             meshBlock,
                             streamSummaries);
+                        var attributeSets = FindNifMeshAttributeSets(
+                            archiveName,
+                            entry,
+                            manifestEntry,
+                            meshBlock,
+                            streamSummaries);
                         if (pairings.Count > 0)
                         {
                             pairCompatibleMeshes++;
                             pairCompatibleLinks += pairings.Count;
+                        }
+
+                        if (attributeSets.Count > 0)
+                        {
+                            attributeCompatibleMeshes++;
+                            attributeCompatibleSets += attributeSets.Count;
                         }
 
                         var patternKey = string.Join("|", streamSummaries.Take(16).Select(static s => $"@{s.MeshPayloadOffset}:size={s.TargetSize}:payload={s.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "?"}:role={s.RoleStats.PrimaryRole}{(s.MaybeStringIndex ? "?" : string.Empty)}"));
@@ -2569,6 +2596,30 @@ internal static class Program
                                 MeshFirst16: meshBlock.First16,
                                 PairingCount: pairings.Count,
                                 Streams: streamSummaries.Take(16).ToList()));
+                        }
+
+                        foreach (var attributeSet in attributeSets)
+                        {
+                            var key = $"meshSize={meshBlock.Size}|position@{attributeSet.PositionMeshPayloadOffset}:payload={attributeSet.PositionDeclaredPayloadBytes}|normal@{attributeSet.NormalMeshPayloadOffset}:payload={attributeSet.NormalDeclaredPayloadBytes}|uv@{attributeSet.UvMeshPayloadOffset}:payload={attributeSet.UvDeclaredPayloadBytes}|count={attributeSet.VertexCount}";
+                            if (!attributeSetGroups.TryGetValue(key, out var attributeSetGroup))
+                            {
+                                attributeSetGroup = new NifMeshAttributeSetAccumulator(
+                                    key,
+                                    meshBlock.Size,
+                                    attributeSet.PositionDeclaredPayloadBytes,
+                                    attributeSet.NormalDeclaredPayloadBytes,
+                                    attributeSet.UvDeclaredPayloadBytes,
+                                    attributeSet.VertexCount);
+                                attributeSetGroups.Add(key, attributeSetGroup);
+                            }
+
+                            attributeSetGroup.Count++;
+                            attributeSetGroup.NifIds.Add(entry.IdPrefix);
+                            attributeSetGroup.ConfidenceTotal += attributeSet.Confidence;
+                            if (attributeSetGroup.Samples.Count < 16)
+                            {
+                                attributeSetGroup.Samples.Add(attributeSet);
+                            }
                         }
 
                         foreach (var pairing in pairings)
@@ -2656,6 +2707,21 @@ internal static class Program
                 Samples: group.Samples);
         }
 
+        static NifMeshAttributeSetGroup toAttributeSetRecord(NifMeshAttributeSetAccumulator group)
+        {
+            return new NifMeshAttributeSetGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                PositionDeclaredPayloadBytes: group.PositionDeclaredPayloadBytes,
+                NormalDeclaredPayloadBytes: group.NormalDeclaredPayloadBytes,
+                UvDeclaredPayloadBytes: group.UvDeclaredPayloadBytes,
+                VertexCount: group.VertexCount,
+                AverageConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
+                Samples: group.Samples);
+        }
+
         var report = new NifMeshBindingInventoryReport(
             RootDirectory: rootDirectory,
             ManifestPath: manifestPath,
@@ -2669,6 +2735,8 @@ internal static class Program
             InvalidDeclaredStreamBodies: invalidDeclaredStreamBodies,
             PairCompatibleMeshes: pairCompatibleMeshes,
             PairCompatibleLinks: pairCompatibleLinks,
+            AttributeCompatibleMeshes: attributeCompatibleMeshes,
+            AttributeCompatibleSets: attributeCompatibleSets,
             RoleGroups: roleGroups.Values
                 .Select(toRoleRecord)
                 .OrderByDescending(static g => g.Count)
@@ -2690,6 +2758,14 @@ internal static class Program
                 .ThenBy(static g => g.MeshSize)
                 .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
                 .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopAttributeSets: attributeSetGroups.Values
+                .Select(toAttributeSetRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.AverageConfidence)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
                 .ToList());
 
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-binding-inventory.json");
@@ -2705,8 +2781,11 @@ internal static class Program
         Console.WriteLine($"Invalid declared stream bodies: {invalidDeclaredStreamBodies:N0}");
         Console.WriteLine($"Pair-compatible meshes: {pairCompatibleMeshes:N0}");
         Console.WriteLine($"Pair-compatible links: {pairCompatibleLinks:N0}");
+        Console.WriteLine($"Attribute-compatible meshes: {attributeCompatibleMeshes:N0}");
+        Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
         Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
         Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.IndexRole}->{g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
+        Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -6262,6 +6341,107 @@ internal static class Program
             .ToList();
     }
 
+    private static List<NifMeshAttributeSetSample> FindNifMeshAttributeSets(
+        string? archiveName,
+        ArchiveEntrySample? entry,
+        ManifestEntryBrief? manifestEntry,
+        NifBlockInfo meshBlock,
+        List<NifMeshBoundStreamSummary> streams)
+    {
+        var positions = streams
+            .Where(static s => s.RoleStats.PrimaryRole.StartsWith("position-float3", StringComparison.OrdinalIgnoreCase))
+            .Select(static s => (Stream: s, VertexCount: GetPrimaryRoleVertexCount(s)))
+            .Where(static s => s.VertexCount is > 0)
+            .ToList();
+        var normals = streams
+            .Where(static s => s.RoleStats.PrimaryRole.StartsWith("normal-float3", StringComparison.OrdinalIgnoreCase))
+            .Select(static s => (Stream: s, VertexCount: GetPrimaryRoleVertexCount(s)))
+            .Where(static s => s.VertexCount is > 0)
+            .ToList();
+        var uvs = streams
+            .Where(static s => s.RoleStats.PrimaryRole.StartsWith("uv-float2", StringComparison.OrdinalIgnoreCase))
+            .Select(static s => (Stream: s, VertexCount: GetPrimaryRoleVertexCount(s)))
+            .Where(static s => s.VertexCount is > 0)
+            .ToList();
+        var sets = new List<NifMeshAttributeSetSample>();
+
+        foreach (var position in positions)
+        {
+            foreach (var normal in normals)
+            {
+                foreach (var uv in uvs)
+                {
+                    if (position.VertexCount != normal.VertexCount || position.VertexCount != uv.VertexCount)
+                    {
+                        continue;
+                    }
+
+                    var confidence = Math.Min(position.Stream.RoleStats.Confidence, Math.Min(normal.Stream.RoleStats.Confidence, uv.Stream.RoleStats.Confidence));
+                    sets.Add(new NifMeshAttributeSetSample(
+                        ArchiveName: archiveName,
+                        EntryIndex: entry?.Index,
+                        IdPrefix: entry?.IdPrefix,
+                        ManifestEntryIndex: manifestEntry?.Index,
+                        MeshBlockIndex: meshBlock.Index,
+                        MeshSize: meshBlock.Size,
+                        VertexCount: position.VertexCount!.Value,
+                        Confidence: confidence,
+                        PositionMeshPayloadOffset: position.Stream.MeshPayloadOffset,
+                        PositionBlockIndex: position.Stream.TargetBlockIndex,
+                        PositionDeclaredPayloadBytes: position.Stream.DeclaredPayloadBytes,
+                        PositionRole: position.Stream.RoleStats.PrimaryRole,
+                        NormalMeshPayloadOffset: normal.Stream.MeshPayloadOffset,
+                        NormalBlockIndex: normal.Stream.TargetBlockIndex,
+                        NormalDeclaredPayloadBytes: normal.Stream.DeclaredPayloadBytes,
+                        NormalRole: normal.Stream.RoleStats.PrimaryRole,
+                        UvMeshPayloadOffset: uv.Stream.MeshPayloadOffset,
+                        UvBlockIndex: uv.Stream.TargetBlockIndex,
+                        UvDeclaredPayloadBytes: uv.Stream.DeclaredPayloadBytes,
+                        UvRole: uv.Stream.RoleStats.PrimaryRole));
+                }
+            }
+        }
+
+        return sets
+            .OrderByDescending(static s => s.Confidence)
+            .ThenBy(static s => s.PositionMeshPayloadOffset)
+            .ThenBy(static s => s.NormalMeshPayloadOffset)
+            .ThenBy(static s => s.UvMeshPayloadOffset)
+            .Take(16)
+            .ToList();
+    }
+
+    private static int? GetPrimaryRoleVertexCount(NifMeshBoundStreamSummary stream)
+    {
+        var role = stream.RoleStats.PrimaryRole;
+        if (role.Contains("ror1", StringComparison.OrdinalIgnoreCase))
+        {
+            if (role.StartsWith("uv-float2", StringComparison.OrdinalIgnoreCase))
+            {
+                return stream.RoleStats.RotatedFloat2Stats?.VectorCount;
+            }
+
+            if (role.StartsWith("normal-float3", StringComparison.OrdinalIgnoreCase) ||
+                role.StartsWith("position-float3", StringComparison.OrdinalIgnoreCase))
+            {
+                return stream.RoleStats.RotatedFloat3Stats?.VectorCount;
+            }
+        }
+
+        if (role.StartsWith("uv-float2", StringComparison.OrdinalIgnoreCase))
+        {
+            return stream.RoleStats.Float2Stats?.VectorCount;
+        }
+
+        if (role.StartsWith("normal-float3", StringComparison.OrdinalIgnoreCase) ||
+            role.StartsWith("position-float3", StringComparison.OrdinalIgnoreCase))
+        {
+            return stream.RoleStats.Float3Stats?.VectorCount;
+        }
+
+        return null;
+    }
+
     private static List<NifMeshPayloadRoleWindow> FindNifMeshPayloadRoleWindows(ReadOnlySpan<byte> meshPayload, List<int> vertexCounts)
     {
         var windows = new List<NifMeshPayloadRoleWindow>();
@@ -8645,6 +8825,7 @@ internal sealed record NifMeshProbeReport(
     int MeshesEmitted,
     int CandidateLinks,
     int Pairings,
+    int AttributeSets,
     List<string> HeaderWarnings,
     List<NifMeshProbe> Meshes);
 
@@ -8659,6 +8840,7 @@ internal sealed record NifMeshProbe(
     List<string> StringSamples,
     List<NifMeshBoundStreamSummary> Streams,
     List<NifMeshProbePairing> Pairings,
+    List<NifMeshAttributeSetSample> AttributeSets,
     List<NifMeshPayloadRoleWindow> PayloadWindows);
 
 internal sealed record NifMeshProbePairing(
@@ -9008,6 +9190,26 @@ internal sealed class NifMeshBindingPairingAccumulator(
     public List<NifMeshBindingPairingSample> Samples { get; } = [];
 }
 
+internal sealed class NifMeshAttributeSetAccumulator(
+    string pattern,
+    uint meshSize,
+    uint? positionDeclaredPayloadBytes,
+    uint? normalDeclaredPayloadBytes,
+    uint? uvDeclaredPayloadBytes,
+    int vertexCount)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public uint? PositionDeclaredPayloadBytes { get; } = positionDeclaredPayloadBytes;
+    public uint? NormalDeclaredPayloadBytes { get; } = normalDeclaredPayloadBytes;
+    public uint? UvDeclaredPayloadBytes { get; } = uvDeclaredPayloadBytes;
+    public int VertexCount { get; } = vertexCount;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public double ConfidenceTotal { get; set; }
+    public List<NifMeshAttributeSetSample> Samples { get; } = [];
+}
+
 internal sealed record NifMeshBindingInventoryReport(
     string RootDirectory,
     string ManifestPath,
@@ -9021,9 +9223,12 @@ internal sealed record NifMeshBindingInventoryReport(
     int InvalidDeclaredStreamBodies,
     int PairCompatibleMeshes,
     int PairCompatibleLinks,
+    int AttributeCompatibleMeshes,
+    int AttributeCompatibleSets,
     List<NifMeshBindingRoleGroup> RoleGroups,
     List<NifMeshBindingPatternGroup> TopPatterns,
-    List<NifMeshBindingPairingGroup> TopPairings);
+    List<NifMeshBindingPairingGroup> TopPairings,
+    List<NifMeshAttributeSetGroup> TopAttributeSets);
 
 internal sealed record NifMeshBindingRoleGroup(
     string Role,
@@ -9056,6 +9261,18 @@ internal sealed record NifMeshBindingPairingGroup(
     double AverageConfidence,
     double AverageIndexCoverageRatio,
     List<NifMeshBindingPairingSample> Samples);
+
+internal sealed record NifMeshAttributeSetGroup(
+    string Pattern,
+    uint MeshSize,
+    int Count,
+    int NifPayloads,
+    uint? PositionDeclaredPayloadBytes,
+    uint? NormalDeclaredPayloadBytes,
+    uint? UvDeclaredPayloadBytes,
+    int VertexCount,
+    double AverageConfidence,
+    List<NifMeshAttributeSetSample> Samples);
 
 internal sealed record NifMeshBindingStreamSample(
     string ArchiveName,
@@ -9110,6 +9327,28 @@ internal sealed record NifMeshBindingPairingSample(
     int VertexCount,
     double IndexCoverageRatio,
     int Confidence);
+
+internal sealed record NifMeshAttributeSetSample(
+    string? ArchiveName,
+    int? EntryIndex,
+    string? IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    int VertexCount,
+    int Confidence,
+    int PositionMeshPayloadOffset,
+    int PositionBlockIndex,
+    uint? PositionDeclaredPayloadBytes,
+    string PositionRole,
+    int NormalMeshPayloadOffset,
+    int NormalBlockIndex,
+    uint? NormalDeclaredPayloadBytes,
+    string NormalRole,
+    int UvMeshPayloadOffset,
+    int UvBlockIndex,
+    uint? UvDeclaredPayloadBytes,
+    string UvRole);
 
 internal sealed record NifMeshStreamRoleStats(
     string PrimaryRole,

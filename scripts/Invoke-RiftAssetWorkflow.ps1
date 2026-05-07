@@ -95,13 +95,15 @@ function Show-ReportSummary {
             Write-Host "NIF payloads=$($report.NifPayloads) meshBlocks=$($report.MeshBlocks) links=$($report.CandidateLinks) pairMeshes=$($report.PairCompatibleMeshes) pairLinks=$($report.PairCompatibleLinks)"
             Write-Host ('Top roles: ' + (Get-TopText $report.RoleGroups { param($g) "$($g.Role)=$($g.Count)" }))
             Write-Host ('Top pairings: ' + (Get-TopText $report.TopPairings { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) $($g.IndexRole)->$($g.VertexRole) v=$($g.VertexCount) max=$($g.MaxIndexObserved)" }))
+            Write-Host ('Top attribute sets: ' + (Get-TopText $report.TopAttributeSets { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) p=$($g.PositionDeclaredPayloadBytes)/n=$($g.NormalDeclaredPayloadBytes)/uv=$($g.UvDeclaredPayloadBytes) v=$($g.VertexCount)" }))
         }
         'MeshProbe' {
-            Write-Host "version=$($report.NifVersion) meshes=$($report.MeshBlockCount) emitted=$($report.MeshesEmitted) links=$($report.CandidateLinks) pairings=$($report.Pairings)"
+            Write-Host "version=$($report.NifVersion) meshes=$($report.MeshBlockCount) emitted=$($report.MeshesEmitted) links=$($report.CandidateLinks) pairings=$($report.Pairings) attributeSets=$($report.AttributeSets)"
             foreach ($mesh in @($report.Meshes | Select-Object -First 3)) {
-                Write-Host "Mesh #$($mesh.MeshBlockIndex) size=$($mesh.MeshSize) streams=$($mesh.Streams.Count) pairings=$($mesh.Pairings.Count) payloadWindows=$($mesh.PayloadWindows.Count)"
+                Write-Host "Mesh #$($mesh.MeshBlockIndex) size=$($mesh.MeshSize) streams=$($mesh.Streams.Count) pairings=$($mesh.Pairings.Count) attributeSets=$($mesh.AttributeSets.Count) payloadWindows=$($mesh.PayloadWindows.Count)"
                 Write-Host ('  roles: ' + (Get-TopText $mesh.Streams { param($s) "@$($s.MeshPayloadOffset)->#$($s.TargetBlockIndex) payload=$($s.DeclaredPayloadBytes) $($s.RoleStats.PrimaryRole) c=$($s.RoleStats.Confidence)" } 8))
                 Write-Host ('  pairings: ' + (Get-TopText $mesh.Pairings { param($p) "index@$($p.IndexMeshPayloadOffset)/#$($p.IndexBlockIndex) max=$($p.IndexMax) -> stream@$($p.VertexMeshPayloadOffset)/#$($p.VertexBlockIndex) v=$($p.VertexCount)" } 5))
+                Write-Host ('  attributes: ' + (Get-TopText $mesh.AttributeSets { param($a) "p@$($a.PositionMeshPayloadOffset)/#$($a.PositionBlockIndex) n@$($a.NormalMeshPayloadOffset)/#$($a.NormalBlockIndex) uv@$($a.UvMeshPayloadOffset)/#$($a.UvBlockIndex) v=$($a.VertexCount)" } 5))
                 Write-Host ('  payload windows: ' + (Get-TopText $mesh.PayloadWindows { param($w) "@$($w.PayloadOffset) bytes=$($w.ByteLength) $($w.Role) v=$($w.VertexCount)" } 5))
             }
         }
