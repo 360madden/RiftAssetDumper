@@ -566,6 +566,30 @@ Top pattern sample: c841eb9a0ed1c95e mesh #6 size=325
 
 The first `uint32` in these `NiDataStream` blocks appears to declare stream payload bytes, with a repeated 29-byte block header in the sampled families. This is still a structural lead, not final vertex/index semantics.
 
+Inventory the stream-header rule across all copied NIF payloads:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-headers --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-header-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+NiDataStream blocks: 31,777
+Declared payload blocks: 31,777
+Valid declared payload blocks: 31,777
+Invalid declared payload blocks: 0
+Top header byte counts: 29=31,777
+Top stream families:
+  size=317 payload=288 header=29 count=1,605
+  size=221 payload=192 header=29 count=920
+  size=605 payload=576 header=29 count=679
+  size=77  payload=48  header=29 count=663
+  size=125 payload=96  header=29 count=645
+```
+
+This upgrades the 29-byte `NiDataStream` header from a sampled lead to a copied-set invariant for the currently parsed NIF data streams.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell

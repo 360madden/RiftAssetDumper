@@ -104,6 +104,11 @@ internal static class Program
                 return InventoryNifMeshStreams(options);
             }
 
+            if (options.Command == "inventory-nif-stream-headers")
+            {
+                return InventoryNifStreamHeaders(options);
+            }
+
             if (options.Command == "mine-nif-references")
             {
                 return MineNifReferences(options);
@@ -2119,6 +2124,247 @@ internal static class Program
         Console.WriteLine($"Ambiguous candidate links: {ambiguousCandidateLinkCount:N0}");
         Console.WriteLine($"Top offsets: {string.Join(", ", report.OffsetGroups.Take(8).Select(static g => $"@{g.PayloadOffset}={g.Count:N0}"))}");
         Console.WriteLine($"Top patterns: {string.Join(" | ", report.TopPatterns.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.Pattern}"))}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
+    private static int InventoryNifStreamHeaders(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var headerGroups = new Dictionary<int, NifStreamHeaderAccumulator>();
+        var familyGroups = new Dictionary<string, NifStreamHeaderFamilyAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var dataStreamBlocks = 0;
+        var declaredPayloadBlocks = 0;
+        var validDeclaredPayloadBlocks = 0;
+        var invalidDeclaredPayloadBlocks = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var block in header.Blocks.Where(static b => b.TypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        dataStreamBlocks++;
+                        var blockPayload = SliceNifBlockPayload(payload.Bytes, block);
+                        if (blockPayload.Length < 4)
+                        {
+                            continue;
+                        }
+
+                        declaredPayloadBlocks++;
+                        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                        if (declaredPayloadBytes > blockPayload.Length)
+                        {
+                            invalidDeclaredPayloadBlocks++;
+                            continue;
+                        }
+
+                        validDeclaredPayloadBlocks++;
+                        var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
+                        var declaredPayloadOffset = headerBytes;
+                        var declaredPayload = blockPayload.Slice(declaredPayloadOffset, checked((int)declaredPayloadBytes));
+                        var strideCandidates = FindWholeBlockStrideCandidates(declaredPayload.Length);
+                        var sample = new NifStreamHeaderSample(
+                            ArchiveName: archiveName,
+                            EntryIndex: entry.Index,
+                            IdPrefix: entry.IdPrefix,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            BlockIndex: block.Index,
+                            TypeName: block.TypeName,
+                            DataOffset: block.DataOffset,
+                            BlockSize: block.Size,
+                            First16: block.First16,
+                            DeclaredPayloadBytes: declaredPayloadBytes,
+                            HeaderBytes: headerBytes,
+                            PayloadFirst16: ToHex(declaredPayload[..Math.Min(16, declaredPayload.Length)]),
+                            PayloadStrideCandidates: strideCandidates);
+
+                        if (!headerGroups.TryGetValue(headerBytes, out var headerGroup))
+                        {
+                            headerGroup = new NifStreamHeaderAccumulator(headerBytes);
+                            headerGroups.Add(headerBytes, headerGroup);
+                        }
+
+                        headerGroup.Count++;
+                        headerGroup.TypeCounts[block.TypeName] = headerGroup.TypeCounts.GetValueOrDefault(block.TypeName) + 1;
+                        headerGroup.BlockSizeCounts[block.Size] = headerGroup.BlockSizeCounts.GetValueOrDefault(block.Size) + 1;
+                        headerGroup.DeclaredPayloadSizeCounts[declaredPayloadBytes] = headerGroup.DeclaredPayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes) + 1;
+                        foreach (var strideCandidate in strideCandidates)
+                        {
+                            headerGroup.PayloadStrideCounts[strideCandidate.Stride] = headerGroup.PayloadStrideCounts.GetValueOrDefault(strideCandidate.Stride) + 1;
+                        }
+
+                        if (headerGroup.Samples.Count < 16)
+                        {
+                            headerGroup.Samples.Add(sample);
+                        }
+
+                        var familyKey = $"{block.TypeName}|size={block.Size}|payload={declaredPayloadBytes}|header={headerBytes}|first16={block.First16}";
+                        if (!familyGroups.TryGetValue(familyKey, out var familyGroup))
+                        {
+                            familyGroup = new NifStreamHeaderFamilyAccumulator(block.TypeName, block.Size, declaredPayloadBytes, headerBytes, block.First16, sample.PayloadFirst16);
+                            familyGroups.Add(familyKey, familyGroup);
+                        }
+
+                        familyGroup.Count++;
+                        familyGroup.NifIds.Add(entry.IdPrefix);
+                        foreach (var strideCandidate in strideCandidates)
+                        {
+                            familyGroup.PayloadStrideCounts[strideCandidate.Stride] = familyGroup.PayloadStrideCounts.GetValueOrDefault(strideCandidate.Stride) + 1;
+                        }
+
+                        if (familyGroup.Samples.Count < 16)
+                        {
+                            familyGroup.Samples.Add(sample);
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static List<NifSizeCount> topSizeCounts(Dictionary<uint, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key)
+                .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        static List<NifIntCount> topIntCounts(Dictionary<int, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key)
+                .Select(static kvp => new NifIntCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        static NifStreamHeaderGroup toHeaderRecord(NifStreamHeaderAccumulator group)
+        {
+            return new NifStreamHeaderGroup(
+                HeaderBytes: group.HeaderBytes,
+                Count: group.Count,
+                TypeCounts: group.TypeCounts
+                    .OrderByDescending(static kvp => kvp.Value)
+                    .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
+                    .ToList(),
+                BlockSizes: topSizeCounts(group.BlockSizeCounts),
+                DeclaredPayloadSizes: topSizeCounts(group.DeclaredPayloadSizeCounts),
+                PayloadStrides: topIntCounts(group.PayloadStrideCounts),
+                Samples: group.Samples);
+        }
+
+        static NifStreamHeaderFamilyGroup toFamilyRecord(NifStreamHeaderFamilyAccumulator family)
+        {
+            return new NifStreamHeaderFamilyGroup(
+                TypeName: family.TypeName,
+                BlockSize: family.BlockSize,
+                DeclaredPayloadBytes: family.DeclaredPayloadBytes,
+                HeaderBytes: family.HeaderBytes,
+                First16: family.First16,
+                PayloadFirst16: family.PayloadFirst16,
+                Count: family.Count,
+                NifPayloads: family.NifIds.Count,
+                PayloadStrides: topIntCounts(family.PayloadStrideCounts),
+                Samples: family.Samples);
+        }
+
+        var report = new NifStreamHeaderInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            DataStreamBlocks: dataStreamBlocks,
+            DeclaredPayloadBlocks: declaredPayloadBlocks,
+            ValidDeclaredPayloadBlocks: validDeclaredPayloadBlocks,
+            InvalidDeclaredPayloadBlocks: invalidDeclaredPayloadBlocks,
+            HeaderGroups: headerGroups.Values
+                .Select(toHeaderRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.HeaderBytes)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopFamilies: familyGroups.Values
+                .Select(toFamilyRecord)
+                .OrderByDescending(static f => f.Count)
+                .ThenBy(static f => f.BlockSize)
+                .ThenBy(static f => f.DeclaredPayloadBytes)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-stream-header-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NiDataStream blocks: {dataStreamBlocks:N0}");
+        Console.WriteLine($"Declared payload blocks: {declaredPayloadBlocks:N0}");
+        Console.WriteLine($"Valid declared payload blocks: {validDeclaredPayloadBlocks:N0}");
+        Console.WriteLine($"Invalid declared payload blocks: {invalidDeclaredPayloadBlocks:N0}");
+        Console.WriteLine($"Top header byte counts: {string.Join(", ", report.HeaderGroups.Take(8).Select(static g => $"{g.HeaderBytes}={g.Count:N0}"))}");
+        Console.WriteLine($"Top stream families: {string.Join(" | ", report.TopFamilies.Take(5).Select(static f => $"size={f.BlockSize}/payload={f.DeclaredPayloadBytes}/header={f.HeaderBytes} count={f.Count:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -5271,6 +5517,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-mesh-streams --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-headers --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
@@ -5486,6 +5733,7 @@ internal static class Program
                     case "inventory-nif":
                     case "inventory-nif-blocks":
                     case "inventory-nif-mesh-streams":
+                    case "inventory-nif-stream-headers":
                     case "mine-nif-references":
                     case "link-nif-textures":
                     case "extract-linked-textures":
@@ -6176,6 +6424,84 @@ internal sealed record NifMeshStreamSample(
     string TargetFirst16,
     bool MaybeStringIndex,
     string? StringValue);
+
+internal sealed class NifStreamHeaderAccumulator(int headerBytes)
+{
+    public int HeaderBytes { get; } = headerBytes;
+    public int Count { get; set; }
+    public Dictionary<string, int> TypeCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<uint, int> BlockSizeCounts { get; } = [];
+    public Dictionary<uint, int> DeclaredPayloadSizeCounts { get; } = [];
+    public Dictionary<int, int> PayloadStrideCounts { get; } = [];
+    public List<NifStreamHeaderSample> Samples { get; } = [];
+}
+
+internal sealed class NifStreamHeaderFamilyAccumulator(string typeName, uint blockSize, uint declaredPayloadBytes, int headerBytes, string first16, string payloadFirst16)
+{
+    public string TypeName { get; } = typeName;
+    public uint BlockSize { get; } = blockSize;
+    public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public int HeaderBytes { get; } = headerBytes;
+    public string First16 { get; } = first16;
+    public string PayloadFirst16 { get; } = payloadFirst16;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<int, int> PayloadStrideCounts { get; } = [];
+    public List<NifStreamHeaderSample> Samples { get; } = [];
+}
+
+internal sealed record NifStreamHeaderInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int DataStreamBlocks,
+    int DeclaredPayloadBlocks,
+    int ValidDeclaredPayloadBlocks,
+    int InvalidDeclaredPayloadBlocks,
+    List<NifStreamHeaderGroup> HeaderGroups,
+    List<NifStreamHeaderFamilyGroup> TopFamilies);
+
+internal sealed record NifStreamHeaderGroup(
+    int HeaderBytes,
+    int Count,
+    List<NifStringCount> TypeCounts,
+    List<NifSizeCount> BlockSizes,
+    List<NifSizeCount> DeclaredPayloadSizes,
+    List<NifIntCount> PayloadStrides,
+    List<NifStreamHeaderSample> Samples);
+
+internal sealed record NifStreamHeaderFamilyGroup(
+    string TypeName,
+    uint BlockSize,
+    uint DeclaredPayloadBytes,
+    int HeaderBytes,
+    string First16,
+    string PayloadFirst16,
+    int Count,
+    int NifPayloads,
+    List<NifIntCount> PayloadStrides,
+    List<NifStreamHeaderSample> Samples);
+
+internal sealed record NifStringCount(string Value, int Count);
+
+internal sealed record NifIntCount(int Value, int Count);
+
+internal sealed record NifStreamHeaderSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int BlockIndex,
+    string TypeName,
+    int DataOffset,
+    uint BlockSize,
+    string First16,
+    uint DeclaredPayloadBytes,
+    int HeaderBytes,
+    string PayloadFirst16,
+    List<StrideCandidate> PayloadStrideCandidates);
 
 internal sealed record NifReferenceSample(
     string ArchiveName,
