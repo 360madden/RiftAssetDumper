@@ -1,6 +1,6 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-05-06
+Date: 2026-05-07
 
 ## TL;DR 🧭
 
@@ -11,6 +11,21 @@ Date: 2026-05-06
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
 | Model→texture graph | ✅ working | NIF references link `3,224` model assets to `2,514` unique texture manifest assets. |
 | Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
+
+## Approved operating mode 🚀
+
+This repo is now following the approved **Aggressive Evidence Workflow**:
+
+```text
+docs\aggressive-discovery-workflow.md
+```
+
+| Principle | Practical behavior |
+|---|---|
+| Maximum real discovery speed | Add narrow probes/inventories, run smoke + full copied-set scans, then immediately advance the strongest lead. |
+| Not reckless output | No copied assets, generated dumps, raw user-profile paths, or unproven model exports get committed. |
+| Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, then validate `maxIndex < vertexCount`. |
+| Export gate | OBJ/model export stays experimental and disabled until mesh/stream pairing is structurally proven. |
 
 ## Compression truth 🧊
 

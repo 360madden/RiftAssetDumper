@@ -2,6 +2,16 @@
 
 Read-only RIFT asset archive research workspace.
 
+## Operating mode 🚀
+
+This repo now uses the approved **Aggressive Evidence Workflow**: optimize for maximum real discovery speed, not reckless output. The durable workflow plan is in:
+
+```text
+docs\aggressive-discovery-workflow.md
+```
+
+Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, and validate `maxIndex < vertexCount` before any experimental OBJ/model export.
+
 ## Privacy and path redaction
 
 The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports. Paths under the current user's profile are emitted with an environment-variable placeholder:
