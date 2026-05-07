@@ -18,6 +18,12 @@ Optionized workflow helper:
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
 ```
 
+Focused mesh probe helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
 Prefer adding options/modes to this helper before creating new one-off helper apps.
 
 ## Privacy and path redaction
@@ -587,6 +593,26 @@ Top pairing: meshSize=325 count=134 index-u16be-strip-lead -> uint16-compatible-
 ```
 
 This is the first full copied-set mesh-binding proof that candidate index streams can be paired with same-mesh stream bodies where `maxIndex < vertexCount`. Role scoring is still intentionally conservative: `uint16-compatible-body` is a stream compatibility label, not final vertex semantics.
+
+Probe one mesh with role and pairing evidence:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-mesh --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-c841-mesh6.json"
+```
+
+Validated sample:
+
+```text
+Mesh #6 size=325
+@216 -> #25 payload=288 role=uint16-compatible-body
+@292 -> #23 payload=72 role=index-u16be-strip-lead maxIndex=23
+@300 -> #29 payload=192 role=uint16-compatible-body
+Pairings:
+  index @292/#23 -> @216/#25 vertexCount=24 coverage=1.00
+  index @292/#23 -> @300/#29 vertexCount=24 coverage=1.00
+```
+
+This creates the one-mesh proof packet needed before tightening role scoring or attempting any experimental geometry export.
 
 Probe the target data streams for one NIF mesh:
 

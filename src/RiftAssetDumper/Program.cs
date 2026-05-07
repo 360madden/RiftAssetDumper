@@ -90,6 +90,11 @@ internal static class Program
                 return ProbeNifStreams(options);
             }
 
+            if (options.Command == "probe-nif-mesh")
+            {
+                return ProbeNifMesh(options);
+            }
+
             if (options.Command == "probe-nif-stream-body")
             {
                 return ProbeNifStreamBody(options);
@@ -1581,6 +1586,86 @@ internal static class Program
                     ? "none"
                     : FormatPreferredStrideSummary(stream.DeclaredPayloadStrideCandidates, max: 6);
                 Console.WriteLine($"  stream #{stream.TargetBlockIndex} first16={stream.TargetFirst64[..Math.Min(32, stream.TargetFirst64.Length)]} declaredPayload={stream.DeclaredPayloadBytes} declaredOffset={stream.DeclaredPayloadOffset} declaredStrides={declaredStrideText} bodyStride={strideText}");
+            }
+        }
+
+        if (header.Warnings.Count > 0)
+        {
+            Console.WriteLine($"Warnings: {string.Join("; ", header.Warnings)}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return header.Warnings.Count == 0 ? 0 : 2;
+    }
+
+    private static int ProbeNifMesh(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var (payload, source) = LoadPayloadForProbe(options, rootDirectory);
+        var detected = DetectFileType(payload);
+        if (detected.Extension != "nif")
+        {
+            Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+            return 1;
+        }
+
+        var header = ParseNifHeader(payload);
+        var meshes = new List<NifMeshProbe>();
+        var allMeshBlocks = header.Blocks
+            .Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static b => b.Index)
+            .ToList();
+        foreach (var meshBlock in allMeshBlocks)
+        {
+            if (options.MeshBlockFilter is not null && meshBlock.Index != options.MeshBlockFilter.Value)
+            {
+                continue;
+            }
+
+            var meshPayload = SliceNifBlockPayload(payload, meshBlock);
+            var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+            var pairings = FindNifMeshProbePairings(streamSummaries);
+            meshes.Add(new NifMeshProbe(
+                MeshBlockIndex: meshBlock.Index,
+                MeshSize: meshBlock.Size,
+                MeshDataOffset: meshBlock.DataOffset,
+                MeshFirst64: ToHex(meshPayload[..Math.Min(64, meshPayload.Length)]),
+                UInt32Prefix: meshBlock.UInt32Prefix,
+                Int32Prefix: ReadInt32Prefix(meshPayload, maxValues: 16),
+                Float32Prefix: meshBlock.Float32Prefix,
+                StringSamples: meshBlock.StringSamples,
+                Streams: streamSummaries,
+                Pairings: pairings));
+        }
+
+        if (options.MeshBlockFilter is not null && meshes.Count == 0)
+        {
+            Console.Error.WriteLine($"ERROR: NiMesh block #{options.MeshBlockFilter.Value} was not found.");
+            return 1;
+        }
+
+        var report = new NifMeshProbeReport(
+            Source: source,
+            Length: payload.Length,
+            NifVersion: header.VersionText,
+            MeshBlockCount: allMeshBlocks.Count,
+            MeshesEmitted: meshes.Count,
+            CandidateLinks: meshes.Sum(static m => m.Streams.Count),
+            Pairings: meshes.Sum(static m => m.Pairings.Count),
+            HeaderWarnings: header.Warnings,
+            Meshes: meshes);
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-probe.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0}");
+        foreach (var mesh in meshes.Take(8))
+        {
+            Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
+            foreach (var pairing in mesh.Pairings.Take(5))
+            {
+                Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} confidence={pairing.Confidence}");
             }
         }
 
@@ -5994,6 +6079,121 @@ internal static class Program
             .ToList();
     }
 
+    private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
+        byte[] payload,
+        NifHeaderInfo header,
+        NifBlockInfo meshBlock)
+    {
+        var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
+        var streamSummaries = new List<NifMeshBoundStreamSummary>();
+        foreach (var candidate in meshBlock.DataStreamReferenceCandidates.OrderBy(static c => c.PayloadOffset).ThenBy(static c => c.TargetBlockIndex))
+        {
+            blocksByIndex.TryGetValue(candidate.TargetBlockIndex, out var targetBlock);
+            ReadOnlySpan<byte> targetPayload = targetBlock is null
+                ? ReadOnlySpan<byte>.Empty
+                : SliceNifBlockPayload(payload, targetBlock);
+            uint? declaredPayloadBytes = null;
+            int? headerBytes = null;
+            var bodyFirst16 = string.Empty;
+            NifMeshStreamRoleStats roleStats;
+            if (targetPayload.Length >= 4)
+            {
+                declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(targetPayload[..4]);
+                if (declaredPayloadBytes.Value <= targetPayload.Length)
+                {
+                    headerBytes = targetPayload.Length - checked((int)declaredPayloadBytes.Value);
+                    var body = targetPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
+                    bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
+                    roleStats = AnalyzeNifMeshBoundStreamRole(body);
+                }
+                else
+                {
+                    roleStats = NifMeshStreamRoleStats.Invalid("declared-payload-past-block");
+                }
+            }
+            else
+            {
+                roleStats = NifMeshStreamRoleStats.Invalid("stream-block-too-small");
+            }
+
+            streamSummaries.Add(new NifMeshBoundStreamSummary(
+                MeshPayloadOffset: candidate.PayloadOffset,
+                TargetBlockIndex: candidate.TargetBlockIndex,
+                TargetTypeName: candidate.TargetTypeName,
+                TargetSize: candidate.TargetSize,
+                TargetFirst16: candidate.TargetFirst16,
+                DeclaredPayloadBytes: declaredPayloadBytes,
+                HeaderBytes: headerBytes,
+                BodyFirst16: bodyFirst16,
+                MaybeStringIndex: candidate.MaybeStringIndex,
+                StringValue: candidate.StringValue,
+                RoleStats: roleStats));
+        }
+
+        return streamSummaries;
+    }
+
+    private static List<NifMeshProbePairing> FindNifMeshProbePairings(List<NifMeshBoundStreamSummary> streams)
+    {
+        var pairings = new List<NifMeshProbePairing>();
+        var indexStreams = streams
+            .Where(static s => s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.IndexMax is not null)
+            .ToList();
+        var vertexStreams = streams
+            .Where(static s => !s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.VertexCountCandidates.Count > 0)
+            .ToList();
+
+        foreach (var indexStream in indexStreams)
+        {
+            var maxIndex = indexStream.RoleStats.IndexMax!.Value;
+            foreach (var vertexStream in vertexStreams)
+            {
+                if (vertexStream.TargetBlockIndex == indexStream.TargetBlockIndex)
+                {
+                    continue;
+                }
+
+                var compatibleVertexCount = vertexStream.RoleStats.VertexCountCandidates
+                    .Where(count => count > maxIndex)
+                    .OrderBy(static count => count)
+                    .FirstOrDefault();
+                if (compatibleVertexCount <= 0)
+                {
+                    continue;
+                }
+
+                var confidence = Math.Min(indexStream.RoleStats.Confidence, vertexStream.RoleStats.Confidence);
+                if (compatibleVertexCount == maxIndex + 1)
+                {
+                    confidence = Math.Min(100, confidence + 10);
+                }
+
+                pairings.Add(new NifMeshProbePairing(
+                    IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
+                    IndexBlockIndex: indexStream.TargetBlockIndex,
+                    IndexDeclaredPayloadBytes: indexStream.DeclaredPayloadBytes,
+                    IndexRole: indexStream.RoleStats.PrimaryRole,
+                    IndexMax: maxIndex,
+                    IndexPairCount: indexStream.RoleStats.IndexPairCount,
+                    VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
+                    VertexBlockIndex: vertexStream.TargetBlockIndex,
+                    VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
+                    VertexRole: vertexStream.RoleStats.PrimaryRole,
+                    VertexCount: compatibleVertexCount,
+                    IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
+                    Confidence: confidence));
+            }
+        }
+
+        return pairings
+            .OrderByDescending(static p => p.Confidence)
+            .ThenByDescending(static p => p.IndexCoverageRatio)
+            .ThenBy(static p => p.IndexMeshPayloadOffset)
+            .ThenBy(static p => p.VertexMeshPayloadOffset)
+            .Take(16)
+            .ToList();
+    }
+
     private static string ClassifyNifIndexCandidate(NifStreamEndianStats endianStats, NifUInt16BeIndexStats indexStats)
     {
         if (indexStats.PairCount == 0)
@@ -7589,6 +7789,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-binary --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-streams --root <SourceFolder> --id <16hex> --mesh-block <n>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --root <SourceFolder> --id <16hex> --mesh-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-stream-body --root <SourceFolder> --id <16hex> --stream-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
@@ -7814,6 +8015,7 @@ internal static class Program
                     case "probe-binary":
                     case "probe-nif":
                     case "probe-nif-streams":
+                    case "probe-nif-mesh":
                     case "probe-nif-stream-body":
                     case "inventory-nif":
                     case "inventory-nif-blocks":
@@ -8285,6 +8487,44 @@ internal sealed record NifStreamTargetProbe(
     List<StrideCandidate> DeclaredPayloadStrideCandidates,
     bool MaybeStringIndex,
     string? StringValue);
+
+internal sealed record NifMeshProbeReport(
+    BinaryAssetSource Source,
+    int Length,
+    string NifVersion,
+    int MeshBlockCount,
+    int MeshesEmitted,
+    int CandidateLinks,
+    int Pairings,
+    List<string> HeaderWarnings,
+    List<NifMeshProbe> Meshes);
+
+internal sealed record NifMeshProbe(
+    int MeshBlockIndex,
+    uint MeshSize,
+    int MeshDataOffset,
+    string MeshFirst64,
+    List<uint> UInt32Prefix,
+    List<int> Int32Prefix,
+    List<float?> Float32Prefix,
+    List<string> StringSamples,
+    List<NifMeshBoundStreamSummary> Streams,
+    List<NifMeshProbePairing> Pairings);
+
+internal sealed record NifMeshProbePairing(
+    int IndexMeshPayloadOffset,
+    int IndexBlockIndex,
+    uint? IndexDeclaredPayloadBytes,
+    string IndexRole,
+    ushort IndexMax,
+    int? IndexPairCount,
+    int VertexMeshPayloadOffset,
+    int VertexBlockIndex,
+    uint? VertexDeclaredPayloadBytes,
+    string VertexRole,
+    int VertexCount,
+    double IndexCoverageRatio,
+    int Confidence);
 
 internal sealed record NifStreamBodyProbeReport(
     BinaryAssetSource Source,

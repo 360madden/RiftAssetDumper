@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('MeshBindings', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
+    [ValidateSet('MeshBindings', 'MeshProbe', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
     [string[]] $Mode = @('MeshBindings'),
 
     [string] $Root = '',
@@ -22,6 +22,10 @@ param(
     [int] $SmokeMaxTotal = 100,
 
     [int] $Limit = 100,
+
+    [string] $Id = '',
+
+    [int] $MeshBlock = -1,
 
     [switch] $Full,
 
@@ -49,6 +53,7 @@ if ($Mode -contains 'All') {
 
 $commandMap = @{
     MeshBindings    = @{ Command = 'inventory-nif-mesh-bindings';    Base = 'nif-mesh-binding-inventory' }
+    MeshProbe       = @{ Command = 'probe-nif-mesh';                  Base = 'probe-nif-mesh' }
     MeshStreams     = @{ Command = 'inventory-nif-mesh-streams';      Base = 'nif-mesh-stream-inventory' }
     IndexCandidates = @{ Command = 'inventory-nif-index-candidates';  Base = 'nif-index-candidate-inventory' }
     StreamEndianness = @{ Command = 'inventory-nif-stream-endianness'; Base = 'nif-stream-endianness-inventory' }
@@ -91,6 +96,14 @@ function Show-ReportSummary {
             Write-Host ('Top roles: ' + (Get-TopText $report.RoleGroups { param($g) "$($g.Role)=$($g.Count)" }))
             Write-Host ('Top pairings: ' + (Get-TopText $report.TopPairings { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) $($g.IndexRole)->$($g.VertexRole) v=$($g.VertexCount) max=$($g.MaxIndexObserved)" }))
         }
+        'MeshProbe' {
+            Write-Host "version=$($report.NifVersion) meshes=$($report.MeshBlockCount) emitted=$($report.MeshesEmitted) links=$($report.CandidateLinks) pairings=$($report.Pairings)"
+            foreach ($mesh in @($report.Meshes | Select-Object -First 3)) {
+                Write-Host "Mesh #$($mesh.MeshBlockIndex) size=$($mesh.MeshSize) streams=$($mesh.Streams.Count) pairings=$($mesh.Pairings.Count)"
+                Write-Host ('  roles: ' + (Get-TopText $mesh.Streams { param($s) "@$($s.MeshPayloadOffset)->#$($s.TargetBlockIndex) payload=$($s.DeclaredPayloadBytes) $($s.RoleStats.PrimaryRole) c=$($s.RoleStats.Confidence)" } 8))
+                Write-Host ('  pairings: ' + (Get-TopText $mesh.Pairings { param($p) "index@$($p.IndexMeshPayloadOffset)/#$($p.IndexBlockIndex) max=$($p.IndexMax) -> stream@$($p.VertexMeshPayloadOffset)/#$($p.VertexBlockIndex) v=$($p.VertexCount)" } 5))
+            }
+        }
         'MeshStreams' {
             Write-Host "NIF payloads=$($report.NifPayloads) meshBlocks=$($report.MeshBlocks) links=$($report.CandidateLinks) ambiguous=$($report.AmbiguousCandidateLinks)"
             Write-Host ('Top offsets: ' + (Get-TopText $report.OffsetGroups { param($g) "@$($g.PayloadOffset)=$($g.Count)" }))
@@ -122,6 +135,22 @@ foreach ($modeName in $Mode) {
     $command = [string]$entry.Command
     $base = [string]$entry.Base
 
+    if ($modeName -eq 'MeshProbe') {
+        if ([string]::IsNullOrWhiteSpace($Id)) {
+            throw '-Mode MeshProbe requires -Id <16hex>.'
+        }
+
+        $probePath = Join-Path $Out $(if ($MeshBlock -ge 0) { "$base-$Id-mesh$MeshBlock.json" } else { "$base-$Id.json" })
+        $probeArgs = @('run', '--project', $Project, '--', $command, '--root', $Root, '--id', $Id, '--out', $probePath)
+        if ($MeshBlock -ge 0) {
+            $probeArgs += @('--mesh-block', [string]$MeshBlock)
+        }
+
+        Invoke-Checked -Label "$modeName probe" -Args $probeArgs
+        Show-ReportSummary -ModeName $modeName -Path $probePath
+        continue
+    }
+
     if (-not $NoSmoke) {
         $smokePath = Join-Path $Out "$base-smoke.json"
         Invoke-Checked -Label "$modeName smoke" -Args @('run', '--project', $Project, '--', $command, '--root', $Root, '--max-total', [string]$SmokeMaxTotal, '--out', $smokePath, '--limit', [string]$Limit)
@@ -137,7 +166,11 @@ foreach ($modeName in $Mode) {
 
 if ($PrivacyScan) {
     Write-Host "`n==> privacy scan" -ForegroundColor Cyan
-    $hits = git -C $repoRoot grep -n -I "mrkoo\|C:\\Users\\" -- . 2>$null
+    $localAccountPattern = 'mr' + 'koo'
+    $userProfilePattern = 'C:' + '\\Users\\'
+    $hits = @()
+    $hits += git -C $repoRoot grep -n -I $localAccountPattern -- . 2>$null
+    $hits += git -C $repoRoot grep -n -I $userProfilePattern -- . 2>$null
     $rawHits = @($hits | Where-Object { $_ -and ($_ -notmatch '%USERPROFILE%' -and $_ -notmatch '%USERNAME%' -and $_ -notmatch '<WindowsUser>') })
     if ($rawHits.Count -gt 0) {
         Write-Host 'Potential raw private path/account hits:' -ForegroundColor Red

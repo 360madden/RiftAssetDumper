@@ -34,6 +34,10 @@ Optionized helper:
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
 ```
 
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
 Helper policy: add modes/options to durable helpers before creating one-off helper apps.
 
 ## Compression truth 🧊
@@ -410,6 +414,41 @@ Top pair-compatible patterns:
 
 Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, and compatible `24`-element streams at `@216`/`@300`. This is still not final vertex decoding because `uint16-compatible-body` is a conservative compatibility label, not a proven position/UV role.
 
+## Focused NIF mesh probe 🧪
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-mesh --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-c841-mesh6.json"
+```
+
+Validated sample:
+
+| Field | Value |
+|---|---|
+| Asset ID | `c841eb9a0ed1c95e` |
+| Mesh block | `#6` |
+| Mesh size | `325` |
+| Candidate links | `3` |
+| Pairings | `2` |
+
+Stream roles:
+
+| Mesh offset | Stream block | Payload bytes | Role | Confidence |
+|---:|---:|---:|---|---:|
+| `@216` | `#25` | `288` | `uint16-compatible-body` | `25` |
+| `@292` | `#23?` | `72` | `index-u16be-strip-lead` | `85` |
+| `@300` | `#29` | `192` | `uint16-compatible-body` | `25` |
+
+Pairing proof:
+
+| Index stream | Max index | Compatible stream | Vertex count | Coverage | Confidence |
+|---|---:|---|---:|---:|---:|
+| `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `35` |
+| `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `35` |
+
+Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The next best strategy is not export yet; it is role refinement for the two compatible `uint16-compatible-body` streams.
+
 ## NIF data-stream header proof 🔎
 
 Command added:
@@ -739,6 +778,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 ```
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
 ```
 
@@ -787,7 +830,7 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
 2. Refine `uint16-compatible-body` into stricter role candidates instead of treating it as final vertex semantics.
 3. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
-4. Add `probe-nif-mesh` to produce a one-asset block/stream/role/pairing proof packet.
+4. Add byte-shift/endian/stride role probes for `@216 payload=288` and `@300 payload=192`.
 5. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
 6. Add mesh-level topology scoring for strip/list/fan/restart candidates.
 7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.

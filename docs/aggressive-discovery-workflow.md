@@ -211,6 +211,12 @@ Current helper:
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
 ```
 
+Focused one-mesh probe mode:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
 Design target: this script should become the optionized local workbench for discovery cycles. Add modes before adding separate scripts unless the new helper needs a genuinely different runtime surface.
 
 ## Immediate implementation plan 🎯
@@ -220,10 +226,11 @@ Design target: this script should become the optionized local workbench for disc
 | 1 | Mesh binding v2 | `inventory-nif-mesh-bindings` with role-ready JSON grouping | Full copied-set top patterns identify stable mesh size + stream size families |
 | 2 | Helper workbench | Optionized workflow helper with smoke/full/privacy options | One command runs the current discovery cycle and summarizes output |
 | 3 | Stream role inventory refinement | Improve role scoring for referenced streams only | Top patterns label likely index/position/normal/UV streams with confidence flags |
-| 4 | Mesh probe | Add `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
-| 5 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
-| 6 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
-| 7 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
+| 4 | Mesh probe | `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
+| 5 | Shifted/encoded role refinement | Add byte-shift/endian/stride probes for coarse stream roles | `uint16-compatible-body` splits into better position/normal/UV/packed labels |
+| 6 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
+| 7 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
+| 8 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
 
 ## Definition of done for each milestone ✅
 
