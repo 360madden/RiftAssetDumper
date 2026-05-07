@@ -342,6 +342,43 @@ Top repeated stream-reference patterns:
 
 Why this matters: every copied `NiMesh` block now has at least one stream candidate. The most repeated, non-ambiguous lead is `@168`, and the most repeated multi-stream families identify concrete mesh/data-stream layouts to reverse before attempting OBJ export.
 
+## NIF data-stream header proof 🔎
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
+```
+
+Validated against the top repeated three-stream pattern:
+
+| Field | Value |
+|---|---|
+| Sample asset | `c841eb9a0ed1c95e` |
+| Mesh block | `#6` |
+| Mesh size | `325` |
+| Pattern inventory count | `138` |
+| Candidate refs | `@216→#25`, `@292→#23?`, `@300→#29` |
+
+Stream-header evidence:
+
+| Stream | Block size | First `uint32` | Derived header bytes | Plausible payload splits |
+|---:|---:|---:|---:|---|
+| `#25` | `317` | `288` | `29` | `12×24`, `16×18`, `24×12`, `32×9`, `48×6` |
+| `#23?` | `101` | `72` | `29` | `12×6`, `24×3`, `36×2` |
+| `#29` | `221` | `192` | `29` | `12×16`, `16×12`, `24×8`, `32×6`, `64×3` |
+
+Cross-checks:
+
+| Sample | Mesh | Stream | Block size | First `uint32` | Derived header bytes |
+|---|---:|---:|---:|---:|---:|
+| `f8062ab36ac1c9a9` | `#6` | `#13` | `317` | `288` | `29` |
+| `16ecac86a42d4d96` | `#7` | `#37?` | `77` | `48` | `29` |
+| `16ecac86a42d4d96` | `#7` | `#35?` | `41` | `12` | `29` |
+| `16ecac86a42d4d96` | `#7` | `#41?` | `61` | `32` | `29` |
+
+Why this matters: we now have repeatable evidence that sampled `NiDataStream` blocks start with a declared payload byte count and carry a 29-byte stream header. That gives the geometry decoder a real boundary for testing vertex/index strides instead of treating the whole block as raw data.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -429,6 +466,18 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 ```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-streams --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-stream-inventory.json" --limit 100
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id f8062ab36ac1c9a9 --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-f806-mesh6.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --input "C:\RIFT MODDING\Assets\Extracted\nif-bundles-batch-top3\16ecac86a42d4d96\model\001234_m120931_fnv4ca650ce_pak1736_off1119528_16ecac86a42d4d96.nif" --mesh-block 7 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-16ecac-mesh7.json"
 ```
 
 ```powershell

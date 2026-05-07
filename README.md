@@ -549,6 +549,23 @@ Top pattern: meshSize=325 count=138 @216:size=317|@292:size=101?|@300:size=221
 
 This makes `@168` the strongest copied-set lead for small repeated meshes, while the `meshSize=325` and `meshSize=321` three-stream patterns look like good next targets for vertex/index/attribute role inference.
 
+Probe the target data streams for one NIF mesh:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
+```
+
+Current stream-header proof:
+
+```text
+Top pattern sample: c841eb9a0ed1c95e mesh #6 size=325
+@216 -> stream #25 size=317, declaredPayload=288, declaredOffset=29, plausible 12x24 / 24x12 / 32x9
+@292 -> stream #23 size=101?, declaredPayload=72, declaredOffset=29, plausible 12x6 / 24x3
+@300 -> stream #29 size=221, declaredPayload=192, declaredOffset=29, plausible 12x16 / 24x8 / 32x6
+```
+
+The first `uint32` in these `NiDataStream` blocks appears to declare stream payload bytes, with a repeated 29-byte block header in the sampled families. This is still a structural lead, not final vertex/index semantics.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell
