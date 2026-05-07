@@ -11,7 +11,8 @@ Date: 2026-05-07
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
 | Model→texture graph | ✅ working | NIF references link `3,224` model assets to `2,514` unique texture manifest assets. |
 | Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
-| Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,463` same-mesh index/vertex-count-compatible links. |
+| Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,468` same-mesh index/vertex-count-compatible links. |
+| Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
 
 ## Approved operating mode 🚀
 
@@ -390,29 +391,30 @@ Validated full copied-set result:
 | Valid declared stream bodies | `11,564` |
 | Invalid declared stream bodies | `0` |
 | Pair-compatible meshes | `2,076` |
-| Pair-compatible links | `4,463` |
+| Pair-compatible links | `4,468` |
 
 Top stream roles:
 
 | Role | Count | High confidence | Top payload sizes |
 |---|---:|---:|---|
-| `uint16-compatible-body` | `7,177` | `0` | `288×475`, `192×431`, `384×240`, `576×222`, `48×194` |
+| `uv-float2-ror1-lead` | `4,633` | `4,633` | `192×326`, `384×159`, `216×133`, `288×116`, `32×107` |
+| `normal-float3-ror1-lead` | `4,167` | `4,167` | `288×361`, `576×150`, `192×123`, `720×107`, `48×88` |
 | `index-u16be-strip-lead` | `2,101` | `2,101` | `72×285`, `144×121`, `48×103`, `12×89`, `192×84` |
-| `strided-body` | `1,953` | `0` | `32×118`, `128×71`, `64×61`, `1644×61`, `416×60` |
-| `uv-float2-lead` | `148` | `0` | `192×38`, `64×10`, `144×7`, `96×5`, `72×4` |
+| `position-float3-ror1-lead` | `210` | `210` | `192×20`, `456×7`, `48×6`, `264×6`, `276×6` |
+| `strided-body` | `204` | `0` | `6×38`, `8×21`, `64×18`, `32×11`, `96×9` |
 | `index-u16be-list-lead` | `112` | `112` | `48×15`, `120×11`, `72×10`, `144×10`, `108×9` |
 
 Top pair-compatible patterns:
 
 | Mesh size | Count | Index stream | Compatible stream | Vertex count | Max index | Coverage |
 |---:|---:|---|---|---:|---:|---:|
-| `325` | `134` | `@292 payload=72 index-u16be-strip-lead` | `@216 payload=288 uint16-compatible-body` | `24` | `23` | `1.00` |
-| `325` | `124` | `@292 payload=72 index-u16be-strip-lead` | `@300 payload=192 uint16-compatible-body` | `24` | `23` | `1.00` |
-| `321` | `60` | `@288 payload=72 index-u16be-strip-lead` | `@212 payload=288 uint16-compatible-body` | `24` | `23` | `1.00` |
-| `305` | `58` | `@272 payload=12 index-u16be-strip-lead` | `@196 payload=48 uint16-compatible-body` | `4` | `3` | `1.00` |
-| `301` | `50` | `@268 payload=144 index-u16be-strip-lead` | `@192 payload=576 uint16-compatible-body` | `48` | `47` | `1.00` |
+| `325` | `134` | `@292 payload=72 index-u16be-strip-lead` | `@216 payload=288 normal-float3-ror1-lead` | `24` | `23` | `1.00` |
+| `325` | `118` | `@292 payload=72 index-u16be-strip-lead` | `@300 payload=192 uv-float2-ror1-lead` | `24` | `23` | `1.00` |
+| `321` | `60` | `@288 payload=72 index-u16be-strip-lead` | `@212 payload=288 normal-float3-ror1-lead` | `24` | `23` | `1.00` |
+| `305` | `57` | `@272 payload=12 index-u16be-strip-lead` | `@280 payload=32 uv-float2-ror1-lead` | `4` | `3` | `1.00` |
+| `301` | `50` | `@268 payload=144 index-u16be-strip-lead` | `@276 payload=384 uv-float2-ror1-lead` | `48` | `47` | `1.00` |
 
-Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, and compatible `24`-element streams at `@216`/`@300`. This is still not final vertex decoding because `uint16-compatible-body` is a conservative compatibility label, not a proven position/UV role.
+Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility, then promoted a byte-order lead. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, `@216` as rotate-right-1 normal `float3`, and `@300` as rotate-right-1 UV `float2`. Position data is still not proven.
 
 ## Focused NIF mesh probe 🧪
 
@@ -436,18 +438,18 @@ Stream roles:
 
 | Mesh offset | Stream block | Payload bytes | Role | Confidence |
 |---:|---:|---:|---|---:|
-| `@216` | `#25` | `288` | `uint16-compatible-body` | `25` |
+| `@216` | `#25` | `288` | `normal-float3-ror1-lead` | `85` |
 | `@292` | `#23?` | `72` | `index-u16be-strip-lead` | `85` |
-| `@300` | `#29` | `192` | `uint16-compatible-body` | `25` |
+| `@300` | `#29` | `192` | `uv-float2-ror1-lead` | `80` |
 
 Pairing proof:
 
 | Index stream | Max index | Compatible stream | Vertex count | Coverage | Confidence |
 |---|---:|---|---:|---:|---:|
-| `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `35` |
-| `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `35` |
+| `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `95` |
+| `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `90` |
 
-Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The next best strategy is not export yet; it is role refinement for the two compatible `uint16-compatible-body` streams.
+Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing.
 
 ## NIF data-stream header proof 🔎
 
@@ -828,9 +830,9 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ## Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
-2. Refine `uint16-compatible-body` into stricter role candidates instead of treating it as final vertex semantics.
+2. Find the position source for the `meshSize=325` family; normals and UVs are now strong rotate-right-1 leads, but positions remain unproven.
 3. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
-4. Add byte-shift/endian/stride role probes for `@216 payload=288` and `@300 payload=192`.
+4. Add byte-shift/endian/stride role probes for the `NiMesh` block payload itself and nearby non-stream fields.
 5. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
 6. Add mesh-level topology scoring for strip/list/fan/restart candidates.
 7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.

@@ -5749,8 +5749,10 @@ internal static class Program
         var bodyStats = AnalyzeNifStreamBody(body);
         var endianStats = body.Length % 2 == 0 ? AnalyzeNifStreamEndian(body) : null;
         var indexStats = body.Length % 2 == 0 ? AnalyzeNifUInt16BeIndex(body) : null;
-        var float2Stats = AnalyzeNifFloatVectors(body, components: 2);
-        var float3Stats = AnalyzeNifFloatVectors(body, components: 3);
+        var float2Stats = AnalyzeNifFloatVectors(body, components: 2, NifFloatByteTransform.LittleEndian);
+        var float3Stats = AnalyzeNifFloatVectors(body, components: 3, NifFloatByteTransform.LittleEndian);
+        var rotatedFloat2Stats = AnalyzeNifFloatVectors(body, components: 2, NifFloatByteTransform.RotateRight1);
+        var rotatedFloat3Stats = AnalyzeNifFloatVectors(body, components: 3, NifFloatByteTransform.RotateRight1);
         var vertexCountCandidates = FindWholeBlockStrideCandidates(body.Length)
             .Where(static c => c.Stride is 8 or 12 or 16 or 20 or 24 or 28 or 32 or 36 or 40 or 44 or 48 or 56 or 64)
             .Select(static c => c.Count)
@@ -5777,7 +5779,9 @@ internal static class Program
                 EndianStats: endianStats,
                 IndexStats: indexStats,
                 Float2Stats: float2Stats,
-                Float3Stats: float3Stats);
+                Float3Stats: float3Stats,
+                RotatedFloat2Stats: rotatedFloat2Stats,
+                RotatedFloat3Stats: rotatedFloat3Stats);
         }
 
         if (endianStats?.Classification == "big-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 3)
@@ -5859,6 +5863,41 @@ internal static class Program
             }
         }
 
+        if (rotatedFloat3Stats.VectorCount >= 3 && rotatedFloat3Stats.FiniteVectorRatio >= 0.95 && rotatedFloat3Stats.PlausibleValueRatio >= 0.95)
+        {
+            if (rotatedFloat3Stats.NearUnitVectorRatio >= 0.75 && rotatedFloat3Stats.NonZeroVectorRatio >= 0.50)
+            {
+                roleCandidates.Add("normal-float3-ror1-lead");
+                evidence.Add($"rotate-right-1 float3 vectors are mostly unit length ({rotatedFloat3Stats.NearUnitVectorRatio:0.####})");
+                if (confidence < 85)
+                {
+                    primaryRole = "normal-float3-ror1-lead";
+                    confidence = 85;
+                }
+            }
+            else if (rotatedFloat3Stats.MaxExtent >= 0.0001 && rotatedFloat3Stats.NonZeroVectorRatio >= 0.50)
+            {
+                roleCandidates.Add("position-float3-ror1-lead");
+                evidence.Add($"rotate-right-1 float3 vectors have finite nonzero bounds, extent={rotatedFloat3Stats.MaxExtent:0.####}");
+                if (confidence < 75)
+                {
+                    primaryRole = "position-float3-ror1-lead";
+                    confidence = 75;
+                }
+            }
+        }
+
+        if (rotatedFloat2Stats.VectorCount >= 3 && rotatedFloat2Stats.FiniteVectorRatio >= 0.95 && rotatedFloat2Stats.UvRangeRatio >= 0.80 && rotatedFloat2Stats.NonZeroVectorRatio >= 0.50)
+        {
+            roleCandidates.Add("uv-float2-ror1-lead");
+            evidence.Add($"rotate-right-1 float2 values are mostly in UV-ish range ({rotatedFloat2Stats.UvRangeRatio:0.####})");
+            if (confidence < 80)
+            {
+                primaryRole = "uv-float2-ror1-lead";
+                confidence = 80;
+            }
+        }
+
         if (roleCandidates.Count == 0)
         {
             roleCandidates.Add(bodyStats.Classification);
@@ -5879,10 +5918,12 @@ internal static class Program
             EndianStats: endianStats,
             IndexStats: indexStats,
             Float2Stats: float2Stats,
-            Float3Stats: float3Stats);
+            Float3Stats: float3Stats,
+            RotatedFloat2Stats: rotatedFloat2Stats,
+            RotatedFloat3Stats: rotatedFloat3Stats);
     }
 
-    private static NifFloatVectorStats AnalyzeNifFloatVectors(ReadOnlySpan<byte> body, int components)
+    private static NifFloatVectorStats AnalyzeNifFloatVectors(ReadOnlySpan<byte> body, int components, NifFloatByteTransform transform)
     {
         var bytesPerVector = checked(components * 4);
         var aligned = body.Length > 0 && body.Length % bytesPerVector == 0;
@@ -5909,7 +5950,7 @@ internal static class Program
             var nonZero = false;
             for (var component = 0; component < components; component++)
             {
-                var value = ReadFiniteFloat32(body.Slice(offset + (component * 4), 4));
+                var value = ReadFiniteFloat32(body.Slice(offset + (component * 4), 4), transform);
                 if (value is null)
                 {
                     finite = false;
@@ -5985,6 +6026,7 @@ internal static class Program
         var extentZ = minZ is null || maxZ is null ? 0 : maxZ.Value - minZ.Value;
 
         return new NifFloatVectorStats(
+            Transform: transform.ToString(),
             Components: components,
             Aligned: aligned,
             VectorCount: vectorCount,
@@ -6004,6 +6046,23 @@ internal static class Program
             MaxZ: maxZ,
             MaxExtent: Math.Round(Math.Max(extentX, Math.Max(extentY, extentZ)), 6),
             Prefix: prefix);
+    }
+
+    private static float? ReadFiniteFloat32(ReadOnlySpan<byte> bytes, NifFloatByteTransform transform)
+    {
+        if (bytes.Length < 4)
+        {
+            return null;
+        }
+
+        var bits = transform switch
+        {
+            NifFloatByteTransform.LittleEndian => BinaryPrimitives.ReadInt32LittleEndian(bytes),
+            NifFloatByteTransform.RotateRight1 => bytes[3] | (bytes[0] << 8) | (bytes[1] << 16) | (bytes[2] << 24),
+            _ => BinaryPrimitives.ReadInt32LittleEndian(bytes)
+        };
+        var value = BitConverter.Int32BitsToSingle(bits);
+        return float.IsFinite(value) ? value : null;
     }
 
     private static List<NifMeshBindingPairingSample> FindNifMeshBindingPairings(
@@ -8962,7 +9021,9 @@ internal sealed record NifMeshStreamRoleStats(
     NifStreamEndianStats? EndianStats,
     NifUInt16BeIndexStats? IndexStats,
     NifFloatVectorStats? Float2Stats,
-    NifFloatVectorStats? Float3Stats)
+    NifFloatVectorStats? Float3Stats,
+    NifFloatVectorStats? RotatedFloat2Stats,
+    NifFloatVectorStats? RotatedFloat3Stats)
 {
     public static NifMeshStreamRoleStats Invalid(string reason) => new(
         PrimaryRole: "invalid-stream-body",
@@ -8976,10 +9037,19 @@ internal sealed record NifMeshStreamRoleStats(
         EndianStats: null,
         IndexStats: null,
         Float2Stats: null,
-        Float3Stats: null);
+        Float3Stats: null,
+        RotatedFloat2Stats: null,
+        RotatedFloat3Stats: null);
+}
+
+internal enum NifFloatByteTransform
+{
+    LittleEndian,
+    RotateRight1
 }
 
 internal sealed record NifFloatVectorStats(
+    string Transform,
     int Components,
     bool Aligned,
     int VectorCount,

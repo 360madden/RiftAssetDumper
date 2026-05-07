@@ -587,12 +587,15 @@ NiMesh blocks: 5,507
 Candidate stream links: 11,564
 Valid declared stream bodies: 11,564
 Pair-compatible meshes: 2,076
-Pair-compatible links: 4,463
-Top role: index-u16be-strip-lead=2,101
-Top pairing: meshSize=325 count=134 index-u16be-strip-lead -> uint16-compatible-body, vertexCount=24, maxIndex=23
+Pair-compatible links: 4,468
+Top roles:
+  uv-float2-ror1-lead=4,633
+  normal-float3-ror1-lead=4,167
+  index-u16be-strip-lead=2,101
+Top pairing: meshSize=325 count=134 index-u16be-strip-lead -> normal-float3-ror1-lead, vertexCount=24, maxIndex=23
 ```
 
-This is the first full copied-set mesh-binding proof that candidate index streams can be paired with same-mesh stream bodies where `maxIndex < vertexCount`. Role scoring is still intentionally conservative: `uint16-compatible-body` is a stream compatibility label, not final vertex semantics.
+This is the first full copied-set mesh-binding proof that candidate index streams can be paired with same-mesh stream bodies where `maxIndex < vertexCount`. The former coarse `uint16-compatible-body` families now mostly decode as per-float byte-rotated streams: rotate each 4-byte word right by 1 byte to expose normal-like `float3` and UV-like `float2` values.
 
 Probe one mesh with role and pairing evidence:
 
@@ -604,15 +607,15 @@ Validated sample:
 
 ```text
 Mesh #6 size=325
-@216 -> #25 payload=288 role=uint16-compatible-body
+@216 -> #25 payload=288 role=normal-float3-ror1-lead
 @292 -> #23 payload=72 role=index-u16be-strip-lead maxIndex=23
-@300 -> #29 payload=192 role=uint16-compatible-body
+@300 -> #29 payload=192 role=uv-float2-ror1-lead
 Pairings:
   index @292/#23 -> @216/#25 vertexCount=24 coverage=1.00
   index @292/#23 -> @300/#29 vertexCount=24 coverage=1.00
 ```
 
-This creates the one-mesh proof packet needed before tightening role scoring or attempting any experimental geometry export.
+This creates the one-mesh proof packet needed before attempting any experimental geometry export. Current interpretation for the top family: `payload=72` is a big-endian strip-like index lead, `payload=288` is a byte-rotated normal `float3` lead, and `payload=192` is a byte-rotated UV `float2` lead. Position data is still not proven.
 
 Probe the target data streams for one NIF mesh:
 
