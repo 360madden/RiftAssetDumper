@@ -89,6 +89,11 @@ internal static class Program
                 return InventoryNif(options);
             }
 
+            if (options.Command == "inventory-nif-blocks")
+            {
+                return InventoryNifBlocks(options);
+            }
+
             if (options.Command == "mine-nif-references")
             {
                 return MineNifReferences(options);
@@ -1576,6 +1581,196 @@ internal static class Program
             Console.WriteLine($"- {group.VersionText}: count={group.Count:N0} size={group.MinSize:N0}..{group.MaxSize:N0} blockTypes={group.BlockTypeCount:N0} strings={group.MinStringCount:N0}..{group.MaxStringCount:N0} refs={group.ReferenceCount:N0} first={string.Join(", ", group.BlockTypes.Take(5))}");
         }
 
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
+    private static int InventoryNifBlocks(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var typeGroups = new Dictionary<string, NifBlockTypeAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var families = new Dictionary<string, NifBlockFamilyAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var totalBlocks = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    totalBlocks += header.Blocks.Count;
+                    var seenTypesInNif = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var block in header.Blocks)
+                    {
+                        if (!typeGroups.TryGetValue(block.TypeName, out var typeGroup))
+                        {
+                            typeGroup = new NifBlockTypeAccumulator(block.TypeName);
+                            typeGroups.Add(block.TypeName, typeGroup);
+                        }
+
+                        typeGroup.BlockCount++;
+                        typeGroup.MinBlockSize = Math.Min(typeGroup.MinBlockSize, block.Size);
+                        typeGroup.MaxBlockSize = Math.Max(typeGroup.MaxBlockSize, block.Size);
+                        typeGroup.First16Values.Add(block.First16);
+                        if (seenTypesInNif.Add(block.TypeName))
+                        {
+                            typeGroup.NifPayloadCount++;
+                        }
+
+                        var sample = new NifBlockInventorySample(
+                            ArchiveName: archiveName,
+                            EntryIndex: entry.Index,
+                            IdPrefix: entry.IdPrefix,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            BlockIndex: block.Index,
+                            DataOffset: block.DataOffset,
+                            Size: block.Size,
+                            First16: block.First16,
+                            StringSamples: block.StringSamples.Take(6).ToList());
+                        if (typeGroup.Samples.Count < 12)
+                        {
+                            typeGroup.Samples.Add(sample);
+                        }
+
+                        var familyKey = $"{block.TypeName}|{block.Size}|{block.First16}";
+                        if (!families.TryGetValue(familyKey, out var family))
+                        {
+                            family = new NifBlockFamilyAccumulator(block.TypeName, block.Size, block.First16);
+                            families.Add(familyKey, family);
+                        }
+
+                        family.Count++;
+                        family.NifIds.Add(entry.IdPrefix);
+                        foreach (var stringSample in block.StringSamples.Take(6))
+                        {
+                            family.StringSamples.Add(stringSample);
+                        }
+
+                        if (family.Samples.Count < 12)
+                        {
+                            family.Samples.Add(sample);
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static NifBlockTypeInventoryGroup toTypeRecord(NifBlockTypeAccumulator group)
+        {
+            return new NifBlockTypeInventoryGroup(
+                TypeName: group.TypeName,
+                NifPayloads: group.NifPayloadCount,
+                BlockCount: group.BlockCount,
+                MinBlockSize: group.MinBlockSize == uint.MaxValue ? 0 : group.MinBlockSize,
+                MaxBlockSize: group.MaxBlockSize,
+                DistinctFirst16: group.First16Values.Count,
+                Samples: group.Samples);
+        }
+
+        static NifBlockPayloadFamily toFamilyRecord(NifBlockFamilyAccumulator family)
+        {
+            return new NifBlockPayloadFamily(
+                TypeName: family.TypeName,
+                Size: family.Size,
+                First16: family.First16,
+                Count: family.Count,
+                NifPayloads: family.NifIds.Count,
+                StringSamples: family.StringSamples.Take(12).ToList(),
+                Samples: family.Samples);
+        }
+
+        var familyRecords = families.Values
+            .Select(toFamilyRecord)
+            .OrderByDescending(static f => f.Count)
+            .ThenBy(static f => f.TypeName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static f => f.Size)
+            .ToList();
+        var report = new NifBlockInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            TotalBlocks: totalBlocks,
+            BlockTypes: typeGroups.Values
+                .Select(toTypeRecord)
+                .OrderByDescending(static g => g.BlockCount)
+                .ThenBy(static g => g.TypeName, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            MeshFamilies: familyRecords.Where(static f => string.Equals(f.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase)).ToList(),
+            DataStreamFamilies: familyRecords.Where(static f => f.TypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase)).ToList(),
+            TopFamilies: familyRecords.Take(options.Limit > 0 ? options.Limit : 100).ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-block-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"Total blocks: {totalBlocks:N0}");
+        Console.WriteLine($"Block types: {report.BlockTypes.Count:N0}");
+        Console.WriteLine($"Mesh families: {report.MeshFamilies.Count:N0}");
+        Console.WriteLine($"DataStream families: {report.DataStreamFamilies.Count:N0}");
+        Console.WriteLine($"Top block types: {string.Join(", ", report.BlockTypes.Take(8).Select(static g => $"{g.TypeName}={g.BlockCount:N0}"))}");
+        Console.WriteLine($"Top mesh families: {string.Join(", ", report.MeshFamilies.Take(5).Select(static f => $"size={f.Size} count={f.Count:N0}"))}");
+        Console.WriteLine($"Top data stream families: {string.Join(", ", report.DataStreamFamilies.Take(5).Select(static f => $"{f.TypeName}/size={f.Size} count={f.Count:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -4550,6 +4745,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-binary --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
@@ -4758,6 +4954,7 @@ internal static class Program
                     case "probe-binary":
                     case "probe-nif":
                     case "inventory-nif":
+                    case "inventory-nif-blocks":
                     case "mine-nif-references":
                     case "link-nif-textures":
                     case "extract-linked-textures":
@@ -5254,6 +5451,69 @@ internal sealed record NifInventorySample(
     uint? BlockCount,
     uint? StringCount,
     int ReferenceCount);
+
+internal sealed class NifBlockTypeAccumulator(string typeName)
+{
+    public string TypeName { get; } = typeName;
+    public int NifPayloadCount { get; set; }
+    public int BlockCount { get; set; }
+    public uint MinBlockSize { get; set; } = uint.MaxValue;
+    public uint MaxBlockSize { get; set; }
+    public HashSet<string> First16Values { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifBlockInventorySample> Samples { get; } = [];
+}
+
+internal sealed class NifBlockFamilyAccumulator(string typeName, uint size, string first16)
+{
+    public string TypeName { get; } = typeName;
+    public uint Size { get; } = size;
+    public string First16 { get; } = first16;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public SortedSet<string> StringSamples { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifBlockInventorySample> Samples { get; } = [];
+}
+
+internal sealed record NifBlockInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int TotalBlocks,
+    List<NifBlockTypeInventoryGroup> BlockTypes,
+    List<NifBlockPayloadFamily> MeshFamilies,
+    List<NifBlockPayloadFamily> DataStreamFamilies,
+    List<NifBlockPayloadFamily> TopFamilies);
+
+internal sealed record NifBlockTypeInventoryGroup(
+    string TypeName,
+    int NifPayloads,
+    int BlockCount,
+    uint MinBlockSize,
+    uint MaxBlockSize,
+    int DistinctFirst16,
+    List<NifBlockInventorySample> Samples);
+
+internal sealed record NifBlockPayloadFamily(
+    string TypeName,
+    uint Size,
+    string First16,
+    int Count,
+    int NifPayloads,
+    List<string> StringSamples,
+    List<NifBlockInventorySample> Samples);
+
+internal sealed record NifBlockInventorySample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int BlockIndex,
+    int DataOffset,
+    uint Size,
+    string First16,
+    List<string> StringSamples);
 
 internal sealed record NifReferenceSample(
     string ArchiveName,

@@ -280,6 +280,61 @@ NiDataStream size families:
 
 Why this matters: the next geometry decoder can now work from exact `NiMesh` and `NiDataStream` block boundaries instead of guessing from whole-file binary signatures.
 
+## Full copied-set NIF block inventory 📊
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| Total NIF blocks | `137,973` |
+| Distinct block types | `32` |
+| Mesh payload families | `435` |
+| DataStream payload families | `771` |
+
+Top block types:
+
+| Block type | NIF payloads | Block count |
+|---|---:|---:|
+| `NiDataStream\u00011\u000119` | `5,087` | `26,087` |
+| `NiIntegerExtraData` | `3,241` | `12,910` |
+| `NiFloatExtraData` | `3,180` | `11,047` |
+| `NiMaterialProperty` | `5,111` | `10,595` |
+| `NiVertexColorProperty` | `5,111` | `10,214` |
+| `NiSourceTexture` | `3,242` | `9,489` |
+| `NiFloatsExtraData` | `4,258` | `8,629` |
+| `NiNode` | `5,111` | `6,534` |
+| `NiMesh` | `5,087` | `5,507` |
+
+Top repeated mesh families:
+
+| Family | Count | NIF payloads |
+|---|---:|---:|
+| `NiMesh size=214` | `954` | `954` |
+| `NiMesh size=193` | `719` | `719` |
+| `NiMesh size=301` | `301` | `301` |
+| `NiMesh size=325` | `263` | `263` |
+| `NiMesh size=305` | `163` | `163` |
+
+Top repeated data-stream families:
+
+| Family | Count | NIF payloads |
+|---|---:|---:|
+| `NiDataStream\u00011\u000119 size=317` | `1,605` | `501` |
+| `NiDataStream\u00011\u000119 size=221` | `920` | `613` |
+| `NiDataStream\u00011\u000119 size=605` | `679` | `233` |
+| `NiDataStream\u00011\u000119 size=77` | `663` | `228` |
+| `NiDataStream\u00011\u000119 size=125` | `645` | `464` |
+
+Why this matters: geometry work now has ranked targets. Instead of trying to decode every NIF variant, start with the repeated `NiMesh size=214/193` and `NiDataStream size=317/221/605/77/125` families that appear hundreds or thousands of times.
+
 ## Commands validated ✅
 
 ```powershell
@@ -310,10 +365,14 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif --root "C:\RIFT MODDING\Assets\Source" --id 21900d2ee4f931ca --out "C:\RIFT MODDING\Assets\Exports\probe-nif-blockmap-21900d.json"
 ```
 
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
+```
+
 ## Current safest next direction 🛡️
 
-1. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
-2. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
-3. Expand batch extraction to `--limit 10` once visual/tool compatibility is confirmed.
-4. Copy only the highest-yield archive chunks locally when repeated extraction of the same texture families becomes useful.
+1. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
+2. Infer vertex/index stream roles for the top `NiDataStream` size families.
+3. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
+4. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
 5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

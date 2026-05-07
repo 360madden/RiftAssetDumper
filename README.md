@@ -455,6 +455,59 @@ Example mesh block string clues:
 
 This is the first evidence-backed bridge from "NIF detected" to concrete model internals: exact block payload offsets, block sizes, mesh block identities, texture-linked strings, and repeated data-stream block families are now visible in JSON.
 
+Inventory NIF block families across the full copied archive set:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
+```
+
+Current full copied-set block inventory:
+
+```text
+Inspected payloads: 40,203
+NIF payloads: 5,111
+Total blocks: 137,973
+Block types: 32
+Mesh families: 435
+DataStream families: 771
+```
+
+Top block families:
+
+```text
+NiDataStream\u00011\u000119 = 26,087 blocks in 5,087 NIFs
+NiIntegerExtraData = 12,910 blocks
+NiFloatExtraData = 11,047 blocks
+NiMaterialProperty = 10,595 blocks
+NiVertexColorProperty = 10,214 blocks
+NiSourceTexture = 9,489 blocks
+NiFloatsExtraData = 8,629 blocks
+NiNode = 6,534 blocks
+NiMesh = 5,507 blocks in 5,087 NIFs
+```
+
+Top repeated mesh payload families:
+
+```text
+NiMesh size=214 count=954
+NiMesh size=193 count=719
+NiMesh size=301 count=301
+NiMesh size=325 count=263
+NiMesh size=305 count=163
+```
+
+Top repeated data-stream payload families:
+
+```text
+NiDataStream\u00011\u000119 size=317 count=1,605
+NiDataStream\u00011\u000119 size=221 count=920
+NiDataStream\u00011\u000119 size=605 count=679
+NiDataStream\u00011\u000119 size=77 count=663
+NiDataStream\u00011\u000119 size=125 count=645
+```
+
+This identifies the highest-value repeated mesh/data-stream formats to decode first.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell
