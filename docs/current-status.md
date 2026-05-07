@@ -437,6 +437,16 @@ Top attribute topology groups:
 | `implicit-triangle-list-candidate` | `93` | `2` | `31` | `91` | `-` |
 | `implicit-triangle-strip-or-fan-candidate` | `14` | `2` | `-` | `12` | `-` |
 
+Top extra streams found beside complete attribute sets:
+
+| Topology lead | Vertex count | Extra stream | Payload | Role | Count | Fit |
+|---|---:|---:|---:|---|---:|---|
+| `implicit-strip-or-quad-candidate` | `16` | `@272` | `64` | `strided-body` | `6` | `per-vertex:4`, `per-quad:16` |
+| `implicit-triangle-strip-or-fan-candidate` | `23` | `@296` | `92` | `uv-float2-lead` | `2` | `per-vertex:4` |
+| `implicit-triangle-list-or-quad-candidate` | `36` | `@296` | `144` | `position-float3-lead` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12`, `per-quad:16` |
+| `implicit-triangle-strip-or-fan-candidate` | `38` | `@296` | `152` | `uv-float2-lead` | `2` | `per-vertex:4` |
+| `implicit-triangle-list-candidate` | `51` | `@288` | `204` | `strided-body` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12` |
+
 Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility, then promoted a byte-order lead. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, `@216` as rotate-right-1 normal `float3`, and `@300` as rotate-right-1 UV `float2`. Position data is still not proven.
 
 ## Focused NIF mesh probe 🧪
@@ -515,6 +525,7 @@ Topology scoring:
 | Triangle strip/fan | Candidate with `14` triangles |
 | Quad list | Candidate with `4` quads |
 | Confidence | `35` structural-only; **not export proof** |
+| Extra stream | `@272/#25`, payload `64`, `strided-body`, fit=`per-vertex:4`, `per-quad:16` |
 
 Why this matters: geometry discovery now has a second validated lane besides index pairings: unindexed or separately-indexed meshes with complete position/normal/UV attribute sets. The missing piece for renderable export is now narrower: distinguish strip/fan vs quad or find a separate topology stream for these attribute-only meshes, while separately continuing position discovery for the top indexed `meshSize=325` family.
 
