@@ -421,6 +421,49 @@ Top stream families:
 
 Why this matters: for every copied `NiDataStream` block currently parsed, `blockSize - firstUInt32 == 29`. That makes the stream body boundary evidence-backed across the full copied NIF set, not just in hand-picked samples.
 
+## Full copied-set stream-body inventory 🧪
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-bodies --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-body-inventory.json" --limit 100
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| NiDataStream blocks | `31,777` |
+| Valid stream bodies | `31,777` |
+| Invalid stream bodies | `0` |
+
+Top declared payload sizes:
+
+| Payload bytes | Count | Average non-zero bytes | Top coarse classes |
+|---:|---:|---:|---|
+| `288` | `1,757` | `136.10` | `uint16-compatible-body=1,718`, `strided-body=36`, `float32-compatible-body=3` |
+| `192` | `1,094` | `137.64` | `uint16-compatible-body=940`, `strided-body=146`, `float32-compatible-body=8` |
+| `48` | `843` | `21.89` | `uint16-compatible-body=796`, `strided-body=42`, `float32-compatible-body=5` |
+| `96` | `813` | `77.94` | `uint16-compatible-body=466`, `strided-body=345`, `float32-compatible-body=2` |
+| `576` | `751` | `407.75` | `uint16-compatible-body=722`, `strided-body=28`, `float32-compatible-body=1` |
+| `72` | `730` | `44.63` | `uint16-compatible-body=598`, `strided-body=132` |
+| `216` | `709` | `152.32` | `uint16-compatible-body=670`, `strided-body=39` |
+| `144` | `706` | `93.53` | `uint16-compatible-body=624`, `strided-body=51`, `float32-compatible-body=31` |
+
+Top repeated body signatures:
+
+| Payload bytes | Count | NIF payloads | First 16 body bytes | Coarse class |
+|---:|---:|---:|---|---|
+| `72` | `352` | `341` | `00010002000200010003000400050006` | `uint16-compatible-body` |
+| `96` | `328` | `318` | `ffffffffffffffffffffffffffffffff` | `strided-body` |
+| `288` | `195` | `194` | `00803f00000000000000000000803f00` | `uint16-compatible-body` |
+| `288` | `180` | `178` | `000000000000000000803f0000000000` | `uint16-compatible-body` |
+| `12` | `168` | `159` | `000100020002000100030001` | `uint16-compatible-body` |
+
+Why this matters: stream analysis now operates on the declared body only, not the 29-byte header. The coarse classes are intentionally conservative compatibility hints for ranking; they do not yet prove vertex/index/UV roles.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -527,13 +570,18 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-bodies --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-body-inventory.json" --limit 100
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
 ```
 
 ## Current safest next direction 🛡️
 
-1. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
-2. Infer vertex/index stream roles for the top `NiDataStream` size families.
-3. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
-4. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
-5. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+1. Decode only declared stream bodies after the proven 29-byte `NiDataStream` header.
+2. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
+3. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
+4. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
+5. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+6. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

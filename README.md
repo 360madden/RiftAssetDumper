@@ -590,6 +590,28 @@ Top stream families:
 
 This upgrades the 29-byte `NiDataStream` header from a sampled lead to a copied-set invariant for the currently parsed NIF data streams.
 
+Inventory only the declared stream bodies after that 29-byte header:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-stream-bodies --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-stream-body-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+NiDataStream blocks: 31,777
+Valid stream bodies: 31,777
+Invalid stream bodies: 0
+Top payload sizes: 288=1,757, 192=1,094, 48=843, 96=813, 576=751
+Top body signatures:
+  payload=72  first16=00010002000200010003000400050006 count=352
+  payload=96  first16=ffffffffffffffffffffffffffffffff count=328
+  payload=288 first16=00803f00000000000000000000803f00 count=195
+  payload=288 first16=000000000000000000803f0000000000 count=180
+```
+
+The body inventory reports coarse compatibility classes such as `uint16-compatible-body`, `float32-compatible-body`, and `strided-body`. These are ranking hints only; they are not final stream roles.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell
