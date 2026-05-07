@@ -508,6 +508,27 @@ NiDataStream\u00011\u000119 size=125 count=645
 
 This identifies the highest-value repeated mesh/data-stream formats to decode first.
 
+`probe-nif` also now records candidate `NiMesh` -> `NiDataStream` references by scanning block payload fields for values that point at `NiDataStream` blocks. These are marked as candidates because some fields can overlap with string-table indexes, but repeated offsets are strong decode leads. Console output appends `?` when the same numeric value could also be interpreted as a string-table index, and the JSON records include `MaybeStringIndex` plus `StringValue` for review.
+
+Validated rich model candidate stream links:
+
+```text
+Model: 16ecac86a42d4d96
+Mesh #7   -> @236:#37? size=77,  @312:#35? size=41, @320:#41? size=61
+Mesh #44  -> @0:#37? size=77,    @236:#72 size=149, @312:#35? size=41, @320:#76 size=109
+Mesh #79  -> @236:#103 size=569, @312:#35? size=41, @320:#107 size=389
+Mesh #110 -> @236:#132 size=149, @312:#35? size=41, @320:#136 size=109
+```
+
+Validated smaller copied model candidate stream links:
+
+```text
+Model: 21900d2ee4f931ca
+Mesh #6 -> @212:#24 size=1673, @288:#22? size=1649, @296:#28 size=1125
+```
+
+The repeated `NiMesh` payload offsets around `@236`, `@312`, and `@320` are now the next best concrete fields to decode.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell

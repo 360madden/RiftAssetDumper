@@ -1413,6 +1413,17 @@ internal static class Program
         if (header.Blocks.Count > 0)
         {
             Console.WriteLine($"Block map samples: {string.Join(" | ", header.Blocks.Take(8).Select(static b => $"#{b.Index}:{b.TypeName} size={b.Size} off={b.DataOffset}"))}");
+            var meshDataStreamLinks = header.Blocks
+                .Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase))
+                .Select(static b => $"#{b.Index}->{string.Join(",", b.DataStreamReferenceCandidates.Take(4).Select(static r => $"@{r.PayloadOffset}:#{r.TargetBlockIndex}{(r.MaybeStringIndex ? "?" : string.Empty)}"))}")
+                .Where(static text => !text.EndsWith("->", StringComparison.Ordinal))
+                .Take(6)
+                .ToList();
+            if (meshDataStreamLinks.Count > 0)
+            {
+                Console.WriteLine($"Mesh data-stream candidates: {string.Join(" | ", meshDataStreamLinks)}");
+            }
+
             var stringLinkedBlocks = header.Blocks.Where(static b => b.StringSamples.Count > 0).Take(5).ToList();
             if (stringLinkedBlocks.Count > 0)
             {
@@ -3204,7 +3215,19 @@ internal static class Program
     {
         var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
         var blocks = new List<NifBlockInfo>(blockCount);
+        var blockOffsets = new List<int>(blockCount);
         var offset = blockDataOffset;
+        for (var i = 0; i < blockCount; i++)
+        {
+            blockOffsets.Add(offset);
+            offset += checked((int)Math.Min(blockSizes[i], int.MaxValue));
+            if (offset > data.Length)
+            {
+                break;
+            }
+        }
+
+        offset = blockDataOffset;
         for (var i = 0; i < blockCount; i++)
         {
             var size = blockSizes[i];
@@ -3232,7 +3255,8 @@ internal static class Program
                 UInt32Prefix: ReadUInt32Prefix(payload, maxValues: 8),
                 Float32Prefix: ReadFloat32Prefix(payload, maxValues: 8),
                 StringIndexCandidates: stringIndexCandidates.Take(32).ToList(),
-                StringSamples: stringSamples));
+                StringSamples: stringSamples,
+                DataStreamReferenceCandidates: FindNifDataStreamReferenceCandidates(data, payload, blockOffsets, blockTypeIndices, blockSizes, blockTypeNames, strings).Take(32).ToList()));
             offset += checked((int)Math.Min(size, int.MaxValue));
             if (offset > data.Length)
             {
@@ -3241,6 +3265,55 @@ internal static class Program
         }
 
         return blocks;
+    }
+
+    private static List<NifBlockReferenceCandidate> FindNifDataStreamReferenceCandidates(
+        ReadOnlySpan<byte> data,
+        ReadOnlySpan<byte> payload,
+        List<int> blockOffsets,
+        List<int> blockTypeIndices,
+        List<uint> blockSizes,
+        List<(int Index, string Name, string DisplayName)> blockTypeNames,
+        List<NifStringInfo> strings)
+    {
+        var candidates = new List<NifBlockReferenceCandidate>();
+        var seen = new HashSet<(int Offset, int Target)>();
+        var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
+        for (var offset = 0; offset + 4 <= payload.Length; offset += 4)
+        {
+            var targetBlockIndex = BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset, 4));
+            if (targetBlockIndex < 0 || targetBlockIndex >= blockCount || !seen.Add((offset, targetBlockIndex)))
+            {
+                continue;
+            }
+
+            var targetTypeIndex = blockTypeIndices[targetBlockIndex];
+            var targetTypeName = targetTypeIndex >= 0 && targetTypeIndex < blockTypeNames.Count
+                ? blockTypeNames[targetTypeIndex].DisplayName
+                : $"type-index-{targetTypeIndex}";
+            if (!targetTypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var targetOffset = targetBlockIndex < blockOffsets.Count ? blockOffsets[targetBlockIndex] : data.Length;
+            var safeTargetSize = targetOffset < data.Length
+                ? Math.Min(checked((int)Math.Min(blockSizes[targetBlockIndex], int.MaxValue)), data.Length - targetOffset)
+                : 0;
+            var targetPayload = safeTargetSize > 0 ? data.Slice(targetOffset, safeTargetSize) : ReadOnlySpan<byte>.Empty;
+            var targetFirst16 = ToHex(targetPayload[..Math.Min(16, targetPayload.Length)]);
+            var maybeStringIndex = targetBlockIndex >= 0 && targetBlockIndex < strings.Count;
+            candidates.Add(new NifBlockReferenceCandidate(
+                PayloadOffset: offset,
+                TargetBlockIndex: targetBlockIndex,
+                TargetTypeName: targetTypeName,
+                TargetSize: blockSizes[targetBlockIndex],
+                TargetFirst16: targetFirst16,
+                MaybeStringIndex: maybeStringIndex,
+                StringValue: maybeStringIndex ? strings[targetBlockIndex].Value : null));
+        }
+
+        return candidates;
     }
 
     private static List<uint> ReadUInt32Prefix(ReadOnlySpan<byte> payload, int maxValues)
@@ -5392,7 +5465,17 @@ internal sealed record NifBlockInfo(
     List<uint> UInt32Prefix,
     List<float?> Float32Prefix,
     List<int> StringIndexCandidates,
-    List<string> StringSamples);
+    List<string> StringSamples,
+    List<NifBlockReferenceCandidate> DataStreamReferenceCandidates);
+
+internal sealed record NifBlockReferenceCandidate(
+    int PayloadOffset,
+    int TargetBlockIndex,
+    string TargetTypeName,
+    uint TargetSize,
+    string TargetFirst16,
+    bool MaybeStringIndex,
+    string? StringValue);
 
 internal sealed record NifStringInfo(int Index, string Value);
 
