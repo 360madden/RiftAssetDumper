@@ -549,28 +549,29 @@ Validated full copied-set result:
 | Even-length stream bodies | `31,777` |
 | Big-endian uint16 lead bodies | `5,551` |
 | Big-endian triangle-aligned bodies | `5,481` |
+| Triangle-strip less-degenerate bodies | `9,712` |
 
 Index-candidate classes:
 
-| Class | Count | Triangle-aligned | Avg triangles | Avg max index | Avg degenerate ratio |
-|---|---:|---:|---:|---:|---:|
-| `not-index-ranked` | `24,459` | `19,487` | `106.97` | `61,371.28` | `0.22` |
-| `uint16be-triangle-aligned-lead` | `5,481` | `5,481` | `63.34` | `64.04` | `0.48` |
-| `ambiguous-u16-triangle-aligned` | `1,613` | `1,613` | `65.39` | `31,047.74` | `0.73` |
-| `little-endian-u16-lead` | `154` | `132` | `25.27` | `45,809.53` | `0.84` |
-| `uint16be-index-lead` | `70` | `0` | `8.44` | `61.44` | `0.11` |
+| Class | Count | Triangle-aligned | Avg triangles | Avg max index | Avg fixed-triple deg ratio | Strip-less-degenerate count | Avg strip-window deg ratio |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `not-index-ranked` | `24,459` | `19,487` | `106.97` | `61,371.28` | `0.22` | `3,708` | `0.22` |
+| `uint16be-triangle-aligned-lead` | `5,481` | `5,481` | `63.34` | `64.04` | `0.48` | `5,135` | `0.32` |
+| `ambiguous-u16-triangle-aligned` | `1,613` | `1,613` | `65.39` | `31,047.74` | `0.73` | `787` | `0.68` |
+| `little-endian-u16-lead` | `154` | `132` | `25.27` | `45,809.53` | `0.84` | `80` | `0.86` |
+| `uint16be-index-lead` | `70` | `0` | `8.44` | `61.44` | `0.11` | `2` | `0.10` |
 
 Top uint16be signatures:
 
-| Payload bytes | Count | NIF payloads | Avg triangles | Avg degenerate ratio | Max observed index | First 16 body bytes |
-|---:|---:|---:|---:|---:|---:|---|
-| `72` | `352` | `341` | `12` | `0.50` | `27` | `00010002000200010003000400050006` |
-| `12` | `168` | `159` | `2` | `1.00` | `3` | `000100020002000100030001` |
-| `144` | `161` | `161` | `24` | `0.47` | `61` | `00010002000200010003000400050006` |
-| `1620` | `92` | `92` | `270` | `0.52` | `178` | `00010002000200010003000200030004` |
-| `192` | `77` | `77` | `32` | `0.48` | `71` | `00010002000200010003000400050006` |
+| Payload bytes | Count | NIF payloads | Avg triangles | Avg fixed-triple deg ratio | Strip-less count | Avg strip-window deg ratio | Max observed index | First 16 body bytes |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| `72` | `352` | `341` | `12` | `0.50` | `352` | `0.35` | `27` | `00010002000200010003000400050006` |
+| `12` | `168` | `159` | `2` | `1.00` | `168` | `0.75` | `3` | `000100020002000100030001` |
+| `144` | `161` | `161` | `24` | `0.47` | `161` | `0.31` | `61` | `00010002000200010003000400050006` |
+| `1620` | `92` | `92` | `270` | `0.52` | `92` | `0.48` | `178` | `00010002000200010003000200030004` |
+| `192` | `77` | `77` | `32` | `0.48` | `77` | `0.30` | `71` | `00010002000200010003000400050006` |
 
-Why this matters: `5,481` stream bodies are now ranked as big-endian `uint16` triangle-aligned leads. The high degenerate ratio means these should not be treated as proven simple triangle lists; they may be strip/fan-style index streams or include restart/degenerate stitching patterns.
+Why this matters: `5,481` stream bodies are now ranked as big-endian `uint16` triangle-aligned leads. The high fixed-triple degenerate ratio means these should not be treated as proven simple triangle lists. The new strip-window metric is stronger: `9,712` bodies are less degenerate under a sliding triangle-strip interpretation, and `5,135` of the `5,481` top-class big-endian bodies improve this way. That points toward strip/fan-style index streams or restart/degenerate stitching patterns as the next best geometry target.
 
 ## Full copied-set NIF block inventory 📊
 

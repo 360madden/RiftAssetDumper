@@ -660,13 +660,14 @@ Current copied-data result:
 ```text
 Big-endian uint16 lead bodies: 5,551
 Big-endian triangle-aligned bodies: 5,481
+Triangle-strip less-degenerate bodies: 9,712
 uint16be-triangle-aligned-lead: 5,481
 uint16be-index-lead: 70
 Top uint16be signature:
   payload=72 first16=00010002000200010003000400050006 count=352
 ```
 
-The top `payload=72` signature has `12` big-endian `uint16` triples per body and max observed index `27`, but the average degenerate-triangle ratio is about `0.50`. Treat this as strong index/strip/fan-style evidence, not simple triangle-list proof.
+The top `payload=72` signature has `12` big-endian `uint16` triples per body and max observed index `27`, but the average naive triangle-list degenerate ratio is about `0.50`. A sliding triangle-strip interpretation lowers that family to about `0.35`, and all `352` samples are less degenerate as strips than as fixed triples. Treat this as strong index/strip/fan-style evidence, not simple triangle-list proof.
 
 Inventory all copied NIF payloads without writing extracted model files:
 

@@ -2998,6 +2998,7 @@ internal static class Program
         var bigEndianLeadBodies = 0;
         var bigEndianTriangleAlignedBodies = 0;
         var ambiguousTriangleAlignedBodies = 0;
+        var triangleStripLessDegenerateBodies = 0;
         var invalidStreamBodies = 0;
 
         foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
@@ -3088,6 +3089,11 @@ internal static class Program
                             ambiguousTriangleAlignedBodies++;
                         }
 
+                        if (indexStats.TriangleStripLessDegenerateThanTriples)
+                        {
+                            triangleStripLessDegenerateBodies++;
+                        }
+
                         var sample = new NifIndexCandidateSample(
                             ArchiveName: archiveName,
                             EntryIndex: entry.Index,
@@ -3119,6 +3125,13 @@ internal static class Program
                         classGroup.MaxIndexTotal += indexStats.BigEndianMaxIndex;
                         classGroup.TriangleCountTotal += indexStats.TriangleCount;
                         classGroup.DegenerateTriangleRatioTotal += indexStats.DegenerateTriangleRatio;
+                        classGroup.TriangleStripWindowCountTotal += indexStats.TriangleStripWindowCount;
+                        classGroup.TriangleStripDegenerateRatioTotal += indexStats.TriangleStripDegenerateRatio;
+                        if (indexStats.TriangleStripLessDegenerateThanTriples)
+                        {
+                            classGroup.TriangleStripLessDegenerateThanTriplesCount++;
+                        }
+
                         if (classGroup.Samples.Count < 16)
                         {
                             classGroup.Samples.Add(sample);
@@ -3144,6 +3157,13 @@ internal static class Program
 
                         signatureGroup.TriangleCountTotal += indexStats.TriangleCount;
                         signatureGroup.DegenerateTriangleRatioTotal += indexStats.DegenerateTriangleRatio;
+                        signatureGroup.TriangleStripWindowCountTotal += indexStats.TriangleStripWindowCount;
+                        signatureGroup.TriangleStripDegenerateRatioTotal += indexStats.TriangleStripDegenerateRatio;
+                        if (indexStats.TriangleStripLessDegenerateThanTriples)
+                        {
+                            signatureGroup.TriangleStripLessDegenerateThanTriplesCount++;
+                        }
+
                         if (signatureGroup.Samples.Count < 16)
                         {
                             signatureGroup.Samples.Add(sample);
@@ -3175,6 +3195,9 @@ internal static class Program
                 AverageTriangleCount: group.Count == 0 ? 0 : Math.Round(group.TriangleCountTotal / (double)group.Count, 2),
                 AverageMaxIndex: group.Count == 0 ? 0 : Math.Round(group.MaxIndexTotal / (double)group.Count, 2),
                 AverageDegenerateTriangleRatio: group.Count == 0 ? 0 : Math.Round(group.DegenerateTriangleRatioTotal / group.Count, 4),
+                TriangleStripLessDegenerateThanTriplesCount: group.TriangleStripLessDegenerateThanTriplesCount,
+                AverageTriangleStripWindowCount: group.Count == 0 ? 0 : Math.Round(group.TriangleStripWindowCountTotal / (double)group.Count, 2),
+                AverageTriangleStripDegenerateRatio: group.Count == 0 ? 0 : Math.Round(group.TriangleStripDegenerateRatioTotal / group.Count, 4),
                 PayloadSizes: topSizeCounts(group.PayloadSizeCounts),
                 Samples: group.Samples);
         }
@@ -3190,6 +3213,9 @@ internal static class Program
                 TriangleAlignedCount: group.TriangleAlignedCount,
                 AverageTriangleCount: group.Count == 0 ? 0 : Math.Round(group.TriangleCountTotal / (double)group.Count, 2),
                 AverageDegenerateTriangleRatio: group.Count == 0 ? 0 : Math.Round(group.DegenerateTriangleRatioTotal / group.Count, 4),
+                TriangleStripLessDegenerateThanTriplesCount: group.TriangleStripLessDegenerateThanTriplesCount,
+                AverageTriangleStripWindowCount: group.Count == 0 ? 0 : Math.Round(group.TriangleStripWindowCountTotal / (double)group.Count, 2),
+                AverageTriangleStripDegenerateRatio: group.Count == 0 ? 0 : Math.Round(group.TriangleStripDegenerateRatioTotal / group.Count, 4),
                 MaxObservedIndex: group.MaxObservedIndex,
                 MinObservedMaxIndex: group.MinObservedMaxIndex,
                 Samples: group.Samples);
@@ -3214,6 +3240,7 @@ internal static class Program
             BigEndianLeadBodies: bigEndianLeadBodies,
             BigEndianTriangleAlignedBodies: bigEndianTriangleAlignedBodies,
             AmbiguousTriangleAlignedBodies: ambiguousTriangleAlignedBodies,
+            TriangleStripLessDegenerateBodies: triangleStripLessDegenerateBodies,
             InvalidStreamBodies: invalidStreamBodies,
             ClassGroups: classGroups.Values
                 .Select(toClassRecord)
@@ -3237,6 +3264,7 @@ internal static class Program
         Console.WriteLine($"Even-length stream bodies: {evenLengthBodies:N0}");
         Console.WriteLine($"Big-endian uint16 lead bodies: {bigEndianLeadBodies:N0}");
         Console.WriteLine($"Big-endian triangle-aligned bodies: {bigEndianTriangleAlignedBodies:N0}");
+        Console.WriteLine($"Triangle-strip less-degenerate bodies: {triangleStripLessDegenerateBodies:N0}");
         Console.WriteLine($"Index candidate classes: {string.Join(", ", report.ClassGroups.Take(8).Select(static g => $"{g.Classification}={g.Count:N0}"))}");
         Console.WriteLine($"Top uint16be signatures: {string.Join(" | ", report.TopBigEndianIndexSignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
@@ -5203,18 +5231,25 @@ internal static class Program
         var pairCount = body.Length / 2;
         var triangleAligned = body.Length > 0 && body.Length % 6 == 0;
         var triangleCount = body.Length / 6;
+        var values = new ushort[pairCount];
         var distinct = new HashSet<ushort>();
         ushort maxIndex = 0;
         ushort minIndex = ushort.MaxValue;
+        var firstIndices = new List<ushort>(Math.Min(pairCount, 32));
         var firstTriples = new List<NifUInt16Triple>(Math.Min(triangleCount, 16));
         var degenerateTriangles = 0;
 
         for (var i = 0; i < pairCount; i++)
         {
             var value = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(i * 2, 2));
+            values[i] = value;
             distinct.Add(value);
             maxIndex = Math.Max(maxIndex, value);
             minIndex = Math.Min(minIndex, value);
+            if (firstIndices.Count < 32)
+            {
+                firstIndices.Add(value);
+            }
         }
 
         for (var i = 0; i < triangleCount; i++)
@@ -5234,10 +5269,26 @@ internal static class Program
             }
         }
 
+        var triangleStripWindowCount = Math.Max(0, pairCount - 2);
+        var triangleStripDegenerateWindows = 0;
+        for (var i = 0; i < triangleStripWindowCount; i++)
+        {
+            var a = values[i];
+            var b = values[i + 1];
+            var c = values[i + 2];
+            if (a == b || b == c || a == c)
+            {
+                triangleStripDegenerateWindows++;
+            }
+        }
+
         if (pairCount == 0)
         {
             minIndex = 0;
         }
+
+        var degenerateTriangleRatio = triangleCount == 0 ? 0 : Math.Round(degenerateTriangles / (double)triangleCount, 4);
+        var triangleStripDegenerateRatio = triangleStripWindowCount == 0 ? 0 : Math.Round(triangleStripDegenerateWindows / (double)triangleStripWindowCount, 4);
 
         return new NifUInt16BeIndexStats(
             PairCount: pairCount,
@@ -5247,7 +5298,13 @@ internal static class Program
             BigEndianMaxIndex: maxIndex,
             BigEndianDistinctIndexCount: distinct.Count,
             DegenerateTriangles: degenerateTriangles,
-            DegenerateTriangleRatio: triangleCount == 0 ? 0 : Math.Round(degenerateTriangles / (double)triangleCount, 4),
+            DegenerateTriangleRatio: degenerateTriangleRatio,
+            TriangleStripWindowCount: triangleStripWindowCount,
+            TriangleStripNonDegenerateWindowCount: triangleStripWindowCount - triangleStripDegenerateWindows,
+            TriangleStripDegenerateWindows: triangleStripDegenerateWindows,
+            TriangleStripDegenerateRatio: triangleStripDegenerateRatio,
+            TriangleStripLessDegenerateThanTriples: triangleCount > 0 && triangleStripWindowCount > 0 && triangleStripDegenerateRatio < degenerateTriangleRatio,
+            FirstBigEndianIndices: firstIndices,
             FirstBigEndianTriples: firstTriples);
     }
 
@@ -8075,6 +8132,9 @@ internal sealed class NifIndexCandidateClassAccumulator(string classification)
     public long MaxIndexTotal { get; set; }
     public long TriangleCountTotal { get; set; }
     public double DegenerateTriangleRatioTotal { get; set; }
+    public int TriangleStripLessDegenerateThanTriplesCount { get; set; }
+    public long TriangleStripWindowCountTotal { get; set; }
+    public double TriangleStripDegenerateRatioTotal { get; set; }
     public Dictionary<uint, int> PayloadSizeCounts { get; } = [];
     public List<NifIndexCandidateSample> Samples { get; } = [];
 }
@@ -8089,6 +8149,9 @@ internal sealed class NifIndexCandidateSignatureAccumulator(string classificatio
     public int TriangleAlignedCount { get; set; }
     public long TriangleCountTotal { get; set; }
     public double DegenerateTriangleRatioTotal { get; set; }
+    public int TriangleStripLessDegenerateThanTriplesCount { get; set; }
+    public long TriangleStripWindowCountTotal { get; set; }
+    public double TriangleStripDegenerateRatioTotal { get; set; }
     public ushort MaxObservedIndex { get; set; }
     public ushort? MinObservedMaxIndex { get; set; }
     public List<NifIndexCandidateSample> Samples { get; } = [];
@@ -8106,6 +8169,7 @@ internal sealed record NifIndexCandidateInventoryReport(
     int BigEndianLeadBodies,
     int BigEndianTriangleAlignedBodies,
     int AmbiguousTriangleAlignedBodies,
+    int TriangleStripLessDegenerateBodies,
     int InvalidStreamBodies,
     List<NifIndexCandidateClassGroup> ClassGroups,
     List<NifIndexCandidateSignatureGroup> TopBigEndianIndexSignatures,
@@ -8118,6 +8182,9 @@ internal sealed record NifIndexCandidateClassGroup(
     double AverageTriangleCount,
     double AverageMaxIndex,
     double AverageDegenerateTriangleRatio,
+    int TriangleStripLessDegenerateThanTriplesCount,
+    double AverageTriangleStripWindowCount,
+    double AverageTriangleStripDegenerateRatio,
     List<NifSizeCount> PayloadSizes,
     List<NifIndexCandidateSample> Samples);
 
@@ -8130,6 +8197,9 @@ internal sealed record NifIndexCandidateSignatureGroup(
     int TriangleAlignedCount,
     double AverageTriangleCount,
     double AverageDegenerateTriangleRatio,
+    int TriangleStripLessDegenerateThanTriplesCount,
+    double AverageTriangleStripWindowCount,
+    double AverageTriangleStripDegenerateRatio,
     ushort MaxObservedIndex,
     ushort? MinObservedMaxIndex,
     List<NifIndexCandidateSample> Samples);
@@ -8158,6 +8228,12 @@ internal sealed record NifUInt16BeIndexStats(
     int BigEndianDistinctIndexCount,
     int DegenerateTriangles,
     double DegenerateTriangleRatio,
+    int TriangleStripWindowCount,
+    int TriangleStripNonDegenerateWindowCount,
+    int TriangleStripDegenerateWindows,
+    double TriangleStripDegenerateRatio,
+    bool TriangleStripLessDegenerateThanTriples,
+    List<ushort> FirstBigEndianIndices,
     List<NifUInt16Triple> FirstBigEndianTriples);
 
 internal sealed record NifReferenceSample(
