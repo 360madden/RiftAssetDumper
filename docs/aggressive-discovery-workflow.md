@@ -192,16 +192,38 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 Until then, run the focused commands manually and commit each stable milestone.
 
+## Helper apps and optionized tooling 🧰
+
+Build helper tooling ahead of bottlenecks, but prefer **optionized helpers** over many one-off apps.
+
+| Rule | Practical effect |
+|---|---|
+| One helper, many modes | Add modes/options to a durable helper instead of creating a new helper app for every discovery question. |
+| CLI-first | Keep the .NET dumper as the source of truth; helpers should orchestrate commands, not duplicate parsers. |
+| Generated-output only | Helper reports/logs go under ignored `Exports/` unless explicitly promoted to docs. |
+| Repeatable smoke/full runs | Helpers should run smoke and full copied-set scans with the same command shape every time. |
+| Blocker-aware | If a full run fails, helpers should preserve the smoke output and failing command so the blocker is resumable. |
+| Privacy-safe by default | Helpers should keep redaction on and offer privacy scans before commits/pushes. |
+
+Current helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
+```
+
+Design target: this script should become the optionized local workbench for discovery cycles. Add modes before adding separate scripts unless the new helper needs a genuinely different runtime surface.
+
 ## Immediate implementation plan 🎯
 
 | Priority | Milestone | Deliverable | Exit criteria |
 |---:|---|---|---|
-| 1 | Mesh binding v2 | Strengthen `inventory-nif-mesh-streams` output or add role-ready JSON grouping | Full copied-set top patterns identify stable mesh size + stream size families |
-| 2 | Stream role inventory | Add role scoring for referenced streams only | Top patterns label likely index/position/normal/UV streams with confidence flags |
-| 3 | Mesh probe | Add `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
-| 4 | Pairing proof | Add `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
-| 5 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
-| 6 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
+| 1 | Mesh binding v2 | `inventory-nif-mesh-bindings` with role-ready JSON grouping | Full copied-set top patterns identify stable mesh size + stream size families |
+| 2 | Helper workbench | Optionized workflow helper with smoke/full/privacy options | One command runs the current discovery cycle and summarizes output |
+| 3 | Stream role inventory refinement | Improve role scoring for referenced streams only | Top patterns label likely index/position/normal/UV streams with confidence flags |
+| 4 | Mesh probe | Add `probe-nif-mesh` | One known asset emits a complete mesh/block/stream/role report |
+| 5 | Pairing proof | Strengthen `maxIndex < vertexCount` checks | At least one repeated family passes structural pairing across multiple assets |
+| 6 | Topology proof | Add strip/list/fan/restart scoring | Top index family has a ranked topology interpretation |
+| 7 | Experimental export | Add disabled-by-default OBJ export | Only writes when proof gates pass and `--experimental --write-obj` are explicit |
 
 ## Definition of done for each milestone ✅
 

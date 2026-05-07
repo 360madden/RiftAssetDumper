@@ -11,6 +11,7 @@ Date: 2026-05-07
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
 | Model→texture graph | ✅ working | NIF references link `3,224` model assets to `2,514` unique texture manifest assets. |
 | Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
+| Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,463` same-mesh index/vertex-count-compatible links. |
 
 ## Approved operating mode 🚀
 
@@ -26,6 +27,14 @@ docs\aggressive-discovery-workflow.md
 | Not reckless output | No copied assets, generated dumps, raw user-profile paths, or unproven model exports get committed. |
 | Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, then validate `maxIndex < vertexCount`. |
 | Export gate | OBJ/model export stays experimental and disabled until mesh/stream pairing is structurally proven. |
+
+Optionized helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
+```
+
+Helper policy: add modes/options to durable helpers before creating one-off helper apps.
 
 ## Compression truth 🧊
 
@@ -357,6 +366,50 @@ Top repeated stream-reference patterns:
 
 Why this matters: every copied `NiMesh` block now has at least one stream candidate. The most repeated, non-ambiguous lead is `@168`, and the most repeated multi-stream families identify concrete mesh/data-stream layouts to reverse before attempting OBJ export.
 
+## Mesh-bound stream role and pairing inventory 🧷
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-bindings --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-binding-inventory.json" --limit 100
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| NiMesh blocks | `5,507` |
+| Mesh blocks with candidates | `5,507` |
+| Candidate stream links | `11,564` |
+| Valid declared stream bodies | `11,564` |
+| Invalid declared stream bodies | `0` |
+| Pair-compatible meshes | `2,076` |
+| Pair-compatible links | `4,463` |
+
+Top stream roles:
+
+| Role | Count | High confidence | Top payload sizes |
+|---|---:|---:|---|
+| `uint16-compatible-body` | `7,177` | `0` | `288×475`, `192×431`, `384×240`, `576×222`, `48×194` |
+| `index-u16be-strip-lead` | `2,101` | `2,101` | `72×285`, `144×121`, `48×103`, `12×89`, `192×84` |
+| `strided-body` | `1,953` | `0` | `32×118`, `128×71`, `64×61`, `1644×61`, `416×60` |
+| `uv-float2-lead` | `148` | `0` | `192×38`, `64×10`, `144×7`, `96×5`, `72×4` |
+| `index-u16be-list-lead` | `112` | `112` | `48×15`, `120×11`, `72×10`, `144×10`, `108×9` |
+
+Top pair-compatible patterns:
+
+| Mesh size | Count | Index stream | Compatible stream | Vertex count | Max index | Coverage |
+|---:|---:|---|---|---:|---:|---:|
+| `325` | `134` | `@292 payload=72 index-u16be-strip-lead` | `@216 payload=288 uint16-compatible-body` | `24` | `23` | `1.00` |
+| `325` | `124` | `@292 payload=72 index-u16be-strip-lead` | `@300 payload=192 uint16-compatible-body` | `24` | `23` | `1.00` |
+| `321` | `60` | `@288 payload=72 index-u16be-strip-lead` | `@212 payload=288 uint16-compatible-body` | `24` | `23` | `1.00` |
+| `305` | `58` | `@272 payload=12 index-u16be-strip-lead` | `@196 payload=48 uint16-compatible-body` | `4` | `3` | `1.00` |
+| `301` | `50` | `@268 payload=144 index-u16be-strip-lead` | `@192 payload=576 uint16-compatible-body` | `48` | `47` | `1.00` |
+
+Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, and compatible `24`-element streams at `@216`/`@300`. This is still not final vertex decoding because `uint16-compatible-body` is a conservative compatibility label, not a proven position/UV role.
+
 ## NIF data-stream header proof 🔎
 
 Command added:
@@ -678,6 +731,14 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-bindings --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-binding-inventory.json" --limit 100
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
 ```
 
@@ -723,11 +784,11 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 ## Current safest next direction 🛡️
 
-1. Decode only declared stream bodies after the proven 29-byte `NiDataStream` header.
-2. Prioritize `uint16be-triangle-aligned-lead` bodies, but account for strip/fan/restart-style degenerate patterns.
-3. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
-4. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
-5. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.
-6. Use the block map to decode `NiMesh` references to `NiDataStream` blocks.
-7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation.
+1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
+2. Refine `uint16-compatible-body` into stricter role candidates instead of treating it as final vertex semantics.
+3. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
+4. Add `probe-nif-mesh` to produce a one-asset block/stream/role/pairing proof packet.
+5. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
+6. Add mesh-level topology scoring for strip/list/fan/restart candidates.
+7. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
 8. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

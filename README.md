@@ -12,6 +12,14 @@ docs\aggressive-discovery-workflow.md
 
 Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, and validate `maxIndex < vertexCount` before any experimental OBJ/model export.
 
+Optionized workflow helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
+```
+
+Prefer adding options/modes to this helper before creating new one-off helper apps.
+
 ## Privacy and path redaction
 
 The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports. Paths under the current user's profile are emitted with an environment-variable placeholder:
@@ -558,6 +566,27 @@ Top pattern: meshSize=325 count=138 @216:size=317|@292:size=101?|@300:size=221
 ```
 
 This makes `@168` the strongest copied-set lead for small repeated meshes, while the `meshSize=325` and `meshSize=321` three-stream patterns look like good next targets for vertex/index/attribute role inference.
+
+Inventory mesh-bound streams with role scoring and pairing checks:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-mesh-bindings --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-mesh-binding-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+NIF payloads: 5,111
+NiMesh blocks: 5,507
+Candidate stream links: 11,564
+Valid declared stream bodies: 11,564
+Pair-compatible meshes: 2,076
+Pair-compatible links: 4,463
+Top role: index-u16be-strip-lead=2,101
+Top pairing: meshSize=325 count=134 index-u16be-strip-lead -> uint16-compatible-body, vertexCount=24, maxIndex=23
+```
+
+This is the first full copied-set mesh-binding proof that candidate index streams can be paired with same-mesh stream bodies where `maxIndex < vertexCount`. Role scoring is still intentionally conservative: `uint16-compatible-body` is a stream compatibility label, not final vertex semantics.
 
 Probe the target data streams for one NIF mesh:
 

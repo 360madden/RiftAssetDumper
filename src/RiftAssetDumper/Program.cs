@@ -110,6 +110,11 @@ internal static class Program
                 return InventoryNifMeshStreams(options);
             }
 
+            if (options.Command == "inventory-nif-mesh-bindings")
+            {
+                return InventoryNifMeshBindings(options);
+            }
+
             if (options.Command == "inventory-nif-stream-headers")
             {
                 return InventoryNifStreamHeaders(options);
@@ -2262,6 +2267,352 @@ internal static class Program
         Console.WriteLine($"Ambiguous candidate links: {ambiguousCandidateLinkCount:N0}");
         Console.WriteLine($"Top offsets: {string.Join(", ", report.OffsetGroups.Take(8).Select(static g => $"@{g.PayloadOffset}={g.Count:N0}"))}");
         Console.WriteLine($"Top patterns: {string.Join(" | ", report.TopPatterns.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.Pattern}"))}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
+    private static int InventoryNifMeshBindings(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var roleGroups = new Dictionary<string, NifMeshBindingRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var meshBlockCount = 0;
+        var meshBlocksWithCandidates = 0;
+        var candidateLinkCount = 0;
+        var validDeclaredStreamBodies = 0;
+        var invalidDeclaredStreamBodies = 0;
+        var pairCompatibleMeshes = 0;
+        var pairCompatibleLinks = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
+                    foreach (var meshBlock in header.Blocks.Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        meshBlockCount++;
+                        var candidates = meshBlock.DataStreamReferenceCandidates
+                            .OrderBy(static c => c.PayloadOffset)
+                            .ThenBy(static c => c.TargetBlockIndex)
+                            .ToList();
+                        if (candidates.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        meshBlocksWithCandidates++;
+                        var streamSummaries = new List<NifMeshBoundStreamSummary>(candidates.Count);
+                        foreach (var candidate in candidates)
+                        {
+                            candidateLinkCount++;
+                            blocksByIndex.TryGetValue(candidate.TargetBlockIndex, out var targetBlock);
+                            ReadOnlySpan<byte> targetPayload = targetBlock is null
+                                ? ReadOnlySpan<byte>.Empty
+                                : SliceNifBlockPayload(payload.Bytes, targetBlock);
+                            uint? declaredPayloadBytes = null;
+                            int? headerBytes = null;
+                            var bodyFirst16 = string.Empty;
+                            NifMeshStreamRoleStats roleStats;
+                            if (targetPayload.Length >= 4)
+                            {
+                                declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(targetPayload[..4]);
+                                if (declaredPayloadBytes.Value <= targetPayload.Length)
+                                {
+                                    headerBytes = targetPayload.Length - checked((int)declaredPayloadBytes.Value);
+                                    var body = targetPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
+                                    bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
+                                    roleStats = AnalyzeNifMeshBoundStreamRole(body);
+                                    validDeclaredStreamBodies++;
+                                }
+                                else
+                                {
+                                    roleStats = NifMeshStreamRoleStats.Invalid("declared-payload-past-block");
+                                    invalidDeclaredStreamBodies++;
+                                }
+                            }
+                            else
+                            {
+                                roleStats = NifMeshStreamRoleStats.Invalid("stream-block-too-small");
+                                invalidDeclaredStreamBodies++;
+                            }
+
+                            var summary = new NifMeshBoundStreamSummary(
+                                MeshPayloadOffset: candidate.PayloadOffset,
+                                TargetBlockIndex: candidate.TargetBlockIndex,
+                                TargetTypeName: candidate.TargetTypeName,
+                                TargetSize: candidate.TargetSize,
+                                TargetFirst16: candidate.TargetFirst16,
+                                DeclaredPayloadBytes: declaredPayloadBytes,
+                                HeaderBytes: headerBytes,
+                                BodyFirst16: bodyFirst16,
+                                MaybeStringIndex: candidate.MaybeStringIndex,
+                                StringValue: candidate.StringValue,
+                                RoleStats: roleStats);
+                            streamSummaries.Add(summary);
+
+                            if (!roleGroups.TryGetValue(roleStats.PrimaryRole, out var roleGroup))
+                            {
+                                roleGroup = new NifMeshBindingRoleAccumulator(roleStats.PrimaryRole);
+                                roleGroups.Add(roleStats.PrimaryRole, roleGroup);
+                            }
+
+                            roleGroup.Count++;
+                            if (roleStats.Confidence >= 70)
+                            {
+                                roleGroup.HighConfidenceCount++;
+                            }
+
+                            roleGroup.MeshSizeCounts[meshBlock.Size] = roleGroup.MeshSizeCounts.GetValueOrDefault(meshBlock.Size) + 1;
+                            if (declaredPayloadBytes is not null)
+                            {
+                                roleGroup.DeclaredPayloadSizeCounts[declaredPayloadBytes.Value] = roleGroup.DeclaredPayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes.Value) + 1;
+                            }
+
+                            if (roleGroup.Samples.Count < 16)
+                            {
+                                roleGroup.Samples.Add(new NifMeshBindingStreamSample(
+                                    ArchiveName: archiveName,
+                                    EntryIndex: entry.Index,
+                                    IdPrefix: entry.IdPrefix,
+                                    ManifestEntryIndex: manifestEntry?.Index,
+                                    MeshBlockIndex: meshBlock.Index,
+                                    MeshSize: meshBlock.Size,
+                                    Stream: summary));
+                            }
+                        }
+
+                        var pairings = FindNifMeshBindingPairings(
+                            archiveName,
+                            entry,
+                            manifestEntry,
+                            meshBlock,
+                            streamSummaries);
+                        if (pairings.Count > 0)
+                        {
+                            pairCompatibleMeshes++;
+                            pairCompatibleLinks += pairings.Count;
+                        }
+
+                        var patternKey = string.Join("|", streamSummaries.Take(16).Select(static s => $"@{s.MeshPayloadOffset}:size={s.TargetSize}:payload={s.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "?"}:role={s.RoleStats.PrimaryRole}{(s.MaybeStringIndex ? "?" : string.Empty)}"));
+                        if (!patternGroups.TryGetValue(patternKey, out var patternGroup))
+                        {
+                            patternGroup = new NifMeshBindingPatternAccumulator(patternKey, meshBlock.Size, meshBlock.First16);
+                            patternGroups.Add(patternKey, patternGroup);
+                        }
+
+                        patternGroup.Count++;
+                        patternGroup.NifIds.Add(entry.IdPrefix);
+                        if (pairings.Count > 0)
+                        {
+                            patternGroup.PairCompatibleCount++;
+                        }
+
+                        if (patternGroup.Samples.Count < 12)
+                        {
+                            patternGroup.Samples.Add(new NifMeshBindingMeshSample(
+                                ArchiveName: archiveName,
+                                EntryIndex: entry.Index,
+                                IdPrefix: entry.IdPrefix,
+                                ManifestEntryIndex: manifestEntry?.Index,
+                                MeshBlockIndex: meshBlock.Index,
+                                MeshSize: meshBlock.Size,
+                                MeshFirst16: meshBlock.First16,
+                                PairingCount: pairings.Count,
+                                Streams: streamSummaries.Take(16).ToList()));
+                        }
+
+                        foreach (var pairing in pairings)
+                        {
+                            var key = $"meshSize={meshBlock.Size}|index@{pairing.IndexMeshPayloadOffset}:payload={pairing.IndexDeclaredPayloadBytes}:role={pairing.IndexRole}|vertex@{pairing.VertexMeshPayloadOffset}:payload={pairing.VertexDeclaredPayloadBytes}:role={pairing.VertexRole}:count={pairing.VertexCount}";
+                            if (!pairingGroups.TryGetValue(key, out var pairingGroup))
+                            {
+                                pairingGroup = new NifMeshBindingPairingAccumulator(
+                                    key,
+                                    meshBlock.Size,
+                                    pairing.IndexRole,
+                                    pairing.VertexRole,
+                                    pairing.IndexDeclaredPayloadBytes,
+                                    pairing.VertexDeclaredPayloadBytes,
+                                    pairing.VertexCount);
+                                pairingGroups.Add(key, pairingGroup);
+                            }
+
+                            pairingGroup.Count++;
+                            pairingGroup.NifIds.Add(entry.IdPrefix);
+                            pairingGroup.MaxIndexObserved = Math.Max(pairingGroup.MaxIndexObserved, pairing.IndexMax);
+                            pairingGroup.ConfidenceTotal += pairing.Confidence;
+                            pairingGroup.IndexCoverageRatioTotal += pairing.IndexCoverageRatio;
+                            if (pairingGroup.Samples.Count < 16)
+                            {
+                                pairingGroup.Samples.Add(pairing);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static List<NifSizeCount> topSizeCounts(Dictionary<uint, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key)
+                .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        static NifMeshBindingRoleGroup toRoleRecord(NifMeshBindingRoleAccumulator group)
+        {
+            return new NifMeshBindingRoleGroup(
+                Role: group.Role,
+                Count: group.Count,
+                HighConfidenceCount: group.HighConfidenceCount,
+                MeshSizes: topSizeCounts(group.MeshSizeCounts),
+                DeclaredPayloadSizes: topSizeCounts(group.DeclaredPayloadSizeCounts),
+                Samples: group.Samples);
+        }
+
+        static NifMeshBindingPatternGroup toPatternRecord(NifMeshBindingPatternAccumulator group)
+        {
+            return new NifMeshBindingPatternGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                MeshFirst16: group.MeshFirst16,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                PairCompatibleCount: group.PairCompatibleCount,
+                Samples: group.Samples);
+        }
+
+        static NifMeshBindingPairingGroup toPairingRecord(NifMeshBindingPairingAccumulator group)
+        {
+            return new NifMeshBindingPairingGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                IndexRole: group.IndexRole,
+                VertexRole: group.VertexRole,
+                IndexDeclaredPayloadBytes: group.IndexDeclaredPayloadBytes,
+                VertexDeclaredPayloadBytes: group.VertexDeclaredPayloadBytes,
+                VertexCount: group.VertexCount,
+                MaxIndexObserved: group.MaxIndexObserved,
+                AverageConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
+                AverageIndexCoverageRatio: group.Count == 0 ? 0 : Math.Round(group.IndexCoverageRatioTotal / group.Count, 4),
+                Samples: group.Samples);
+        }
+
+        var report = new NifMeshBindingInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            MeshBlocks: meshBlockCount,
+            MeshBlocksWithCandidates: meshBlocksWithCandidates,
+            CandidateLinks: candidateLinkCount,
+            ValidDeclaredStreamBodies: validDeclaredStreamBodies,
+            InvalidDeclaredStreamBodies: invalidDeclaredStreamBodies,
+            PairCompatibleMeshes: pairCompatibleMeshes,
+            PairCompatibleLinks: pairCompatibleLinks,
+            RoleGroups: roleGroups.Values
+                .Select(toRoleRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopPatterns: patternGroups.Values
+                .Select(toPatternRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.PairCompatibleCount)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopPairings: pairingGroups.Values
+                .Select(toPairingRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.AverageConfidence)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-binding-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NiMesh blocks: {meshBlockCount:N0}");
+        Console.WriteLine($"Mesh blocks with candidates: {meshBlocksWithCandidates:N0}");
+        Console.WriteLine($"Candidate stream links: {candidateLinkCount:N0}");
+        Console.WriteLine($"Valid declared stream bodies: {validDeclaredStreamBodies:N0}");
+        Console.WriteLine($"Invalid declared stream bodies: {invalidDeclaredStreamBodies:N0}");
+        Console.WriteLine($"Pair-compatible meshes: {pairCompatibleMeshes:N0}");
+        Console.WriteLine($"Pair-compatible links: {pairCompatibleLinks:N0}");
+        Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
+        Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.IndexRole}->{g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -5308,6 +5659,341 @@ internal static class Program
             FirstBigEndianTriples: firstTriples);
     }
 
+    private static NifMeshStreamRoleStats AnalyzeNifMeshBoundStreamRole(ReadOnlySpan<byte> body)
+    {
+        var bodyStats = AnalyzeNifStreamBody(body);
+        var endianStats = body.Length % 2 == 0 ? AnalyzeNifStreamEndian(body) : null;
+        var indexStats = body.Length % 2 == 0 ? AnalyzeNifUInt16BeIndex(body) : null;
+        var float2Stats = AnalyzeNifFloatVectors(body, components: 2);
+        var float3Stats = AnalyzeNifFloatVectors(body, components: 3);
+        var vertexCountCandidates = FindWholeBlockStrideCandidates(body.Length)
+            .Where(static c => c.Stride is 8 or 12 or 16 or 20 or 24 or 28 or 32 or 36 or 40 or 44 or 48 or 56 or 64)
+            .Select(static c => c.Count)
+            .Distinct()
+            .OrderBy(static c => c)
+            .ToList();
+        var evidence = new List<string>();
+        var roleCandidates = new List<string>();
+        var primaryRole = "unknown-stream";
+        var confidence = 0;
+        ushort? indexMax = null;
+
+        if (bodyStats.AllZero)
+        {
+            return new NifMeshStreamRoleStats(
+                PrimaryRole: "all-zero-stream",
+                Confidence: 10,
+                RoleCandidates: ["all-zero-stream"],
+                Evidence: ["all bytes are zero"],
+                VertexCountCandidates: vertexCountCandidates,
+                IndexMax: null,
+                IndexPairCount: null,
+                BodyStats: bodyStats,
+                EndianStats: endianStats,
+                IndexStats: indexStats,
+                Float2Stats: float2Stats,
+                Float3Stats: float3Stats);
+        }
+
+        if (endianStats?.Classification == "big-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 3)
+        {
+            indexMax = indexStats.BigEndianMaxIndex;
+            evidence.Add($"big-endian uint16 lead, maxIndex={indexStats.BigEndianMaxIndex}, distinct={indexStats.BigEndianDistinctIndexCount}");
+            if (indexStats.TriangleStripLessDegenerateThanTriples)
+            {
+                primaryRole = "index-u16be-strip-lead";
+                confidence = 85;
+                roleCandidates.Add(primaryRole);
+                evidence.Add($"strip windows less degenerate than fixed triples ({indexStats.TriangleStripDegenerateRatio:0.####} < {indexStats.DegenerateTriangleRatio:0.####})");
+            }
+            else if (indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.25)
+            {
+                primaryRole = "index-u16be-list-lead";
+                confidence = 80;
+                roleCandidates.Add(primaryRole);
+                evidence.Add($"fixed triples are low-degenerate ({indexStats.DegenerateTriangleRatio:0.####})");
+            }
+            else
+            {
+                primaryRole = "index-u16be-lead";
+                confidence = 70;
+                roleCandidates.Add(primaryRole);
+                evidence.Add("compact big-endian uint16 stream without a proven topology");
+            }
+        }
+
+        if (endianStats?.Classification == "little-endian-u16-lead" && primaryRole == "unknown-stream")
+        {
+            primaryRole = "index-u16le-lead";
+            confidence = 55;
+            roleCandidates.Add(primaryRole);
+            evidence.Add("little-endian uint16 lead; lower confidence than current big-endian family");
+        }
+
+        if (float3Stats.VectorCount >= 3 && float3Stats.FiniteVectorRatio >= 0.95 && float3Stats.PlausibleValueRatio >= 0.95)
+        {
+            if (float3Stats.NearUnitVectorRatio >= 0.75 && float3Stats.NonZeroVectorRatio >= 0.50)
+            {
+                roleCandidates.Add("normal-float3-lead");
+                evidence.Add($"float3 vectors are mostly unit length ({float3Stats.NearUnitVectorRatio:0.####})");
+                if (confidence < 75)
+                {
+                    primaryRole = "normal-float3-lead";
+                    confidence = 75;
+                }
+            }
+            else if (float3Stats.MaxExtent >= 0.0001 && float3Stats.NonZeroVectorRatio >= 0.50)
+            {
+                roleCandidates.Add("position-float3-lead");
+                evidence.Add($"float3 vectors have finite nonzero bounds, extent={float3Stats.MaxExtent:0.####}");
+                if (confidence < 65)
+                {
+                    primaryRole = "position-float3-lead";
+                    confidence = 65;
+                }
+            }
+            else
+            {
+                roleCandidates.Add("float3-compatible-lead");
+                if (confidence < 45)
+                {
+                    primaryRole = "float3-compatible-lead";
+                    confidence = 45;
+                }
+            }
+        }
+
+        if (float2Stats.VectorCount >= 3 && float2Stats.FiniteVectorRatio >= 0.95 && float2Stats.UvRangeRatio >= 0.80 && float2Stats.NonZeroVectorRatio >= 0.50)
+        {
+            roleCandidates.Add("uv-float2-lead");
+            evidence.Add($"float2 values are mostly in UV-ish range ({float2Stats.UvRangeRatio:0.####})");
+            if (confidence < 55)
+            {
+                primaryRole = "uv-float2-lead";
+                confidence = 55;
+            }
+        }
+
+        if (roleCandidates.Count == 0)
+        {
+            roleCandidates.Add(bodyStats.Classification);
+            evidence.Add($"stream body classifier={bodyStats.Classification}");
+            primaryRole = bodyStats.Classification;
+            confidence = bodyStats.Classification == "empty-body" ? 10 : 25;
+        }
+
+        return new NifMeshStreamRoleStats(
+            PrimaryRole: primaryRole,
+            Confidence: confidence,
+            RoleCandidates: roleCandidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            Evidence: evidence,
+            VertexCountCandidates: vertexCountCandidates,
+            IndexMax: indexMax,
+            IndexPairCount: indexStats?.PairCount,
+            BodyStats: bodyStats,
+            EndianStats: endianStats,
+            IndexStats: indexStats,
+            Float2Stats: float2Stats,
+            Float3Stats: float3Stats);
+    }
+
+    private static NifFloatVectorStats AnalyzeNifFloatVectors(ReadOnlySpan<byte> body, int components)
+    {
+        var bytesPerVector = checked(components * 4);
+        var aligned = body.Length > 0 && body.Length % bytesPerVector == 0;
+        var vectorCount = body.Length / bytesPerVector;
+        var finiteVectors = 0;
+        var plausibleValues = 0;
+        var totalValues = vectorCount * components;
+        var nonZeroVectors = 0;
+        var nearUnitVectors = 0;
+        var uvRangeValues = 0;
+        double? minX = null;
+        double? maxX = null;
+        double? minY = null;
+        double? maxY = null;
+        double? minZ = null;
+        double? maxZ = null;
+        var prefix = new List<NifFloatVectorPrefix>(Math.Min(vectorCount, 12));
+
+        for (var i = 0; i < vectorCount; i++)
+        {
+            var offset = i * bytesPerVector;
+            var values = new double[components];
+            var finite = true;
+            var nonZero = false;
+            for (var component = 0; component < components; component++)
+            {
+                var value = ReadFiniteFloat32(body.Slice(offset + (component * 4), 4));
+                if (value is null)
+                {
+                    finite = false;
+                    values[component] = double.NaN;
+                    continue;
+                }
+
+                var doubleValue = (double)value.Value;
+                values[component] = doubleValue;
+                var abs = Math.Abs(doubleValue);
+                if (abs > 0.0000001)
+                {
+                    nonZero = true;
+                }
+
+                if (abs == 0 || abs is >= 0.0000001 and <= 1_000_000)
+                {
+                    plausibleValues++;
+                }
+
+                if (doubleValue is >= -10 and <= 10)
+                {
+                    uvRangeValues++;
+                }
+            }
+
+            if (prefix.Count < 12)
+            {
+                prefix.Add(new NifFloatVectorPrefix(
+                    Index: i,
+                    X: finite ? values[0] : null,
+                    Y: finite && components > 1 ? values[1] : null,
+                    Z: finite && components > 2 ? values[2] : null));
+            }
+
+            if (!finite)
+            {
+                continue;
+            }
+
+            finiteVectors++;
+            if (nonZero)
+            {
+                nonZeroVectors++;
+            }
+
+            minX = minX is null ? values[0] : Math.Min(minX.Value, values[0]);
+            maxX = maxX is null ? values[0] : Math.Max(maxX.Value, values[0]);
+            if (components > 1)
+            {
+                minY = minY is null ? values[1] : Math.Min(minY.Value, values[1]);
+                maxY = maxY is null ? values[1] : Math.Max(maxY.Value, values[1]);
+            }
+
+            if (components > 2)
+            {
+                minZ = minZ is null ? values[2] : Math.Min(minZ.Value, values[2]);
+                maxZ = maxZ is null ? values[2] : Math.Max(maxZ.Value, values[2]);
+            }
+
+            if (components == 3)
+            {
+                var length = Math.Sqrt((values[0] * values[0]) + (values[1] * values[1]) + (values[2] * values[2]));
+                if (length is >= 0.75 and <= 1.25)
+                {
+                    nearUnitVectors++;
+                }
+            }
+        }
+
+        var extentX = minX is null || maxX is null ? 0 : maxX.Value - minX.Value;
+        var extentY = minY is null || maxY is null ? 0 : maxY.Value - minY.Value;
+        var extentZ = minZ is null || maxZ is null ? 0 : maxZ.Value - minZ.Value;
+
+        return new NifFloatVectorStats(
+            Components: components,
+            Aligned: aligned,
+            VectorCount: vectorCount,
+            FiniteVectorCount: finiteVectors,
+            FiniteVectorRatio: vectorCount == 0 ? 0 : Math.Round(finiteVectors / (double)vectorCount, 4),
+            PlausibleValueRatio: totalValues == 0 ? 0 : Math.Round(plausibleValues / (double)totalValues, 4),
+            NonZeroVectorCount: nonZeroVectors,
+            NonZeroVectorRatio: vectorCount == 0 ? 0 : Math.Round(nonZeroVectors / (double)vectorCount, 4),
+            NearUnitVectorCount: nearUnitVectors,
+            NearUnitVectorRatio: vectorCount == 0 ? 0 : Math.Round(nearUnitVectors / (double)vectorCount, 4),
+            UvRangeRatio: totalValues == 0 ? 0 : Math.Round(uvRangeValues / (double)totalValues, 4),
+            MinX: minX,
+            MaxX: maxX,
+            MinY: minY,
+            MaxY: maxY,
+            MinZ: minZ,
+            MaxZ: maxZ,
+            MaxExtent: Math.Round(Math.Max(extentX, Math.Max(extentY, extentZ)), 6),
+            Prefix: prefix);
+    }
+
+    private static List<NifMeshBindingPairingSample> FindNifMeshBindingPairings(
+        string archiveName,
+        ArchiveEntrySample entry,
+        ManifestEntryBrief? manifestEntry,
+        NifBlockInfo meshBlock,
+        List<NifMeshBoundStreamSummary> streams)
+    {
+        var pairings = new List<NifMeshBindingPairingSample>();
+        var indexStreams = streams
+            .Where(static s => s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.IndexMax is not null)
+            .ToList();
+        var vertexStreams = streams
+            .Where(static s => !s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.VertexCountCandidates.Count > 0)
+            .ToList();
+
+        foreach (var indexStream in indexStreams)
+        {
+            var maxIndex = indexStream.RoleStats.IndexMax!.Value;
+            foreach (var vertexStream in vertexStreams)
+            {
+                if (vertexStream.TargetBlockIndex == indexStream.TargetBlockIndex)
+                {
+                    continue;
+                }
+
+                var compatibleVertexCount = vertexStream.RoleStats.VertexCountCandidates
+                    .Where(count => count > maxIndex)
+                    .OrderBy(static count => count)
+                    .FirstOrDefault();
+                if (compatibleVertexCount <= 0)
+                {
+                    continue;
+                }
+
+                var confidence = Math.Min(indexStream.RoleStats.Confidence, vertexStream.RoleStats.Confidence);
+                if (compatibleVertexCount == maxIndex + 1)
+                {
+                    confidence = Math.Min(100, confidence + 10);
+                }
+
+                var coverageRatio = compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4);
+                pairings.Add(new NifMeshBindingPairingSample(
+                    ArchiveName: archiveName,
+                    EntryIndex: entry.Index,
+                    IdPrefix: entry.IdPrefix,
+                    ManifestEntryIndex: manifestEntry?.Index,
+                    MeshBlockIndex: meshBlock.Index,
+                    MeshSize: meshBlock.Size,
+                    IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
+                    IndexBlockIndex: indexStream.TargetBlockIndex,
+                    IndexDeclaredPayloadBytes: indexStream.DeclaredPayloadBytes,
+                    IndexRole: indexStream.RoleStats.PrimaryRole,
+                    IndexMax: maxIndex,
+                    IndexPairCount: indexStream.RoleStats.IndexPairCount,
+                    VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
+                    VertexBlockIndex: vertexStream.TargetBlockIndex,
+                    VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
+                    VertexRole: vertexStream.RoleStats.PrimaryRole,
+                    VertexCount: compatibleVertexCount,
+                    IndexCoverageRatio: coverageRatio,
+                    Confidence: confidence));
+            }
+        }
+
+        return pairings
+            .OrderByDescending(static p => p.Confidence)
+            .ThenByDescending(static p => p.IndexCoverageRatio)
+            .ThenBy(static p => p.IndexMeshPayloadOffset)
+            .ThenBy(static p => p.VertexMeshPayloadOffset)
+            .Take(16)
+            .ToList();
+    }
+
     private static string ClassifyNifIndexCandidate(NifStreamEndianStats endianStats, NifUInt16BeIndexStats indexStats)
     {
         if (indexStats.PairCount == 0)
@@ -6907,6 +7593,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-mesh-streams --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-mesh-bindings --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-headers --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-bodies --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-endianness --root <SourceFolder> --max-total 100");
@@ -7131,6 +7818,7 @@ internal static class Program
                     case "inventory-nif":
                     case "inventory-nif-blocks":
                     case "inventory-nif-mesh-streams":
+                    case "inventory-nif-mesh-bindings":
                     case "inventory-nif-stream-headers":
                     case "inventory-nif-stream-bodies":
                     case "inventory-nif-stream-endianness":
@@ -7873,6 +8561,206 @@ internal sealed record NifMeshStreamSample(
     string TargetFirst16,
     bool MaybeStringIndex,
     string? StringValue);
+
+internal sealed class NifMeshBindingRoleAccumulator(string role)
+{
+    public string Role { get; } = role;
+    public int Count { get; set; }
+    public int HighConfidenceCount { get; set; }
+    public Dictionary<uint, int> MeshSizeCounts { get; } = [];
+    public Dictionary<uint, int> DeclaredPayloadSizeCounts { get; } = [];
+    public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshBindingPatternAccumulator(string pattern, uint meshSize, string meshFirst16)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public string MeshFirst16 { get; } = meshFirst16;
+    public int Count { get; set; }
+    public int PairCompatibleCount { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifMeshBindingMeshSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshBindingPairingAccumulator(
+    string pattern,
+    uint meshSize,
+    string indexRole,
+    string vertexRole,
+    uint? indexDeclaredPayloadBytes,
+    uint? vertexDeclaredPayloadBytes,
+    int vertexCount)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public string IndexRole { get; } = indexRole;
+    public string VertexRole { get; } = vertexRole;
+    public uint? IndexDeclaredPayloadBytes { get; } = indexDeclaredPayloadBytes;
+    public uint? VertexDeclaredPayloadBytes { get; } = vertexDeclaredPayloadBytes;
+    public int VertexCount { get; } = vertexCount;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public ushort MaxIndexObserved { get; set; }
+    public double ConfidenceTotal { get; set; }
+    public double IndexCoverageRatioTotal { get; set; }
+    public List<NifMeshBindingPairingSample> Samples { get; } = [];
+}
+
+internal sealed record NifMeshBindingInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int MeshBlocks,
+    int MeshBlocksWithCandidates,
+    int CandidateLinks,
+    int ValidDeclaredStreamBodies,
+    int InvalidDeclaredStreamBodies,
+    int PairCompatibleMeshes,
+    int PairCompatibleLinks,
+    List<NifMeshBindingRoleGroup> RoleGroups,
+    List<NifMeshBindingPatternGroup> TopPatterns,
+    List<NifMeshBindingPairingGroup> TopPairings);
+
+internal sealed record NifMeshBindingRoleGroup(
+    string Role,
+    int Count,
+    int HighConfidenceCount,
+    List<NifSizeCount> MeshSizes,
+    List<NifSizeCount> DeclaredPayloadSizes,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifMeshBindingPatternGroup(
+    string Pattern,
+    uint MeshSize,
+    string MeshFirst16,
+    int Count,
+    int NifPayloads,
+    int PairCompatibleCount,
+    List<NifMeshBindingMeshSample> Samples);
+
+internal sealed record NifMeshBindingPairingGroup(
+    string Pattern,
+    uint MeshSize,
+    int Count,
+    int NifPayloads,
+    string IndexRole,
+    string VertexRole,
+    uint? IndexDeclaredPayloadBytes,
+    uint? VertexDeclaredPayloadBytes,
+    int VertexCount,
+    ushort MaxIndexObserved,
+    double AverageConfidence,
+    double AverageIndexCoverageRatio,
+    List<NifMeshBindingPairingSample> Samples);
+
+internal sealed record NifMeshBindingStreamSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    NifMeshBoundStreamSummary Stream);
+
+internal sealed record NifMeshBindingMeshSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    string MeshFirst16,
+    int PairingCount,
+    List<NifMeshBoundStreamSummary> Streams);
+
+internal sealed record NifMeshBoundStreamSummary(
+    int MeshPayloadOffset,
+    int TargetBlockIndex,
+    string TargetTypeName,
+    uint TargetSize,
+    string TargetFirst16,
+    uint? DeclaredPayloadBytes,
+    int? HeaderBytes,
+    string BodyFirst16,
+    bool MaybeStringIndex,
+    string? StringValue,
+    NifMeshStreamRoleStats RoleStats);
+
+internal sealed record NifMeshBindingPairingSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    int IndexMeshPayloadOffset,
+    int IndexBlockIndex,
+    uint? IndexDeclaredPayloadBytes,
+    string IndexRole,
+    ushort IndexMax,
+    int? IndexPairCount,
+    int VertexMeshPayloadOffset,
+    int VertexBlockIndex,
+    uint? VertexDeclaredPayloadBytes,
+    string VertexRole,
+    int VertexCount,
+    double IndexCoverageRatio,
+    int Confidence);
+
+internal sealed record NifMeshStreamRoleStats(
+    string PrimaryRole,
+    int Confidence,
+    List<string> RoleCandidates,
+    List<string> Evidence,
+    List<int> VertexCountCandidates,
+    ushort? IndexMax,
+    int? IndexPairCount,
+    NifStreamBodyStats? BodyStats,
+    NifStreamEndianStats? EndianStats,
+    NifUInt16BeIndexStats? IndexStats,
+    NifFloatVectorStats? Float2Stats,
+    NifFloatVectorStats? Float3Stats)
+{
+    public static NifMeshStreamRoleStats Invalid(string reason) => new(
+        PrimaryRole: "invalid-stream-body",
+        Confidence: 0,
+        RoleCandidates: ["invalid-stream-body"],
+        Evidence: [reason],
+        VertexCountCandidates: [],
+        IndexMax: null,
+        IndexPairCount: null,
+        BodyStats: null,
+        EndianStats: null,
+        IndexStats: null,
+        Float2Stats: null,
+        Float3Stats: null);
+}
+
+internal sealed record NifFloatVectorStats(
+    int Components,
+    bool Aligned,
+    int VectorCount,
+    int FiniteVectorCount,
+    double FiniteVectorRatio,
+    double PlausibleValueRatio,
+    int NonZeroVectorCount,
+    double NonZeroVectorRatio,
+    int NearUnitVectorCount,
+    double NearUnitVectorRatio,
+    double UvRangeRatio,
+    double? MinX,
+    double? MaxX,
+    double? MinY,
+    double? MaxY,
+    double? MinZ,
+    double? MaxZ,
+    double MaxExtent,
+    List<NifFloatVectorPrefix> Prefix);
+
+internal sealed record NifFloatVectorPrefix(int Index, double? X, double? Y, double? Z);
 
 internal sealed class NifStreamHeaderAccumulator(int headerBytes)
 {
