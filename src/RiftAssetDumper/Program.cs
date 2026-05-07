@@ -125,6 +125,11 @@ internal static class Program
                 return InventoryNifStreamEndianness(options);
             }
 
+            if (options.Command == "inventory-nif-index-candidates")
+            {
+                return InventoryNifIndexCandidates(options);
+            }
+
             if (options.Command == "mine-nif-references")
             {
                 return MineNifReferences(options);
@@ -2969,6 +2974,275 @@ internal static class Program
         return failed == 0 ? 0 : 2;
     }
 
+    private static int InventoryNifIndexCandidates(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var classGroups = new Dictionary<string, NifIndexCandidateClassAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var signatureGroups = new Dictionary<string, NifIndexCandidateSignatureAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var inspected = 0;
+        var nifCount = 0;
+        var failed = 0;
+        var dataStreamBlocks = 0;
+        var validStreamBodies = 0;
+        var evenLengthBodies = 0;
+        var bigEndianLeadBodies = 0;
+        var bigEndianTriangleAlignedBodies = 0;
+        var ambiguousTriangleAlignedBodies = 0;
+        var invalidStreamBodies = 0;
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var entries = ReadArchiveEntryTable(stream);
+            if (entries is null)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                if (nifCount >= options.MaxTotalOrUnlimited())
+                {
+                    break;
+                }
+
+                if (entry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(entry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(entry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    inspected++;
+                    var packed = ReadArchivePayload(stream, entry, archiveName);
+                    var payload = DecompressPayload(entry.Compression, packed, entry.Sha1, entry.IdPrefix, options.Lzma2Mode);
+                    if (DetectFileType(payload.Bytes).Extension != "nif")
+                    {
+                        continue;
+                    }
+
+                    nifCount++;
+                    var header = ParseNifHeader(payload.Bytes);
+                    foreach (var block in header.Blocks.Where(static b => b.TypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        dataStreamBlocks++;
+                        var blockPayload = SliceNifBlockPayload(payload.Bytes, block);
+                        if (blockPayload.Length < 4)
+                        {
+                            invalidStreamBodies++;
+                            continue;
+                        }
+
+                        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                        if (declaredPayloadBytes > blockPayload.Length)
+                        {
+                            invalidStreamBodies++;
+                            continue;
+                        }
+
+                        validStreamBodies++;
+                        var bodyOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
+                        var body = blockPayload.Slice(bodyOffset, checked((int)declaredPayloadBytes));
+                        if (body.Length % 2 != 0)
+                        {
+                            continue;
+                        }
+
+                        evenLengthBodies++;
+                        var endianStats = AnalyzeNifStreamEndian(body);
+                        var indexStats = AnalyzeNifUInt16BeIndex(body);
+                        var classification = ClassifyNifIndexCandidate(endianStats, indexStats);
+                        if (endianStats.Classification == "big-endian-u16-lead")
+                        {
+                            bigEndianLeadBodies++;
+                            if (indexStats.TriangleAligned)
+                            {
+                                bigEndianTriangleAlignedBodies++;
+                            }
+                        }
+
+                        if (endianStats.Classification == "ambiguous-small-u16" && indexStats.TriangleAligned)
+                        {
+                            ambiguousTriangleAlignedBodies++;
+                        }
+
+                        var sample = new NifIndexCandidateSample(
+                            ArchiveName: archiveName,
+                            EntryIndex: entry.Index,
+                            IdPrefix: entry.IdPrefix,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            BlockIndex: block.Index,
+                            TypeName: block.TypeName,
+                            BlockSize: block.Size,
+                            HeaderBytes: bodyOffset,
+                            DeclaredPayloadBytes: declaredPayloadBytes,
+                            PayloadFirst16: endianStats.First16,
+                            EndianStats: endianStats,
+                            IndexStats: indexStats,
+                            Classification: classification);
+
+                        if (!classGroups.TryGetValue(classification, out var classGroup))
+                        {
+                            classGroup = new NifIndexCandidateClassAccumulator(classification);
+                            classGroups.Add(classification, classGroup);
+                        }
+
+                        classGroup.Count++;
+                        if (indexStats.TriangleAligned)
+                        {
+                            classGroup.TriangleAlignedCount++;
+                        }
+
+                        classGroup.PayloadSizeCounts[declaredPayloadBytes] = classGroup.PayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes) + 1;
+                        classGroup.MaxIndexTotal += indexStats.BigEndianMaxIndex;
+                        classGroup.TriangleCountTotal += indexStats.TriangleCount;
+                        classGroup.DegenerateTriangleRatioTotal += indexStats.DegenerateTriangleRatio;
+                        if (classGroup.Samples.Count < 16)
+                        {
+                            classGroup.Samples.Add(sample);
+                        }
+
+                        var signatureKey = $"{classification}|{declaredPayloadBytes}|{endianStats.First16}";
+                        if (!signatureGroups.TryGetValue(signatureKey, out var signatureGroup))
+                        {
+                            signatureGroup = new NifIndexCandidateSignatureAccumulator(classification, declaredPayloadBytes, endianStats.First16);
+                            signatureGroups.Add(signatureKey, signatureGroup);
+                        }
+
+                        signatureGroup.Count++;
+                        signatureGroup.NifIds.Add(entry.IdPrefix);
+                        signatureGroup.MaxObservedIndex = Math.Max(signatureGroup.MaxObservedIndex, indexStats.BigEndianMaxIndex);
+                        signatureGroup.MinObservedMaxIndex = signatureGroup.MinObservedMaxIndex is null
+                            ? indexStats.BigEndianMaxIndex
+                            : Math.Min(signatureGroup.MinObservedMaxIndex.Value, indexStats.BigEndianMaxIndex);
+                        if (indexStats.TriangleAligned)
+                        {
+                            signatureGroup.TriangleAlignedCount++;
+                        }
+
+                        signatureGroup.TriangleCountTotal += indexStats.TriangleCount;
+                        signatureGroup.DegenerateTriangleRatioTotal += indexStats.DegenerateTriangleRatio;
+                        if (signatureGroup.Samples.Count < 16)
+                        {
+                            signatureGroup.Samples.Add(sample);
+                        }
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        static List<NifSizeCount> topSizeCounts(Dictionary<uint, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key)
+                .Select(static kvp => new NifSizeCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        static NifIndexCandidateClassGroup toClassRecord(NifIndexCandidateClassAccumulator group)
+        {
+            return new NifIndexCandidateClassGroup(
+                Classification: group.Classification,
+                Count: group.Count,
+                TriangleAlignedCount: group.TriangleAlignedCount,
+                AverageTriangleCount: group.Count == 0 ? 0 : Math.Round(group.TriangleCountTotal / (double)group.Count, 2),
+                AverageMaxIndex: group.Count == 0 ? 0 : Math.Round(group.MaxIndexTotal / (double)group.Count, 2),
+                AverageDegenerateTriangleRatio: group.Count == 0 ? 0 : Math.Round(group.DegenerateTriangleRatioTotal / group.Count, 4),
+                PayloadSizes: topSizeCounts(group.PayloadSizeCounts),
+                Samples: group.Samples);
+        }
+
+        static NifIndexCandidateSignatureGroup toSignatureRecord(NifIndexCandidateSignatureAccumulator group)
+        {
+            return new NifIndexCandidateSignatureGroup(
+                Classification: group.Classification,
+                DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+                PayloadFirst16: group.PayloadFirst16,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                TriangleAlignedCount: group.TriangleAlignedCount,
+                AverageTriangleCount: group.Count == 0 ? 0 : Math.Round(group.TriangleCountTotal / (double)group.Count, 2),
+                AverageDegenerateTriangleRatio: group.Count == 0 ? 0 : Math.Round(group.DegenerateTriangleRatioTotal / group.Count, 4),
+                MaxObservedIndex: group.MaxObservedIndex,
+                MinObservedMaxIndex: group.MinObservedMaxIndex,
+                Samples: group.Samples);
+        }
+
+        var signatureRecords = signatureGroups.Values
+            .Select(toSignatureRecord)
+            .OrderByDescending(static g => g.Count)
+            .ThenBy(static g => g.Classification, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static g => g.DeclaredPayloadBytes)
+            .ThenBy(static g => g.PayloadFirst16, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var report = new NifIndexCandidateInventoryReport(
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            InspectedPayloads: inspected,
+            NifPayloads: nifCount,
+            Failed: failed,
+            DataStreamBlocks: dataStreamBlocks,
+            ValidStreamBodies: validStreamBodies,
+            EvenLengthBodies: evenLengthBodies,
+            BigEndianLeadBodies: bigEndianLeadBodies,
+            BigEndianTriangleAlignedBodies: bigEndianTriangleAlignedBodies,
+            AmbiguousTriangleAlignedBodies: ambiguousTriangleAlignedBodies,
+            InvalidStreamBodies: invalidStreamBodies,
+            ClassGroups: classGroups.Values
+                .Select(toClassRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.Classification, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            TopBigEndianIndexSignatures: signatureRecords
+                .Where(static g => g.Classification.StartsWith("uint16be", StringComparison.OrdinalIgnoreCase))
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopSignatures: signatureRecords.Take(options.Limit > 0 ? options.Limit : 100).ToList());
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-index-candidate-inventory.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"NIF payloads: {nifCount:N0}");
+        Console.WriteLine($"NiDataStream blocks: {dataStreamBlocks:N0}");
+        Console.WriteLine($"Valid stream bodies: {validStreamBodies:N0}");
+        Console.WriteLine($"Even-length stream bodies: {evenLengthBodies:N0}");
+        Console.WriteLine($"Big-endian uint16 lead bodies: {bigEndianLeadBodies:N0}");
+        Console.WriteLine($"Big-endian triangle-aligned bodies: {bigEndianTriangleAlignedBodies:N0}");
+        Console.WriteLine($"Index candidate classes: {string.Join(", ", report.ClassGroups.Take(8).Select(static g => $"{g.Classification}={g.Count:N0}"))}");
+        Console.WriteLine($"Top uint16be signatures: {string.Join(" | ", report.TopBigEndianIndexSignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
+    }
+
     private static int MineNifReferences(AppOptions options)
     {
         var rootDirectory = Path.GetFullPath(options.RootDirectory);
@@ -4924,6 +5198,89 @@ internal static class Program
         return "mixed-u16-body";
     }
 
+    private static NifUInt16BeIndexStats AnalyzeNifUInt16BeIndex(ReadOnlySpan<byte> body)
+    {
+        var pairCount = body.Length / 2;
+        var triangleAligned = body.Length > 0 && body.Length % 6 == 0;
+        var triangleCount = body.Length / 6;
+        var distinct = new HashSet<ushort>();
+        ushort maxIndex = 0;
+        ushort minIndex = ushort.MaxValue;
+        var firstTriples = new List<NifUInt16Triple>(Math.Min(triangleCount, 16));
+        var degenerateTriangles = 0;
+
+        for (var i = 0; i < pairCount; i++)
+        {
+            var value = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(i * 2, 2));
+            distinct.Add(value);
+            maxIndex = Math.Max(maxIndex, value);
+            minIndex = Math.Min(minIndex, value);
+        }
+
+        for (var i = 0; i < triangleCount; i++)
+        {
+            var offset = i * 6;
+            var a = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offset, 2));
+            var b = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offset + 2, 2));
+            var c = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offset + 4, 2));
+            if (firstTriples.Count < 16)
+            {
+                firstTriples.Add(new NifUInt16Triple(i, a, b, c));
+            }
+
+            if (a == b || b == c || a == c)
+            {
+                degenerateTriangles++;
+            }
+        }
+
+        if (pairCount == 0)
+        {
+            minIndex = 0;
+        }
+
+        return new NifUInt16BeIndexStats(
+            PairCount: pairCount,
+            TriangleAligned: triangleAligned,
+            TriangleCount: triangleCount,
+            BigEndianMinIndex: minIndex,
+            BigEndianMaxIndex: maxIndex,
+            BigEndianDistinctIndexCount: distinct.Count,
+            DegenerateTriangles: degenerateTriangles,
+            DegenerateTriangleRatio: triangleCount == 0 ? 0 : Math.Round(degenerateTriangles / (double)triangleCount, 4),
+            FirstBigEndianTriples: firstTriples);
+    }
+
+    private static string ClassifyNifIndexCandidate(NifStreamEndianStats endianStats, NifUInt16BeIndexStats indexStats)
+    {
+        if (indexStats.PairCount == 0)
+        {
+            return "empty-index-body";
+        }
+
+        if (endianStats.Classification == "big-endian-u16-lead" && indexStats.TriangleAligned)
+        {
+            return "uint16be-triangle-aligned-lead";
+        }
+
+        if (endianStats.Classification == "big-endian-u16-lead")
+        {
+            return "uint16be-index-lead";
+        }
+
+        if (endianStats.Classification == "ambiguous-small-u16" && indexStats.TriangleAligned)
+        {
+            return "ambiguous-u16-triangle-aligned";
+        }
+
+        if (endianStats.Classification == "little-endian-u16-lead")
+        {
+            return "little-endian-u16-lead";
+        }
+
+        return "not-index-ranked";
+    }
+
     private static string ClassifyNifStreamBody(
         int byteLength,
         int nonZeroBytes,
@@ -6496,6 +6853,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-headers --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-bodies --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-stream-endianness --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-index-candidates --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-nif-references --root <SourceFolder> --out <candidates.txt>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- link-nif-textures --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- extract-linked-textures --root <SourceFolder> --input <links.jsonl>");
@@ -6719,6 +7077,7 @@ internal static class Program
                     case "inventory-nif-stream-headers":
                     case "inventory-nif-stream-bodies":
                     case "inventory-nif-stream-endianness":
+                    case "inventory-nif-index-candidates":
                     case "mine-nif-references":
                     case "link-nif-textures":
                     case "extract-linked-textures":
@@ -7707,6 +8066,99 @@ internal sealed record NifStreamEndianStats(
     double LittleEndianMultipleOf256Ratio,
     double BigEndianMultipleOf256Ratio,
     string Classification);
+
+internal sealed class NifIndexCandidateClassAccumulator(string classification)
+{
+    public string Classification { get; } = classification;
+    public int Count { get; set; }
+    public int TriangleAlignedCount { get; set; }
+    public long MaxIndexTotal { get; set; }
+    public long TriangleCountTotal { get; set; }
+    public double DegenerateTriangleRatioTotal { get; set; }
+    public Dictionary<uint, int> PayloadSizeCounts { get; } = [];
+    public List<NifIndexCandidateSample> Samples { get; } = [];
+}
+
+internal sealed class NifIndexCandidateSignatureAccumulator(string classification, uint declaredPayloadBytes, string payloadFirst16)
+{
+    public string Classification { get; } = classification;
+    public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public string PayloadFirst16 { get; } = payloadFirst16;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public int TriangleAlignedCount { get; set; }
+    public long TriangleCountTotal { get; set; }
+    public double DegenerateTriangleRatioTotal { get; set; }
+    public ushort MaxObservedIndex { get; set; }
+    public ushort? MinObservedMaxIndex { get; set; }
+    public List<NifIndexCandidateSample> Samples { get; } = [];
+}
+
+internal sealed record NifIndexCandidateInventoryReport(
+    string RootDirectory,
+    string ManifestPath,
+    int InspectedPayloads,
+    int NifPayloads,
+    int Failed,
+    int DataStreamBlocks,
+    int ValidStreamBodies,
+    int EvenLengthBodies,
+    int BigEndianLeadBodies,
+    int BigEndianTriangleAlignedBodies,
+    int AmbiguousTriangleAlignedBodies,
+    int InvalidStreamBodies,
+    List<NifIndexCandidateClassGroup> ClassGroups,
+    List<NifIndexCandidateSignatureGroup> TopBigEndianIndexSignatures,
+    List<NifIndexCandidateSignatureGroup> TopSignatures);
+
+internal sealed record NifIndexCandidateClassGroup(
+    string Classification,
+    int Count,
+    int TriangleAlignedCount,
+    double AverageTriangleCount,
+    double AverageMaxIndex,
+    double AverageDegenerateTriangleRatio,
+    List<NifSizeCount> PayloadSizes,
+    List<NifIndexCandidateSample> Samples);
+
+internal sealed record NifIndexCandidateSignatureGroup(
+    string Classification,
+    uint DeclaredPayloadBytes,
+    string PayloadFirst16,
+    int Count,
+    int NifPayloads,
+    int TriangleAlignedCount,
+    double AverageTriangleCount,
+    double AverageDegenerateTriangleRatio,
+    ushort MaxObservedIndex,
+    ushort? MinObservedMaxIndex,
+    List<NifIndexCandidateSample> Samples);
+
+internal sealed record NifIndexCandidateSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int BlockIndex,
+    string TypeName,
+    uint BlockSize,
+    int HeaderBytes,
+    uint DeclaredPayloadBytes,
+    string PayloadFirst16,
+    NifStreamEndianStats EndianStats,
+    NifUInt16BeIndexStats IndexStats,
+    string Classification);
+
+internal sealed record NifUInt16BeIndexStats(
+    int PairCount,
+    bool TriangleAligned,
+    int TriangleCount,
+    ushort BigEndianMinIndex,
+    ushort BigEndianMaxIndex,
+    int BigEndianDistinctIndexCount,
+    int DegenerateTriangles,
+    double DegenerateTriangleRatio,
+    List<NifUInt16Triple> FirstBigEndianTriples);
 
 internal sealed record NifReferenceSample(
     string ArchiveName,

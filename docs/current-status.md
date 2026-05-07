@@ -530,6 +530,48 @@ Top big-endian signatures:
 
 Why this matters: big-endian `uint16` is now a copied-set-ranked lead affecting `5,551` stream bodies, especially compact/index-like payload sizes. It is still a lead, not final index-buffer proof, until checked against mesh vertex counts and triangle divisibility.
 
+## Full copied-set index-candidate inventory 🧷
+
+Command added:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-index-candidates --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-index-candidate-inventory.json" --limit 100
+```
+
+Validated full copied-set result:
+
+| Metric | Value |
+|---|---:|
+| Inspected payloads | `40,203` |
+| NIF payloads | `5,111` |
+| NiDataStream blocks | `31,777` |
+| Valid stream bodies | `31,777` |
+| Even-length stream bodies | `31,777` |
+| Big-endian uint16 lead bodies | `5,551` |
+| Big-endian triangle-aligned bodies | `5,481` |
+
+Index-candidate classes:
+
+| Class | Count | Triangle-aligned | Avg triangles | Avg max index | Avg degenerate ratio |
+|---|---:|---:|---:|---:|---:|
+| `not-index-ranked` | `24,459` | `19,487` | `106.97` | `61,371.28` | `0.22` |
+| `uint16be-triangle-aligned-lead` | `5,481` | `5,481` | `63.34` | `64.04` | `0.48` |
+| `ambiguous-u16-triangle-aligned` | `1,613` | `1,613` | `65.39` | `31,047.74` | `0.73` |
+| `little-endian-u16-lead` | `154` | `132` | `25.27` | `45,809.53` | `0.84` |
+| `uint16be-index-lead` | `70` | `0` | `8.44` | `61.44` | `0.11` |
+
+Top uint16be signatures:
+
+| Payload bytes | Count | NIF payloads | Avg triangles | Avg degenerate ratio | Max observed index | First 16 body bytes |
+|---:|---:|---:|---:|---:|---:|---|
+| `72` | `352` | `341` | `12` | `0.50` | `27` | `00010002000200010003000400050006` |
+| `12` | `168` | `159` | `2` | `1.00` | `3` | `000100020002000100030001` |
+| `144` | `161` | `161` | `24` | `0.47` | `61` | `00010002000200010003000400050006` |
+| `1620` | `92` | `92` | `270` | `0.52` | `178` | `00010002000200010003000200030004` |
+| `192` | `77` | `77` | `32` | `0.48` | `71` | `00010002000200010003000400050006` |
+
+Why this matters: `5,481` stream bodies are now ranked as big-endian `uint16` triangle-aligned leads. The high degenerate ratio means these should not be treated as proven simple triangle lists; they may be strip/fan-style index streams or include restart/degenerate stitching patterns.
+
 ## Full copied-set NIF block inventory 📊
 
 Command added:
@@ -656,13 +698,17 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ```
 
 ```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-index-candidates --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-index-candidate-inventory.json" --limit 100
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
 ```
 
 ## Current safest next direction 🛡️
 
 1. Decode only declared stream bodies after the proven 29-byte `NiDataStream` header.
-2. Prioritize `big-endian-u16-lead` stream bodies for index/triangle plausibility checks.
+2. Prioritize `uint16be-triangle-aligned-lead` bodies, but account for strip/fan/restart-style degenerate patterns.
 3. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
 4. Decode repeated `NiMesh size=214` and `NiMesh size=193` families first.
 5. Infer vertex/index stream roles for the top `NiDataStream` payload-size families.

@@ -649,6 +649,25 @@ Top big-endian signature:
 
 This promotes big-endian `uint16` from a one-sample clue to a ranked copied-set lead. It is still not final index semantics until mesh vertex-count and triangle-layout checks agree.
 
+Rank big-endian `uint16` bodies as index/triangle-layout candidates:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-index-candidates --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-index-candidate-inventory.json" --limit 100
+```
+
+Current copied-data result:
+
+```text
+Big-endian uint16 lead bodies: 5,551
+Big-endian triangle-aligned bodies: 5,481
+uint16be-triangle-aligned-lead: 5,481
+uint16be-index-lead: 70
+Top uint16be signature:
+  payload=72 first16=00010002000200010003000400050006 count=352
+```
+
+The top `payload=72` signature has `12` big-endian `uint16` triples per body and max observed index `27`, but the average degenerate-triangle ratio is about `0.50`. Treat this as strong index/strip/fan-style evidence, not simple triangle-list proof.
+
 Inventory all copied NIF payloads without writing extracted model files:
 
 ```powershell
