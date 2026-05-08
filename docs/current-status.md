@@ -14,6 +14,7 @@ Date: 2026-05-07
 | Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,468` same-mesh index/vertex-count-compatible links. |
 | Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
 | Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
+| Attribute extra streams | ✅ split truth | Focused probing down-ranked low-variation `@272/#25` and `@296` side streams, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like, first-segment proof samples include area/parity plus compact review flags, and the aggregate + focused sibling proof guards now fail if those proof signals silently flip. |
 
 ## Approved operating mode 🚀
 
@@ -27,7 +28,7 @@ docs\aggressive-discovery-workflow.md
 |---|---|
 | Maximum real discovery speed | Add narrow probes/inventories, run smoke + full copied-set scans, then immediately advance the strongest lead. |
 | Not reckless output | No copied assets, generated dumps, raw user-profile paths, or unproven model exports get committed. |
-| Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, then validate `maxIndex < vertexCount`. |
+| Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, validate `maxIndex < vertexCount`, and down-rank non-geometry sentinel/mask side streams before export work. |
 | Export gate | OBJ/model export stays experimental and disabled until mesh/stream pairing is structurally proven. |
 
 Optionized helper:
@@ -38,6 +39,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProbe -Id 75d5a06d7c0de1dd -MeshBlock 7 -ExtraOffset 272
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProofGuard -SkipBuild
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraSiblingProofGuard -SkipBuild
 ```
 
 Helper policy: add modes/options to durable helpers before creating one-off helper apps.
@@ -404,8 +417,10 @@ Top stream roles:
 | `normal-float3-ror1-lead` | `4,167` | `4,167` | `288×361`, `576×150`, `192×123`, `720×107`, `48×88` |
 | `index-u16be-strip-lead` | `2,101` | `2,101` | `72×285`, `144×121`, `48×103`, `12×89`, `192×84` |
 | `position-float3-ror1-lead` | `210` | `210` | `192×20`, `456×7`, `48×6`, `264×6`, `276×6` |
-| `strided-body` | `204` | `0` | `6×38`, `8×21`, `64×18`, `32×11`, `96×9` |
 | `index-u16be-list-lead` | `112` | `112` | `48×15`, `120×11`, `72×10`, `144×10`, `108×9` |
+| `u32-sentinel-mask-body` | `101` | `0` | `64×18`, `96×9`, `60×8`, `32×6`, `92×4` |
+| `strided-body` | `81` | `0` | `6×38`, `88×6`, `32×5`, `116×4`, `284×4` |
+| `u32-repeated-pattern-body` | `77` | `0` | `8×21`, `144×5`, `464×5`, `92×4`, `152×4` |
 
 Top pair-compatible patterns:
 
@@ -441,11 +456,11 @@ Top extra streams found beside complete attribute sets:
 
 | Topology lead | Vertex count | Extra stream | Payload | Role | Count | Fit |
 |---|---:|---:|---:|---|---:|---|
-| `implicit-strip-or-quad-candidate` | `16` | `@272` | `64` | `strided-body` | `6` | `per-vertex:4`, `per-quad:16` |
-| `implicit-triangle-strip-or-fan-candidate` | `23` | `@296` | `92` | `uv-float2-lead` | `2` | `per-vertex:4` |
-| `implicit-triangle-list-or-quad-candidate` | `36` | `@296` | `144` | `position-float3-lead` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12`, `per-quad:16` |
-| `implicit-triangle-strip-or-fan-candidate` | `38` | `@296` | `152` | `uv-float2-lead` | `2` | `per-vertex:4` |
-| `implicit-triangle-list-candidate` | `51` | `@288` | `204` | `strided-body` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12` |
+| `implicit-strip-or-quad-candidate` | `16` | `@272` | `64` | `u32-sentinel-mask-body` | `6` | `per-vertex:4`, `per-quad:16` |
+| `implicit-triangle-strip-or-fan-candidate` | `23` | `@296` | `92` | `u32-repeated-pattern-body` | `2` | `per-vertex:4` |
+| `implicit-triangle-list-or-quad-candidate` | `36` | `@296` | `144` | `u32-repeated-pattern-body` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12`, `per-quad:16` |
+| `implicit-triangle-strip-or-fan-candidate` | `38` | `@296` | `152` | `u32-repeated-pattern-body` | `2` | `per-vertex:4` |
+| `implicit-triangle-list-candidate` | `51` | `@288` | `204` | `u32-sentinel-mask-body` | `2` | `per-vertex:4`, `per-triangle-list-triangle:12` |
 
 Why this matters: mesh stream binding moved from candidate references to same-mesh role and count compatibility, then promoted a byte-order lead. The strongest family now predicts `meshSize=325`, `@292` as a big-endian strip-like index stream, `@216` as rotate-right-1 normal `float3`, and `@300` as rotate-right-1 UV `float2`. Position data is still not proven.
 
@@ -525,9 +540,177 @@ Topology scoring:
 | Triangle strip/fan | Candidate with `14` triangles |
 | Quad list | Candidate with `4` quads |
 | Confidence | `35` structural-only; **not export proof** |
-| Extra stream | `@272/#25`, payload `64`, `strided-body`, fit=`per-vertex:4`, `per-quad:16` |
+| Extra stream | `@272/#25`, payload `64`, `u32-sentinel-mask-body`, fit=`per-vertex:4`, `per-quad:16` |
 
 Why this matters: geometry discovery now has a second validated lane besides index pairings: unindexed or separately-indexed meshes with complete position/normal/UV attribute sets. The missing piece for renderable export is now narrower: distinguish strip/fan vs quad or find a separate topology stream for these attribute-only meshes, while separately continuing position discovery for the top indexed `meshSize=325` family.
+
+## Focused attribute extra-stream probe 🧪
+
+Command added:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProbe -Id 75d5a06d7c0de1dd -MeshBlock 7 -ExtraOffset 272
+```
+
+Direct CLI shape:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-attribute-extra --root "C:\RIFT MODDING\Assets\Source" --id 75d5a06d7c0de1dd --mesh-block 7 --extra-offset 272 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-attribute-extra-75d5a06d7c0de1dd-mesh7-extra272.json"
+```
+
+Validated across all six top `v=16` / mesh `#7` samples from `assets.053`:
+
+| Asset ID | Extra stream | Payload | Header | Role | Byte histogram | Repeated 4-byte pattern |
+|---|---|---:|---:|---|---|---|
+| `75d5a06d7c0de1dd` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+| `ec36d556375300cb` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+| `1d7d90fc36f7c49a` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+| `a6b26dabf88e1733` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+| `8f996a791c0bc108` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+| `04297730afc68f38` | `@272/#25` | `64` | `29` | `u32-sentinel-mask-body` | `0xff×63`, `0x01×1` | `ffffffff×15` |
+
+Grouped views are still emitted for traceability:
+
+| View | Slots | Bytes/slot | Fit |
+|---|---:|---:|---|
+| `per-vertex` | `16` | `4` | exact |
+| `per-strip-or-fan-triangle` | `14` | `4` | near-fit with `8` trailing bytes |
+| `per-quad` | `4` | `16` | exact |
+
+Additional top extra-stream probes also down-ranked the apparent `@296` float leads:
+
+| Group | Sample | Extra stream | Payload | Role after low-variation guard | Repeated pattern |
+|---|---|---|---:|---|---|
+| `v=23`, strip/fan candidate | `1c4f0a1acdb5e141` | `@296` | `92` | `u32-repeated-pattern-body` | `3a3aff3a×22` |
+| `v=36`, triangle-list-or-quad candidate | `acccb682df4d4ad8` | `@296` | `144` | `u32-repeated-pattern-body` | `3a3aff3a×35` |
+| `v=38`, strip/fan candidate | `b57694c1f202ec07` | `@296` | `152` | `u32-repeated-pattern-body` | `3a3aff3a×37` |
+
+Interpretation: these top side streams are now useful mostly as **negative/guardrail results**. `@272` repeats the same sentinel-like body across every top sample, while `@296` repeats a constant `3a3aff3a` word. They should not decide strip-vs-quad topology and should not advance export readiness by themselves.
+
+### Explicit-index extra stream lead 🧷
+
+The same probe now emits index compatibility when the extra stream role is index-like. Current strongest positive sample:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProbe -Id 6fc01704d4a509d5 -MeshBlock 6 -ExtraOffset 264
+```
+
+| Field | Value |
+|---|---|
+| Asset ID | `6fc01704d4a509d5` |
+| Mesh block | `#6` |
+| Mesh size | `297` |
+| Attribute vertex count | `128` |
+| Extra stream | `@264/#15` |
+| Payload/header | `906` / `29` bytes |
+| Role | `index-u16be-strip-lead` |
+| Candidate topology | `explicit-index-strip-lead` |
+| Pair count | `453` |
+| Triangle aligned | `true`, `151` fixed triples |
+| Index range | min=`1`, max=`127`, distinct=`127` |
+| Vertex range check | max index is within `v=128`; max coverage=`1.0000`, distinct coverage=`0.9922` |
+| Degeneracy comparison | strip windows `0.2949` (`318/451` non-degenerate) vs fixed triples `0.4768` |
+| Index-base hint | `one-based-or-reserved-zero-ambiguous` |
+| Guardrail | zero index is absent; raw and subtract-one mappings both stay in range |
+| Position/normal/UV fitness preference | `raw-zero-based` is now favored by lower decoded-position and normal-delta strip metrics; UV metrics are neutral/no-worse, but this is still proof evidence rather than exporter permission |
+| Strip/restart structure | `degenerate-bridge-stitch-candidate`; no `0xffff` sentinels and no zero values in the focused `v=128` sibling samples |
+
+Sibling confirmation: `caa9a88e94ec8db0` has the same mesh `#6`, extra `@264/#15`, `min=1`, `max=127`, `distinct=127`, `explicit-index-strip-lead`, and the same `one-based-or-reserved-zero-ambiguous` base hint.
+
+First big-endian index prefix:
+
+```text
+1,2,2,1,3,4,5,6,6,5,7,8,9,10,11,12
+```
+
+Non-export mapping comparison now emitted by the probe:
+
+| Mapping | Offset | Valid | Referenced vertices | Missing vertex sample | Mapped range |
+|---|---:|---:|---:|---|---|
+| `raw-zero-based` | `0` | `true` | `127/128` | `0` | `1..127` |
+| `subtract-one` | `-1` | `true` | `127/128` | `127` | `0..126` |
+
+Position/normal/UV endpoint samples are now emitted beside the mapping comparison:
+
+| Vertex | Position sample | Normal sample / length | UV sample |
+|---:|---|---|---|
+| `0` | `(8.45803, 55.9203, 11.5675)` | `(0.91553, -0.17972, 0.36526)`, len=`1.00195` | `(0.69254, 1.00000)` |
+| `1` | `(5.99985, 54.7183, 13.0649)` | `(0.00000, -0.11365, 0.99352)`, len=`0.999995` | `(1.00002, 0.37944)` |
+| `126` | `(-0.0000458, 0.0000, -2.0000)` | `(-1.00002, 0.00000, 0.00001)`, len=`1.00002` | `(0.00000, 1.00000)` |
+| `127` | `(-0.0000458, 54.0088, -2.0000)` | `(-1.00002, 0.00000, 0.00001)`, len=`1.00002` | `(0.00000, 1.00000)` |
+
+These samples were identical for `6fc01704d4a509d5` and sibling `caa9a88e94ec8db0`. Vertex `0` and vertex `127` both decode as plausible attribute vertices, so endpoint samples alone do not break the tie.
+
+Decoded strip-window fitness now compares the two valid mappings without exporting geometry. The probe also emits a bounded `FirstSegmentTriangles` proof packet with the first 24 finite segmented triangles per mapping:
+
+| Mapping | Segmented finite windows | Segments | Segmented median max position edge | P95 max position edge | Segmented median normal delta | Segmented median UV delta | Median triangle area | Near-zero area count | First segment triangle samples |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `raw-zero-based` | `318/318` | `77` | `6.241469` | `56.775176` | `1.001207` | `0` | `7.306626` | `3` | `24` |
+| `subtract-one` | `318/318` | `77` | `11.228368` | `64.554090` | `1.352521` | `0` | `18.465333` | `3` | `24` |
+
+Full `MeshBindings` inventory now aggregates this same fitness signal:
+
+| Mesh size | Vertex count | Extra stream | Count | Raw preferred | Subtract-one preferred | Avg raw median max edge | Avg subtract-one median max edge | Avg edge delta | Avg normal delta gap | Avg UV delta gap |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `297` | `128` | `@264` / `index-u16be-strip-lead` | `2` | `2` | `0` | `6.241469` | `11.228368` | `4.986899` | `0.351314` | `0` |
+| `297` | `95` | `@264` / `index-u16be-strip-lead` | `1` | `1` | `0` | `26.207964` | `29.416373` | `3.208409` | `1.126855` | `0.009159` |
+| `297` | `80` | `@264` / `index-u16be-strip-lead` | `1` | `1` | `0` | `18.185839` | `20.242797` | `2.056958` | `0.015236` | `0` |
+| `297` | `64` | `@264` / `index-u16be-strip-lead` | `1` | `1` | `0` | `32.711052` | `33.097804` | `0.386752` | `1.263661` | `0.009147` |
+
+Full inventory now also aggregates triangle-area and proof-review signals for those same `@264` groups:
+
+| Vertex count | Avg raw area median | Avg subtract-one area median | Area gap | Plane switches raw/sub | Sign switches raw/sub | Parity breaks raw/sub |
+|---:|---:|---:|---:|---:|---:|---:|
+| `128` | `7.306626` | `18.465333` | `11.158707` | `9/11` | `4/6` | `0/0` |
+| `95` | `145.385492` | `158.367037` | `12.981545` | `16/11` | `6/13` | `0/0` |
+| `80` | `86.247240` | `88.759229` | `2.511989` | `9/10` | `7/10` | `0/0` |
+| `64` | `203.274538` | `220.248136` | `16.973598` | `7/8` | `5/8` | `0/0` |
+
+Full inventory also aggregates non-exporting strip-structure and segmented-fitness diagnostics:
+
+| Vertex count | Count | Dominant strip structure | Segments | Segmented windows | Dropped degenerate windows | Dropped cross-segment windows | Avg mirrored bridges | `0xffff` sentinel count | Zero value count |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| `128` | `2` | `degenerate-bridge-stitch-candidate` | `77` | `318` | `133` | `0` | `51` | `0` | `0` |
+| `95` | `1` | `degenerate-bridge-stitch-candidate` | `30` | `118` | `60` | `0` | `30` | `0` | `1` |
+| `80` | `1` | `degenerate-bridge-stitch-candidate` | `20` | `78` | `40` | `0` | `20` | `0` | `0` |
+| `64` | `1` | `degenerate-bridge-stitch-candidate` | `21` | `82` | `42` | `0` | `21` | `0` | `1` |
+
+Focused `v=128` strip structure:
+
+```text
+degenerate-bridge-stitch-candidate; degRuns=77 maxDegRun=2 nonDegRuns=77 maxNonDegRun=19 adjacentRepeats=56 mirroredBridges=51 sentinels=0 zeroValues=0
+segmented fitness: 77 segments, 318/318 finite segmented windows, 133 dropped degenerate windows, 0 dropped cross-segment windows
+raw-zero-based medians: position=6.241469, normal=1.001207, uv=0, area=7.306626; nearZeroArea=3; firstSegmentTriangles=24
+subtract-one medians: position=11.228368, normal=1.352521, uv=0, area=18.465333; nearZeroArea=3; firstSegmentTriangles=24
+first raw triangle: window=2 vertices=2,1,3 area=2.488735 dominantPlane=xy signedArea=1.882589 parity=even
+first raw proof review: flags=non-contiguous-windows=2,dominant-plane-switches=9,dominant-sign-switches=4; planes=xy:12,yz:8,xz:4; sign=+18/-6/0; parityBreaks=0
+first subtract-one triangle: window=2 vertices=1,0,2 area=5.031246 dominantPlane=xy signedArea=-4.031175 parity=even
+first subtract-one proof review: flags=non-contiguous-windows=2,dominant-plane-switches=11,dominant-sign-switches=6; planes=xy:11,yz:8,xz:5; sign=+16/-8/0; parityBreaks=0
+```
+
+Interpretation: segmented decoded-position edge fitness favors `raw-zero-based` over `subtract-one` across every full-inventory `@264` explicit-index group seen so far (`raw=5`, `subtract-one=0`, `tie=0`). The segmented normal-delta and triangle-area aggregates also favor raw in every group; UV deltas are neutral or slightly raw-favored. Focused first-segment triangle samples now include independent area, dominant signed plane, strip parity diagnostics, and compact proof-review flags. Across full inventory, both mappings keep `parityBreaks=0`; subtract-one has higher area medians in every group and generally more sign-switch churn, though `v=95` has more raw plane switches. The proof-review aggregates are corroborating diagnostics, not exporter permission. Strip structure is not sentinel-based (`0xffff=0` everywhere); it is consistently degenerate-bridge/stitch-like, with short degenerate runs and repeated bridge motifs. Current segmentation drops only degenerate windows and reports `0` non-degenerate cross-segment windows for these groups, so the continuous and segmented position median scores currently match. This promotes raw-zero-based plus degenerate-bridge stitching to the current best topology hypothesis for this `@264/#15` family. Export remains blocked until the emitted bounded first-segment triangle proof is reviewed/validated and an exporter is added behind an explicit experimental gate.
+
+Regression guard for this current topology hypothesis:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProofGuard -SkipBuild
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraSiblingProofGuard -SkipBuild
+```
+
+The aggregate guard reruns full mesh-binding inventory and asserts that the four current `meshSize=297`, `@264`, `index-u16be-strip-lead` groups remain raw-zero-based preferred (`5/5`, `0` subtract-one wins, `0` ties), keep positive segmented edge/normal/area gaps, keep degenerate-bridge/stitch strip structure, and keep sentinel/cross-segment/parity-break regressions at zero. The focused sibling guard reruns the two known-positive `v=128` probes (`6fc01704d4a509d5` and `caa9a88e94ec8db0`) and asserts exact stream/block shape, index prefix, mapping candidates, stitch structure, first-segment triangle proof, and raw-vs-subtract-one fitness gaps.
+
+First strip-preview windows now emitted by the probe:
+
+```text
+0:1,2,2* | 1:2,2,1* | 2:2,1,3 | 3:1,3,4 | 4:3,4,5 | 5:4,5,6
+```
+
+`*` marks degenerate windows.
+
+Interpretation: this is now the best topology-bearing attribute-extra lead. It still is **not export proof** because the stream needs segment-level stitch handling and render-independent triangle validation, but it is materially stronger than the sentinel/repeated-pattern side streams.
 
 ## NIF data-stream header proof 🔎
 
@@ -862,6 +1045,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 ```
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProbe -Id 75d5a06d7c0de1dd -MeshBlock 7 -ExtraOffset 272
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProofGuard -SkipBuild
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraSiblingProofGuard -SkipBuild
+```
+
+```powershell
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- probe-nif-streams --root "C:\RIFT MODDING\Assets\Source" --id c841eb9a0ed1c95e --mesh-block 6 --out "C:\RIFT MODDING\Assets\Exports\probe-nif-streams-c841-mesh6.json"
 ```
 
@@ -908,10 +1103,10 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 ## Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
-2. For the attribute-set lane, distinguish `implicit-strip-or-quad-candidate` by mining the adjacent `strided-body` streams and mesh payload fields.
-3. Find the position source for the `meshSize=325` indexed family; normals and UVs are strong rotate-right-1 leads, but positions remain unproven.
-4. Prioritize `meshSize=325` and `meshSize=321` because both have repeated pair-compatible `payload=72` index leads with `maxIndex=23` and compatible `24`-element streams.
-5. Add byte-shift/endian/stride role probes for the `NiMesh` block payload itself and nearby non-stream fields.
+2. For the attribute-set lane, promote `@264/#15` on `6fc01704d4a509d5` as the next topology-bearing lead, while keeping `@272/#25` and repeated `@296` bodies as guardrail/negative evidence.
+3. Promote `@264/#15` raw-zero-based plus degenerate-bridge stitching as the current best topology hypothesis, and review the emitted bounded `FirstSegmentTriangles` proof before any exporter.
+4. Continue the `meshSize=325` and `meshSize=321` indexed-family position-source search; normals and UVs are strong rotate-right-1 leads, but positions remain unproven.
+5. Run and extend `AttributeExtraProofGuard` plus `AttributeExtraSiblingProofGuard` whenever mesh-binding, mapping fitness, or topology-probe code changes so future probe changes cannot silently flip the current `@264` topology hypothesis.
 6. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
 7. Add index-family topology scoring directly to mesh-binding pair reports.
 8. Add a disabled experimental exporter only after one lane has positions, normals, UVs, and topology/index proof.

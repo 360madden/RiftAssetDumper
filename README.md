@@ -10,7 +10,7 @@ This repo now uses the approved **Aggressive Evidence Workflow**: optimize for m
 docs\aggressive-discovery-workflow.md
 ```
 
-Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, and validate `maxIndex < vertexCount` before any experimental OBJ/model export.
+Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
 
 Optionized workflow helper:
 
@@ -22,6 +22,24 @@ Focused mesh probe helper:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
+```
+
+Focused attribute extra-stream probe helper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProbe -Id 75d5a06d7c0de1dd -MeshBlock 7 -ExtraOffset 272
+```
+
+Attribute-extra topology proof regression guard:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraProofGuard -SkipBuild
+```
+
+Focused `@264/#15` sibling proof regression guard:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraSiblingProofGuard -SkipBuild
 ```
 
 Prefer adding options/modes to this helper before creating new one-off helper apps.
@@ -248,6 +266,7 @@ Important conclusion: compression `2` has now been confirmed in manifest Table 0
 - Original filename recovery now has hash matching, confidence controls, JSONL output, and safe recovered-name extraction wiring. No real original paths have been recovered from placeholder candidates yet.
 - Gamebryo/NIF model payloads are detected from the `Gamebryo File Format, Version 20.6.0.0` header and extracted with `.nif` extension.
 - Geometry/model work is at evidence-gathering stage: binary signatures can be inventoried and one asset can be probed, but no OBJ/model export is claimed supported.
+- The top attribute side streams split into negative guardrails and one stronger lead: `@272/#25` and repeated `@296` bodies are low-variation sentinel/repeated-pattern payloads, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples, `0` subtract-one wins); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like rather than `0xffff` sentinel-based, focused probes emit a bounded 24-triangle `FirstSegmentTriangles` proof packet per mapping with area, dominant signed plane, strip parity diagnostics, and compact proof-review flags, and aggregate + focused sibling proof guards now fail if the current proof signals silently regress; export remains blocked pending proof review/validation behind an explicit experimental gate.
 
 ## Filename hash/name recovery helpers
 

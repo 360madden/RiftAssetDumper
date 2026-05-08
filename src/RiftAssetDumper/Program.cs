@@ -95,6 +95,11 @@ internal static class Program
                 return ProbeNifMesh(options);
             }
 
+            if (options.Command == "probe-nif-attribute-extra")
+            {
+                return ProbeNifAttributeExtra(options);
+            }
+
             if (options.Command == "probe-nif-stream-body")
             {
                 return ProbeNifStreamBody(options);
@@ -1703,6 +1708,277 @@ internal static class Program
         return header.Warnings.Count == 0 ? 0 : 2;
     }
 
+    private static int ProbeNifAttributeExtra(AppOptions options)
+    {
+        if (options.MeshBlockFilter is null)
+        {
+            Console.Error.WriteLine("ERROR: probe-nif-attribute-extra requires --mesh-block <n>.");
+            return 1;
+        }
+
+        if (options.ExtraOffsetFilter is null)
+        {
+            Console.Error.WriteLine("ERROR: probe-nif-attribute-extra requires --extra-offset <n>.");
+            return 1;
+        }
+
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var (payload, source) = LoadPayloadForProbe(options, rootDirectory);
+        var detected = DetectFileType(payload);
+        if (detected.Extension != "nif")
+        {
+            Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+            return 1;
+        }
+
+        var header = ParseNifHeader(payload);
+        var meshBlock = header.Blocks.FirstOrDefault(b =>
+            string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase) &&
+            b.Index == options.MeshBlockFilter.Value);
+        if (meshBlock is null)
+        {
+            Console.Error.WriteLine($"ERROR: NiMesh block #{options.MeshBlockFilter.Value} was not found.");
+            return 1;
+        }
+
+        var meshPayload = SliceNifBlockPayload(payload, meshBlock);
+        var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+        var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
+        var matches = new List<NifAttributeExtraProbeMatch>();
+        var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
+
+        for (var attributeSetIndex = 0; attributeSetIndex < attributeSets.Count; attributeSetIndex++)
+        {
+            var attributeSet = attributeSets[attributeSetIndex];
+            foreach (var extra in attributeSet.ExtraStreams.Where(e => e.MeshPayloadOffset == options.ExtraOffsetFilter.Value))
+            {
+                var extraSummary = streamSummaries.FirstOrDefault(s =>
+                    s.MeshPayloadOffset == extra.MeshPayloadOffset &&
+                    s.TargetBlockIndex == extra.BlockIndex);
+                var roleStats = extraSummary?.RoleStats;
+                var isIndexRole = roleStats?.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) == true;
+                blocksByIndex.TryGetValue(extra.BlockIndex, out var extraBlock);
+                var blockPayload = extraBlock is null
+                    ? ReadOnlySpan<byte>.Empty
+                    : SliceNifBlockPayload(payload, extraBlock);
+                uint? declaredPayloadBytes = null;
+                int? headerBytes = null;
+                ReadOnlySpan<byte> body = ReadOnlySpan<byte>.Empty;
+                NifStreamBodyStats? bodyStats = null;
+                if (blockPayload.Length >= 4)
+                {
+                    declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                    if (declaredPayloadBytes.Value <= blockPayload.Length)
+                    {
+                        headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes.Value);
+                        body = blockPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
+                        bodyStats = AnalyzeNifStreamBody(body);
+                    }
+                }
+
+                var indexCompatibility = isIndexRole ? BuildNifAttributeExtraIndexCompatibility(attributeSet.VertexCount, roleStats?.IndexStats, body) : null;
+                var vertexSampleIndices = BuildNifAttributeVertexSampleIndices(attributeSet.VertexCount, indexCompatibility);
+                var positionVertexSamples = BuildNifAttributeFloatVertexSamples(
+                    payload,
+                    blocksByIndex,
+                    attributeSet.PositionBlockIndex,
+                    "position",
+                    attributeSet.PositionRole,
+                    components: 3,
+                    vertexSampleIndices);
+                var normalVertexSamples = BuildNifAttributeFloatVertexSamples(
+                    payload,
+                    blocksByIndex,
+                    attributeSet.NormalBlockIndex,
+                    "normal",
+                    attributeSet.NormalRole,
+                    components: 3,
+                    vertexSampleIndices);
+                var uvVertexSamples = BuildNifAttributeFloatVertexSamples(
+                    payload,
+                    blocksByIndex,
+                    attributeSet.UvBlockIndex,
+                    "uv",
+                    attributeSet.UvRole,
+                    components: 2,
+                    vertexSampleIndices);
+                var mappingPositionFitness = BuildNifAttributeMappingPositionFitness(
+                    payload,
+                    blocksByIndex,
+                    attributeSet,
+                    body,
+                    indexCompatibility);
+
+                matches.Add(new NifAttributeExtraProbeMatch(
+                    AttributeSetIndex: attributeSetIndex,
+                    VertexCount: attributeSet.VertexCount,
+                    Topology: attributeSet.Topology,
+                    PositionMeshPayloadOffset: attributeSet.PositionMeshPayloadOffset,
+                    PositionBlockIndex: attributeSet.PositionBlockIndex,
+                    PositionDeclaredPayloadBytes: attributeSet.PositionDeclaredPayloadBytes,
+                    PositionRole: attributeSet.PositionRole,
+                    NormalMeshPayloadOffset: attributeSet.NormalMeshPayloadOffset,
+                    NormalBlockIndex: attributeSet.NormalBlockIndex,
+                    NormalDeclaredPayloadBytes: attributeSet.NormalDeclaredPayloadBytes,
+                    NormalRole: attributeSet.NormalRole,
+                    UvMeshPayloadOffset: attributeSet.UvMeshPayloadOffset,
+                    UvBlockIndex: attributeSet.UvBlockIndex,
+                    UvDeclaredPayloadBytes: attributeSet.UvDeclaredPayloadBytes,
+                    UvRole: attributeSet.UvRole,
+                    ExtraMeshPayloadOffset: extra.MeshPayloadOffset,
+                    ExtraBlockIndex: extra.BlockIndex,
+                    ExtraTargetTypeName: extraBlock?.TypeName ?? "missing-block",
+                    ExtraBlockSize: extraBlock?.Size,
+                    ExtraDeclaredPayloadBytes: declaredPayloadBytes,
+                    HeaderBytes: headerBytes,
+                    BodyOffset: headerBytes,
+                    Role: extra.Role,
+                    RoleConfidence: extra.RoleConfidence,
+                    FitSummary: extra.FitSummary,
+                    BlockFirst64: ToHex(blockPayload[..Math.Min(64, blockPayload.Length)]),
+                    BodyFirst64: ToHex(body[..Math.Min(64, body.Length)]),
+                    BodyFirst128: ToHex(body[..Math.Min(128, body.Length)]),
+                    BodyStats: bodyStats,
+                    RoleCandidates: roleStats?.RoleCandidates ?? [],
+                    RoleEvidence: roleStats?.Evidence ?? [],
+                    VertexCountCandidates: roleStats?.VertexCountCandidates ?? [],
+                    IndexMax: isIndexRole ? roleStats?.IndexMax : null,
+                    IndexPairCount: isIndexRole ? roleStats?.IndexPairCount : null,
+                    IndexStats: isIndexRole ? roleStats?.IndexStats : null,
+                    IndexCompatibility: indexCompatibility,
+                    PositionVertexSamples: positionVertexSamples,
+                    NormalVertexSamples: normalVertexSamples,
+                    UvVertexSamples: uvVertexSamples,
+                    MappingPositionFitness: mappingPositionFitness,
+                    UInt8Prefix: body[..Math.Min(64, body.Length)].ToArray().ToList(),
+                    ByteHistogramTop: BuildByteHistogram(body, maxEntries: 16),
+                    UInt16LittleEndianPrefix: ReadUInt16Prefix(body, maxValues: 32),
+                    UInt16BigEndianPrefix: ReadUInt16BigEndianPrefix(body, maxValues: 32),
+                    UInt32LittleEndianPrefix: ReadUInt32Prefix(body, maxValues: 24),
+                    UInt32BigEndianPrefix: ReadUInt32BigEndianPrefix(body, maxValues: 24),
+                    Float32LittleEndianPrefix: ReadFloat32Prefix(body, maxValues: 24),
+                    Float32BigEndianPrefix: ReadFloat32BigEndianPrefix(body, maxValues: 24),
+                    Repeated2BytePatterns: FindRepeatedFixedWidthPatterns(body, width: 2, maxEntries: 12),
+                    Repeated4BytePatterns: FindRepeatedFixedWidthPatterns(body, width: 4, maxEntries: 12),
+                    GroupedViews: BuildNifAttributeExtraGroupedViews(body, attributeSet)));
+            }
+        }
+
+        if (matches.Count == 0)
+        {
+            var available = attributeSets
+                .SelectMany(static a => a.ExtraStreams)
+                .OrderBy(static e => e.MeshPayloadOffset)
+                .ThenBy(static e => e.BlockIndex)
+                .Select(static e => $"@{e.MeshPayloadOffset}/#{e.BlockIndex}")
+                .Distinct(StringComparer.Ordinal)
+                .Take(16)
+                .ToList();
+            var suffix = available.Count == 0
+                ? " No attribute extra streams were found for this mesh."
+                : $" Available extras: {string.Join(", ", available)}.";
+            Console.Error.WriteLine($"ERROR: no attribute extra stream was found at mesh payload offset @{options.ExtraOffsetFilter.Value} on NiMesh #{meshBlock.Index}.{suffix}");
+            return 1;
+        }
+
+        var report = new NifAttributeExtraProbeReport(
+            Source: source,
+            Length: payload.Length,
+            NifVersion: header.VersionText,
+            MeshBlockIndex: meshBlock.Index,
+            MeshSize: meshBlock.Size,
+            MeshDataOffset: meshBlock.DataOffset,
+            MeshFirst64: ToHex(meshPayload[..Math.Min(64, meshPayload.Length)]),
+            AttributeSets: attributeSets.Count,
+            ExtraMeshPayloadOffset: options.ExtraOffsetFilter.Value,
+            Matches: matches.Count,
+            HeaderWarnings: header.Warnings,
+            ExtraStreams: matches);
+
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-attribute-extra-probe.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"NIF attribute extra probe: version={header.VersionText} mesh=#{meshBlock.Index} size={meshBlock.Size:N0} attributeSets={attributeSets.Count:N0} matches={matches.Count:N0}");
+        foreach (var match in matches.Take(8))
+        {
+            var topBytes = match.ByteHistogramTop.Count == 0
+                ? "none"
+                : string.Join(",", match.ByteHistogramTop.Take(6).Select(static h => $"{h.Hex}x{h.Count}"));
+            Console.WriteLine($"Extra @{match.ExtraMeshPayloadOffset}/#{match.ExtraBlockIndex} payload={match.ExtraDeclaredPayloadBytes} header={match.HeaderBytes} role={match.Role} c={match.RoleConfidence} fit={match.FitSummary}");
+            Console.WriteLine($"  first64={match.BodyFirst64}");
+            Console.WriteLine($"  top bytes={topBytes}");
+            Console.WriteLine($"  u16le={string.Join(",", match.UInt16LittleEndianPrefix.Take(12))}");
+            Console.WriteLine($"  u16be={string.Join(",", match.UInt16BigEndianPrefix.Take(12))}");
+            Console.WriteLine($"  u32le={string.Join(",", match.UInt32LittleEndianPrefix.Take(8))}");
+            Console.WriteLine($"  u32be={string.Join(",", match.UInt32BigEndianPrefix.Take(8))}");
+            Console.WriteLine($"  f32le={string.Join(",", match.Float32LittleEndianPrefix.Take(8).Select(static f => f?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"))}");
+            Console.WriteLine($"  f32be={string.Join(",", match.Float32BigEndianPrefix.Take(8).Select(static f => f?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"))}");
+            if (match.IndexCompatibility is not null)
+            {
+                Console.WriteLine($"  index {match.IndexCompatibility.CandidateTopology}: min={match.IndexCompatibility.MinIndex} max={match.IndexCompatibility.MaxIndex} distinct={match.IndexCompatibility.DistinctIndexCount} withinVertexCount={match.IndexCompatibility.MaxIndexWithinVertexCount} maxCoverage={match.IndexCompatibility.MaxIndexCoverageRatio:0.####} distinctCoverage={match.IndexCompatibility.DistinctIndexCoverageRatio:0.####}");
+                Console.WriteLine($"  index baseHint={match.IndexCompatibility.IndexBaseHint} usesZero={match.IndexCompatibility.UsesZeroIndex}");
+                Console.WriteLine($"  index stripNonDegenerate={match.IndexCompatibility.TriangleStripNonDegenerateWindowCount}/{match.IndexCompatibility.TriangleStripWindowCount} stripDegenerate={match.IndexCompatibility.TriangleStripDegenerateRatio:0.####} tripleDegenerate={match.IndexCompatibility.DegenerateTriangleRatio:0.####} first={string.Join(",", match.IndexCompatibility.FirstIndices.Take(16))}");
+                Console.WriteLine($"  strip structure={match.IndexCompatibility.StripStructure.Hint} degRuns={match.IndexCompatibility.StripStructure.DegenerateRunCount} maxDegRun={match.IndexCompatibility.StripStructure.MaxDegenerateRunLength} nonDegRuns={match.IndexCompatibility.StripStructure.NonDegenerateRunCount} maxNonDegRun={match.IndexCompatibility.StripStructure.MaxNonDegenerateRunLength} adjacentRepeats={match.IndexCompatibility.StripStructure.AdjacentRepeatCount} mirroredBridges={match.IndexCompatibility.StripStructure.MirroredAdjacentRepeatBridgeCount} sentinels={match.IndexCompatibility.StripStructure.SentinelRestartValueCount} zeroValues={match.IndexCompatibility.StripStructure.ZeroIndexValueCount}");
+                var previewText = string.Join(
+                    " | ",
+                    match.IndexCompatibility.FirstStripTriangles.Take(6).Select(static t => $"{t.Index}:{t.A},{t.B},{t.C}{(t.Degenerate ? "*" : string.Empty)}"));
+                Console.WriteLine($"  strip preview={previewText}");
+                foreach (var mapping in match.IndexCompatibility.MappingCandidates.Take(2))
+                {
+                    var missing = mapping.MissingVertexSamples.Count == 0 ? "none" : string.Join(",", mapping.MissingVertexSamples.Take(8));
+                    Console.WriteLine($"  mapping {mapping.Name}: offset={mapping.IndexOffset} valid={mapping.ValidForVertexCount} range={FormatNullableInt(mapping.MappedMinIndex)}..{FormatNullableInt(mapping.MappedMaxIndex)} outOfRange={mapping.OutOfRangeIndexCount} referenced={mapping.ReferencedVertexCount}/{match.IndexCompatibility.VertexCount} missing={mapping.MissingVertexCount} sampleMissing={missing} first={string.Join(",", mapping.FirstMappedIndices.Take(12))}");
+                }
+            }
+
+            if (match.PositionVertexSamples.Count > 0)
+            {
+                Console.WriteLine($"  position samples={string.Join(" | ", match.PositionVertexSamples.Take(6).Select(FormatNifAttributeVertexSample))}");
+            }
+
+            if (match.NormalVertexSamples.Count > 0)
+            {
+                Console.WriteLine($"  normal samples={string.Join(" | ", match.NormalVertexSamples.Take(6).Select(FormatNifAttributeVertexSample))}");
+            }
+
+            if (match.UvVertexSamples.Count > 0)
+            {
+                Console.WriteLine($"  uv samples={string.Join(" | ", match.UvVertexSamples.Take(6).Select(FormatNifAttributeVertexSample))}");
+            }
+
+            foreach (var fitness in match.MappingPositionFitness.Take(2))
+            {
+                var worst = fitness.WorstTriangles.Count == 0
+                    ? "none"
+                    : string.Join(" | ", fitness.WorstTriangles.Take(3).Select(static t => $"{t.StripWindowIndex}:{t.A},{t.B},{t.C} max={t.MaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"}"));
+                var firstSegmentTriangles = fitness.FirstSegmentTriangles.Count == 0
+                    ? "none"
+                    : string.Join(" | ", fitness.FirstSegmentTriangles.Take(3).Select(static t => $"{t.StripWindowIndex}:{t.A},{t.B},{t.C} pos={t.MaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} n={t.NormalMaxDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} uv={t.UvMaxDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} area={t.Area?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} {t.DominantAreaPlane}:{t.DominantSignedArea?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} parity={t.StripWindingParity}"));
+                var review = fitness.FirstSegmentProofReview;
+                var reviewFlags = review.ReviewFlags.Count == 0 ? "none" : string.Join(",", review.ReviewFlags);
+                var dominantPlanes = review.DominantPlaneCounts.Count == 0
+                    ? "none"
+                    : string.Join(",", review.DominantPlaneCounts.Take(3).Select(static c => $"{c.Value}:{c.Count}"));
+                Console.WriteLine($"  position fit {fitness.MappingName}: finite={fitness.FiniteTriangleWindowCount}/{fitness.NonDegenerateTriangleWindowCount} medianMaxEdge={fitness.MedianMaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} p95MaxEdge={fitness.P95MaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} maxEdge={fitness.MaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} segments={fitness.SegmentCount} segFinite={fitness.SegmentedFiniteTriangleWindowCount}/{fitness.SegmentedTriangleWindowCount} segMedian={fitness.SegmentedMedianMaxEdge?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} normMedian={fitness.SegmentedMedianNormalDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} uvMedian={fitness.SegmentedMedianUvDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} areaMedian={fitness.SegmentedMedianTriangleArea?.ToString("g6", CultureInfo.InvariantCulture) ?? "null"} nearZeroArea={fitness.SegmentedNearZeroTriangleAreaCount} proofFlags={reviewFlags} planes={dominantPlanes} sign=+{review.PositiveDominantSignedAreaCount}/-{review.NegativeDominantSignedAreaCount}/0{review.ZeroDominantSignedAreaCount} parityBreaks={review.NonAlternatingParityTransitionCount} droppedDeg={fitness.DroppedDegenerateWindowCount} droppedCross={fitness.DroppedCrossSegmentWindowCount} firstSeg={firstSegmentTriangles} worst={worst}");
+            }
+
+            foreach (var view in match.GroupedViews.Take(4))
+            {
+                var firstSlot = view.PrefixSlots.Count == 0 ? "none" : view.PrefixSlots[0].Hex;
+                var exact = view.ExactFit ? "exact" : $"remainder={view.RemainderBytes}";
+                Console.WriteLine($"  view {view.Name}: slots={view.SlotCount} bytesPerSlot={view.BytesPerSlot} {exact} first={firstSlot}");
+            }
+        }
+
+        if (header.Warnings.Count > 0)
+        {
+            Console.WriteLine($"Warnings: {string.Join("; ", header.Warnings)}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return header.Warnings.Count == 0 ? 0 : 2;
+    }
+
     private static int ProbeNifStreamBody(AppOptions options)
     {
         var rootDirectory = Path.GetFullPath(options.RootDirectory);
@@ -2400,6 +2676,7 @@ internal static class Program
         var attributeSetGroups = new Dictionary<string, NifMeshAttributeSetAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeTopologyGroups = new Dictionary<string, NifAttributeTopologyAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeExtraGroups = new Dictionary<string, NifAttributeExtraStreamAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var attributeExtraMappingFitnessGroups = new Dictionary<string, NifAttributeExtraMappingFitnessAccumulator>(StringComparer.OrdinalIgnoreCase);
         var inspected = 0;
         var nifCount = 0;
         var failed = 0;
@@ -2673,6 +2950,95 @@ internal static class Program
                                 {
                                     extraGroup.Samples.Add(attributeSet);
                                 }
+
+                                var extraSummary = streamSummaries.FirstOrDefault(s =>
+                                    s.MeshPayloadOffset == extra.MeshPayloadOffset &&
+                                    s.TargetBlockIndex == extra.BlockIndex);
+                                if (extraSummary?.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) == true &&
+                                    extraSummary.RoleStats.IndexStats is not null &&
+                                    blocksByIndex.TryGetValue(extra.BlockIndex, out var extraBlock))
+                                {
+                                    var extraPayload = SliceNifBlockPayload(payload.Bytes, extraBlock);
+                                    if (extraPayload.Length >= 4)
+                                    {
+                                        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(extraPayload[..4]);
+                                        if (declaredPayloadBytes <= extraPayload.Length)
+                                        {
+                                            var headerBytes = extraPayload.Length - checked((int)declaredPayloadBytes);
+                                            var extraBody = extraPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
+                                            var indexCompatibility = BuildNifAttributeExtraIndexCompatibility(attributeSet.VertexCount, extraSummary.RoleStats.IndexStats, extraBody);
+                                            var positionFitness = BuildNifAttributeMappingPositionFitness(payload.Bytes, blocksByIndex, attributeSet, extraBody, indexCompatibility);
+                                            var rawFitness = positionFitness.FirstOrDefault(static f => string.Equals(f.MappingName, "raw-zero-based", StringComparison.OrdinalIgnoreCase));
+                                            var subtractOneFitness = positionFitness.FirstOrDefault(static f => string.Equals(f.MappingName, "subtract-one", StringComparison.OrdinalIgnoreCase));
+                                            var preferredMapping = GetNifAttributeMappingFitnessPreference(rawFitness, subtractOneFitness);
+
+                                            if (preferredMapping != "insufficient")
+                                            {
+                                                var fitnessKey = $"meshSize={meshBlock.Size}|topology={attributeSet.Topology.PrimaryTopology}|vertexCount={attributeSet.VertexCount}|extra@{extra.MeshPayloadOffset}:payload={extra.DeclaredPayloadBytes}:role={extra.Role}";
+                                                if (!attributeExtraMappingFitnessGroups.TryGetValue(fitnessKey, out var fitnessGroup))
+                                                {
+                                                    fitnessGroup = new NifAttributeExtraMappingFitnessAccumulator(
+                                                        fitnessKey,
+                                                        meshBlock.Size,
+                                                        attributeSet.Topology.PrimaryTopology,
+                                                        attributeSet.VertexCount,
+                                                        extra.MeshPayloadOffset,
+                                                        extra.Role,
+                                                        extra.DeclaredPayloadBytes);
+                                                    attributeExtraMappingFitnessGroups.Add(fitnessKey, fitnessGroup);
+                                                }
+
+                                                fitnessGroup.Count++;
+                                                fitnessGroup.NifIds.Add(entry.IdPrefix);
+                                                fitnessGroup.AddFitness(rawFitness, subtractOneFitness, preferredMapping);
+                                                if (indexCompatibility?.StripStructure is not null)
+                                                {
+                                                    fitnessGroup.AddStripStructure(indexCompatibility.StripStructure);
+                                                }
+
+                                                if (fitnessGroup.Samples.Count < 16)
+                                                {
+                                                    fitnessGroup.Samples.Add(new NifAttributeExtraMappingFitnessSample(
+                                                        ArchiveName: archiveName,
+                                                        EntryIndex: entry.Index,
+                                                        IdPrefix: entry.IdPrefix,
+                                                        ManifestEntryIndex: manifestEntry?.Index,
+                                                        MeshBlockIndex: meshBlock.Index,
+                                                        MeshSize: meshBlock.Size,
+                                                        VertexCount: attributeSet.VertexCount,
+                                                        ExtraMeshPayloadOffset: extra.MeshPayloadOffset,
+                                                        ExtraBlockIndex: extra.BlockIndex,
+                                                        ExtraRole: extra.Role,
+                                                        RawMedianMaxEdge: rawFitness?.MedianMaxEdge,
+                                                        SubtractOneMedianMaxEdge: subtractOneFitness?.MedianMaxEdge,
+                                                        RawSegmentedMedianMaxEdge: rawFitness?.SegmentedMedianMaxEdge,
+                                                        SubtractOneSegmentedMedianMaxEdge: subtractOneFitness?.SegmentedMedianMaxEdge,
+                                                        RawSegmentedMedianNormalDelta: rawFitness?.SegmentedMedianNormalDelta,
+                                                        SubtractOneSegmentedMedianNormalDelta: subtractOneFitness?.SegmentedMedianNormalDelta,
+                                                        RawSegmentedMedianUvDelta: rawFitness?.SegmentedMedianUvDelta,
+                                                        SubtractOneSegmentedMedianUvDelta: subtractOneFitness?.SegmentedMedianUvDelta,
+                                                        RawSegmentedMedianTriangleArea: rawFitness?.SegmentedMedianTriangleArea,
+                                                        SubtractOneSegmentedMedianTriangleArea: subtractOneFitness?.SegmentedMedianTriangleArea,
+                                                        RawFirstSegmentProofFlags: rawFitness is null ? [] : rawFitness.FirstSegmentProofReview.ReviewFlags,
+                                                        SubtractOneFirstSegmentProofFlags: subtractOneFitness is null ? [] : subtractOneFitness.FirstSegmentProofReview.ReviewFlags,
+                                                        RawFirstSegmentDominantPlaneSwitchCount: rawFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
+                                                        SubtractOneFirstSegmentDominantPlaneSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
+                                                        RawFirstSegmentDominantSignedAreaSignSwitchCount: rawFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
+                                                        SubtractOneFirstSegmentDominantSignedAreaSignSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
+                                                        RawFirstSegmentNonAlternatingParityTransitionCount: rawFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
+                                                        SubtractOneFirstSegmentNonAlternatingParityTransitionCount: subtractOneFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
+                                                        RawP95MaxEdge: rawFitness?.P95MaxEdge,
+                                                        SubtractOneP95MaxEdge: subtractOneFitness?.P95MaxEdge,
+                                                        SegmentCount: rawFitness?.SegmentCount ?? subtractOneFitness?.SegmentCount,
+                                                        SegmentedTriangleWindowCount: rawFitness?.SegmentedTriangleWindowCount ?? subtractOneFitness?.SegmentedTriangleWindowCount,
+                                                        DroppedDegenerateWindowCount: rawFitness?.DroppedDegenerateWindowCount ?? subtractOneFitness?.DroppedDegenerateWindowCount,
+                                                        DroppedCrossSegmentWindowCount: rawFitness?.DroppedCrossSegmentWindowCount ?? subtractOneFitness?.DroppedCrossSegmentWindowCount,
+                                                        PreferredMapping: preferredMapping));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -2809,6 +3175,83 @@ internal static class Program
                 Samples: group.Samples);
         }
 
+        static NifAttributeExtraMappingFitnessGroup toAttributeExtraMappingFitnessRecord(NifAttributeExtraMappingFitnessAccumulator group)
+        {
+            var averageRawMedian = group.RawMedianMaxEdgeCount == 0 ? (double?)null : Math.Round(group.RawMedianMaxEdgeTotal / group.RawMedianMaxEdgeCount, 6);
+            var averageSubtractOneMedian = group.SubtractOneMedianMaxEdgeCount == 0 ? (double?)null : Math.Round(group.SubtractOneMedianMaxEdgeTotal / group.SubtractOneMedianMaxEdgeCount, 6);
+            var averageRawSegmentedMedian = group.RawSegmentedMedianMaxEdgeCount == 0 ? (double?)null : Math.Round(group.RawSegmentedMedianMaxEdgeTotal / group.RawSegmentedMedianMaxEdgeCount, 6);
+            var averageSubtractOneSegmentedMedian = group.SubtractOneSegmentedMedianMaxEdgeCount == 0 ? (double?)null : Math.Round(group.SubtractOneSegmentedMedianMaxEdgeTotal / group.SubtractOneSegmentedMedianMaxEdgeCount, 6);
+            var averageRawSegmentedNormalMedian = group.RawSegmentedMedianNormalDeltaCount == 0 ? (double?)null : Math.Round(group.RawSegmentedMedianNormalDeltaTotal / group.RawSegmentedMedianNormalDeltaCount, 6);
+            var averageSubtractOneSegmentedNormalMedian = group.SubtractOneSegmentedMedianNormalDeltaCount == 0 ? (double?)null : Math.Round(group.SubtractOneSegmentedMedianNormalDeltaTotal / group.SubtractOneSegmentedMedianNormalDeltaCount, 6);
+            var averageRawSegmentedUvMedian = group.RawSegmentedMedianUvDeltaCount == 0 ? (double?)null : Math.Round(group.RawSegmentedMedianUvDeltaTotal / group.RawSegmentedMedianUvDeltaCount, 6);
+            var averageSubtractOneSegmentedUvMedian = group.SubtractOneSegmentedMedianUvDeltaCount == 0 ? (double?)null : Math.Round(group.SubtractOneSegmentedMedianUvDeltaTotal / group.SubtractOneSegmentedMedianUvDeltaCount, 6);
+            var averageRawSegmentedAreaMedian = group.RawSegmentedMedianTriangleAreaCount == 0 ? (double?)null : Math.Round(group.RawSegmentedMedianTriangleAreaTotal / group.RawSegmentedMedianTriangleAreaCount, 6);
+            var averageSubtractOneSegmentedAreaMedian = group.SubtractOneSegmentedMedianTriangleAreaCount == 0 ? (double?)null : Math.Round(group.SubtractOneSegmentedMedianTriangleAreaTotal / group.SubtractOneSegmentedMedianTriangleAreaCount, 6);
+            return new NifAttributeExtraMappingFitnessGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                Topology: group.Topology,
+                VertexCount: group.VertexCount,
+                ExtraMeshPayloadOffset: group.ExtraMeshPayloadOffset,
+                ExtraRole: group.ExtraRole,
+                ExtraDeclaredPayloadBytes: group.ExtraDeclaredPayloadBytes,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                RawZeroBasedPreferredCount: group.RawZeroBasedPreferredCount,
+                SubtractOnePreferredCount: group.SubtractOnePreferredCount,
+                TieCount: group.TieCount,
+                AverageRawMedianMaxEdge: averageRawMedian,
+                AverageSubtractOneMedianMaxEdge: averageSubtractOneMedian,
+                AverageMedianMaxEdgeDelta: averageRawMedian is null || averageSubtractOneMedian is null ? null : Math.Round(averageSubtractOneMedian.Value - averageRawMedian.Value, 6),
+                AverageRawSegmentedMedianMaxEdge: averageRawSegmentedMedian,
+                AverageSubtractOneSegmentedMedianMaxEdge: averageSubtractOneSegmentedMedian,
+                AverageSegmentedMedianMaxEdgeDelta: averageRawSegmentedMedian is null || averageSubtractOneSegmentedMedian is null ? null : Math.Round(averageSubtractOneSegmentedMedian.Value - averageRawSegmentedMedian.Value, 6),
+                AverageRawSegmentedMedianNormalDelta: averageRawSegmentedNormalMedian,
+                AverageSubtractOneSegmentedMedianNormalDelta: averageSubtractOneSegmentedNormalMedian,
+                AverageSegmentedMedianNormalDeltaGap: averageRawSegmentedNormalMedian is null || averageSubtractOneSegmentedNormalMedian is null ? null : Math.Round(averageSubtractOneSegmentedNormalMedian.Value - averageRawSegmentedNormalMedian.Value, 6),
+                AverageRawSegmentedMedianUvDelta: averageRawSegmentedUvMedian,
+                AverageSubtractOneSegmentedMedianUvDelta: averageSubtractOneSegmentedUvMedian,
+                AverageSegmentedMedianUvDeltaGap: averageRawSegmentedUvMedian is null || averageSubtractOneSegmentedUvMedian is null ? null : Math.Round(averageSubtractOneSegmentedUvMedian.Value - averageRawSegmentedUvMedian.Value, 6),
+                AverageRawSegmentedMedianTriangleArea: averageRawSegmentedAreaMedian,
+                AverageSubtractOneSegmentedMedianTriangleArea: averageSubtractOneSegmentedAreaMedian,
+                AverageSegmentedMedianTriangleAreaGap: averageRawSegmentedAreaMedian is null || averageSubtractOneSegmentedAreaMedian is null ? null : Math.Round(averageSubtractOneSegmentedAreaMedian.Value - averageRawSegmentedAreaMedian.Value, 6),
+                AverageRawFirstSegmentNearZeroAreaCount: group.RawFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.RawFirstSegmentNearZeroAreaCountTotal / group.RawFirstSegmentProofReviewCount, 2),
+                AverageSubtractOneFirstSegmentNearZeroAreaCount: group.SubtractOneFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.SubtractOneFirstSegmentNearZeroAreaCountTotal / group.SubtractOneFirstSegmentProofReviewCount, 2),
+                AverageRawFirstSegmentDominantPlaneSwitchCount: group.RawFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.RawFirstSegmentDominantPlaneSwitchCountTotal / group.RawFirstSegmentProofReviewCount, 2),
+                AverageSubtractOneFirstSegmentDominantPlaneSwitchCount: group.SubtractOneFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.SubtractOneFirstSegmentDominantPlaneSwitchCountTotal / group.SubtractOneFirstSegmentProofReviewCount, 2),
+                AverageRawFirstSegmentDominantSignedAreaSignSwitchCount: group.RawFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.RawFirstSegmentDominantSignedAreaSignSwitchCountTotal / group.RawFirstSegmentProofReviewCount, 2),
+                AverageSubtractOneFirstSegmentDominantSignedAreaSignSwitchCount: group.SubtractOneFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.SubtractOneFirstSegmentDominantSignedAreaSignSwitchCountTotal / group.SubtractOneFirstSegmentProofReviewCount, 2),
+                AverageRawFirstSegmentNonContiguousWindowTransitionCount: group.RawFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.RawFirstSegmentNonContiguousWindowTransitionCountTotal / group.RawFirstSegmentProofReviewCount, 2),
+                AverageSubtractOneFirstSegmentNonContiguousWindowTransitionCount: group.SubtractOneFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.SubtractOneFirstSegmentNonContiguousWindowTransitionCountTotal / group.SubtractOneFirstSegmentProofReviewCount, 2),
+                AverageRawFirstSegmentNonAlternatingParityTransitionCount: group.RawFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.RawFirstSegmentNonAlternatingParityTransitionCountTotal / group.RawFirstSegmentProofReviewCount, 2),
+                AverageSubtractOneFirstSegmentNonAlternatingParityTransitionCount: group.SubtractOneFirstSegmentProofReviewCount == 0 ? null : Math.Round(group.SubtractOneFirstSegmentNonAlternatingParityTransitionCountTotal / group.SubtractOneFirstSegmentProofReviewCount, 2),
+                AverageSegmentCount: group.Count == 0 ? null : Math.Round(group.SegmentCountTotal / group.Count, 2),
+                AverageSegmentedTriangleWindowCount: group.Count == 0 ? null : Math.Round(group.SegmentedTriangleWindowCountTotal / group.Count, 2),
+                AverageDroppedDegenerateWindowCount: group.Count == 0 ? null : Math.Round(group.DroppedDegenerateWindowCountTotal / group.Count, 2),
+                AverageDroppedCrossSegmentWindowCount: group.Count == 0 ? null : Math.Round(group.DroppedCrossSegmentWindowCountTotal / group.Count, 2),
+                DominantStripStructureHint: group.StripStructureHintCounts.Count == 0
+                    ? "unknown"
+                    : group.StripStructureHintCounts
+                        .OrderByDescending(static kvp => kvp.Value)
+                        .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                        .First()
+                        .Key,
+                AverageAdjacentRepeatCount: group.StripStructureCount == 0 ? null : Math.Round(group.AdjacentRepeatCountTotal / group.StripStructureCount, 2),
+                AverageMirroredBridgeCount: group.StripStructureCount == 0 ? null : Math.Round(group.MirroredBridgeCountTotal / group.StripStructureCount, 2),
+                AverageDegenerateRunCount: group.StripStructureCount == 0 ? null : Math.Round(group.DegenerateRunCountTotal / group.StripStructureCount, 2),
+                AverageMaxDegenerateRunLength: group.StripStructureCount == 0 ? null : Math.Round(group.MaxDegenerateRunLengthTotal / group.StripStructureCount, 2),
+                AverageNonDegenerateRunCount: group.StripStructureCount == 0 ? null : Math.Round(group.NonDegenerateRunCountTotal / group.StripStructureCount, 2),
+                AverageMaxNonDegenerateRunLength: group.StripStructureCount == 0 ? null : Math.Round(group.MaxNonDegenerateRunLengthTotal / group.StripStructureCount, 2),
+                SentinelRestartValueCountTotal: group.SentinelRestartValueCountTotal,
+                ZeroIndexValueCountTotal: group.ZeroIndexValueCountTotal,
+                PreferredMapping: group.RawZeroBasedPreferredCount > group.SubtractOnePreferredCount
+                    ? "raw-zero-based"
+                    : group.SubtractOnePreferredCount > group.RawZeroBasedPreferredCount
+                        ? "subtract-one"
+                        : "tie",
+                Samples: group.Samples);
+        }
+
         var report = new NifMeshBindingInventoryReport(
             RootDirectory: rootDirectory,
             ManifestPath: manifestPath,
@@ -2869,6 +3312,15 @@ internal static class Program
                 .ThenBy(static g => g.ExtraMeshPayloadOffset)
                 .ThenBy(static g => g.ExtraRole, StringComparer.OrdinalIgnoreCase)
                 .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            TopAttributeExtraMappingFitness: attributeExtraMappingFitnessGroups.Values
+                .Select(toAttributeExtraMappingFitnessRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.RawZeroBasedPreferredCount)
+                .ThenByDescending(static g => g.AverageMedianMaxEdgeDelta ?? double.MinValue)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.ExtraMeshPayloadOffset)
+                .Take(options.Limit > 0 ? options.Limit : 100)
                 .ToList());
 
         var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-mesh-binding-inventory.json");
@@ -2891,6 +3343,7 @@ internal static class Program
         Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
         Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
         Console.WriteLine($"Top attribute extras: {string.Join(" | ", report.TopAttributeExtraStreams.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} extra@{g.ExtraMeshPayloadOffset} payload={g.ExtraDeclaredPayloadBytes} {g.ExtraRole} count={g.Count:N0} fit={g.FitSummary}"))}");
+        Console.WriteLine($"Top attribute extra mapping fitness: {string.Join(" | ", report.TopAttributeExtraMappingFitness.Take(5).Select(static g => $"meshSize={g.MeshSize} v={g.VertexCount} extra@{g.ExtraMeshPayloadOffset} {g.ExtraRole} count={g.Count:N0} prefer={g.PreferredMapping} raw={g.RawZeroBasedPreferredCount:N0} sub1={g.SubtractOnePreferredCount:N0} avgDelta={g.AverageMedianMaxEdgeDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} segDelta={g.AverageSegmentedMedianMaxEdgeDelta?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} normGap={g.AverageSegmentedMedianNormalDeltaGap?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} uvGap={g.AverageSegmentedMedianUvDeltaGap?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} areaGap={g.AverageSegmentedMedianTriangleAreaGap?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} proofSwitches={g.AverageRawFirstSegmentDominantPlaneSwitchCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}/{g.AverageSubtractOneFirstSegmentDominantPlaneSwitchCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} signSwitches={g.AverageRawFirstSegmentDominantSignedAreaSignSwitchCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}/{g.AverageSubtractOneFirstSegmentDominantSignedAreaSignSwitchCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} parityBreaks={g.AverageRawFirstSegmentNonAlternatingParityTransitionCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}/{g.AverageSubtractOneFirstSegmentNonAlternatingParityTransitionCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} segments={g.AverageSegmentCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} droppedCross={g.AverageDroppedCrossSegmentWindowCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} strip={g.DominantStripStructureHint} bridges={g.AverageMirroredBridgeCount?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} sentinels={g.SentinelRestartValueCountTotal:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -5442,6 +5895,18 @@ internal static class Program
         return values;
     }
 
+    private static List<uint> ReadUInt32BigEndianPrefix(ReadOnlySpan<byte> payload, int maxValues)
+    {
+        var count = Math.Min(maxValues, payload.Length / 4);
+        var values = new List<uint>(count);
+        for (var i = 0; i < count; i++)
+        {
+            values.Add(BinaryPrimitives.ReadUInt32BigEndian(payload.Slice(i * 4, 4)));
+        }
+
+        return values;
+    }
+
     private static List<int> ReadInt32Prefix(ReadOnlySpan<byte> payload, int maxValues)
     {
         var count = Math.Min(maxValues, payload.Length / 4);
@@ -5561,6 +6026,1227 @@ internal static class Program
         }
 
         return values;
+    }
+
+    private static List<float?> ReadFloat32BigEndianPrefix(ReadOnlySpan<byte> payload, int maxValues)
+    {
+        var count = Math.Min(maxValues, payload.Length / 4);
+        var values = new List<float?>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var value = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(payload.Slice(i * 4, 4)));
+            values.Add(float.IsFinite(value) ? value : null);
+        }
+
+        return values;
+    }
+
+    private static List<NifByteHistogramEntry> BuildByteHistogram(ReadOnlySpan<byte> payload, int maxEntries)
+    {
+        var counts = new int[256];
+        foreach (var value in payload)
+        {
+            counts[value]++;
+        }
+
+        var entries = new List<NifByteHistogramEntry>();
+        for (var value = 0; value < counts.Length; value++)
+        {
+            var count = counts[value];
+            if (count == 0)
+            {
+                continue;
+            }
+
+            entries.Add(new NifByteHistogramEntry(
+                Value: value,
+                Hex: $"0x{value:x2}",
+                Count: count,
+                Ratio: payload.Length == 0 ? 0 : Math.Round(count / (double)payload.Length, 6)));
+        }
+
+        return entries
+            .OrderByDescending(static e => e.Count)
+            .ThenBy(static e => e.Value)
+            .Take(maxEntries)
+            .ToList();
+    }
+
+    private static List<NifRepeatedBodyPattern> FindRepeatedFixedWidthPatterns(ReadOnlySpan<byte> payload, int width, int maxEntries)
+    {
+        if (width <= 0 || payload.Length < width)
+        {
+            return [];
+        }
+
+        var groups = new Dictionary<string, NifRepeatedBodyPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var count = payload.Length / width;
+        for (var i = 0; i < count; i++)
+        {
+            var offset = i * width;
+            var hex = ToHex(payload.Slice(offset, width));
+            if (!groups.TryGetValue(hex, out var group))
+            {
+                group = new NifRepeatedBodyPatternAccumulator(hex, width);
+                groups.Add(hex, group);
+            }
+
+            group.Count++;
+            if (group.Offsets.Count < 16)
+            {
+                group.Offsets.Add(offset);
+            }
+        }
+
+        return groups.Values
+            .Where(static g => g.Count > 1)
+            .OrderByDescending(static g => g.Count)
+            .ThenBy(static g => g.Hex, StringComparer.OrdinalIgnoreCase)
+            .Take(maxEntries)
+            .Select(static g => new NifRepeatedBodyPattern(g.Hex, g.Width, g.Count, g.Offsets))
+            .ToList();
+    }
+
+    private static List<NifAttributeExtraGroupedView> BuildNifAttributeExtraGroupedViews(ReadOnlySpan<byte> body, NifMeshAttributeSetSample attributeSet)
+    {
+        var views = new List<NifAttributeExtraGroupedView>
+        {
+            BuildNifAttributeExtraGroupedView("per-vertex", body, attributeSet.VertexCount),
+        };
+
+        if (attributeSet.Topology.TriangleListTriangleCount is not null)
+        {
+            views.Add(BuildNifAttributeExtraGroupedView("per-triangle-list-triangle", body, attributeSet.Topology.TriangleListTriangleCount.Value));
+        }
+
+        if (attributeSet.Topology.TriangleStripTriangleCount is not null)
+        {
+            views.Add(BuildNifAttributeExtraGroupedView("per-strip-or-fan-triangle", body, attributeSet.Topology.TriangleStripTriangleCount.Value));
+        }
+
+        if (attributeSet.Topology.QuadListQuadCount is not null)
+        {
+            views.Add(BuildNifAttributeExtraGroupedView("per-quad", body, attributeSet.Topology.QuadListQuadCount.Value));
+        }
+
+        return views;
+    }
+
+    private static NifAttributeExtraIndexCompatibility? BuildNifAttributeExtraIndexCompatibility(
+        int vertexCount,
+        NifUInt16BeIndexStats? indexStats,
+        ReadOnlySpan<byte> body)
+    {
+        if (indexStats is null || vertexCount <= 0)
+        {
+            return null;
+        }
+
+        var maxIndexWithinVertexCount = indexStats.BigEndianMaxIndex < vertexCount;
+        var maxCoverageRatio = Math.Round((indexStats.BigEndianMaxIndex + 1) / (double)vertexCount, 4);
+        var distinctCoverageRatio = Math.Round(indexStats.BigEndianDistinctIndexCount / (double)vertexCount, 4);
+        string candidateTopology;
+        var evidence = new List<string>
+        {
+            $"max-index={indexStats.BigEndianMaxIndex.ToString(CultureInfo.InvariantCulture)} vertex-count={vertexCount.ToString(CultureInfo.InvariantCulture)}",
+            $"distinct-indices={indexStats.BigEndianDistinctIndexCount.ToString(CultureInfo.InvariantCulture)}",
+        };
+
+        if (!maxIndexWithinVertexCount)
+        {
+            candidateTopology = "index-out-of-range";
+            evidence.Add("max index is not within the attribute vertex count");
+        }
+        else if (indexStats.TriangleStripLessDegenerateThanTriples)
+        {
+            candidateTopology = "explicit-index-strip-lead";
+            evidence.Add($"strip windows are less degenerate than fixed triples ({indexStats.TriangleStripDegenerateRatio:0.####} < {indexStats.DegenerateTriangleRatio:0.####})");
+        }
+        else if (indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.25)
+        {
+            candidateTopology = "explicit-index-list-lead";
+            evidence.Add($"fixed triples are low-degenerate ({indexStats.DegenerateTriangleRatio:0.####})");
+        }
+        else
+        {
+            candidateTopology = "explicit-index-topology-unknown";
+            evidence.Add("index range is compatible but topology remains ambiguous");
+        }
+
+        if (indexStats.BigEndianMinIndex > 0)
+        {
+            evidence.Add("zero index is absent from the sampled stream; check for 1-based or reserved-zero semantics before export");
+        }
+
+        var indexBaseHint = GetNifAttributeExtraIndexBaseHint(vertexCount, indexStats);
+        var allIndices = ReadUInt16BigEndianValues(body);
+        var mappingCandidates = BuildNifAttributeExtraIndexMappingCandidates(vertexCount, allIndices);
+        var stripStructure = BuildNifTriangleStripStructureStats(allIndices);
+        evidence.Add($"index-base-hint={indexBaseHint}");
+        evidence.Add($"strip-structure={stripStructure.Hint}; mirrored-bridges={stripStructure.MirroredAdjacentRepeatBridgeCount.ToString(CultureInfo.InvariantCulture)} sentinel-restarts={stripStructure.SentinelRestartValueCount.ToString(CultureInfo.InvariantCulture)} zero-values={stripStructure.ZeroIndexValueCount.ToString(CultureInfo.InvariantCulture)}");
+
+        return new NifAttributeExtraIndexCompatibility(
+            CandidateTopology: candidateTopology,
+            VertexCount: vertexCount,
+            PairCount: indexStats.PairCount,
+            TriangleAligned: indexStats.TriangleAligned,
+            TriangleCount: indexStats.TriangleCount,
+            MinIndex: indexStats.BigEndianMinIndex,
+            MaxIndex: indexStats.BigEndianMaxIndex,
+            DistinctIndexCount: indexStats.BigEndianDistinctIndexCount,
+            MaxIndexWithinVertexCount: maxIndexWithinVertexCount,
+            MaxIndexCoverageRatio: maxCoverageRatio,
+            DistinctIndexCoverageRatio: distinctCoverageRatio,
+            UsesZeroIndex: indexStats.BigEndianMinIndex == 0,
+            DegenerateTriangleRatio: indexStats.DegenerateTriangleRatio,
+            TriangleStripWindowCount: indexStats.TriangleStripWindowCount,
+            TriangleStripNonDegenerateWindowCount: indexStats.TriangleStripNonDegenerateWindowCount,
+            TriangleStripDegenerateRatio: indexStats.TriangleStripDegenerateRatio,
+            TriangleStripLessDegenerateThanTriples: indexStats.TriangleStripLessDegenerateThanTriples,
+            IndexBaseHint: indexBaseHint,
+            FirstIndices: indexStats.FirstBigEndianIndices,
+            FirstTriples: indexStats.FirstBigEndianTriples,
+            FirstStripTriangles: BuildNifTriangleStripPreview(indexStats.FirstBigEndianIndices, maxTriangles: 16),
+            MappingCandidates: mappingCandidates,
+            StripStructure: stripStructure,
+            Evidence: evidence);
+    }
+
+    private static List<ushort> ReadUInt16BigEndianValues(ReadOnlySpan<byte> payload)
+    {
+        var count = payload.Length / 2;
+        var values = new List<ushort>(count);
+        for (var i = 0; i < count; i++)
+        {
+            values.Add(BinaryPrimitives.ReadUInt16BigEndian(payload.Slice(i * 2, 2)));
+        }
+
+        return values;
+    }
+
+    private static List<NifAttributeExtraIndexMappingCandidate> BuildNifAttributeExtraIndexMappingCandidates(int vertexCount, List<ushort> indices)
+    {
+        return
+        [
+            BuildNifAttributeExtraIndexMappingCandidate("raw-zero-based", 0, vertexCount, indices),
+            BuildNifAttributeExtraIndexMappingCandidate("subtract-one", -1, vertexCount, indices)
+        ];
+    }
+
+    private static NifAttributeExtraIndexMappingCandidate BuildNifAttributeExtraIndexMappingCandidate(
+        string name,
+        int indexOffset,
+        int vertexCount,
+        List<ushort> indices)
+    {
+        var referenced = new HashSet<int>();
+        var mappedPrefix = new List<int>(Math.Min(indices.Count, 32));
+        var outOfRange = 0;
+        int? mappedMin = null;
+        int? mappedMax = null;
+
+        foreach (var sourceIndex in indices)
+        {
+            var mapped = sourceIndex + indexOffset;
+            if (mappedPrefix.Count < 32)
+            {
+                mappedPrefix.Add(mapped);
+            }
+
+            if (mapped < 0 || mapped >= vertexCount)
+            {
+                outOfRange++;
+                continue;
+            }
+
+            referenced.Add(mapped);
+            mappedMin = mappedMin is null ? mapped : Math.Min(mappedMin.Value, mapped);
+            mappedMax = mappedMax is null ? mapped : Math.Max(mappedMax.Value, mapped);
+        }
+
+        var missingSamples = new List<int>();
+        for (var vertex = 0; vertex < vertexCount && missingSamples.Count < 16; vertex++)
+        {
+            if (!referenced.Contains(vertex))
+            {
+                missingSamples.Add(vertex);
+            }
+        }
+
+        var missingVertexCount = Math.Max(0, vertexCount - referenced.Count);
+        var valid = outOfRange == 0;
+        var evidence = new List<string>
+        {
+            valid ? "all mapped indices are within the attribute vertex count" : $"{outOfRange.ToString(CultureInfo.InvariantCulture)} mapped index value(s) are out of range",
+            $"referenced-vertices={referenced.Count.ToString(CultureInfo.InvariantCulture)}/{vertexCount.ToString(CultureInfo.InvariantCulture)}",
+        };
+        if (missingSamples.Count > 0)
+        {
+            evidence.Add($"first-missing-vertices={string.Join(",", missingSamples)}");
+        }
+
+        return new NifAttributeExtraIndexMappingCandidate(
+            Name: name,
+            IndexOffset: indexOffset,
+            ValidForVertexCount: valid,
+            OutOfRangeIndexCount: outOfRange,
+            ReferencedVertexCount: referenced.Count,
+            ReferencedVertexCoverageRatio: vertexCount == 0 ? 0 : Math.Round(referenced.Count / (double)vertexCount, 4),
+            MissingVertexCount: missingVertexCount,
+            MissingVertexSamples: missingSamples,
+            MappedMinIndex: mappedMin,
+            MappedMaxIndex: mappedMax,
+            FirstMappedIndices: mappedPrefix,
+            FirstMappedStripTriangles: BuildMappedTriangleStripPreview(mappedPrefix, vertexCount, maxTriangles: 16),
+            Evidence: evidence);
+    }
+
+    private static List<NifMappedTriangleStripPreviewTriangle> BuildMappedTriangleStripPreview(List<int> mappedIndices, int vertexCount, int maxTriangles)
+    {
+        var triangles = new List<NifMappedTriangleStripPreviewTriangle>();
+        for (var i = 0; i + 2 < mappedIndices.Count && triangles.Count < maxTriangles; i++)
+        {
+            var a = mappedIndices[i];
+            var b = mappedIndices[i + 1];
+            var c = mappedIndices[i + 2];
+            var outOfRange = a < 0 || a >= vertexCount || b < 0 || b >= vertexCount || c < 0 || c >= vertexCount;
+            var degenerate = a == b || a == c || b == c;
+            triangles.Add(new NifMappedTriangleStripPreviewTriangle(
+                Index: i,
+                A: a,
+                B: b,
+                C: c,
+                WindingParity: (i % 2) == 0 ? "even" : "odd",
+                Degenerate: degenerate,
+                OutOfRange: outOfRange));
+        }
+
+        return triangles;
+    }
+
+    private static List<int> BuildNifAttributeVertexSampleIndices(int vertexCount, NifAttributeExtraIndexCompatibility? indexCompatibility)
+    {
+        var samples = new List<int>();
+        void add(int index)
+        {
+            if (index >= 0 && index < vertexCount && !samples.Contains(index))
+            {
+                samples.Add(index);
+            }
+        }
+
+        void addNeighborhood(int index)
+        {
+            add(index);
+            add(index - 1);
+            add(index + 1);
+        }
+
+        add(0);
+        add(1);
+        add(vertexCount - 2);
+        add(vertexCount - 1);
+        if (indexCompatibility is not null)
+        {
+            foreach (var mapping in indexCompatibility.MappingCandidates)
+            {
+                foreach (var missing in mapping.MissingVertexSamples.Take(4))
+                {
+                    addNeighborhood(missing);
+                }
+            }
+
+            foreach (var index in indexCompatibility.FirstIndices.Take(4))
+            {
+                addNeighborhood(index);
+            }
+        }
+
+        return samples.Take(16).ToList();
+    }
+
+    private static List<NifAttributeVertexSample> BuildNifAttributeFloatVertexSamples(
+        byte[] payload,
+        IReadOnlyDictionary<int, NifBlockInfo> blocksByIndex,
+        int blockIndex,
+        string attributeName,
+        string role,
+        int components,
+        List<int> vertexIndices)
+    {
+        if (components is < 2 or > 3 || vertexIndices.Count == 0 || !blocksByIndex.TryGetValue(blockIndex, out var streamBlock))
+        {
+            return [];
+        }
+
+        var blockPayload = SliceNifBlockPayload(payload, streamBlock);
+        if (blockPayload.Length < 4)
+        {
+            return [];
+        }
+
+        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+        if (declaredPayloadBytes > blockPayload.Length)
+        {
+            return [];
+        }
+
+        var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
+        var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
+        var bytesPerVector = checked(components * 4);
+        var vectorCount = body.Length / bytesPerVector;
+        var transform = role.Contains("ror1", StringComparison.OrdinalIgnoreCase)
+            ? NifFloatByteTransform.RotateRight1
+            : NifFloatByteTransform.LittleEndian;
+        var samples = new List<NifAttributeVertexSample>();
+        foreach (var vertexIndex in vertexIndices)
+        {
+            if (vertexIndex < 0 || vertexIndex >= vectorCount)
+            {
+                continue;
+            }
+
+            var values = DecodeNifAttributeVector(body, components, transform, vertexIndex);
+            samples.Add(new NifAttributeVertexSample(
+                Index: vertexIndex,
+                Attribute: attributeName,
+                Role: role,
+                Transform: FormatNifFloatTransformSuffix(transform),
+                Components: components,
+                X: values[0],
+                Y: values[1],
+                Z: components > 2 ? values[2] : null,
+                VectorLength: ComputeNifAttributeVectorLength(values, components),
+                PreviousDistance: vertexIndex > 0 ? ComputeNifAttributeVectorDistance(body, components, transform, vertexIndex - 1, vertexIndex) : null,
+                NextDistance: vertexIndex + 1 < vectorCount ? ComputeNifAttributeVectorDistance(body, components, transform, vertexIndex, vertexIndex + 1) : null));
+        }
+
+        return samples;
+    }
+
+    private static double?[] DecodeNifAttributeVector(ReadOnlySpan<byte> body, int components, NifFloatByteTransform transform, int vertexIndex)
+    {
+        var values = new double?[3];
+        var bytesPerVector = checked(components * 4);
+        var offset = checked(vertexIndex * bytesPerVector);
+        if (offset < 0 || offset + bytesPerVector > body.Length)
+        {
+            return values;
+        }
+
+        for (var component = 0; component < components; component++)
+        {
+            values[component] = ToNullableDouble(ReadFiniteFloat32(body.Slice(offset + (component * 4), 4), transform));
+        }
+
+        return values;
+    }
+
+    private static double? ComputeNifAttributeVectorLength(double?[] values, int components)
+    {
+        double sum = 0;
+        for (var component = 0; component < components; component++)
+        {
+            if (values[component] is null)
+            {
+                return null;
+            }
+
+            sum += values[component]!.Value * values[component]!.Value;
+        }
+
+        return Math.Round(Math.Sqrt(sum), 6);
+    }
+
+    private static double? ComputeNifAttributeVectorDistance(
+        ReadOnlySpan<byte> body,
+        int components,
+        NifFloatByteTransform transform,
+        int fromVertexIndex,
+        int toVertexIndex)
+    {
+        var from = DecodeNifAttributeVector(body, components, transform, fromVertexIndex);
+        var to = DecodeNifAttributeVector(body, components, transform, toVertexIndex);
+        double sum = 0;
+        for (var component = 0; component < components; component++)
+        {
+            if (from[component] is null || to[component] is null)
+            {
+                return null;
+            }
+
+            var delta = to[component]!.Value - from[component]!.Value;
+            sum += delta * delta;
+        }
+
+        return Math.Round(Math.Sqrt(sum), 6);
+    }
+
+    private static double? ComputeNifAttributeTriangleMaxDistance(
+        ReadOnlySpan<byte> body,
+        int components,
+        NifFloatByteTransform transform,
+        int a,
+        int b,
+        int c)
+    {
+        if (components is < 2 or > 3 || body.IsEmpty)
+        {
+            return null;
+        }
+
+        var ab = ComputeNifAttributeVectorDistance(body, components, transform, a, b);
+        var bc = ComputeNifAttributeVectorDistance(body, components, transform, b, c);
+        var ca = ComputeNifAttributeVectorDistance(body, components, transform, c, a);
+        if (ab is null || bc is null || ca is null)
+        {
+            return null;
+        }
+
+        return Math.Max(ab.Value, Math.Max(bc.Value, ca.Value));
+    }
+
+    private static NifAttributeTriangleShape? ComputeNifPositionTriangleShape(
+        ReadOnlySpan<byte> body,
+        NifFloatByteTransform transform,
+        int a,
+        int b,
+        int c)
+    {
+        var va = DecodeNifAttributeVector(body, components: 3, transform, a);
+        var vb = DecodeNifAttributeVector(body, components: 3, transform, b);
+        var vc = DecodeNifAttributeVector(body, components: 3, transform, c);
+        if (va[0] is null || va[1] is null || va[2] is null ||
+            vb[0] is null || vb[1] is null || vb[2] is null ||
+            vc[0] is null || vc[1] is null || vc[2] is null)
+        {
+            return null;
+        }
+
+        var ux = vb[0]!.Value - va[0]!.Value;
+        var uy = vb[1]!.Value - va[1]!.Value;
+        var uz = vb[2]!.Value - va[2]!.Value;
+        var vx = vc[0]!.Value - va[0]!.Value;
+        var vy = vc[1]!.Value - va[1]!.Value;
+        var vz = vc[2]!.Value - va[2]!.Value;
+        var crossX = (uy * vz) - (uz * vy);
+        var crossY = (uz * vx) - (ux * vz);
+        var crossZ = (ux * vy) - (uy * vx);
+        var area = 0.5 * Math.Sqrt((crossX * crossX) + (crossY * crossY) + (crossZ * crossZ));
+        var absX = Math.Abs(crossX);
+        var absY = Math.Abs(crossY);
+        var absZ = Math.Abs(crossZ);
+        var (dominantPlane, dominantSignedArea) = absZ >= absX && absZ >= absY
+            ? ("xy", 0.5 * crossZ)
+            : absY >= absX && absY >= absZ
+                ? ("xz", 0.5 * crossY)
+                : ("yz", 0.5 * crossX);
+
+        return new NifAttributeTriangleShape(
+            Area: Math.Round(area, 6),
+            DominantPlane: dominantPlane,
+            DominantSignedArea: Math.Round(dominantSignedArea, 6));
+    }
+
+    private static List<NifAttributeExtraMappingPositionFitness> BuildNifAttributeMappingPositionFitness(
+        byte[] payload,
+        IReadOnlyDictionary<int, NifBlockInfo> blocksByIndex,
+        NifMeshAttributeSetSample attributeSet,
+        ReadOnlySpan<byte> indexBody,
+        NifAttributeExtraIndexCompatibility? indexCompatibility)
+    {
+        if (indexCompatibility is null ||
+            indexBody.Length < 6 ||
+            !TryGetNifAttributeFloatBody(payload, blocksByIndex, attributeSet.PositionBlockIndex, attributeSet.PositionRole, components: 3, out var positionBody, out var positionTransform))
+        {
+            return [];
+        }
+
+        var hasNormalBody = TryGetNifAttributeFloatBody(payload, blocksByIndex, attributeSet.NormalBlockIndex, attributeSet.NormalRole, components: 3, out var normalBody, out var normalTransform);
+        var hasUvBody = TryGetNifAttributeFloatBody(payload, blocksByIndex, attributeSet.UvBlockIndex, attributeSet.UvRole, components: 2, out var uvBody, out var uvTransform);
+        var indices = ReadUInt16BigEndianValues(indexBody);
+
+        var fitness = new List<NifAttributeExtraMappingPositionFitness>();
+        foreach (var mapping in indexCompatibility.MappingCandidates)
+        {
+            fitness.Add(BuildNifAttributeMappingPositionFitnessCandidate(
+                mapping,
+                indices,
+                positionBody,
+                positionTransform,
+                hasNormalBody ? normalBody : ReadOnlySpan<byte>.Empty,
+                hasNormalBody ? normalTransform : NifFloatByteTransform.LittleEndian,
+                hasNormalBody ? 3 : 0,
+                hasUvBody ? uvBody : ReadOnlySpan<byte>.Empty,
+                hasUvBody ? uvTransform : NifFloatByteTransform.LittleEndian,
+                hasUvBody ? 2 : 0,
+                attributeSet.VertexCount,
+                indexCompatibility.StripStructure.Hint));
+        }
+
+        return fitness;
+    }
+
+    private static bool TryGetNifAttributeFloatBody(
+        byte[] payload,
+        IReadOnlyDictionary<int, NifBlockInfo> blocksByIndex,
+        int blockIndex,
+        string role,
+        int components,
+        out ReadOnlySpan<byte> body,
+        out NifFloatByteTransform transform)
+    {
+        body = ReadOnlySpan<byte>.Empty;
+        transform = role.Contains("ror1", StringComparison.OrdinalIgnoreCase)
+            ? NifFloatByteTransform.RotateRight1
+            : NifFloatByteTransform.LittleEndian;
+        if (components is < 2 or > 3 || !blocksByIndex.TryGetValue(blockIndex, out var streamBlock))
+        {
+            return false;
+        }
+
+        var blockPayload = SliceNifBlockPayload(payload, streamBlock);
+        if (blockPayload.Length < 4)
+        {
+            return false;
+        }
+
+        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+        if (declaredPayloadBytes > blockPayload.Length)
+        {
+            return false;
+        }
+
+        var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
+        body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
+        return body.Length >= components * 4;
+    }
+
+    private static NifAttributeExtraMappingPositionFitness BuildNifAttributeMappingPositionFitnessCandidate(
+        NifAttributeExtraIndexMappingCandidate mapping,
+        List<ushort> indices,
+        ReadOnlySpan<byte> positionBody,
+        NifFloatByteTransform positionTransform,
+        ReadOnlySpan<byte> normalBody,
+        NifFloatByteTransform normalTransform,
+        int normalComponents,
+        ReadOnlySpan<byte> uvBody,
+        NifFloatByteTransform uvTransform,
+        int uvComponents,
+        int vertexCount,
+        string restartModeHypothesis)
+    {
+        var triangleWindowCount = Math.Max(0, indices.Count - 2);
+        var nonDegenerateTriangleWindowCount = 0;
+        var outOfRangeTriangleWindowCount = 0;
+        var finiteMaxEdges = new List<double>(triangleWindowCount);
+        var triangleSamples = new List<NifAttributeExtraMappingPositionTriangleSample>();
+        var segmentedTriangleWindowCount = 0;
+        var segmentedMaxEdges = new List<double>(triangleWindowCount);
+        var segmentedNormalDeltas = new List<double>(triangleWindowCount);
+        var segmentedUvDeltas = new List<double>(triangleWindowCount);
+        var segmentedAreas = new List<double>(triangleWindowCount);
+        var segmentedNearZeroAreaCount = 0;
+        var segmentedTriangleSamples = new List<NifAttributeExtraMappingPositionTriangleSample>();
+        var firstSegmentTriangleSamples = new List<NifAttributeExtraMappingPositionTriangleSample>();
+        var segmentSamples = new List<NifAttributeExtraMappingPositionSegmentSample>();
+        int? segmentStartWindow = null;
+        int segmentTriangleWindowCount = 0;
+        int segmentFiniteTriangleWindowCount = 0;
+        int segmentStartA = 0;
+        int segmentStartB = 0;
+        int segmentEndB = 0;
+        int segmentEndC = 0;
+        var segmentMaxEdges = new List<double>();
+
+        for (var i = 0; i + 2 < indices.Count; i++)
+        {
+            var a = indices[i] + mapping.IndexOffset;
+            var b = indices[i + 1] + mapping.IndexOffset;
+            var c = indices[i + 2] + mapping.IndexOffset;
+            if (a == b || a == c || b == c)
+            {
+                closeSegment();
+                continue;
+            }
+
+            nonDegenerateTriangleWindowCount++;
+            if (a < 0 || a >= vertexCount || b < 0 || b >= vertexCount || c < 0 || c >= vertexCount)
+            {
+                outOfRangeTriangleWindowCount++;
+                closeSegment();
+                continue;
+            }
+
+            if (segmentStartWindow is null)
+            {
+                segmentStartWindow = i;
+                segmentStartA = a;
+                segmentStartB = b;
+                segmentMaxEdges.Clear();
+                segmentTriangleWindowCount = 0;
+                segmentFiniteTriangleWindowCount = 0;
+            }
+
+            segmentedTriangleWindowCount++;
+            segmentTriangleWindowCount++;
+            segmentEndB = b;
+            segmentEndC = c;
+            var ab = ComputeNifAttributeVectorDistance(positionBody, components: 3, positionTransform, a, b);
+            var bc = ComputeNifAttributeVectorDistance(positionBody, components: 3, positionTransform, b, c);
+            var ca = ComputeNifAttributeVectorDistance(positionBody, components: 3, positionTransform, c, a);
+            if (ab is null || bc is null || ca is null)
+            {
+                continue;
+            }
+
+            var maxEdge = Math.Max(ab.Value, Math.Max(bc.Value, ca.Value));
+            var normalMaxDelta = ComputeNifAttributeTriangleMaxDistance(normalBody, normalComponents, normalTransform, a, b, c);
+            var uvMaxDelta = ComputeNifAttributeTriangleMaxDistance(uvBody, uvComponents, uvTransform, a, b, c);
+            var shape = ComputeNifPositionTriangleShape(positionBody, positionTransform, a, b, c);
+            finiteMaxEdges.Add(maxEdge);
+            segmentedMaxEdges.Add(maxEdge);
+            if (normalMaxDelta is not null)
+            {
+                segmentedNormalDeltas.Add(normalMaxDelta.Value);
+            }
+
+            if (uvMaxDelta is not null)
+            {
+                segmentedUvDeltas.Add(uvMaxDelta.Value);
+            }
+
+            if (shape is not null)
+            {
+                segmentedAreas.Add(shape.Area);
+                if (shape.Area <= 0.000001)
+                {
+                    segmentedNearZeroAreaCount++;
+                }
+            }
+
+            segmentMaxEdges.Add(maxEdge);
+            segmentFiniteTriangleWindowCount++;
+            var triangleSample = new NifAttributeExtraMappingPositionTriangleSample(
+                StripWindowIndex: i,
+                A: a,
+                B: b,
+                C: c,
+                AB: ab,
+                BC: bc,
+                CA: ca,
+                MaxEdge: maxEdge,
+                NormalMaxDelta: normalMaxDelta,
+                UvMaxDelta: uvMaxDelta,
+                Area: shape?.Area,
+                DominantAreaPlane: shape?.DominantPlane,
+                DominantSignedArea: shape?.DominantSignedArea,
+                StripWindingParity: (i & 1) == 0 ? "even" : "odd");
+            triangleSamples.Add(triangleSample);
+            segmentedTriangleSamples.Add(triangleSample);
+            if (firstSegmentTriangleSamples.Count < 24)
+            {
+                firstSegmentTriangleSamples.Add(triangleSample);
+            }
+        }
+
+        closeSegment();
+        var sortedEdges = finiteMaxEdges.OrderBy(static e => e).ToList();
+        var sortedSegmentedEdges = segmentedMaxEdges.OrderBy(static e => e).ToList();
+        var sortedSegmentedNormalDeltas = segmentedNormalDeltas.OrderBy(static e => e).ToList();
+        var sortedSegmentedUvDeltas = segmentedUvDeltas.OrderBy(static e => e).ToList();
+        var sortedSegmentedAreas = segmentedAreas.OrderBy(static e => e).ToList();
+        var segmentedMedian = GetPercentile(sortedSegmentedEdges, 0.50);
+        var continuousMedian = GetPercentile(sortedEdges, 0.50);
+        return new NifAttributeExtraMappingPositionFitness(
+            MappingName: mapping.Name,
+            IndexOffset: mapping.IndexOffset,
+            RestartModeHypothesis: restartModeHypothesis,
+            TriangleWindowCount: triangleWindowCount,
+            NonDegenerateTriangleWindowCount: nonDegenerateTriangleWindowCount,
+            OutOfRangeTriangleWindowCount: outOfRangeTriangleWindowCount,
+            FiniteTriangleWindowCount: finiteMaxEdges.Count,
+            AverageMaxEdge: finiteMaxEdges.Count == 0 ? null : Math.Round(finiteMaxEdges.Average(), 6),
+            MedianMaxEdge: continuousMedian,
+            P95MaxEdge: GetPercentile(sortedEdges, 0.95),
+            MaxEdge: sortedEdges.Count == 0 ? null : Math.Round(sortedEdges[^1], 6),
+            SegmentCount: segmentSamples.Count,
+            SegmentedTriangleWindowCount: segmentedTriangleWindowCount,
+            DroppedDegenerateWindowCount: triangleWindowCount - nonDegenerateTriangleWindowCount,
+            DroppedCrossSegmentWindowCount: Math.Max(0, nonDegenerateTriangleWindowCount - segmentedTriangleWindowCount - outOfRangeTriangleWindowCount),
+            SegmentedFiniteTriangleWindowCount: segmentedMaxEdges.Count,
+            SegmentedAverageMaxEdge: segmentedMaxEdges.Count == 0 ? null : Math.Round(segmentedMaxEdges.Average(), 6),
+            SegmentedMedianMaxEdge: segmentedMedian,
+            SegmentedP95MaxEdge: GetPercentile(sortedSegmentedEdges, 0.95),
+            SegmentedMaxEdge: sortedSegmentedEdges.Count == 0 ? null : Math.Round(sortedSegmentedEdges[^1], 6),
+            SegmentedFiniteNormalTriangleWindowCount: segmentedNormalDeltas.Count,
+            SegmentedMedianNormalDelta: GetPercentile(sortedSegmentedNormalDeltas, 0.50),
+            SegmentedP95NormalDelta: GetPercentile(sortedSegmentedNormalDeltas, 0.95),
+            SegmentedMaxNormalDelta: sortedSegmentedNormalDeltas.Count == 0 ? null : Math.Round(sortedSegmentedNormalDeltas[^1], 6),
+            SegmentedFiniteUvTriangleWindowCount: segmentedUvDeltas.Count,
+            SegmentedMedianUvDelta: GetPercentile(sortedSegmentedUvDeltas, 0.50),
+            SegmentedP95UvDelta: GetPercentile(sortedSegmentedUvDeltas, 0.95),
+            SegmentedMaxUvDelta: sortedSegmentedUvDeltas.Count == 0 ? null : Math.Round(sortedSegmentedUvDeltas[^1], 6),
+            SegmentedFiniteAreaTriangleWindowCount: segmentedAreas.Count,
+            SegmentedMedianTriangleArea: GetPercentile(sortedSegmentedAreas, 0.50),
+            SegmentedMinTriangleArea: sortedSegmentedAreas.Count == 0 ? null : Math.Round(sortedSegmentedAreas[0], 6),
+            SegmentedNearZeroTriangleAreaCount: segmentedNearZeroAreaCount,
+            ContinuousToSegmentedMedianDelta: continuousMedian is null || segmentedMedian is null ? null : Math.Round(continuousMedian.Value - segmentedMedian.Value, 6),
+            WorstTriangles: triangleSamples
+                .OrderByDescending(static t => t.MaxEdge ?? -1)
+                .ThenBy(static t => t.StripWindowIndex)
+                .Take(8)
+                .ToList(),
+            WorstSegmentedTriangles: segmentedTriangleSamples
+                .OrderByDescending(static t => t.MaxEdge ?? -1)
+                .ThenBy(static t => t.StripWindowIndex)
+                .Take(8)
+                .ToList(),
+            FirstSegmentProofReview: BuildNifAttributeExtraFirstSegmentProofReview(firstSegmentTriangleSamples),
+            FirstSegmentTriangles: firstSegmentTriangleSamples,
+            FirstSegments: segmentSamples.Take(16)
+                .ToList());
+
+        void closeSegment()
+        {
+            if (segmentStartWindow is null || segmentTriangleWindowCount <= 0)
+            {
+                segmentStartWindow = null;
+                segmentTriangleWindowCount = 0;
+                segmentFiniteTriangleWindowCount = 0;
+                segmentMaxEdges.Clear();
+                return;
+            }
+
+            var sortedSegmentEdges = segmentMaxEdges.OrderBy(static e => e).ToList();
+            segmentSamples.Add(new NifAttributeExtraMappingPositionSegmentSample(
+                StartWindow: segmentStartWindow.Value,
+                EndWindow: segmentStartWindow.Value + segmentTriangleWindowCount - 1,
+                TriangleWindowCount: segmentTriangleWindowCount,
+                FiniteTriangleWindowCount: segmentFiniteTriangleWindowCount,
+                StartA: segmentStartA,
+                StartB: segmentStartB,
+                EndB: segmentEndB,
+                EndC: segmentEndC,
+                MedianMaxEdge: GetPercentile(sortedSegmentEdges, 0.50),
+                MaxEdge: sortedSegmentEdges.Count == 0 ? null : Math.Round(sortedSegmentEdges[^1], 6)));
+
+            segmentStartWindow = null;
+            segmentTriangleWindowCount = 0;
+            segmentFiniteTriangleWindowCount = 0;
+            segmentMaxEdges.Clear();
+        }
+    }
+
+    private static NifAttributeExtraFirstSegmentProofReview BuildNifAttributeExtraFirstSegmentProofReview(
+        List<NifAttributeExtraMappingPositionTriangleSample> samples)
+    {
+        const double areaEpsilon = 0.000001;
+        var nearZeroAreaCount = 0;
+        var positiveSignedAreaCount = 0;
+        var negativeSignedAreaCount = 0;
+        var zeroSignedAreaCount = 0;
+        var dominantPlaneSwitchCount = 0;
+        var dominantSignedAreaSignSwitchCount = 0;
+        var contiguousWindowTransitionCount = 0;
+        var nonContiguousWindowTransitionCount = 0;
+        var nonAlternatingParityTransitionCount = 0;
+        var planeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var sample = samples[i];
+            var plane = string.IsNullOrWhiteSpace(sample.DominantAreaPlane)
+                ? "unknown"
+                : sample.DominantAreaPlane;
+            planeCounts[plane] = planeCounts.GetValueOrDefault(plane) + 1;
+
+            if (sample.Area is null || Math.Abs(sample.Area.Value) <= areaEpsilon)
+            {
+                nearZeroAreaCount++;
+            }
+
+            var sign = GetDominantSignedAreaSign(sample, areaEpsilon);
+            switch (sign)
+            {
+                case > 0:
+                    positiveSignedAreaCount++;
+                    break;
+                case < 0:
+                    negativeSignedAreaCount++;
+                    break;
+                default:
+                    zeroSignedAreaCount++;
+                    break;
+            }
+
+            if (i == 0)
+            {
+                continue;
+            }
+
+            var previous = samples[i - 1];
+            if (sample.StripWindowIndex == previous.StripWindowIndex + 1)
+            {
+                contiguousWindowTransitionCount++;
+                if (string.Equals(sample.StripWindingParity, previous.StripWindingParity, StringComparison.OrdinalIgnoreCase))
+                {
+                    nonAlternatingParityTransitionCount++;
+                }
+            }
+            else
+            {
+                nonContiguousWindowTransitionCount++;
+            }
+
+            if (!string.IsNullOrWhiteSpace(sample.DominantAreaPlane) &&
+                !string.IsNullOrWhiteSpace(previous.DominantAreaPlane) &&
+                !string.Equals(sample.DominantAreaPlane, previous.DominantAreaPlane, StringComparison.OrdinalIgnoreCase))
+            {
+                dominantPlaneSwitchCount++;
+            }
+
+            var previousSign = GetDominantSignedAreaSign(previous, areaEpsilon);
+            if (previousSign != 0 && sign != 0 && previousSign != sign)
+            {
+                dominantSignedAreaSignSwitchCount++;
+            }
+        }
+
+        var reviewFlags = new List<string>();
+        if (samples.Count == 0)
+        {
+            reviewFlags.Add("no-first-segment-triangle-samples");
+        }
+
+        if (nearZeroAreaCount > 0)
+        {
+            reviewFlags.Add($"near-zero-area={nearZeroAreaCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (nonContiguousWindowTransitionCount > 0)
+        {
+            reviewFlags.Add($"non-contiguous-windows={nonContiguousWindowTransitionCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (nonAlternatingParityTransitionCount > 0)
+        {
+            reviewFlags.Add($"non-alternating-parity={nonAlternatingParityTransitionCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (dominantPlaneSwitchCount > 0)
+        {
+            reviewFlags.Add($"dominant-plane-switches={dominantPlaneSwitchCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (dominantSignedAreaSignSwitchCount > 0)
+        {
+            reviewFlags.Add($"dominant-sign-switches={dominantSignedAreaSignSwitchCount.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (reviewFlags.Count == 0)
+        {
+            reviewFlags.Add("none");
+        }
+
+        return new NifAttributeExtraFirstSegmentProofReview(
+            TriangleSampleCount: samples.Count,
+            NearZeroAreaCount: nearZeroAreaCount,
+            DominantPlaneCounts: planeCounts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
+                .ToList(),
+            PositiveDominantSignedAreaCount: positiveSignedAreaCount,
+            NegativeDominantSignedAreaCount: negativeSignedAreaCount,
+            ZeroDominantSignedAreaCount: zeroSignedAreaCount,
+            DominantPlaneSwitchCount: dominantPlaneSwitchCount,
+            DominantSignedAreaSignSwitchCount: dominantSignedAreaSignSwitchCount,
+            ContiguousWindowTransitionCount: contiguousWindowTransitionCount,
+            NonContiguousWindowTransitionCount: nonContiguousWindowTransitionCount,
+            NonAlternatingParityTransitionCount: nonAlternatingParityTransitionCount,
+            ReviewFlags: reviewFlags);
+
+        static int GetDominantSignedAreaSign(NifAttributeExtraMappingPositionTriangleSample sample, double epsilon)
+        {
+            if (sample.DominantSignedArea is null || Math.Abs(sample.DominantSignedArea.Value) <= epsilon)
+            {
+                return 0;
+            }
+
+            return sample.DominantSignedArea.Value > 0 ? 1 : -1;
+        }
+    }
+
+    private static double? GetPercentile(List<double> sortedValues, double percentile)
+    {
+        if (sortedValues.Count == 0)
+        {
+            return null;
+        }
+
+        var index = Math.Clamp((int)Math.Ceiling(percentile * sortedValues.Count) - 1, 0, sortedValues.Count - 1);
+        return Math.Round(sortedValues[index], 6);
+    }
+
+    private static string GetNifAttributeMappingFitnessPreference(
+        NifAttributeExtraMappingPositionFitness? rawFitness,
+        NifAttributeExtraMappingPositionFitness? subtractOneFitness)
+    {
+        var rawMedian = rawFitness?.SegmentedMedianMaxEdge ?? rawFitness?.MedianMaxEdge;
+        var subtractOneMedian = subtractOneFitness?.SegmentedMedianMaxEdge ?? subtractOneFitness?.MedianMaxEdge;
+        if (rawMedian is null || subtractOneMedian is null)
+        {
+            return "insufficient";
+        }
+
+        var delta = subtractOneMedian.Value - rawMedian.Value;
+        if (Math.Abs(delta) <= 0.000001)
+        {
+            return "tie";
+        }
+
+        return delta > 0 ? "raw-zero-based" : "subtract-one";
+    }
+
+    private static double? ToNullableDouble(float? value) => value is null ? null : (double)value.Value;
+
+    private static string FormatNifAttributeVertexSample(NifAttributeVertexSample sample)
+    {
+        var components = sample.Components > 2
+            ? $"{FormatNullableDouble(sample.X)},{FormatNullableDouble(sample.Y)},{FormatNullableDouble(sample.Z)}"
+            : $"{FormatNullableDouble(sample.X)},{FormatNullableDouble(sample.Y)}";
+        var metrics = sample.Attribute.Equals("normal", StringComparison.OrdinalIgnoreCase)
+            ? $" len={FormatNullableDouble(sample.VectorLength)}"
+            : $" prev={FormatNullableDouble(sample.PreviousDistance)} next={FormatNullableDouble(sample.NextDistance)}";
+        return $"v{sample.Index}=({components}){metrics}";
+    }
+
+    private static string FormatNullableDouble(double? value)
+    {
+        return value?.ToString("g6", CultureInfo.InvariantCulture) ?? "null";
+    }
+
+    private static string FormatNullableInt(int? value)
+    {
+        return value?.ToString(CultureInfo.InvariantCulture) ?? "null";
+    }
+
+    private static string GetNifAttributeExtraIndexBaseHint(int vertexCount, NifUInt16BeIndexStats indexStats)
+    {
+        if (indexStats.BigEndianMinIndex == 0 && indexStats.BigEndianMaxIndex < vertexCount)
+        {
+            return "zero-based-compatible";
+        }
+
+        if (indexStats.BigEndianMinIndex == 1 && indexStats.BigEndianMaxIndex == vertexCount - 1)
+        {
+            return "one-based-or-reserved-zero-ambiguous";
+        }
+
+        if (indexStats.BigEndianMinIndex > 0 && indexStats.BigEndianMaxIndex < vertexCount)
+        {
+            return "zero-index-absent-compatible";
+        }
+
+        return "index-range-incompatible";
+    }
+
+    private static List<NifTriangleStripPreviewTriangle> BuildNifTriangleStripPreview(List<ushort> indices, int maxTriangles)
+    {
+        var triangles = new List<NifTriangleStripPreviewTriangle>();
+        for (var i = 0; i + 2 < indices.Count && triangles.Count < maxTriangles; i++)
+        {
+            var a = indices[i];
+            var b = indices[i + 1];
+            var c = indices[i + 2];
+            var degenerate = a == b || a == c || b == c;
+            triangles.Add(new NifTriangleStripPreviewTriangle(
+                Index: i,
+                A: a,
+                B: b,
+                C: c,
+                WindingParity: (i % 2) == 0 ? "even" : "odd",
+                Degenerate: degenerate));
+        }
+
+        return triangles;
+    }
+
+    private static NifTriangleStripStructureStats BuildNifTriangleStripStructureStats(List<ushort> indices)
+    {
+        var triangleWindowCount = Math.Max(0, indices.Count - 2);
+        var degenerateRuns = new List<NifTriangleStripWindowRunSample>();
+        var nonDegenerateRuns = new List<NifTriangleStripWindowRunSample>();
+        var sentinelRestartValueCount = 0;
+        var zeroIndexValueCount = 0;
+        var adjacentRepeatCount = 0;
+        var mirroredAdjacentRepeatBridgeCount = 0;
+
+        foreach (var index in indices)
+        {
+            if (index == 0)
+            {
+                zeroIndexValueCount++;
+            }
+
+            if (index == ushort.MaxValue)
+            {
+                sentinelRestartValueCount++;
+            }
+        }
+
+        for (var i = 0; i + 1 < indices.Count; i++)
+        {
+            if (indices[i] == indices[i + 1])
+            {
+                adjacentRepeatCount++;
+            }
+        }
+
+        for (var i = 1; i + 2 < indices.Count; i++)
+        {
+            if (indices[i] == indices[i + 1] &&
+                indices[i - 1] == indices[i + 2] &&
+                indices[i - 1] != indices[i])
+            {
+                mirroredAdjacentRepeatBridgeCount++;
+            }
+        }
+
+        var degenerateWindowCount = 0;
+        var runStart = 0;
+        bool? currentDegenerate = null;
+        for (var window = 0; window < triangleWindowCount; window++)
+        {
+            var a = indices[window];
+            var b = indices[window + 1];
+            var c = indices[window + 2];
+            var degenerate = a == b || a == c || b == c;
+            if (degenerate)
+            {
+                degenerateWindowCount++;
+            }
+
+            if (currentDegenerate is null)
+            {
+                currentDegenerate = degenerate;
+                runStart = window;
+                continue;
+            }
+
+            if (currentDegenerate.Value != degenerate)
+            {
+                addRun(currentDegenerate.Value, runStart, window - runStart);
+                currentDegenerate = degenerate;
+                runStart = window;
+            }
+        }
+
+        if (currentDegenerate is not null)
+        {
+            addRun(currentDegenerate.Value, runStart, triangleWindowCount - runStart);
+        }
+
+        var hint = sentinelRestartValueCount > 0
+            ? "sentinel-restart-markers-present"
+            : mirroredAdjacentRepeatBridgeCount > 0
+                ? "degenerate-bridge-stitch-candidate"
+                : degenerateWindowCount == 0
+                    ? "continuous-strip-no-degenerate-markers"
+                    : "degenerate-markers-no-clear-bridge";
+
+        return new NifTriangleStripStructureStats(
+            Hint: hint,
+            IndexCount: indices.Count,
+            TriangleWindowCount: triangleWindowCount,
+            DegenerateWindowCount: degenerateWindowCount,
+            NonDegenerateWindowCount: triangleWindowCount - degenerateWindowCount,
+            DegenerateRunCount: degenerateRuns.Count,
+            MaxDegenerateRunLength: degenerateRuns.Count == 0 ? 0 : degenerateRuns.Max(static r => r.Length),
+            NonDegenerateRunCount: nonDegenerateRuns.Count,
+            MaxNonDegenerateRunLength: nonDegenerateRuns.Count == 0 ? 0 : nonDegenerateRuns.Max(static r => r.Length),
+            AverageNonDegenerateRunLength: nonDegenerateRuns.Count == 0 ? 0 : Math.Round(nonDegenerateRuns.Average(static r => r.Length), 2),
+            AdjacentRepeatCount: adjacentRepeatCount,
+            MirroredAdjacentRepeatBridgeCount: mirroredAdjacentRepeatBridgeCount,
+            SentinelRestartValueCount: sentinelRestartValueCount,
+            ZeroIndexValueCount: zeroIndexValueCount,
+            FirstDegenerateRuns: degenerateRuns.Take(12).ToList(),
+            FirstNonDegenerateRuns: nonDegenerateRuns.Take(12).ToList());
+
+        void addRun(bool degenerate, int startWindow, int length)
+        {
+            if (length <= 0)
+            {
+                return;
+            }
+
+            var run = new NifTriangleStripWindowRunSample(
+                StartWindow: startWindow,
+                Length: length,
+                EndWindow: startWindow + length - 1);
+            if (degenerate)
+            {
+                degenerateRuns.Add(run);
+            }
+            else
+            {
+                nonDegenerateRuns.Add(run);
+            }
+        }
+    }
+
+    private static NifAttributeExtraGroupedView BuildNifAttributeExtraGroupedView(string name, ReadOnlySpan<byte> body, int slotCount)
+    {
+        if (slotCount <= 0 || body.Length == 0)
+        {
+            return new NifAttributeExtraGroupedView(
+                Name: name,
+                SlotCount: Math.Max(0, slotCount),
+                BodyBytes: body.Length,
+                BytesPerSlot: null,
+                ExactFit: false,
+                RemainderBytes: body.Length,
+                PrefixSlots: [],
+                RemainderFirst32: ToHex(body[..Math.Min(32, body.Length)]));
+        }
+
+        var bytesPerSlot = body.Length / slotCount;
+        var remainderBytes = body.Length % slotCount;
+        var prefixSlots = new List<NifAttributeExtraGroupSlot>();
+        if (bytesPerSlot > 0)
+        {
+            var prefixSlotCount = Math.Min(slotCount, 24);
+            for (var i = 0; i < prefixSlotCount; i++)
+            {
+                var offset = i * bytesPerSlot;
+                var slot = body.Slice(offset, bytesPerSlot);
+                prefixSlots.Add(new NifAttributeExtraGroupSlot(
+                    Index: i,
+                    Offset: offset,
+                    Hex: ToHex(slot),
+                    UInt16LittleEndianPrefix: ReadUInt16Prefix(slot, maxValues: 8),
+                    UInt16BigEndianPrefix: ReadUInt16BigEndianPrefix(slot, maxValues: 8),
+                    UInt32LittleEndianPrefix: ReadUInt32Prefix(slot, maxValues: 4),
+                    UInt32BigEndianPrefix: ReadUInt32BigEndianPrefix(slot, maxValues: 4),
+                    Float32LittleEndianPrefix: ReadFloat32Prefix(slot, maxValues: 4),
+                    Float32BigEndianPrefix: ReadFloat32BigEndianPrefix(slot, maxValues: 4)));
+            }
+        }
+
+        var remainderOffset = bytesPerSlot * slotCount;
+        var remainderFirst32 = remainderBytes > 0 && remainderOffset < body.Length
+            ? ToHex(body.Slice(remainderOffset, Math.Min(32, body.Length - remainderOffset)))
+            : null;
+        return new NifAttributeExtraGroupedView(
+            Name: name,
+            SlotCount: slotCount,
+            BodyBytes: body.Length,
+            BytesPerSlot: bytesPerSlot > 0 ? bytesPerSlot : null,
+            ExactFit: remainderBytes == 0,
+            RemainderBytes: remainderBytes,
+            PrefixSlots: prefixSlots,
+            RemainderFirst32: remainderFirst32);
     }
 
     private static ReadOnlySpan<byte> SliceNifBlockPayload(byte[] payload, NifBlockInfo block)
@@ -5965,6 +7651,25 @@ internal static class Program
                 Confidence: 10,
                 RoleCandidates: ["all-zero-stream"],
                 Evidence: ["all bytes are zero"],
+                VertexCountCandidates: vertexCountCandidates,
+                IndexMax: null,
+                IndexPairCount: null,
+                BodyStats: bodyStats,
+                EndianStats: endianStats,
+                IndexStats: indexStats,
+                Float2Stats: float2Stats,
+                Float3Stats: float3Stats,
+                RotatedFloat2Stats: rotatedFloat2Stats,
+                RotatedFloat3Stats: rotatedFloat3Stats);
+        }
+
+        if (bodyStats.Classification is "u32-sentinel-mask-body" or "u32-repeated-pattern-body")
+        {
+            return new NifMeshStreamRoleStats(
+                PrimaryRole: bodyStats.Classification,
+                Confidence: 25,
+                RoleCandidates: [bodyStats.Classification],
+                Evidence: [$"stream body classifier={bodyStats.Classification}; low-variation uint32 body is not promoted to geometry"],
                 VertexCountCandidates: vertexCountCandidates,
                 IndexMax: null,
                 IndexPairCount: null,
@@ -6865,6 +8570,19 @@ internal static class Program
         if (nonZeroBytes == 0)
         {
             return "all-zero-body";
+        }
+
+        if (byteLength % 4 == 0 &&
+            uint32Distinct is 1 or 2 &&
+            uint32Max == uint.MaxValue)
+        {
+            return "u32-sentinel-mask-body";
+        }
+
+        if (byteLength % 4 == 0 &&
+            uint32Distinct is 1 or 2)
+        {
+            return "u32-repeated-pattern-body";
         }
 
         if (byteLength % 4 == 0 &&
@@ -8411,6 +10129,7 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-streams --root <SourceFolder> --id <16hex> --mesh-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --root <SourceFolder> --id <16hex> --mesh-block <n>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-attribute-extra --root <SourceFolder> --id <16hex> --mesh-block <n> --extra-offset <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-stream-body --root <SourceFolder> --id <16hex> --stream-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
@@ -8449,6 +10168,8 @@ internal static class Program
         Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
         Console.WriteLine("  --stream-block <n>");
         Console.WriteLine("                  Optional NiDataStream block index filter for probe-nif-stream-body");
+        Console.WriteLine("  --extra-offset <n>");
+        Console.WriteLine("                  Mesh payload offset for probe-nif-attribute-extra");
         Console.WriteLine("  --fnv <uint|0xhex>");
         Console.WriteLine("                  Only extract entries with this filename FNV1 hash");
         Console.WriteLine("  --type <kind>   Only write/inspect detected type such as dds, riff, txt, bin, nif, lzma2");
@@ -8582,6 +10303,7 @@ internal static class Program
         string Lzma2Mode,
         int? MeshBlockFilter,
         int? StreamBlockFilter,
+        int? ExtraOffsetFilter,
         bool RedactPaths)
     {
         public static AppOptions Parse(string[] args)
@@ -8615,6 +10337,7 @@ internal static class Program
             var lzma2Mode = "auto";
             int? meshBlockFilter = null;
             int? streamBlockFilter = null;
+            int? extraOffsetFilter = null;
             var redactPaths = true;
 
             for (var i = 0; i < args.Length; i++)
@@ -8637,6 +10360,7 @@ internal static class Program
                     case "probe-nif":
                     case "probe-nif-streams":
                     case "probe-nif-mesh":
+                    case "probe-nif-attribute-extra":
                     case "probe-nif-stream-body":
                     case "inventory-nif":
                     case "inventory-nif-blocks":
@@ -8843,6 +10567,17 @@ internal static class Program
                         }
                         streamBlockFilter = parsedStreamBlock;
                         break;
+                    case "--extra-offset":
+                        if (i + 1 >= args.Length)
+                        {
+                            throw new ArgumentException("--extra-offset requires an integer argument.");
+                        }
+                        if (!int.TryParse(args[++i], out var parsedExtraOffset) || parsedExtraOffset < 0)
+                        {
+                            throw new ArgumentException("--extra-offset must be a non-negative integer.");
+                        }
+                        extraOffsetFilter = parsedExtraOffset;
+                        break;
                     case "--max-total":
                         if (i + 1 >= args.Length)
                         {
@@ -8886,6 +10621,7 @@ internal static class Program
                 lzma2Mode,
                 meshBlockFilter,
                 streamBlockFilter,
+                extraOffsetFilter,
                 redactPaths);
         }
 
@@ -9160,6 +10896,287 @@ internal sealed record NifMeshPayloadRoleWindow(
     int Confidence,
     string First16,
     NifFloatVectorStats Stats);
+
+internal sealed record NifAttributeExtraProbeReport(
+    BinaryAssetSource Source,
+    int Length,
+    string NifVersion,
+    int MeshBlockIndex,
+    uint MeshSize,
+    int MeshDataOffset,
+    string MeshFirst64,
+    int AttributeSets,
+    int ExtraMeshPayloadOffset,
+    int Matches,
+    List<string> HeaderWarnings,
+    List<NifAttributeExtraProbeMatch> ExtraStreams);
+
+internal sealed record NifAttributeExtraProbeMatch(
+    int AttributeSetIndex,
+    int VertexCount,
+    NifAttributeTopologyStats Topology,
+    int PositionMeshPayloadOffset,
+    int PositionBlockIndex,
+    uint? PositionDeclaredPayloadBytes,
+    string PositionRole,
+    int NormalMeshPayloadOffset,
+    int NormalBlockIndex,
+    uint? NormalDeclaredPayloadBytes,
+    string NormalRole,
+    int UvMeshPayloadOffset,
+    int UvBlockIndex,
+    uint? UvDeclaredPayloadBytes,
+    string UvRole,
+    int ExtraMeshPayloadOffset,
+    int ExtraBlockIndex,
+    string ExtraTargetTypeName,
+    uint? ExtraBlockSize,
+    uint? ExtraDeclaredPayloadBytes,
+    int? HeaderBytes,
+    int? BodyOffset,
+    string Role,
+    int RoleConfidence,
+    string FitSummary,
+    string BlockFirst64,
+    string BodyFirst64,
+    string BodyFirst128,
+    NifStreamBodyStats? BodyStats,
+    List<string> RoleCandidates,
+    List<string> RoleEvidence,
+    List<int> VertexCountCandidates,
+    ushort? IndexMax,
+    int? IndexPairCount,
+    NifUInt16BeIndexStats? IndexStats,
+    NifAttributeExtraIndexCompatibility? IndexCompatibility,
+    List<NifAttributeVertexSample> PositionVertexSamples,
+    List<NifAttributeVertexSample> NormalVertexSamples,
+    List<NifAttributeVertexSample> UvVertexSamples,
+    List<NifAttributeExtraMappingPositionFitness> MappingPositionFitness,
+    List<byte> UInt8Prefix,
+    List<NifByteHistogramEntry> ByteHistogramTop,
+    List<ushort> UInt16LittleEndianPrefix,
+    List<ushort> UInt16BigEndianPrefix,
+    List<uint> UInt32LittleEndianPrefix,
+    List<uint> UInt32BigEndianPrefix,
+    List<float?> Float32LittleEndianPrefix,
+    List<float?> Float32BigEndianPrefix,
+    List<NifRepeatedBodyPattern> Repeated2BytePatterns,
+    List<NifRepeatedBodyPattern> Repeated4BytePatterns,
+    List<NifAttributeExtraGroupedView> GroupedViews);
+
+internal sealed record NifAttributeExtraIndexCompatibility(
+    string CandidateTopology,
+    int VertexCount,
+    int PairCount,
+    bool TriangleAligned,
+    int TriangleCount,
+    ushort MinIndex,
+    ushort MaxIndex,
+    int DistinctIndexCount,
+    bool MaxIndexWithinVertexCount,
+    double MaxIndexCoverageRatio,
+    double DistinctIndexCoverageRatio,
+    bool UsesZeroIndex,
+    double DegenerateTriangleRatio,
+    int TriangleStripWindowCount,
+    int TriangleStripNonDegenerateWindowCount,
+    double TriangleStripDegenerateRatio,
+    bool TriangleStripLessDegenerateThanTriples,
+    string IndexBaseHint,
+    List<ushort> FirstIndices,
+    List<NifUInt16Triple> FirstTriples,
+    List<NifTriangleStripPreviewTriangle> FirstStripTriangles,
+    List<NifAttributeExtraIndexMappingCandidate> MappingCandidates,
+    NifTriangleStripStructureStats StripStructure,
+    List<string> Evidence);
+
+internal sealed record NifAttributeExtraIndexMappingCandidate(
+    string Name,
+    int IndexOffset,
+    bool ValidForVertexCount,
+    int OutOfRangeIndexCount,
+    int ReferencedVertexCount,
+    double ReferencedVertexCoverageRatio,
+    int MissingVertexCount,
+    List<int> MissingVertexSamples,
+    int? MappedMinIndex,
+    int? MappedMaxIndex,
+    List<int> FirstMappedIndices,
+    List<NifMappedTriangleStripPreviewTriangle> FirstMappedStripTriangles,
+    List<string> Evidence);
+
+internal sealed record NifAttributeVertexSample(
+    int Index,
+    string Attribute,
+    string Role,
+    string Transform,
+    int Components,
+    double? X,
+    double? Y,
+    double? Z,
+    double? VectorLength,
+    double? PreviousDistance,
+    double? NextDistance);
+
+internal sealed record NifAttributeTriangleShape(
+    double Area,
+    string DominantPlane,
+    double DominantSignedArea);
+
+internal sealed record NifAttributeExtraMappingPositionFitness(
+    string MappingName,
+    int IndexOffset,
+    string RestartModeHypothesis,
+    int TriangleWindowCount,
+    int NonDegenerateTriangleWindowCount,
+    int OutOfRangeTriangleWindowCount,
+    int FiniteTriangleWindowCount,
+    double? AverageMaxEdge,
+    double? MedianMaxEdge,
+    double? P95MaxEdge,
+    double? MaxEdge,
+    int SegmentCount,
+    int SegmentedTriangleWindowCount,
+    int DroppedDegenerateWindowCount,
+    int DroppedCrossSegmentWindowCount,
+    int SegmentedFiniteTriangleWindowCount,
+    double? SegmentedAverageMaxEdge,
+    double? SegmentedMedianMaxEdge,
+    double? SegmentedP95MaxEdge,
+    double? SegmentedMaxEdge,
+    int SegmentedFiniteNormalTriangleWindowCount,
+    double? SegmentedMedianNormalDelta,
+    double? SegmentedP95NormalDelta,
+    double? SegmentedMaxNormalDelta,
+    int SegmentedFiniteUvTriangleWindowCount,
+    double? SegmentedMedianUvDelta,
+    double? SegmentedP95UvDelta,
+    double? SegmentedMaxUvDelta,
+    int SegmentedFiniteAreaTriangleWindowCount,
+    double? SegmentedMedianTriangleArea,
+    double? SegmentedMinTriangleArea,
+    int SegmentedNearZeroTriangleAreaCount,
+    double? ContinuousToSegmentedMedianDelta,
+    List<NifAttributeExtraMappingPositionTriangleSample> WorstTriangles,
+    List<NifAttributeExtraMappingPositionTriangleSample> WorstSegmentedTriangles,
+    NifAttributeExtraFirstSegmentProofReview FirstSegmentProofReview,
+    List<NifAttributeExtraMappingPositionTriangleSample> FirstSegmentTriangles,
+    List<NifAttributeExtraMappingPositionSegmentSample> FirstSegments);
+
+internal sealed record NifAttributeExtraFirstSegmentProofReview(
+    int TriangleSampleCount,
+    int NearZeroAreaCount,
+    List<NifStringCount> DominantPlaneCounts,
+    int PositiveDominantSignedAreaCount,
+    int NegativeDominantSignedAreaCount,
+    int ZeroDominantSignedAreaCount,
+    int DominantPlaneSwitchCount,
+    int DominantSignedAreaSignSwitchCount,
+    int ContiguousWindowTransitionCount,
+    int NonContiguousWindowTransitionCount,
+    int NonAlternatingParityTransitionCount,
+    List<string> ReviewFlags);
+
+internal sealed record NifAttributeExtraMappingPositionTriangleSample(
+    int StripWindowIndex,
+    int A,
+    int B,
+    int C,
+    double? AB,
+    double? BC,
+    double? CA,
+    double? MaxEdge,
+    double? NormalMaxDelta,
+    double? UvMaxDelta,
+    double? Area,
+    string? DominantAreaPlane,
+    double? DominantSignedArea,
+    string StripWindingParity);
+
+internal sealed record NifAttributeExtraMappingPositionSegmentSample(
+    int StartWindow,
+    int EndWindow,
+    int TriangleWindowCount,
+    int FiniteTriangleWindowCount,
+    int StartA,
+    int StartB,
+    int EndB,
+    int EndC,
+    double? MedianMaxEdge,
+    double? MaxEdge);
+
+internal sealed record NifTriangleStripPreviewTriangle(
+    int Index,
+    ushort A,
+    ushort B,
+    ushort C,
+    string WindingParity,
+    bool Degenerate);
+
+internal sealed record NifTriangleStripStructureStats(
+    string Hint,
+    int IndexCount,
+    int TriangleWindowCount,
+    int DegenerateWindowCount,
+    int NonDegenerateWindowCount,
+    int DegenerateRunCount,
+    int MaxDegenerateRunLength,
+    int NonDegenerateRunCount,
+    int MaxNonDegenerateRunLength,
+    double AverageNonDegenerateRunLength,
+    int AdjacentRepeatCount,
+    int MirroredAdjacentRepeatBridgeCount,
+    int SentinelRestartValueCount,
+    int ZeroIndexValueCount,
+    List<NifTriangleStripWindowRunSample> FirstDegenerateRuns,
+    List<NifTriangleStripWindowRunSample> FirstNonDegenerateRuns);
+
+internal sealed record NifTriangleStripWindowRunSample(
+    int StartWindow,
+    int Length,
+    int EndWindow);
+
+internal sealed record NifMappedTriangleStripPreviewTriangle(
+    int Index,
+    int A,
+    int B,
+    int C,
+    string WindingParity,
+    bool Degenerate,
+    bool OutOfRange);
+
+internal sealed record NifByteHistogramEntry(int Value, string Hex, int Count, double Ratio);
+
+internal sealed class NifRepeatedBodyPatternAccumulator(string hex, int width)
+{
+    public string Hex { get; } = hex;
+    public int Width { get; } = width;
+    public int Count { get; set; }
+    public List<int> Offsets { get; } = [];
+}
+
+internal sealed record NifRepeatedBodyPattern(string Hex, int Width, int Count, List<int> Offsets);
+
+internal sealed record NifAttributeExtraGroupedView(
+    string Name,
+    int SlotCount,
+    int BodyBytes,
+    int? BytesPerSlot,
+    bool ExactFit,
+    int RemainderBytes,
+    List<NifAttributeExtraGroupSlot> PrefixSlots,
+    string? RemainderFirst32);
+
+internal sealed record NifAttributeExtraGroupSlot(
+    int Index,
+    int Offset,
+    string Hex,
+    List<ushort> UInt16LittleEndianPrefix,
+    List<ushort> UInt16BigEndianPrefix,
+    List<uint> UInt32LittleEndianPrefix,
+    List<uint> UInt32BigEndianPrefix,
+    List<float?> Float32LittleEndianPrefix,
+    List<float?> Float32BigEndianPrefix);
 
 internal sealed record NifStreamBodyProbeReport(
     BinaryAssetSource Source,
@@ -9549,6 +11566,198 @@ internal sealed class NifAttributeExtraStreamAccumulator(
     public List<NifMeshAttributeSetSample> Samples { get; } = [];
 }
 
+internal sealed class NifAttributeExtraMappingFitnessAccumulator(
+    string pattern,
+    uint meshSize,
+    string topology,
+    int vertexCount,
+    int extraMeshPayloadOffset,
+    string extraRole,
+    uint? extraDeclaredPayloadBytes)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public string Topology { get; } = topology;
+    public int VertexCount { get; } = vertexCount;
+    public int ExtraMeshPayloadOffset { get; } = extraMeshPayloadOffset;
+    public string ExtraRole { get; } = extraRole;
+    public uint? ExtraDeclaredPayloadBytes { get; } = extraDeclaredPayloadBytes;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public int RawZeroBasedPreferredCount { get; private set; }
+    public int SubtractOnePreferredCount { get; private set; }
+    public int TieCount { get; private set; }
+    public double RawMedianMaxEdgeTotal { get; private set; }
+    public int RawMedianMaxEdgeCount { get; private set; }
+    public double SubtractOneMedianMaxEdgeTotal { get; private set; }
+    public int SubtractOneMedianMaxEdgeCount { get; private set; }
+    public double RawSegmentedMedianMaxEdgeTotal { get; private set; }
+    public int RawSegmentedMedianMaxEdgeCount { get; private set; }
+    public double SubtractOneSegmentedMedianMaxEdgeTotal { get; private set; }
+    public int SubtractOneSegmentedMedianMaxEdgeCount { get; private set; }
+    public double RawSegmentedMedianNormalDeltaTotal { get; private set; }
+    public int RawSegmentedMedianNormalDeltaCount { get; private set; }
+    public double SubtractOneSegmentedMedianNormalDeltaTotal { get; private set; }
+    public int SubtractOneSegmentedMedianNormalDeltaCount { get; private set; }
+    public double RawSegmentedMedianUvDeltaTotal { get; private set; }
+    public int RawSegmentedMedianUvDeltaCount { get; private set; }
+    public double SubtractOneSegmentedMedianUvDeltaTotal { get; private set; }
+    public int SubtractOneSegmentedMedianUvDeltaCount { get; private set; }
+    public double RawSegmentedMedianTriangleAreaTotal { get; private set; }
+    public int RawSegmentedMedianTriangleAreaCount { get; private set; }
+    public double SubtractOneSegmentedMedianTriangleAreaTotal { get; private set; }
+    public int SubtractOneSegmentedMedianTriangleAreaCount { get; private set; }
+    public double RawFirstSegmentNearZeroAreaCountTotal { get; private set; }
+    public double RawFirstSegmentDominantPlaneSwitchCountTotal { get; private set; }
+    public double RawFirstSegmentDominantSignedAreaSignSwitchCountTotal { get; private set; }
+    public double RawFirstSegmentNonContiguousWindowTransitionCountTotal { get; private set; }
+    public double RawFirstSegmentNonAlternatingParityTransitionCountTotal { get; private set; }
+    public int RawFirstSegmentProofReviewCount { get; private set; }
+    public double SubtractOneFirstSegmentNearZeroAreaCountTotal { get; private set; }
+    public double SubtractOneFirstSegmentDominantPlaneSwitchCountTotal { get; private set; }
+    public double SubtractOneFirstSegmentDominantSignedAreaSignSwitchCountTotal { get; private set; }
+    public double SubtractOneFirstSegmentNonContiguousWindowTransitionCountTotal { get; private set; }
+    public double SubtractOneFirstSegmentNonAlternatingParityTransitionCountTotal { get; private set; }
+    public int SubtractOneFirstSegmentProofReviewCount { get; private set; }
+    public double SegmentCountTotal { get; private set; }
+    public double SegmentedTriangleWindowCountTotal { get; private set; }
+    public double DroppedDegenerateWindowCountTotal { get; private set; }
+    public double DroppedCrossSegmentWindowCountTotal { get; private set; }
+    public Dictionary<string, int> StripStructureHintCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public int StripStructureCount { get; private set; }
+    public double AdjacentRepeatCountTotal { get; private set; }
+    public double MirroredBridgeCountTotal { get; private set; }
+    public double DegenerateRunCountTotal { get; private set; }
+    public double MaxDegenerateRunLengthTotal { get; private set; }
+    public double NonDegenerateRunCountTotal { get; private set; }
+    public double MaxNonDegenerateRunLengthTotal { get; private set; }
+    public int SentinelRestartValueCountTotal { get; private set; }
+    public int ZeroIndexValueCountTotal { get; private set; }
+    public List<NifAttributeExtraMappingFitnessSample> Samples { get; } = [];
+
+    public void AddFitness(
+        NifAttributeExtraMappingPositionFitness? rawFitness,
+        NifAttributeExtraMappingPositionFitness? subtractOneFitness,
+        string preferredMapping)
+    {
+        if (rawFitness?.MedianMaxEdge is not null)
+        {
+            RawMedianMaxEdgeTotal += rawFitness.MedianMaxEdge.Value;
+            RawMedianMaxEdgeCount++;
+        }
+
+        if (rawFitness?.SegmentedMedianMaxEdge is not null)
+        {
+            RawSegmentedMedianMaxEdgeTotal += rawFitness.SegmentedMedianMaxEdge.Value;
+            RawSegmentedMedianMaxEdgeCount++;
+        }
+
+        if (rawFitness?.SegmentedMedianNormalDelta is not null)
+        {
+            RawSegmentedMedianNormalDeltaTotal += rawFitness.SegmentedMedianNormalDelta.Value;
+            RawSegmentedMedianNormalDeltaCount++;
+        }
+
+        if (rawFitness?.SegmentedMedianUvDelta is not null)
+        {
+            RawSegmentedMedianUvDeltaTotal += rawFitness.SegmentedMedianUvDelta.Value;
+            RawSegmentedMedianUvDeltaCount++;
+        }
+
+        if (rawFitness?.SegmentedMedianTriangleArea is not null)
+        {
+            RawSegmentedMedianTriangleAreaTotal += rawFitness.SegmentedMedianTriangleArea.Value;
+            RawSegmentedMedianTriangleAreaCount++;
+        }
+
+        if (rawFitness is not null)
+        {
+            RawFirstSegmentProofReviewCount++;
+            RawFirstSegmentNearZeroAreaCountTotal += rawFitness.FirstSegmentProofReview.NearZeroAreaCount;
+            RawFirstSegmentDominantPlaneSwitchCountTotal += rawFitness.FirstSegmentProofReview.DominantPlaneSwitchCount;
+            RawFirstSegmentDominantSignedAreaSignSwitchCountTotal += rawFitness.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount;
+            RawFirstSegmentNonContiguousWindowTransitionCountTotal += rawFitness.FirstSegmentProofReview.NonContiguousWindowTransitionCount;
+            RawFirstSegmentNonAlternatingParityTransitionCountTotal += rawFitness.FirstSegmentProofReview.NonAlternatingParityTransitionCount;
+        }
+
+        if (subtractOneFitness?.MedianMaxEdge is not null)
+        {
+            SubtractOneMedianMaxEdgeTotal += subtractOneFitness.MedianMaxEdge.Value;
+            SubtractOneMedianMaxEdgeCount++;
+        }
+
+        if (subtractOneFitness?.SegmentedMedianMaxEdge is not null)
+        {
+            SubtractOneSegmentedMedianMaxEdgeTotal += subtractOneFitness.SegmentedMedianMaxEdge.Value;
+            SubtractOneSegmentedMedianMaxEdgeCount++;
+        }
+
+        if (subtractOneFitness?.SegmentedMedianNormalDelta is not null)
+        {
+            SubtractOneSegmentedMedianNormalDeltaTotal += subtractOneFitness.SegmentedMedianNormalDelta.Value;
+            SubtractOneSegmentedMedianNormalDeltaCount++;
+        }
+
+        if (subtractOneFitness?.SegmentedMedianUvDelta is not null)
+        {
+            SubtractOneSegmentedMedianUvDeltaTotal += subtractOneFitness.SegmentedMedianUvDelta.Value;
+            SubtractOneSegmentedMedianUvDeltaCount++;
+        }
+
+        if (subtractOneFitness?.SegmentedMedianTriangleArea is not null)
+        {
+            SubtractOneSegmentedMedianTriangleAreaTotal += subtractOneFitness.SegmentedMedianTriangleArea.Value;
+            SubtractOneSegmentedMedianTriangleAreaCount++;
+        }
+
+        if (subtractOneFitness is not null)
+        {
+            SubtractOneFirstSegmentProofReviewCount++;
+            SubtractOneFirstSegmentNearZeroAreaCountTotal += subtractOneFitness.FirstSegmentProofReview.NearZeroAreaCount;
+            SubtractOneFirstSegmentDominantPlaneSwitchCountTotal += subtractOneFitness.FirstSegmentProofReview.DominantPlaneSwitchCount;
+            SubtractOneFirstSegmentDominantSignedAreaSignSwitchCountTotal += subtractOneFitness.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount;
+            SubtractOneFirstSegmentNonContiguousWindowTransitionCountTotal += subtractOneFitness.FirstSegmentProofReview.NonContiguousWindowTransitionCount;
+            SubtractOneFirstSegmentNonAlternatingParityTransitionCountTotal += subtractOneFitness.FirstSegmentProofReview.NonAlternatingParityTransitionCount;
+        }
+
+        var representativeFitness = rawFitness ?? subtractOneFitness;
+        if (representativeFitness is not null)
+        {
+            SegmentCountTotal += representativeFitness.SegmentCount;
+            SegmentedTriangleWindowCountTotal += representativeFitness.SegmentedTriangleWindowCount;
+            DroppedDegenerateWindowCountTotal += representativeFitness.DroppedDegenerateWindowCount;
+            DroppedCrossSegmentWindowCountTotal += representativeFitness.DroppedCrossSegmentWindowCount;
+        }
+
+        switch (preferredMapping)
+        {
+            case "raw-zero-based":
+                RawZeroBasedPreferredCount++;
+                break;
+            case "subtract-one":
+                SubtractOnePreferredCount++;
+                break;
+            case "tie":
+                TieCount++;
+                break;
+        }
+    }
+
+    public void AddStripStructure(NifTriangleStripStructureStats stripStructure)
+    {
+        StripStructureCount++;
+        StripStructureHintCounts[stripStructure.Hint] = StripStructureHintCounts.GetValueOrDefault(stripStructure.Hint) + 1;
+        AdjacentRepeatCountTotal += stripStructure.AdjacentRepeatCount;
+        MirroredBridgeCountTotal += stripStructure.MirroredAdjacentRepeatBridgeCount;
+        DegenerateRunCountTotal += stripStructure.DegenerateRunCount;
+        MaxDegenerateRunLengthTotal += stripStructure.MaxDegenerateRunLength;
+        NonDegenerateRunCountTotal += stripStructure.NonDegenerateRunCount;
+        MaxNonDegenerateRunLengthTotal += stripStructure.MaxNonDegenerateRunLength;
+        SentinelRestartValueCountTotal += stripStructure.SentinelRestartValueCount;
+        ZeroIndexValueCountTotal += stripStructure.ZeroIndexValueCount;
+    }
+}
+
 internal sealed record NifMeshBindingInventoryReport(
     string RootDirectory,
     string ManifestPath,
@@ -9569,7 +11778,8 @@ internal sealed record NifMeshBindingInventoryReport(
     List<NifMeshBindingPairingGroup> TopPairings,
     List<NifMeshAttributeSetGroup> TopAttributeSets,
     List<NifAttributeTopologyGroup> TopAttributeTopologies,
-    List<NifAttributeExtraStreamGroup> TopAttributeExtraStreams);
+    List<NifAttributeExtraStreamGroup> TopAttributeExtraStreams,
+    List<NifAttributeExtraMappingFitnessGroup> TopAttributeExtraMappingFitness);
 
 internal sealed record NifMeshBindingRoleGroup(
     string Role,
@@ -9641,6 +11851,97 @@ internal sealed record NifAttributeExtraStreamGroup(
     int Count,
     int NifPayloads,
     List<NifMeshAttributeSetSample> Samples);
+
+internal sealed record NifAttributeExtraMappingFitnessGroup(
+    string Pattern,
+    uint MeshSize,
+    string Topology,
+    int VertexCount,
+    int ExtraMeshPayloadOffset,
+    string ExtraRole,
+    uint? ExtraDeclaredPayloadBytes,
+    int Count,
+    int NifPayloads,
+    int RawZeroBasedPreferredCount,
+    int SubtractOnePreferredCount,
+    int TieCount,
+    double? AverageRawMedianMaxEdge,
+    double? AverageSubtractOneMedianMaxEdge,
+    double? AverageMedianMaxEdgeDelta,
+    double? AverageRawSegmentedMedianMaxEdge,
+    double? AverageSubtractOneSegmentedMedianMaxEdge,
+    double? AverageSegmentedMedianMaxEdgeDelta,
+    double? AverageRawSegmentedMedianNormalDelta,
+    double? AverageSubtractOneSegmentedMedianNormalDelta,
+    double? AverageSegmentedMedianNormalDeltaGap,
+    double? AverageRawSegmentedMedianUvDelta,
+    double? AverageSubtractOneSegmentedMedianUvDelta,
+    double? AverageSegmentedMedianUvDeltaGap,
+    double? AverageRawSegmentedMedianTriangleArea,
+    double? AverageSubtractOneSegmentedMedianTriangleArea,
+    double? AverageSegmentedMedianTriangleAreaGap,
+    double? AverageRawFirstSegmentNearZeroAreaCount,
+    double? AverageSubtractOneFirstSegmentNearZeroAreaCount,
+    double? AverageRawFirstSegmentDominantPlaneSwitchCount,
+    double? AverageSubtractOneFirstSegmentDominantPlaneSwitchCount,
+    double? AverageRawFirstSegmentDominantSignedAreaSignSwitchCount,
+    double? AverageSubtractOneFirstSegmentDominantSignedAreaSignSwitchCount,
+    double? AverageRawFirstSegmentNonContiguousWindowTransitionCount,
+    double? AverageSubtractOneFirstSegmentNonContiguousWindowTransitionCount,
+    double? AverageRawFirstSegmentNonAlternatingParityTransitionCount,
+    double? AverageSubtractOneFirstSegmentNonAlternatingParityTransitionCount,
+    double? AverageSegmentCount,
+    double? AverageSegmentedTriangleWindowCount,
+    double? AverageDroppedDegenerateWindowCount,
+    double? AverageDroppedCrossSegmentWindowCount,
+    string DominantStripStructureHint,
+    double? AverageAdjacentRepeatCount,
+    double? AverageMirroredBridgeCount,
+    double? AverageDegenerateRunCount,
+    double? AverageMaxDegenerateRunLength,
+    double? AverageNonDegenerateRunCount,
+    double? AverageMaxNonDegenerateRunLength,
+    int SentinelRestartValueCountTotal,
+    int ZeroIndexValueCountTotal,
+    string PreferredMapping,
+    List<NifAttributeExtraMappingFitnessSample> Samples);
+
+internal sealed record NifAttributeExtraMappingFitnessSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int? ManifestEntryIndex,
+    int MeshBlockIndex,
+    uint MeshSize,
+    int VertexCount,
+    int ExtraMeshPayloadOffset,
+    int ExtraBlockIndex,
+    string ExtraRole,
+    double? RawMedianMaxEdge,
+    double? SubtractOneMedianMaxEdge,
+    double? RawSegmentedMedianMaxEdge,
+    double? SubtractOneSegmentedMedianMaxEdge,
+    double? RawSegmentedMedianNormalDelta,
+    double? SubtractOneSegmentedMedianNormalDelta,
+    double? RawSegmentedMedianUvDelta,
+    double? SubtractOneSegmentedMedianUvDelta,
+    double? RawSegmentedMedianTriangleArea,
+    double? SubtractOneSegmentedMedianTriangleArea,
+    List<string> RawFirstSegmentProofFlags,
+    List<string> SubtractOneFirstSegmentProofFlags,
+    int? RawFirstSegmentDominantPlaneSwitchCount,
+    int? SubtractOneFirstSegmentDominantPlaneSwitchCount,
+    int? RawFirstSegmentDominantSignedAreaSignSwitchCount,
+    int? SubtractOneFirstSegmentDominantSignedAreaSignSwitchCount,
+    int? RawFirstSegmentNonAlternatingParityTransitionCount,
+    int? SubtractOneFirstSegmentNonAlternatingParityTransitionCount,
+    double? RawP95MaxEdge,
+    double? SubtractOneP95MaxEdge,
+    int? SegmentCount,
+    int? SegmentedTriangleWindowCount,
+    int? DroppedDegenerateWindowCount,
+    int? DroppedCrossSegmentWindowCount,
+    string PreferredMapping);
 
 internal sealed record NifMeshBindingStreamSample(
     string ArchiveName,
