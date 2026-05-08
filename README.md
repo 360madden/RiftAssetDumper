@@ -10,6 +10,14 @@ This repo now uses the approved **Aggressive Evidence Workflow**: optimize for m
 docs\aggressive-discovery-workflow.md
 ```
 
+Reasoning/model routing is governed by the repo safety policy:
+
+```text
+docs\task-routing-safety-policy.md
+```
+
+Short version: keep high/extra-high reasoning for truth, proof, schema, runtime, guard, cross-repo, live-game, exporter, and commit/push decisions. Use lower-intelligence execution only for reversible mechanical work after safety is practically guaranteed and the main high-reasoning lane reviews the result.
+
 Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
 
 Optionized workflow helper:

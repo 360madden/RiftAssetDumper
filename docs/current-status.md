@@ -24,12 +24,19 @@ This repo is now following the approved **Aggressive Evidence Workflow**:
 docs\aggressive-discovery-workflow.md
 ```
 
+Reasoning/model routing for this repo is now explicitly fail-closed:
+
+```text
+docs\task-routing-safety-policy.md
+```
+
 | Principle | Practical behavior |
 |---|---|
 | Maximum real discovery speed | Add narrow probes/inventories, run smoke + full copied-set scans, then immediately advance the strongest lead. |
 | Not reckless output | No copied assets, generated dumps, raw user-profile paths, or unproven model exports get committed. |
 | Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, validate `maxIndex < vertexCount`, and down-rank non-geometry sentinel/mask side streams before export work. |
 | Export gate | OBJ/model export stays experimental and disabled until mesh/stream pairing is structurally proven. |
+| Reasoning safety | Use high/extra-high reasoning for truth, proof, schema, guard, runtime, cross-repo, live-game, exporter, and commit/push decisions; lower-intelligence execution is allowed only for reversible mechanical work after the safety checklist passes and main-lane review follows. |
 
 Optionized helper:
 
