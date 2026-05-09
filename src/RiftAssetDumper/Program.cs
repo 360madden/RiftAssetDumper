@@ -1933,7 +1933,7 @@ internal static class Program
             Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
             foreach (var pairing in mesh.Pairings.Take(5))
             {
-                Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
+                Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
             }
 
             foreach (var attributeSet in mesh.AttributeSets.Take(3))
@@ -2923,6 +2923,7 @@ internal static class Program
         var lookup = ReadManifestLookup(manifestPath);
         var filter = BuildExtractionFilter(options, lookup);
         var roleGroups = new Dictionary<string, NifMeshBindingRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var usageAccessRoleGroups = new Dictionary<string, NifMeshBindingUsageAccessRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
         var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
         var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeSetGroups = new Dictionary<string, NifMeshAttributeSetAccumulator>(StringComparer.OrdinalIgnoreCase);
@@ -3059,6 +3060,8 @@ internal static class Program
                             }
 
                             roleGroup.Count++;
+                            var usageAccessKey = FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess);
+                            roleGroup.UsageAccessCounts[usageAccessKey] = roleGroup.UsageAccessCounts.GetValueOrDefault(usageAccessKey) + 1;
                             if (roleStats.Confidence >= 70)
                             {
                                 roleGroup.HighConfidenceCount++;
@@ -3073,6 +3076,40 @@ internal static class Program
                             if (roleGroup.Samples.Count < 16)
                             {
                                 roleGroup.Samples.Add(new NifMeshBindingStreamSample(
+                                    ArchiveName: archiveName,
+                                    EntryIndex: entry.Index,
+                                    IdPrefix: entry.IdPrefix,
+                                    ManifestEntryIndex: manifestEntry?.Index,
+                                    MeshBlockIndex: meshBlock.Index,
+                                    MeshSize: meshBlock.Size,
+                                    Stream: summary));
+                            }
+
+                            var usageAccessRoleKey = $"{usageAccessKey}|role={roleStats.PrimaryRole}";
+                            if (!usageAccessRoleGroups.TryGetValue(usageAccessRoleKey, out var usageAccessRoleGroup))
+                            {
+                                usageAccessRoleGroup = new NifMeshBindingUsageAccessRoleAccumulator(
+                                    roleStats.PrimaryRole,
+                                    summary.DataStreamUsage,
+                                    summary.DataStreamAccess);
+                                usageAccessRoleGroups.Add(usageAccessRoleKey, usageAccessRoleGroup);
+                            }
+
+                            usageAccessRoleGroup.Count++;
+                            if (roleStats.Confidence >= 70)
+                            {
+                                usageAccessRoleGroup.HighConfidenceCount++;
+                            }
+
+                            usageAccessRoleGroup.MeshSizeCounts[meshBlock.Size] = usageAccessRoleGroup.MeshSizeCounts.GetValueOrDefault(meshBlock.Size) + 1;
+                            if (declaredPayloadBytes is not null)
+                            {
+                                usageAccessRoleGroup.DeclaredPayloadSizeCounts[declaredPayloadBytes.Value] = usageAccessRoleGroup.DeclaredPayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes.Value) + 1;
+                            }
+
+                            if (usageAccessRoleGroup.Samples.Count < 16)
+                            {
+                                usageAccessRoleGroup.Samples.Add(new NifMeshBindingStreamSample(
                                     ArchiveName: archiveName,
                                     EntryIndex: entry.Index,
                                     IdPrefix: entry.IdPrefix,
@@ -3298,7 +3335,7 @@ internal static class Program
 
                         foreach (var pairing in pairings)
                         {
-                            var key = $"meshSize={meshBlock.Size}|index@{pairing.IndexMeshPayloadOffset}:payload={pairing.IndexDeclaredPayloadBytes}:role={pairing.IndexRole}|vertex@{pairing.VertexMeshPayloadOffset}:payload={pairing.VertexDeclaredPayloadBytes}:role={pairing.VertexRole}:count={pairing.VertexCount}";
+                            var key = $"meshSize={meshBlock.Size}|index@{pairing.IndexMeshPayloadOffset}:payload={pairing.IndexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)}:role={pairing.IndexRole}|vertex@{pairing.VertexMeshPayloadOffset}:payload={pairing.VertexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)}:role={pairing.VertexRole}:count={pairing.VertexCount}";
                             if (!pairingGroups.TryGetValue(key, out var pairingGroup))
                             {
                                 pairingGroup = new NifMeshBindingPairingAccumulator(
@@ -3308,6 +3345,10 @@ internal static class Program
                                     pairing.VertexRole,
                                     pairing.IndexDeclaredPayloadBytes,
                                     pairing.VertexDeclaredPayloadBytes,
+                                    pairing.IndexDataStreamUsage,
+                                    pairing.IndexDataStreamAccess,
+                                    pairing.VertexDataStreamUsage,
+                                    pairing.VertexDataStreamAccess,
                                     pairing.VertexCount);
                                 pairingGroups.Add(key, pairingGroup);
                             }
@@ -3340,10 +3381,33 @@ internal static class Program
                 .ToList();
         }
 
+        static List<NifStringCount> topStringCounts(Dictionary<string, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
         static NifMeshBindingRoleGroup toRoleRecord(NifMeshBindingRoleAccumulator group)
         {
             return new NifMeshBindingRoleGroup(
                 Role: group.Role,
+                Count: group.Count,
+                HighConfidenceCount: group.HighConfidenceCount,
+                UsageAccessCounts: topStringCounts(group.UsageAccessCounts),
+                MeshSizes: topSizeCounts(group.MeshSizeCounts),
+                DeclaredPayloadSizes: topSizeCounts(group.DeclaredPayloadSizeCounts),
+                Samples: group.Samples);
+        }
+
+        static NifMeshBindingUsageAccessRoleGroup toUsageAccessRoleRecord(NifMeshBindingUsageAccessRoleAccumulator group)
+        {
+            return new NifMeshBindingUsageAccessRoleGroup(
+                Role: group.Role,
+                DataStreamUsage: group.DataStreamUsage,
+                DataStreamAccess: group.DataStreamAccess,
                 Count: group.Count,
                 HighConfidenceCount: group.HighConfidenceCount,
                 MeshSizes: topSizeCounts(group.MeshSizeCounts),
@@ -3374,6 +3438,10 @@ internal static class Program
                 VertexRole: group.VertexRole,
                 IndexDeclaredPayloadBytes: group.IndexDeclaredPayloadBytes,
                 VertexDeclaredPayloadBytes: group.VertexDeclaredPayloadBytes,
+                IndexDataStreamUsage: group.IndexDataStreamUsage,
+                IndexDataStreamAccess: group.IndexDataStreamAccess,
+                VertexDataStreamUsage: group.VertexDataStreamUsage,
+                VertexDataStreamAccess: group.VertexDataStreamAccess,
                 VertexCount: group.VertexCount,
                 MaxIndexObserved: group.MaxIndexObserved,
                 AverageConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
@@ -3527,6 +3595,14 @@ internal static class Program
                 .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
                 .Take(options.Limit > 0 ? options.Limit : 100)
                 .ToList(),
+            TopUsageAccessRoles: usageAccessRoleGroups.Values
+                .Select(toUsageAccessRoleRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.DataStreamUsage, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static g => g.DataStreamAccess, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
             TopPatterns: patternGroups.Values
                 .Select(toPatternRecord)
                 .OrderByDescending(static g => g.Count)
@@ -3593,7 +3669,8 @@ internal static class Program
         Console.WriteLine($"Attribute-compatible meshes: {attributeCompatibleMeshes:N0}");
         Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
         Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
-        Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} {g.IndexRole}->{g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
+        Console.WriteLine($"Top usage/access roles: {string.Join(" | ", report.TopUsageAccessRoles.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role}={g.Count:N0}"))}");
+        Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
         Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
         Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
         Console.WriteLine($"Top attribute extras: {string.Join(" | ", report.TopAttributeExtraStreams.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} extra@{g.ExtraMeshPayloadOffset} payload={g.ExtraDeclaredPayloadBytes} {g.ExtraRole} count={g.Count:N0} fit={g.FitSummary}"))}");
@@ -8339,12 +8416,16 @@ internal static class Program
                     IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
                     IndexBlockIndex: indexStream.TargetBlockIndex,
                     IndexDeclaredPayloadBytes: indexStream.DeclaredPayloadBytes,
+                    IndexDataStreamUsage: indexStream.DataStreamUsage,
+                    IndexDataStreamAccess: indexStream.DataStreamAccess,
                     IndexRole: indexStream.RoleStats.PrimaryRole,
                     IndexMax: maxIndex,
                     IndexPairCount: indexStream.RoleStats.IndexPairCount,
                     VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
                     VertexBlockIndex: vertexStream.TargetBlockIndex,
                     VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
+                    VertexDataStreamUsage: vertexStream.DataStreamUsage,
+                    VertexDataStreamAccess: vertexStream.DataStreamAccess,
                     VertexRole: vertexStream.RoleStats.PrimaryRole,
                     VertexCount: compatibleVertexCount,
                     IndexCoverageRatio: coverageRatio,
@@ -8488,12 +8569,16 @@ internal static class Program
                     IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
                     IndexBlockIndex: indexStream.TargetBlockIndex,
                     IndexDeclaredPayloadBytes: indexStream.DeclaredPayloadBytes,
+                    IndexDataStreamUsage: indexStream.DataStreamUsage,
+                    IndexDataStreamAccess: indexStream.DataStreamAccess,
                     IndexRole: indexStream.RoleStats.PrimaryRole,
                     IndexMax: maxIndex,
                     IndexPairCount: indexStream.RoleStats.IndexPairCount,
                     VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
                     VertexBlockIndex: vertexStream.TargetBlockIndex,
                     VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
+                    VertexDataStreamUsage: vertexStream.DataStreamUsage,
+                    VertexDataStreamAccess: vertexStream.DataStreamAccess,
                     VertexRole: vertexStream.RoleStats.PrimaryRole,
                     VertexCount: compatibleVertexCount,
                     IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
@@ -11942,12 +12027,16 @@ internal sealed record NifMeshProbePairing(
     int IndexMeshPayloadOffset,
     int IndexBlockIndex,
     uint? IndexDeclaredPayloadBytes,
+    string? IndexDataStreamUsage,
+    string? IndexDataStreamAccess,
     string IndexRole,
     ushort IndexMax,
     int? IndexPairCount,
     int VertexMeshPayloadOffset,
     int VertexBlockIndex,
     uint? VertexDeclaredPayloadBytes,
+    string? VertexDataStreamUsage,
+    string? VertexDataStreamAccess,
     string VertexRole,
     int VertexCount,
     double IndexCoverageRatio,
@@ -12547,6 +12636,19 @@ internal sealed class NifMeshBindingRoleAccumulator(string role)
     public string Role { get; } = role;
     public int Count { get; set; }
     public int HighConfidenceCount { get; set; }
+    public Dictionary<string, int> UsageAccessCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<uint, int> MeshSizeCounts { get; } = [];
+    public Dictionary<uint, int> DeclaredPayloadSizeCounts { get; } = [];
+    public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshBindingUsageAccessRoleAccumulator(string role, string? dataStreamUsage, string? dataStreamAccess)
+{
+    public string Role { get; } = role;
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
+    public int Count { get; set; }
+    public int HighConfidenceCount { get; set; }
     public Dictionary<uint, int> MeshSizeCounts { get; } = [];
     public Dictionary<uint, int> DeclaredPayloadSizeCounts { get; } = [];
     public List<NifMeshBindingStreamSample> Samples { get; } = [];
@@ -12570,6 +12672,10 @@ internal sealed class NifMeshBindingPairingAccumulator(
     string vertexRole,
     uint? indexDeclaredPayloadBytes,
     uint? vertexDeclaredPayloadBytes,
+    string? indexDataStreamUsage,
+    string? indexDataStreamAccess,
+    string? vertexDataStreamUsage,
+    string? vertexDataStreamAccess,
     int vertexCount)
 {
     public string Pattern { get; } = pattern;
@@ -12578,6 +12684,10 @@ internal sealed class NifMeshBindingPairingAccumulator(
     public string VertexRole { get; } = vertexRole;
     public uint? IndexDeclaredPayloadBytes { get; } = indexDeclaredPayloadBytes;
     public uint? VertexDeclaredPayloadBytes { get; } = vertexDeclaredPayloadBytes;
+    public string? IndexDataStreamUsage { get; } = indexDataStreamUsage;
+    public string? IndexDataStreamAccess { get; } = indexDataStreamAccess;
+    public string? VertexDataStreamUsage { get; } = vertexDataStreamUsage;
+    public string? VertexDataStreamAccess { get; } = vertexDataStreamAccess;
     public int VertexCount { get; } = vertexCount;
     public int Count { get; set; }
     public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -12862,6 +12972,7 @@ internal sealed record NifMeshBindingInventoryReport(
     int AttributeCompatibleMeshes,
     int AttributeCompatibleSets,
     List<NifMeshBindingRoleGroup> RoleGroups,
+    List<NifMeshBindingUsageAccessRoleGroup> TopUsageAccessRoles,
     List<NifMeshBindingPatternGroup> TopPatterns,
     List<NifMeshBindingPairingGroup> TopPairings,
     List<NifMeshAttributeSetGroup> TopAttributeSets,
@@ -12871,6 +12982,17 @@ internal sealed record NifMeshBindingInventoryReport(
 
 internal sealed record NifMeshBindingRoleGroup(
     string Role,
+    int Count,
+    int HighConfidenceCount,
+    List<NifStringCount> UsageAccessCounts,
+    List<NifSizeCount> MeshSizes,
+    List<NifSizeCount> DeclaredPayloadSizes,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifMeshBindingUsageAccessRoleGroup(
+    string Role,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     int Count,
     int HighConfidenceCount,
     List<NifSizeCount> MeshSizes,
@@ -12895,6 +13017,10 @@ internal sealed record NifMeshBindingPairingGroup(
     string VertexRole,
     uint? IndexDeclaredPayloadBytes,
     uint? VertexDeclaredPayloadBytes,
+    string? IndexDataStreamUsage,
+    string? IndexDataStreamAccess,
+    string? VertexDataStreamUsage,
+    string? VertexDataStreamAccess,
     int VertexCount,
     ushort MaxIndexObserved,
     double AverageConfidence,
@@ -13076,12 +13202,16 @@ internal sealed record NifMeshBindingPairingSample(
     int IndexMeshPayloadOffset,
     int IndexBlockIndex,
     uint? IndexDeclaredPayloadBytes,
+    string? IndexDataStreamUsage,
+    string? IndexDataStreamAccess,
     string IndexRole,
     ushort IndexMax,
     int? IndexPairCount,
     int VertexMeshPayloadOffset,
     int VertexBlockIndex,
     uint? VertexDeclaredPayloadBytes,
+    string? VertexDataStreamUsage,
+    string? VertexDataStreamAccess,
     string VertexRole,
     int VertexCount,
     double IndexCoverageRatio,

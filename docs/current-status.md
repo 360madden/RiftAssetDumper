@@ -107,6 +107,16 @@ Validated smoke sample `21900d2ee4f931ca` has `NiDataStream\u00010\u000119` and 
 
 Latest resumed slice: `inventory-nif-stream-headers`, `inventory-nif-stream-bodies`, and `probe-nif-mesh` now carry `DataStreamUsage` / `DataStreamAccess` into generated JSON samples/summaries. A 50-NIF smoke validated `333` parsed streams with `usage=1 access=19` (`278`) and `usage=0 access=19` (`55`), and `probe-nif-mesh` now uses a metadata-completeness tie-breaker (`DataStreamMetadataScore`) without treating usage/access as final geometry semantics.
 
+Follow-up mesh-binding inventory slice: `inventory-nif-mesh-bindings` now emits role-level `UsageAccessCounts`, `TopUsageAccessRoles`, and index/vertex usage-access metadata in pairing samples/groups so role heuristics can be compared against Gamebryo stream metadata without promoting metadata to geometry truth. A 100-NIF smoke found `211` valid declared stream bodies and grouped the visible roles as:
+
+| Usage/access | Role | Count |
+|---|---|---:|
+| `1/19` | `uv-float2-ror1-lead` | `100` |
+| `1/19` | `normal-float3-ror1-lead` | `77` |
+| `0/19` | `index-u16be-strip-lead` | `34` |
+
+Interpretation: in this bounded smoke, `usage=0 access=19` aligns with compact index-strip leads while `usage=1 access=19` aligns with rotated float normal/UV leads. Top pairings now show the same split as `index[usage=0 access=19] -> vertex[usage=1 access=19]`. Keep this as correlation/ranking evidence only until broader copied-set scans and mesh topology proof agree.
+
 ## Compression truth 🧊
 
 | Scope | Count | Compression counts |
