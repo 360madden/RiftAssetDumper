@@ -8,6 +8,9 @@ bin/
 obj/
 **/bin/
 **/obj/
+__pycache__/
+**/__pycache__/
+*.pyc
 TestResults/
 coverage/
 

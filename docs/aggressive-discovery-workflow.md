@@ -203,6 +203,8 @@ Build helper tooling ahead of bottlenecks, but prefer **optionized helpers** ove
 |---|---|
 | One helper, many modes | Add modes/options to a durable helper instead of creating a new helper app for every discovery question. |
 | CLI-first | Keep the .NET dumper as the source of truth; helpers should orchestrate commands, not duplicate parsers. |
+| Python-first orchestration | New matrix/batching/summary helpers should be Python-first because Python is safer for subprocess timeouts, JSON merging, schema validation, and smoke-testable control flow. |
+| PowerShell compatibility | Existing PowerShell workflow helpers remain supported; port only active bottlenecks or scripts that need richer orchestration. |
 | Generated-output only | Helper reports/logs go under ignored `Exports/` unless explicitly promoted to docs. |
 | Repeatable smoke/full runs | Helpers should run smoke and full copied-set scans with the same command shape every time. |
 | Blocker-aware | If a full run fails, helpers should preserve the smoke output and failing command so the blocker is resumable. |
@@ -214,13 +216,19 @@ Current helper:
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshBindings -Full -PrivacyScan
 ```
 
+Python discovery-matrix helper:
+
+```powershell
+python "C:\RIFT MODDING\Assets\scripts\rift_asset_discovery_matrix.py" --skip-build --jobs signature-baseline semantic-xml-map-zone --privacy-scan
+```
+
 Focused one-mesh probe mode:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode MeshProbe -Id c841eb9a0ed1c95e -MeshBlock 6
 ```
 
-Design target: this script should become the optionized local workbench for discovery cycles. Add modes before adding separate scripts unless the new helper needs a genuinely different runtime surface.
+Design target: keep `Invoke-RiftAssetWorkflow.ps1` as the stable compatibility workbench for existing guard/workflow modes, while Python takes over new batching, matrix, schema-validation, and cross-repo orchestration. Add modes before adding separate one-off helpers unless the new helper needs a genuinely different runtime surface.
 
 ## Immediate implementation plan 🎯
 

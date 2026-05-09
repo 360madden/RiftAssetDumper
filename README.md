@@ -373,12 +373,38 @@ dds
 riff
 bin
 txt
+lua
+xml
 png
 jpg
 ogg
 lzma2
 nif
 ```
+
+Archive-aware signature and semantic index commands:
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-asset-signatures --root "C:\RIFT MODDING\Assets\Source" --max-total 500 --out "C:\RIFT MODDING\Assets\Exports\asset-signature-inventory-smoke.json"
+```
+
+```powershell
+dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- build-asset-semantic-index --root "C:\RIFT MODDING\Assets\Source" --max-total 200 --out "C:\RIFT MODDING\Assets\Exports\asset-semantic-index-smoke.json"
+```
+
+Filtered semantic triage can combine detected type and category filters:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AssetSemanticIndex -Type xml -SemanticCategory hint:map-zone -SmokeMaxTotal 200 -SkipBuild
+```
+
+Python discovery-matrix orchestration batches safe semantic/signature jobs and writes a compact summary under ignored `Exports\discovery-matrix`:
+
+```powershell
+python "C:\RIFT MODDING\Assets\scripts\rift_asset_discovery_matrix.py" --skip-build --jobs signature-baseline semantic-xml-map-zone semantic-bin-waypoint-poi --privacy-scan
+```
+
+The semantic index uses schema `docs\schemas\asset-semantic-index-v1.schema.json` and is generated under ignored `Exports/`. Its `hint:*` categories are search leads only, not parser-backed truth or runtime durability claims. Prefer type-bounded or `--max-total` smoke scans before wildcard `hint:*` scans across all binary payloads. XML summaries store tag-name and attribute-name counts plus parse status/boundary metadata; attribute values, element text, raw XML, and raw parse messages are intentionally omitted. New batching/orchestration helpers should be Python-first while the .NET dumper remains the parser/source of truth.
 
 ## Binary/model/geometry evidence tools
 

@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/asset-semantic-index-v1.schema.json",
+  "title": "RIFT Asset Semantic Index v1",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "GeneratedOutputNotice",
+    "RootDirectory",
+    "ManifestPath",
+    "SemanticCategoryFilters",
+    "InspectedPayloads",
+    "Failed",
+    "TypeCounts",
+    "SemanticCategoryCounts",
+    "SignatureGroups",
+    "Entries"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "asset-semantic-index/v1" },
+    "GeneratedOutputNotice": {
+      "type": "string",
+      "description": "Warning that this report is generated from local copied game assets and should stay under ignored output unless reviewed and redacted."
+    },
+    "RootDirectory": { "type": "string" },
+    "ManifestPath": { "type": "string" },
+    "SemanticCategoryFilters": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Exact category filters or prefix filters ending in * that were applied when generating this report."
+    },
+    "InspectedPayloads": { "type": "integer", "minimum": 0 },
+    "Failed": { "type": "integer", "minimum": 0 },
+    "TypeCounts": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+    "SemanticCategoryCounts": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+    "SignatureGroups": { "type": "array", "items": { "$ref": "#/$defs/signatureGroup" } },
+    "Entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "count": {
+      "type": "object",
+      "required": ["Value", "Count"],
+      "properties": {
+        "Value": { "type": "string" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "signatureGroup": {
+      "type": "object",
+      "required": [
+        "Type",
+        "First4",
+        "First8",
+        "First16",
+        "MagicLabel",
+        "Count",
+        "MinSize",
+        "MaxSize",
+        "SemanticCategoryCounts",
+        "XmlTagCounts",
+        "XmlAttributeCounts",
+        "XmlParseStatusCounts",
+        "XmlParseWarningCounts",
+        "Samples"
+      ],
+      "properties": {
+        "Type": { "type": "string" },
+        "First4": { "$ref": "#/$defs/hexString" },
+        "First8": { "$ref": "#/$defs/hexString" },
+        "First16": { "$ref": "#/$defs/hexString" },
+        "MagicLabel": { "type": "string" },
+        "Count": { "type": "integer", "minimum": 0 },
+        "MinSize": { "type": "integer", "minimum": 0 },
+        "MaxSize": { "type": "integer", "minimum": 0 },
+        "SemanticCategoryCounts": { "type": "array", "items": { "$ref": "#/$defs/count" } },
+        "XmlTagCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML element-name counts only. Values and element text are intentionally omitted."
+        },
+        "XmlAttributeCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML attribute-name counts only. Attribute values are intentionally omitted."
+        },
+        "XmlParseStatusCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML parse status counts for this signature group, for example complete, partial-with-warning, or failed."
+        },
+        "XmlParseWarningCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML warning class counts for this signature group. Warning text and raw XML are intentionally omitted."
+        },
+        "Samples": { "type": "array", "items": { "$ref": "#/$defs/signatureSample" } }
+      },
+      "additionalProperties": false
+    },
+    "signatureSample": {
+      "type": "object",
+      "required": ["ArchiveName", "EntryIndex", "IdPrefix", "Size", "SemanticCategories", "NameCandidates"],
+      "properties": {
+        "ArchiveName": { "type": "string" },
+        "EntryIndex": { "type": "integer", "minimum": 0 },
+        "IdPrefix": { "$ref": "#/$defs/idPrefix" },
+        "Size": { "type": "integer", "minimum": 0 },
+        "ManifestEntryIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "FilenameFnv1Hash": { "type": ["integer", "null"], "minimum": 0 },
+        "PakIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "PakOffset": { "type": ["integer", "null"], "minimum": 0 },
+        "SemanticCategories": { "type": "array", "items": { "type": "string" } },
+        "NameCandidates": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "AssetIdPrefix",
+        "ArchiveName",
+        "EntryIndex",
+        "CompressedSize",
+        "UnpackedSize",
+        "Compression",
+        "DetectedType",
+        "First4",
+        "First8",
+        "First16",
+        "MagicLabel",
+        "SemanticCategories",
+        "NameCandidates",
+        "ReferenceSamples",
+        "XmlTagCounts",
+        "XmlAttributeCounts",
+        "TextSnippetSamples"
+      ],
+      "properties": {
+        "AssetIdPrefix": { "$ref": "#/$defs/idPrefix" },
+        "ArchiveName": { "type": "string" },
+        "EntryIndex": { "type": "integer", "minimum": 0 },
+        "ManifestEntryIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "FilenameFnv1Hash": { "type": ["integer", "null"], "minimum": 0 },
+        "PakIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "PakOffset": { "type": ["integer", "null"], "minimum": 0 },
+        "CompressedSize": { "type": "integer", "minimum": 0 },
+        "UnpackedSize": { "type": "integer", "minimum": 0 },
+        "Compression": { "type": "integer", "minimum": 0 },
+        "DetectedType": { "type": "string" },
+        "Format": { "type": ["string", "null"] },
+        "RiffType": { "type": ["string", "null"] },
+        "Width": { "type": ["integer", "null"], "minimum": 0 },
+        "Height": { "type": ["integer", "null"], "minimum": 0 },
+        "MipMapCount": { "type": ["integer", "null"], "minimum": 0 },
+        "First4": { "$ref": "#/$defs/hexString" },
+        "First8": { "$ref": "#/$defs/hexString" },
+        "First16": { "$ref": "#/$defs/hexString" },
+        "MagicLabel": { "type": "string" },
+        "SemanticCategories": { "type": "array", "items": { "type": "string" } },
+        "NameCandidates": { "type": "array", "items": { "type": "string" } },
+        "ReferenceSamples": { "type": "array", "items": { "type": "string" } },
+        "XmlTagCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML element-name counts only. Values and element text are intentionally omitted."
+        },
+        "XmlAttributeCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/count" },
+          "description": "XML attribute-name counts only. Attribute values are intentionally omitted."
+        },
+        "XmlParseStatus": {
+          "type": ["string", "null"],
+          "description": "XML parse status when the payload was XML, for example complete, partial-with-warning, or failed."
+        },
+        "XmlParseWarning": {
+          "type": ["string", "null"],
+          "description": "XML warning class when parsing did not complete. Raw warning text is intentionally omitted."
+        },
+        "XmlParseLineNumber": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Line number reported by the XML reader when parsing stopped."
+        },
+        "XmlParseLinePosition": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Line position reported by the XML reader when parsing stopped."
+        },
+        "XmlParsedElementCount": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of XML start elements counted before completion or parse stop."
+        },
+        "XmlParsedAttributeNameCount": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of XML attribute names counted before completion or parse stop."
+        },
+        "TextSnippetSamples": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "idPrefix": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "hexString": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]*$"
+    }
+  },
+  "additionalProperties": false
+}

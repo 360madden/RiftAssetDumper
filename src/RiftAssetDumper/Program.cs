@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Xml;
 using SharpCompress.Compressors.Xz;
 
 internal static class Program
@@ -68,6 +69,16 @@ internal static class Program
             if (options.Command == "mine-strings")
             {
                 return MineStrings(options);
+            }
+
+            if (options.Command == "inventory-asset-signatures")
+            {
+                return BuildAssetSemanticIndex(options, includeEntries: false);
+            }
+
+            if (options.Command == "build-asset-semantic-index")
+            {
+                return BuildAssetSemanticIndex(options, includeEntries: true);
             }
 
             if (options.Command == "inventory-binary-signatures")
@@ -1021,6 +1032,17 @@ internal static class Program
         counts[key] = current + 1;
     }
 
+    private static void AddCount(Dictionary<string, int> counts, string key, int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        counts.TryGetValue(key, out var current);
+        counts[key] = current + amount;
+    }
+
     private static int ScanCompression(AppOptions options)
     {
         var rootDirectory = Path.GetFullPath(options.LiveRoot ?? options.RootDirectory);
@@ -1243,6 +1265,236 @@ internal static class Program
         Console.WriteLine($"Candidates: {records.Length:N0}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return 0;
+    }
+
+    private static int BuildAssetSemanticIndex(AppOptions options, bool includeEntries)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var assetsDirectory = ResolveAssetsDirectory(rootDirectory);
+        if (!Directory.Exists(assetsDirectory))
+        {
+            Console.Error.WriteLine($"ERROR: Assets directory does not exist: {DisplayPath(options, assetsDirectory)}");
+            return 1;
+        }
+
+        var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+        var lookup = ReadManifestLookup(manifestPath);
+        var filter = BuildExtractionFilter(options, lookup);
+        var groups = new Dictionary<string, AssetSignatureAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var typeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var semanticCategoryCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var entries = new List<AssetSemanticIndexEntry>();
+        var inspected = 0;
+        var failed = 0;
+        var maxTotal = options.MaxTotalOrUnlimited();
+
+        foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
+        {
+            if (inspected >= maxTotal)
+            {
+                break;
+            }
+
+            var archiveName = Path.GetFileName(archivePath);
+            if (!filter.ArchiveMatches(archiveName))
+            {
+                continue;
+            }
+
+            using var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: 8192, FileOptions.RandomAccess);
+            var archiveEntries = ReadArchiveEntryTable(stream);
+            if (archiveEntries is null)
+            {
+                continue;
+            }
+
+            foreach (var archiveEntry in archiveEntries)
+            {
+                if (inspected >= maxTotal)
+                {
+                    break;
+                }
+
+                if (archiveEntry.IsNull)
+                {
+                    continue;
+                }
+
+                lookup.Table1ById.TryGetValue(archiveEntry.IdPrefix, out var manifestEntry);
+                if (!filter.EntryMatches(archiveEntry, manifestEntry))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var packed = ReadArchivePayload(stream, archiveEntry, archiveName);
+                    var payload = DecompressPayload(archiveEntry.Compression, packed, archiveEntry.Sha1, archiveEntry.IdPrefix, options.Lzma2Mode);
+                    var detected = DetectFileType(payload.Bytes);
+                    if (!filter.TypeMatches(detected.Extension))
+                    {
+                        continue;
+                    }
+
+                    inspected++;
+
+                    var probe = BuildAssetSemanticProbe(
+                        payload.Bytes,
+                        detected,
+                        scanSemanticStrings: includeEntries || options.SemanticCategoryFilters.Count > 0);
+                    if (!SemanticCategoryMatches(probe.SemanticCategories, options.SemanticCategoryFilters))
+                    {
+                        continue;
+                    }
+
+                    IncrementCount(typeCounts, detected.Extension);
+                    foreach (var category in probe.SemanticCategories)
+                    {
+                        IncrementCount(semanticCategoryCounts, category);
+                    }
+
+                    var signatureKey = $"{detected.Extension}|{probe.First16}";
+                    if (!groups.TryGetValue(signatureKey, out var group))
+                    {
+                        group = new AssetSignatureAccumulator(detected.Extension, probe.First4, probe.First8, probe.First16, probe.MagicLabel);
+                        groups.Add(signatureKey, group);
+                    }
+
+                    group.Count++;
+                    group.MinSize = Math.Min(group.MinSize, payload.Bytes.Length);
+                    group.MaxSize = Math.Max(group.MaxSize, payload.Bytes.Length);
+                    foreach (var category in probe.SemanticCategories)
+                    {
+                        IncrementCount(group.SemanticCategoryCounts, category);
+                    }
+
+                    foreach (var tag in probe.XmlTagCounts)
+                    {
+                        AddCount(group.XmlTagCounts, tag.Value, tag.Count);
+                    }
+
+                    foreach (var attribute in probe.XmlAttributeCounts)
+                    {
+                        AddCount(group.XmlAttributeCounts, attribute.Value, attribute.Count);
+                    }
+
+                    if (probe.XmlParseStatus is not null)
+                    {
+                        IncrementCount(group.XmlParseStatusCounts, probe.XmlParseStatus);
+                    }
+
+                    if (probe.XmlParseWarning is not null)
+                    {
+                        IncrementCount(group.XmlParseWarningCounts, probe.XmlParseWarning);
+                    }
+
+                    if (group.Samples.Count < 10)
+                    {
+                        group.Samples.Add(new AssetSignatureSample(
+                            ArchiveName: archiveName,
+                            EntryIndex: archiveEntry.Index,
+                            IdPrefix: archiveEntry.IdPrefix,
+                            Size: payload.Bytes.Length,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            FilenameFnv1Hash: manifestEntry?.FilenameFnv1Hash,
+                            PakIndex: manifestEntry?.PakIndex,
+                            PakOffset: manifestEntry?.PakOffset,
+                            SemanticCategories: probe.SemanticCategories.Take(8).ToList(),
+                            NameCandidates: probe.NameCandidates.Take(5).ToList()));
+                    }
+
+                    if (includeEntries)
+                    {
+                        entries.Add(new AssetSemanticIndexEntry(
+                            AssetIdPrefix: archiveEntry.IdPrefix,
+                            ArchiveName: archiveName,
+                            EntryIndex: archiveEntry.Index,
+                            ManifestEntryIndex: manifestEntry?.Index,
+                            FilenameFnv1Hash: manifestEntry?.FilenameFnv1Hash,
+                            PakIndex: manifestEntry?.PakIndex,
+                            PakOffset: manifestEntry?.PakOffset,
+                            CompressedSize: archiveEntry.Size,
+                            UnpackedSize: payload.Bytes.Length,
+                            Compression: archiveEntry.Compression,
+                            DetectedType: detected.Extension,
+                            Format: detected.Format,
+                            RiffType: detected.RiffType,
+                            Width: detected.Width,
+                            Height: detected.Height,
+                            MipMapCount: detected.MipMapCount,
+                            First4: probe.First4,
+                            First8: probe.First8,
+                            First16: probe.First16,
+                            MagicLabel: probe.MagicLabel,
+                            SemanticCategories: probe.SemanticCategories,
+                            NameCandidates: probe.NameCandidates,
+                            ReferenceSamples: probe.ReferenceSamples,
+                            XmlTagCounts: probe.XmlTagCounts,
+                            XmlAttributeCounts: probe.XmlAttributeCounts,
+                            XmlParseStatus: probe.XmlParseStatus,
+                            XmlParseWarning: probe.XmlParseWarning,
+                            XmlParseLineNumber: probe.XmlParseLineNumber,
+                            XmlParseLinePosition: probe.XmlParseLinePosition,
+                            XmlParsedElementCount: probe.XmlParsedElementCount,
+                            XmlParsedAttributeNameCount: probe.XmlParsedAttributeNameCount,
+                            TextSnippetSamples: probe.TextSnippetSamples));
+                    }
+                }
+                catch
+                {
+                    failed++;
+                }
+            }
+        }
+
+        var report = new AssetSemanticIndexReport(
+            SchemaVersion: "asset-semantic-index/v1",
+            GeneratedOutputNotice: "Generated from local copied RIFT assets. Keep under ignored Exports/ unless separately reviewed and redacted.",
+            RootDirectory: rootDirectory,
+            ManifestPath: manifestPath,
+            SemanticCategoryFilters: options.SemanticCategoryFilters,
+            InspectedPayloads: inspected,
+            Failed: failed,
+            TypeCounts: ToTopStringCounts(typeCounts, take: 64),
+            SemanticCategoryCounts: ToTopStringCounts(semanticCategoryCounts, take: 64),
+            SignatureGroups: groups.Values
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.Type)
+                .ThenBy(static g => g.First16)
+                .Select(static g => new AssetSignatureGroup(
+                    Type: g.Type,
+                    First4: g.First4,
+                    First8: g.First8,
+                    First16: g.First16,
+                    MagicLabel: g.MagicLabel,
+                    Count: g.Count,
+                    MinSize: g.MinSize == int.MaxValue ? 0 : g.MinSize,
+                    MaxSize: g.MaxSize,
+                    SemanticCategoryCounts: ToTopStringCounts(g.SemanticCategoryCounts, take: 32),
+                    XmlTagCounts: ToTopStringCounts(g.XmlTagCounts, take: 32),
+                    XmlAttributeCounts: ToTopStringCounts(g.XmlAttributeCounts, take: 32),
+                    XmlParseStatusCounts: ToTopStringCounts(g.XmlParseStatusCounts, take: 16),
+                    XmlParseWarningCounts: ToTopStringCounts(g.XmlParseWarningCounts, take: 16),
+                    Samples: g.Samples))
+                .ToList(),
+            Entries: includeEntries ? entries : []);
+
+        var defaultFileName = includeEntries ? "asset-semantic-index.json" : "asset-signature-inventory.json";
+        var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, defaultFileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+        File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+        Console.WriteLine($"Inspected payloads: {inspected:N0}");
+        Console.WriteLine($"Failed: {failed:N0}");
+        Console.WriteLine($"Types: {FormatCounts(typeCounts)}");
+        Console.WriteLine($"Semantic categories: {FormatCounts(semanticCategoryCounts)}");
+        foreach (var group in report.SignatureGroups.Take(10))
+        {
+            Console.WriteLine($"- {group.Type} {group.First16}: count={group.Count:N0} size={group.MinSize:N0}..{group.MaxSize:N0} magic={group.MagicLabel}");
+        }
+
+        Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+        return failed == 0 ? 0 : 2;
     }
 
     private static int InventoryBinarySignatures(AppOptions options)
@@ -1678,18 +1930,18 @@ internal static class Program
         Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} attributeSets={report.AttributeSets:N0}");
         foreach (var mesh in meshes.Take(8))
         {
-            Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
+            Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
             foreach (var pairing in mesh.Pairings.Take(5))
             {
-                Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} confidence={pairing.Confidence}");
+                Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
             }
 
             foreach (var attributeSet in mesh.AttributeSets.Take(3))
             {
-                Console.WriteLine($"  attributes position@{attributeSet.PositionMeshPayloadOffset}/#{attributeSet.PositionBlockIndex} normal@{attributeSet.NormalMeshPayloadOffset}/#{attributeSet.NormalBlockIndex} uv@{attributeSet.UvMeshPayloadOffset}/#{attributeSet.UvBlockIndex} vertexCount={attributeSet.VertexCount} confidence={attributeSet.Confidence} topology={FormatNifAttributeTopologySummary(attributeSet.Topology)}");
+                Console.WriteLine($"  attributes position@{attributeSet.PositionMeshPayloadOffset}/#{attributeSet.PositionBlockIndex}{FormatNifDataStreamUsageAccessInline(attributeSet.PositionDataStreamUsage, attributeSet.PositionDataStreamAccess)} normal@{attributeSet.NormalMeshPayloadOffset}/#{attributeSet.NormalBlockIndex}{FormatNifDataStreamUsageAccessInline(attributeSet.NormalDataStreamUsage, attributeSet.NormalDataStreamAccess)} uv@{attributeSet.UvMeshPayloadOffset}/#{attributeSet.UvBlockIndex}{FormatNifDataStreamUsageAccessInline(attributeSet.UvDataStreamUsage, attributeSet.UvDataStreamAccess)} vertexCount={attributeSet.VertexCount} meta={attributeSet.DataStreamMetadataScore} confidence={attributeSet.Confidence} topology={FormatNifAttributeTopologySummary(attributeSet.Topology)}");
                 foreach (var extra in attributeSet.ExtraStreams.Take(3))
                 {
-                    Console.WriteLine($"    extra @{extra.MeshPayloadOffset}/#{extra.BlockIndex} payload={extra.DeclaredPayloadBytes} role={extra.Role} c={extra.RoleConfidence} fit={extra.FitSummary}");
+                    Console.WriteLine($"    extra @{extra.MeshPayloadOffset}/#{extra.BlockIndex}{FormatNifDataStreamUsageAccessInline(extra.DataStreamUsage, extra.DataStreamAccess)} payload={extra.DeclaredPayloadBytes} role={extra.Role} c={extra.RoleConfidence} fit={extra.FitSummary}");
                 }
             }
 
@@ -2788,6 +3040,8 @@ internal static class Program
                                 MeshPayloadOffset: candidate.PayloadOffset,
                                 TargetBlockIndex: candidate.TargetBlockIndex,
                                 TargetTypeName: candidate.TargetTypeName,
+                                DataStreamUsage: candidate.TargetDataStreamUsage,
+                                DataStreamAccess: candidate.TargetDataStreamAccess,
                                 TargetSize: candidate.TargetSize,
                                 TargetFirst16: candidate.TargetFirst16,
                                 DeclaredPayloadBytes: declaredPayloadBytes,
@@ -3363,6 +3617,7 @@ internal static class Program
         var filter = BuildExtractionFilter(options, lookup);
         var headerGroups = new Dictionary<int, NifStreamHeaderAccumulator>();
         var familyGroups = new Dictionary<string, NifStreamHeaderFamilyAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var usageAccessGroups = new Dictionary<string, NifDataStreamUsageAccessAccumulator>(StringComparer.OrdinalIgnoreCase);
         var inspected = 0;
         var nifCount = 0;
         var failed = 0;
@@ -3438,6 +3693,7 @@ internal static class Program
                         var declaredPayloadOffset = headerBytes;
                         var declaredPayload = blockPayload.Slice(declaredPayloadOffset, checked((int)declaredPayloadBytes));
                         var strideCandidates = FindWholeBlockStrideCandidates(declaredPayload.Length);
+                        var usageAccessKey = FormatNifDataStreamUsageAccessKey(block.DataStreamUsage, block.DataStreamAccess);
                         var sample = new NifStreamHeaderSample(
                             ArchiveName: archiveName,
                             EntryIndex: entry.Index,
@@ -3445,6 +3701,8 @@ internal static class Program
                             ManifestEntryIndex: manifestEntry?.Index,
                             BlockIndex: block.Index,
                             TypeName: block.TypeName,
+                            DataStreamUsage: block.DataStreamUsage,
+                            DataStreamAccess: block.DataStreamAccess,
                             DataOffset: block.DataOffset,
                             BlockSize: block.Size,
                             First16: block.First16,
@@ -3461,6 +3719,7 @@ internal static class Program
 
                         headerGroup.Count++;
                         headerGroup.TypeCounts[block.TypeName] = headerGroup.TypeCounts.GetValueOrDefault(block.TypeName) + 1;
+                        headerGroup.UsageAccessCounts[usageAccessKey] = headerGroup.UsageAccessCounts.GetValueOrDefault(usageAccessKey) + 1;
                         headerGroup.BlockSizeCounts[block.Size] = headerGroup.BlockSizeCounts.GetValueOrDefault(block.Size) + 1;
                         headerGroup.DeclaredPayloadSizeCounts[declaredPayloadBytes] = headerGroup.DeclaredPayloadSizeCounts.GetValueOrDefault(declaredPayloadBytes) + 1;
                         foreach (var strideCandidate in strideCandidates)
@@ -3473,10 +3732,18 @@ internal static class Program
                             headerGroup.Samples.Add(sample);
                         }
 
-                        var familyKey = $"{block.TypeName}|size={block.Size}|payload={declaredPayloadBytes}|header={headerBytes}|first16={block.First16}";
+                        if (!usageAccessGroups.TryGetValue(usageAccessKey, out var usageAccessGroup))
+                        {
+                            usageAccessGroup = new NifDataStreamUsageAccessAccumulator(block.DataStreamUsage, block.DataStreamAccess);
+                            usageAccessGroups.Add(usageAccessKey, usageAccessGroup);
+                        }
+
+                        usageAccessGroup.Count++;
+
+                        var familyKey = $"{block.TypeName}|{usageAccessKey}|size={block.Size}|payload={declaredPayloadBytes}|header={headerBytes}|first16={block.First16}";
                         if (!familyGroups.TryGetValue(familyKey, out var familyGroup))
                         {
-                            familyGroup = new NifStreamHeaderFamilyAccumulator(block.TypeName, block.Size, declaredPayloadBytes, headerBytes, block.First16, sample.PayloadFirst16);
+                            familyGroup = new NifStreamHeaderFamilyAccumulator(block.TypeName, block.DataStreamUsage, block.DataStreamAccess, block.Size, declaredPayloadBytes, headerBytes, block.First16, sample.PayloadFirst16);
                             familyGroups.Add(familyKey, familyGroup);
                         }
 
@@ -3518,6 +3785,15 @@ internal static class Program
                 .ToList();
         }
 
+        static List<NifStringCount> topStringCounts(Dictionary<string, int> counts)
+        {
+            return counts
+                .OrderByDescending(static kvp => kvp.Value)
+                .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
+                .ToList();
+        }
+
         static NifStreamHeaderGroup toHeaderRecord(NifStreamHeaderAccumulator group)
         {
             return new NifStreamHeaderGroup(
@@ -3528,6 +3804,7 @@ internal static class Program
                     .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
                     .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
                     .ToList(),
+                UsageAccessCounts: topStringCounts(group.UsageAccessCounts),
                 BlockSizes: topSizeCounts(group.BlockSizeCounts),
                 DeclaredPayloadSizes: topSizeCounts(group.DeclaredPayloadSizeCounts),
                 PayloadStrides: topIntCounts(group.PayloadStrideCounts),
@@ -3538,6 +3815,8 @@ internal static class Program
         {
             return new NifStreamHeaderFamilyGroup(
                 TypeName: family.TypeName,
+                DataStreamUsage: family.DataStreamUsage,
+                DataStreamAccess: family.DataStreamAccess,
                 BlockSize: family.BlockSize,
                 DeclaredPayloadBytes: family.DeclaredPayloadBytes,
                 HeaderBytes: family.HeaderBytes,
@@ -3559,6 +3838,12 @@ internal static class Program
             DeclaredPayloadBlocks: declaredPayloadBlocks,
             ValidDeclaredPayloadBlocks: validDeclaredPayloadBlocks,
             InvalidDeclaredPayloadBlocks: invalidDeclaredPayloadBlocks,
+            UsageAccessGroups: usageAccessGroups.Values
+                .Select(static g => new NifDataStreamUsageAccessGroup(g.DataStreamUsage, g.DataStreamAccess, g.Count))
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.DataStreamUsage, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static g => g.DataStreamAccess, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             HeaderGroups: headerGroups.Values
                 .Select(toHeaderRecord)
                 .OrderByDescending(static g => g.Count)
@@ -3583,8 +3868,9 @@ internal static class Program
         Console.WriteLine($"Declared payload blocks: {declaredPayloadBlocks:N0}");
         Console.WriteLine($"Valid declared payload blocks: {validDeclaredPayloadBlocks:N0}");
         Console.WriteLine($"Invalid declared payload blocks: {invalidDeclaredPayloadBlocks:N0}");
+        Console.WriteLine($"Top usage/access: {string.Join(", ", report.UsageAccessGroups.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)}={g.Count:N0}"))}");
         Console.WriteLine($"Top header byte counts: {string.Join(", ", report.HeaderGroups.Take(8).Select(static g => $"{g.HeaderBytes}={g.Count:N0}"))}");
-        Console.WriteLine($"Top stream families: {string.Join(" | ", report.TopFamilies.Take(5).Select(static f => $"size={f.BlockSize}/payload={f.DeclaredPayloadBytes}/header={f.HeaderBytes} count={f.Count:N0}"))}");
+        Console.WriteLine($"Top stream families: {string.Join(" | ", report.TopFamilies.Take(5).Select(static f => $"size={f.BlockSize}/payload={f.DeclaredPayloadBytes}/header={f.HeaderBytes}{FormatNifDataStreamUsageAccessInline(f.DataStreamUsage, f.DataStreamAccess)} count={f.Count:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -3604,6 +3890,7 @@ internal static class Program
         var filter = BuildExtractionFilter(options, lookup);
         var sizeGroups = new Dictionary<uint, NifStreamBodySizeAccumulator>();
         var signatureGroups = new Dictionary<string, NifStreamBodySignatureAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var usageAccessGroups = new Dictionary<string, NifDataStreamUsageAccessAccumulator>(StringComparer.OrdinalIgnoreCase);
         var inspected = 0;
         var nifCount = 0;
         var failed = 0;
@@ -3676,6 +3963,7 @@ internal static class Program
                         var bodyOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
                         var body = blockPayload.Slice(bodyOffset, checked((int)declaredPayloadBytes));
                         var stats = AnalyzeNifStreamBody(body);
+                        var usageAccessKey = FormatNifDataStreamUsageAccessKey(block.DataStreamUsage, block.DataStreamAccess);
                         validStreamBodies++;
 
                         var sample = new NifStreamBodySample(
@@ -3685,6 +3973,8 @@ internal static class Program
                             ManifestEntryIndex: manifestEntry?.Index,
                             BlockIndex: block.Index,
                             TypeName: block.TypeName,
+                            DataStreamUsage: block.DataStreamUsage,
+                            DataStreamAccess: block.DataStreamAccess,
                             BlockSize: block.Size,
                             HeaderBytes: bodyOffset,
                             DeclaredPayloadBytes: declaredPayloadBytes,
@@ -3699,6 +3989,7 @@ internal static class Program
 
                         sizeGroup.Count++;
                         sizeGroup.ClassificationCounts[stats.Classification] = sizeGroup.ClassificationCounts.GetValueOrDefault(stats.Classification) + 1;
+                        sizeGroup.UsageAccessCounts[usageAccessKey] = sizeGroup.UsageAccessCounts.GetValueOrDefault(usageAccessKey) + 1;
                         sizeGroup.BlockSizeCounts[block.Size] = sizeGroup.BlockSizeCounts.GetValueOrDefault(block.Size) + 1;
                         sizeGroup.NonZeroByteTotal += stats.NonZeroBytes;
                         if (stats.AllZero)
@@ -3716,10 +4007,18 @@ internal static class Program
                             sizeGroup.Samples.Add(sample);
                         }
 
-                        var signatureKey = $"{declaredPayloadBytes}|{stats.First16}";
+                        if (!usageAccessGroups.TryGetValue(usageAccessKey, out var usageAccessGroup))
+                        {
+                            usageAccessGroup = new NifDataStreamUsageAccessAccumulator(block.DataStreamUsage, block.DataStreamAccess);
+                            usageAccessGroups.Add(usageAccessKey, usageAccessGroup);
+                        }
+
+                        usageAccessGroup.Count++;
+
+                        var signatureKey = $"{declaredPayloadBytes}|{usageAccessKey}|{stats.First16}";
                         if (!signatureGroups.TryGetValue(signatureKey, out var signatureGroup))
                         {
-                            signatureGroup = new NifStreamBodySignatureAccumulator(declaredPayloadBytes, stats.First16);
+                            signatureGroup = new NifStreamBodySignatureAccumulator(declaredPayloadBytes, block.DataStreamUsage, block.DataStreamAccess, stats.First16);
                             signatureGroups.Add(signatureKey, signatureGroup);
                         }
 
@@ -3779,6 +4078,7 @@ internal static class Program
                 AllZeroCount: group.AllZeroCount,
                 AverageNonZeroBytes: group.Count == 0 ? 0 : Math.Round(group.NonZeroByteTotal / (double)group.Count, 2),
                 ClassificationCounts: topStringCounts(group.ClassificationCounts),
+                UsageAccessCounts: topStringCounts(group.UsageAccessCounts),
                 BlockSizes: topSizeCounts(group.BlockSizeCounts),
                 PayloadStrides: topIntCounts(group.PayloadStrideCounts),
                 Samples: group.Samples);
@@ -3788,6 +4088,8 @@ internal static class Program
         {
             return new NifStreamBodySignatureGroup(
                 DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+                DataStreamUsage: group.DataStreamUsage,
+                DataStreamAccess: group.DataStreamAccess,
                 PayloadFirst16: group.PayloadFirst16,
                 Count: group.Count,
                 NifPayloads: group.NifIds.Count,
@@ -3805,6 +4107,12 @@ internal static class Program
             DataStreamBlocks: dataStreamBlocks,
             ValidStreamBodies: validStreamBodies,
             InvalidStreamBodies: invalidStreamBodies,
+            UsageAccessGroups: usageAccessGroups.Values
+                .Select(static g => new NifDataStreamUsageAccessGroup(g.DataStreamUsage, g.DataStreamAccess, g.Count))
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.DataStreamUsage, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static g => g.DataStreamAccess, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             PayloadSizeGroups: sizeGroups.Values
                 .Select(toSizeRecord)
                 .OrderByDescending(static g => g.Count)
@@ -3828,8 +4136,9 @@ internal static class Program
         Console.WriteLine($"NiDataStream blocks: {dataStreamBlocks:N0}");
         Console.WriteLine($"Valid stream bodies: {validStreamBodies:N0}");
         Console.WriteLine($"Invalid stream bodies: {invalidStreamBodies:N0}");
+        Console.WriteLine($"Top usage/access: {string.Join(", ", report.UsageAccessGroups.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)}={g.Count:N0}"))}");
         Console.WriteLine($"Top payload sizes: {string.Join(", ", report.PayloadSizeGroups.Take(8).Select(static g => $"{g.DeclaredPayloadBytes}={g.Count:N0}"))}");
-        Console.WriteLine($"Top body signatures: {string.Join(" | ", report.TopBodySignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
+        Console.WriteLine($"Top body signatures: {string.Join(" | ", report.TopBodySignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes}{FormatNifDataStreamUsageAccessInline(g.DataStreamUsage, g.DataStreamAccess)} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
         Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
         return failed == 0 ? 0 : 2;
     }
@@ -5548,7 +5857,7 @@ internal static class Program
         var blockTypeCount = BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset, 2));
         offset += 2;
 
-        var blockTypeNames = new List<(int Index, string Name, string DisplayName)>(blockTypeCount);
+        var blockTypeNames = new List<NifBlockTypeNameInfo>(blockTypeCount);
         for (var i = 0; i < blockTypeCount; i++)
         {
             if (offset + 4 > data.Length)
@@ -5573,7 +5882,7 @@ internal static class Program
 
             var name = Encoding.ASCII.GetString(data.Slice(offset, checked((int)length)));
             offset += checked((int)length);
-            blockTypeNames.Add((i, name, EscapeControlChars(name)));
+            blockTypeNames.Add(BuildNifBlockTypeNameInfo(i, name));
         }
 
         var usageCounts = new int[blockTypeNames.Count];
@@ -5737,7 +6046,14 @@ internal static class Program
             ? null
             : remainingAfterBlockDataOffset - checked((long)totalBlockDataSize.Value);
         var blockTypes = blockTypeNames
-            .Select(t => new NifBlockTypeInfo(t.Index, t.Name, t.DisplayName, t.Index < usageCounts.Length ? usageCounts[t.Index] : 0))
+            .Select(t => new NifBlockTypeInfo(
+                Index: t.Index,
+                Name: t.Name,
+                DisplayName: t.DisplayName,
+                NormalizedName: t.NormalizedName,
+                DataStreamUsage: t.DataStreamUsage,
+                DataStreamAccess: t.DataStreamAccess,
+                UsageCount: t.Index < usageCounts.Length ? usageCounts[t.Index] : 0))
             .ToList();
         var blockInfos = BuildNifBlockInfos(data, blockDataOffset, blockTypeIndices, blockSizes, blockTypeNames, strings);
 
@@ -5777,7 +6093,7 @@ internal static class Program
         int blockDataOffset,
         List<int> blockTypeIndices,
         List<uint> blockSizes,
-        List<(int Index, string Name, string DisplayName)> blockTypeNames,
+        List<NifBlockTypeNameInfo> blockTypeNames,
         List<NifStringInfo> strings)
     {
         var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
@@ -5801,9 +6117,11 @@ internal static class Program
             var safeSize = checked((int)Math.Min(size, (uint)Math.Max(0, data.Length - offset)));
             var payload = safeSize > 0 ? data.Slice(offset, safeSize) : ReadOnlySpan<byte>.Empty;
             var typeIndex = blockTypeIndices[i];
-            var typeName = typeIndex >= 0 && typeIndex < blockTypeNames.Count
-                ? blockTypeNames[typeIndex].DisplayName
-                : $"type-index-{typeIndex}";
+            var typeInfo = typeIndex >= 0 && typeIndex < blockTypeNames.Count
+                ? blockTypeNames[typeIndex]
+                : null;
+            var typeName = typeInfo?.NormalizedName ?? $"type-index-{typeIndex}";
+            var typeDisplayName = typeInfo?.DisplayName ?? typeName;
             var stringIndexCandidates = FindNifStringIndexCandidates(payload, strings.Count);
             var stringSamples = stringIndexCandidates
                 .Take(8)
@@ -5816,6 +6134,9 @@ internal static class Program
                 Index: i,
                 TypeIndex: typeIndex,
                 TypeName: typeName,
+                TypeDisplayName: typeDisplayName,
+                DataStreamUsage: typeInfo?.DataStreamUsage,
+                DataStreamAccess: typeInfo?.DataStreamAccess,
                 Size: size,
                 DataOffset: offset,
                 First16: ToHex(payload[..Math.Min(16, payload.Length)]),
@@ -5840,7 +6161,7 @@ internal static class Program
         List<int> blockOffsets,
         List<int> blockTypeIndices,
         List<uint> blockSizes,
-        List<(int Index, string Name, string DisplayName)> blockTypeNames,
+        List<NifBlockTypeNameInfo> blockTypeNames,
         List<NifStringInfo> strings)
     {
         var candidates = new List<NifBlockReferenceCandidate>();
@@ -5855,9 +6176,10 @@ internal static class Program
             }
 
             var targetTypeIndex = blockTypeIndices[targetBlockIndex];
-            var targetTypeName = targetTypeIndex >= 0 && targetTypeIndex < blockTypeNames.Count
-                ? blockTypeNames[targetTypeIndex].DisplayName
-                : $"type-index-{targetTypeIndex}";
+            var targetTypeInfo = targetTypeIndex >= 0 && targetTypeIndex < blockTypeNames.Count
+                ? blockTypeNames[targetTypeIndex]
+                : null;
+            var targetTypeName = targetTypeInfo?.NormalizedName ?? $"type-index-{targetTypeIndex}";
             if (!targetTypeName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -5874,6 +6196,8 @@ internal static class Program
                 PayloadOffset: offset,
                 TargetBlockIndex: targetBlockIndex,
                 TargetTypeName: targetTypeName,
+                TargetDataStreamUsage: targetTypeInfo?.DataStreamUsage,
+                TargetDataStreamAccess: targetTypeInfo?.DataStreamAccess,
                 TargetSize: blockSizes[targetBlockIndex],
                 TargetFirst16: targetFirst16,
                 MaybeStringIndex: maybeStringIndex,
@@ -8003,6 +8327,7 @@ internal static class Program
                     confidence = Math.Min(100, confidence + 10);
                 }
 
+                var dataStreamMetadataScore = GetNifDataStreamMetadataScore(indexStream, vertexStream);
                 var coverageRatio = compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4);
                 pairings.Add(new NifMeshBindingPairingSample(
                     ArchiveName: archiveName,
@@ -8023,6 +8348,7 @@ internal static class Program
                     VertexRole: vertexStream.RoleStats.PrimaryRole,
                     VertexCount: compatibleVertexCount,
                     IndexCoverageRatio: coverageRatio,
+                    DataStreamMetadataScore: dataStreamMetadataScore,
                     Confidence: confidence));
             }
         }
@@ -8030,10 +8356,40 @@ internal static class Program
         return pairings
             .OrderByDescending(static p => p.Confidence)
             .ThenByDescending(static p => p.IndexCoverageRatio)
+            .ThenByDescending(static p => p.DataStreamMetadataScore)
             .ThenBy(static p => p.IndexMeshPayloadOffset)
             .ThenBy(static p => p.VertexMeshPayloadOffset)
             .Take(16)
             .ToList();
+    }
+
+    private static int GetNifDataStreamMetadataScore(params NifMeshBoundStreamSummary[] streams)
+    {
+        var scored = streams
+            .Where(static s => !string.IsNullOrWhiteSpace(s.DataStreamUsage) || !string.IsNullOrWhiteSpace(s.DataStreamAccess))
+            .ToList();
+        var score = scored.Count;
+        var accessValues = scored
+            .Select(static s => s.DataStreamAccess)
+            .Where(static v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        if (scored.Count > 1 && accessValues == 1)
+        {
+            score++;
+        }
+
+        var usageValues = scored
+            .Select(static s => s.DataStreamUsage)
+            .Where(static v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        if (usageValues > 1)
+        {
+            score++;
+        }
+
+        return score;
     }
 
     private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
@@ -8077,6 +8433,8 @@ internal static class Program
                 MeshPayloadOffset: candidate.PayloadOffset,
                 TargetBlockIndex: candidate.TargetBlockIndex,
                 TargetTypeName: candidate.TargetTypeName,
+                DataStreamUsage: candidate.TargetDataStreamUsage,
+                DataStreamAccess: candidate.TargetDataStreamAccess,
                 TargetSize: candidate.TargetSize,
                 TargetFirst16: candidate.TargetFirst16,
                 DeclaredPayloadBytes: declaredPayloadBytes,
@@ -8125,6 +8483,7 @@ internal static class Program
                     confidence = Math.Min(100, confidence + 10);
                 }
 
+                var dataStreamMetadataScore = GetNifDataStreamMetadataScore(indexStream, vertexStream);
                 pairings.Add(new NifMeshProbePairing(
                     IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
                     IndexBlockIndex: indexStream.TargetBlockIndex,
@@ -8138,6 +8497,7 @@ internal static class Program
                     VertexRole: vertexStream.RoleStats.PrimaryRole,
                     VertexCount: compatibleVertexCount,
                     IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
+                    DataStreamMetadataScore: dataStreamMetadataScore,
                     Confidence: confidence));
             }
         }
@@ -8145,6 +8505,7 @@ internal static class Program
         return pairings
             .OrderByDescending(static p => p.Confidence)
             .ThenByDescending(static p => p.IndexCoverageRatio)
+            .ThenByDescending(static p => p.DataStreamMetadataScore)
             .ThenBy(static p => p.IndexMeshPayloadOffset)
             .ThenBy(static p => p.VertexMeshPayloadOffset)
             .Take(16)
@@ -8188,6 +8549,7 @@ internal static class Program
                     }
 
                     var confidence = Math.Min(position.Stream.RoleStats.Confidence, Math.Min(normal.Stream.RoleStats.Confidence, uv.Stream.RoleStats.Confidence));
+                    var dataStreamMetadataScore = GetNifDataStreamMetadataScore(position.Stream, normal.Stream, uv.Stream);
                     var topology = AnalyzeNifAttributeTopology(position.VertexCount!.Value, hasBoundIndexCandidate);
                     var extraStreams = FindNifAttributeSetExtraStreams(
                         streams,
@@ -8205,18 +8567,25 @@ internal static class Program
                         MeshSize: meshBlock.Size,
                         VertexCount: position.VertexCount!.Value,
                         Confidence: confidence,
+                        DataStreamMetadataScore: dataStreamMetadataScore,
                         Topology: topology,
                         PositionMeshPayloadOffset: position.Stream.MeshPayloadOffset,
                         PositionBlockIndex: position.Stream.TargetBlockIndex,
                         PositionDeclaredPayloadBytes: position.Stream.DeclaredPayloadBytes,
+                        PositionDataStreamUsage: position.Stream.DataStreamUsage,
+                        PositionDataStreamAccess: position.Stream.DataStreamAccess,
                         PositionRole: position.Stream.RoleStats.PrimaryRole,
                         NormalMeshPayloadOffset: normal.Stream.MeshPayloadOffset,
                         NormalBlockIndex: normal.Stream.TargetBlockIndex,
                         NormalDeclaredPayloadBytes: normal.Stream.DeclaredPayloadBytes,
+                        NormalDataStreamUsage: normal.Stream.DataStreamUsage,
+                        NormalDataStreamAccess: normal.Stream.DataStreamAccess,
                         NormalRole: normal.Stream.RoleStats.PrimaryRole,
                         UvMeshPayloadOffset: uv.Stream.MeshPayloadOffset,
                         UvBlockIndex: uv.Stream.TargetBlockIndex,
                         UvDeclaredPayloadBytes: uv.Stream.DeclaredPayloadBytes,
+                        UvDataStreamUsage: uv.Stream.DataStreamUsage,
+                        UvDataStreamAccess: uv.Stream.DataStreamAccess,
                         UvRole: uv.Stream.RoleStats.PrimaryRole,
                         ExtraStreams: extraStreams));
                 }
@@ -8225,6 +8594,7 @@ internal static class Program
 
         return sets
             .OrderByDescending(static s => s.Confidence)
+            .ThenByDescending(static s => s.DataStreamMetadataScore)
             .ThenBy(static s => s.PositionMeshPayloadOffset)
             .ThenBy(static s => s.NormalMeshPayloadOffset)
             .ThenBy(static s => s.UvMeshPayloadOffset)
@@ -8255,6 +8625,8 @@ internal static class Program
                     MeshPayloadOffset: s.MeshPayloadOffset,
                     BlockIndex: s.TargetBlockIndex,
                     DeclaredPayloadBytes: s.DeclaredPayloadBytes,
+                    DataStreamUsage: s.DataStreamUsage,
+                    DataStreamAccess: s.DataStreamAccess,
                     Role: s.RoleStats.PrimaryRole,
                     RoleConfidence: s.RoleStats.Confidence,
                     BytesPerVertex: bytesPerVertex,
@@ -8679,9 +9051,51 @@ internal static class Program
 
     private static string FormatBlockTypeUsage(NifBlockTypeInfo blockType)
     {
+        var label = string.Equals(blockType.NormalizedName, blockType.DisplayName, StringComparison.Ordinal)
+            ? blockType.DisplayName
+            : $"{blockType.NormalizedName} ({blockType.DisplayName})";
+        label += FormatNifDataStreamUsageAccessInline(blockType.DataStreamUsage, blockType.DataStreamAccess);
+
         return blockType.UsageCount > 0
-            ? $"{blockType.DisplayName} x{blockType.UsageCount:N0}"
-            : blockType.DisplayName;
+            ? $"{label} x{blockType.UsageCount:N0}"
+            : label;
+    }
+
+    private static string FormatNifDataStreamUsageAccessKey(string? dataStreamUsage, string? dataStreamAccess)
+    {
+        return $"usage={dataStreamUsage ?? "-"} access={dataStreamAccess ?? "-"}";
+    }
+
+    private static string FormatNifDataStreamUsageAccessInline(string? dataStreamUsage, string? dataStreamAccess)
+    {
+        return string.IsNullOrWhiteSpace(dataStreamUsage) && string.IsNullOrWhiteSpace(dataStreamAccess)
+            ? string.Empty
+            : $" usage={dataStreamUsage ?? "-"} access={dataStreamAccess ?? "-"}";
+    }
+
+    private static NifBlockTypeNameInfo BuildNifBlockTypeNameInfo(int index, string name)
+    {
+        var displayName = EscapeControlChars(name);
+        var normalizedName = displayName;
+        string? dataStreamUsage = null;
+        string? dataStreamAccess = null;
+
+        var parts = name.Split('\u0001');
+        if (parts.Length > 1 &&
+            string.Equals(parts[0], "NiDataStream", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedName = "NiDataStream";
+            dataStreamUsage = parts.Length > 1 && parts[1].Length > 0 ? EscapeControlChars(parts[1]) : null;
+            dataStreamAccess = parts.Length > 2 && parts[2].Length > 0 ? EscapeControlChars(parts[2]) : null;
+        }
+
+        return new NifBlockTypeNameInfo(
+            Index: index,
+            Name: name,
+            DisplayName: displayName,
+            NormalizedName: normalizedName,
+            DataStreamUsage: dataStreamUsage,
+            DataStreamAccess: dataStreamAccess);
     }
 
     private static string EscapeControlChars(string value)
@@ -8851,6 +9265,463 @@ internal static class Program
         {
             yield return builder.ToString();
         }
+    }
+
+    private static IEnumerable<string> ExtractUtf16LeRuns(byte[] bytes, int minLength)
+    {
+        var builder = new StringBuilder();
+        for (var i = 0; i + 1 < bytes.Length; i += 2)
+        {
+            var value = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(i, 2));
+            if (value is >= 32 and <= 126)
+            {
+                builder.Append((char)value);
+                continue;
+            }
+
+            if (builder.Length >= minLength)
+            {
+                yield return builder.ToString();
+            }
+
+            builder.Clear();
+        }
+
+        if (builder.Length >= minLength)
+        {
+            yield return builder.ToString();
+        }
+    }
+
+    private static AssetSemanticProbe BuildAssetSemanticProbe(byte[] payload, DetectedFileType detected, bool scanSemanticStrings)
+    {
+        var categories = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var nameCandidates = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var referenceSamples = new List<string>();
+        var textSnippetSamples = new List<string>();
+        var xmlTagCounts = new List<NifStringCount>();
+        var xmlAttributeCounts = new List<NifStringCount>();
+        XmlFamilyProbe? xmlFamily = null;
+
+        AddDetectedTypeCategories(categories, detected);
+        if (detected.Extension == "xml")
+        {
+            xmlFamily = BuildXmlFamilyProbe(payload);
+            xmlTagCounts = xmlFamily.TagCounts;
+            xmlAttributeCounts = xmlFamily.AttributeCounts;
+            if (xmlTagCounts.Count > 0)
+            {
+                categories.Add("xml:tag-family");
+            }
+
+            if (xmlFamily.ParseWarning is not null)
+            {
+                categories.Add("xml-parse-warning");
+            }
+            else
+            {
+                categories.Add("xml:parse-complete");
+            }
+        }
+
+        if (scanSemanticStrings && detected.Extension == "nif")
+        {
+            try
+            {
+                var header = ParseNifHeader(payload);
+                foreach (var reference in header.References.Take(64))
+                {
+                    AddReferenceSample(referenceSamples, reference.Value);
+                    AddNameCandidate(nameCandidates, reference.Value);
+                    AddSemanticCategoriesForText(categories, reference.Value);
+                }
+
+                foreach (var blockType in header.BlockTypes.OrderByDescending(static b => b.UsageCount).Take(16))
+                {
+                    AddSemanticCategoriesForText(categories, blockType.DisplayName);
+                }
+            }
+            catch
+            {
+                categories.Add("nif-parse-warning");
+            }
+        }
+
+        var pathLikeRegex = PathLikeRegex();
+        var scanPayload = scanSemanticStrings && ShouldScanPayloadStrings(detected) ? BuildSemanticStringScanPayload(payload) : Array.Empty<byte>();
+        foreach (var run in ExtractAsciiRuns(scanPayload, minLength: 4).Take(512)
+            .Concat(ExtractUtf16LeRuns(scanPayload, minLength: 4).Take(128)))
+        {
+            AddSemanticCategoriesForText(categories, run);
+            foreach (Match match in pathLikeRegex.Matches(run))
+            {
+                AddNameCandidate(nameCandidates, match.Value);
+                AddReferenceSample(referenceSamples, match.Value);
+            }
+
+            if (textSnippetSamples.Count < 8 && LooksSemanticallyInteresting(run))
+            {
+                textSnippetSamples.Add(SanitizeTextSnippet(run, maxLength: 96));
+            }
+        }
+
+        return new AssetSemanticProbe(
+            First4: ToHex(payload.AsSpan(0, Math.Min(payload.Length, 4))),
+            First8: ToHex(payload.AsSpan(0, Math.Min(payload.Length, 8))),
+            First16: ToHex(payload.AsSpan(0, Math.Min(payload.Length, 16))),
+            MagicLabel: BuildMagicLabel(payload, detected),
+            SemanticCategories: categories.ToList(),
+            NameCandidates: nameCandidates.Take(16).ToList(),
+            ReferenceSamples: referenceSamples.Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToList(),
+            XmlTagCounts: xmlTagCounts,
+            XmlAttributeCounts: xmlAttributeCounts,
+            XmlParseStatus: xmlFamily?.ParseStatus,
+            XmlParseWarning: xmlFamily?.ParseWarning,
+            XmlParseLineNumber: xmlFamily?.ParseLineNumber,
+            XmlParseLinePosition: xmlFamily?.ParseLinePosition,
+            XmlParsedElementCount: xmlFamily?.ParsedElementCount,
+            XmlParsedAttributeNameCount: xmlFamily?.ParsedAttributeNameCount,
+            TextSnippetSamples: textSnippetSamples.Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList());
+    }
+
+    private static XmlFamilyProbe BuildXmlFamilyProbe(byte[] payload)
+    {
+        var tagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var attributeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var settings = new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                IgnoreComments = true,
+                IgnoreProcessingInstructions = true,
+                IgnoreWhitespace = true,
+                XmlResolver = null
+            };
+
+            using var stream = new MemoryStream(payload, writable: false);
+            using var reader = XmlReader.Create(stream, settings);
+            while (reader.Read())
+            {
+                if (reader.NodeType != XmlNodeType.Element)
+                {
+                    continue;
+                }
+
+                var tagName = SanitizeXmlFamilyName(string.IsNullOrWhiteSpace(reader.LocalName) ? reader.Name : reader.LocalName);
+                if (!string.IsNullOrWhiteSpace(tagName))
+                {
+                    IncrementCount(tagCounts, tagName);
+                }
+
+                if (!reader.HasAttributes)
+                {
+                    continue;
+                }
+
+                while (reader.MoveToNextAttribute())
+                {
+                    var attributeName = SanitizeXmlFamilyName(string.IsNullOrWhiteSpace(reader.LocalName) ? reader.Name : reader.LocalName);
+                    if (!string.IsNullOrWhiteSpace(attributeName))
+                    {
+                        IncrementCount(attributeCounts, attributeName);
+                    }
+                }
+
+                reader.MoveToElement();
+            }
+
+            return new XmlFamilyProbe(
+                TagCounts: ToTopStringCounts(tagCounts, take: 32),
+                AttributeCounts: ToTopStringCounts(attributeCounts, take: 32),
+                ParseStatus: "complete",
+                ParseWarning: null,
+                ParseLineNumber: null,
+                ParseLinePosition: null,
+                ParsedElementCount: tagCounts.Values.Sum(),
+                ParsedAttributeNameCount: attributeCounts.Values.Sum());
+        }
+        catch (XmlException ex)
+        {
+            return new XmlFamilyProbe(
+                TagCounts: ToTopStringCounts(tagCounts, take: 32),
+                AttributeCounts: ToTopStringCounts(attributeCounts, take: 32),
+                ParseStatus: tagCounts.Count > 0 ? "partial-with-warning" : "failed",
+                ParseWarning: ex.GetType().Name,
+                ParseLineNumber: ex.LineNumber,
+                ParseLinePosition: ex.LinePosition,
+                ParsedElementCount: tagCounts.Values.Sum(),
+                ParsedAttributeNameCount: attributeCounts.Values.Sum());
+        }
+    }
+
+    private static string SanitizeXmlFamilyName(string value)
+    {
+        var builder = new StringBuilder();
+        foreach (var c in value.Trim())
+        {
+            if (char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or ':' or '.')
+            {
+                builder.Append(c);
+            }
+            else
+            {
+                builder.Append('_');
+            }
+
+            if (builder.Length >= 64)
+            {
+                break;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool ShouldScanPayloadStrings(DetectedFileType detected)
+    {
+        return detected.Extension is "bin" or "txt" or "lua" or "xml" or "nif";
+    }
+
+    private static byte[] BuildSemanticStringScanPayload(byte[] payload)
+    {
+        const int maxBytes = 256 * 1024;
+        if (payload.Length <= maxBytes)
+        {
+            return payload;
+        }
+
+        var prefixBytes = maxBytes / 2;
+        var suffixBytes = maxBytes - prefixBytes;
+        var scanPayload = new byte[maxBytes];
+        Buffer.BlockCopy(payload, 0, scanPayload, 0, prefixBytes);
+        Buffer.BlockCopy(payload, payload.Length - suffixBytes, scanPayload, prefixBytes, suffixBytes);
+        return scanPayload;
+    }
+
+    private static void AddDetectedTypeCategories(SortedSet<string> categories, DetectedFileType detected)
+    {
+        categories.Add($"type:{detected.Extension}");
+        switch (detected.Extension)
+        {
+            case "dds" or "png" or "jpg":
+                categories.Add("asset:texture");
+                break;
+            case "nif":
+                categories.Add("asset:model");
+                break;
+            case "ogg" or "riff":
+                categories.Add("asset:audio");
+                break;
+            case "lua":
+                categories.Add("asset:script-lua");
+                break;
+            case "xml":
+                categories.Add("asset:xml");
+                break;
+            case "txt":
+                categories.Add("asset:text");
+                break;
+            default:
+                categories.Add("asset:unknown-binary");
+                break;
+        }
+    }
+
+    private static void AddReferenceSample(List<string> references, string value)
+    {
+        if (references.Count >= 32)
+        {
+            return;
+        }
+
+        var cleaned = CleanNifReference(value);
+        if (cleaned.Length > 0)
+        {
+            references.Add(SanitizeTextSnippet(cleaned, maxLength: 128));
+        }
+    }
+
+    private static void AddNameCandidate(SortedSet<string> candidates, string value)
+    {
+        var cleaned = CleanNifReference(value);
+        if (cleaned.Length == 0)
+        {
+            return;
+        }
+
+        var normalized = NormalizeAssetName(cleaned);
+        if (normalized.Length is >= 3 and <= 180)
+        {
+            candidates.Add(normalized);
+        }
+    }
+
+    private static void AddSemanticCategoriesForText(SortedSet<string> categories, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var lower = text.ToLowerInvariant();
+        if (lower.Contains(".dds", StringComparison.Ordinal) ||
+            lower.Contains(".tga", StringComparison.Ordinal) ||
+            lower.Contains("texture", StringComparison.Ordinal))
+        {
+            categories.Add("ref:texture");
+        }
+
+        if (lower.Contains(".nif", StringComparison.Ordinal) ||
+            lower.Contains(".kfm", StringComparison.Ordinal) ||
+            lower.Contains(".kf", StringComparison.Ordinal) ||
+            lower.Contains("model", StringComparison.Ordinal) ||
+            lower.Contains("mesh", StringComparison.Ordinal))
+        {
+            categories.Add("ref:model");
+        }
+
+        if (lower.Contains(".ogg", StringComparison.Ordinal) ||
+            lower.Contains(".wav", StringComparison.Ordinal) ||
+            lower.Contains("sound", StringComparison.Ordinal) ||
+            lower.Contains("audio", StringComparison.Ordinal))
+        {
+            categories.Add("ref:audio");
+        }
+
+        if (lower.Contains(".lua", StringComparison.Ordinal) || LooksLikeLuaText(text))
+        {
+            categories.Add("hint:lua");
+        }
+
+        if (lower.Contains(".xml", StringComparison.Ordinal) || LooksLikeXmlText(text))
+        {
+            categories.Add("hint:xml");
+        }
+
+        if (lower.Contains("interface", StringComparison.Ordinal) ||
+            lower.Contains("/ui", StringComparison.Ordinal) ||
+            lower.Contains("\\ui", StringComparison.Ordinal) ||
+            lower.Contains("addon", StringComparison.Ordinal) ||
+            lower.Contains("frame", StringComparison.Ordinal))
+        {
+            categories.Add("hint:ui");
+        }
+
+        if (lower.Contains("world", StringComparison.Ordinal) ||
+            lower.Contains("zone", StringComparison.Ordinal) ||
+            lower.Contains("terrain", StringComparison.Ordinal) ||
+            lower.Contains("/map", StringComparison.Ordinal) ||
+            lower.Contains("\\map", StringComparison.Ordinal) ||
+            lower.Contains("map_", StringComparison.Ordinal) ||
+            lower.Contains("_map", StringComparison.Ordinal) ||
+            lower.Contains("bounds", StringComparison.Ordinal) ||
+            lower.Contains("coordinate", StringComparison.Ordinal))
+        {
+            categories.Add("hint:map-zone");
+        }
+
+        if (lower.Contains("waypoint", StringComparison.Ordinal) ||
+            lower.Contains("poi", StringComparison.Ordinal) ||
+            lower.Contains("pointofinterest", StringComparison.Ordinal))
+        {
+            categories.Add("hint:waypoint-poi");
+        }
+
+        if (lower.Contains("quest", StringComparison.Ordinal) ||
+            lower.Contains("objective", StringComparison.Ordinal) ||
+            lower.Contains("journal", StringComparison.Ordinal))
+        {
+            categories.Add("hint:quest-objective");
+        }
+
+        if (lower.Contains("npc", StringComparison.Ordinal) ||
+            lower.Contains("actor", StringComparison.Ordinal) ||
+            lower.Contains("creature", StringComparison.Ordinal) ||
+            lower.Contains("character", StringComparison.Ordinal) ||
+            lower.Contains("spawn", StringComparison.Ordinal))
+        {
+            categories.Add("hint:actor-object");
+        }
+    }
+
+    private static bool LooksSemanticallyInteresting(string text)
+    {
+        var categories = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddSemanticCategoriesForText(categories, text);
+        return categories.Any(static c => c.StartsWith("hint:", StringComparison.OrdinalIgnoreCase) || c.StartsWith("ref:", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildMagicLabel(byte[] payload, DetectedFileType detected)
+    {
+        if (detected.Extension == "nif")
+        {
+            return detected.Format ?? "Gamebryo File Format";
+        }
+
+        if (detected.Extension == "riff")
+        {
+            return string.IsNullOrWhiteSpace(detected.RiffType) ? "RIFF" : $"RIFF/{detected.RiffType}";
+        }
+
+        if (detected.Extension == "dds")
+        {
+            return string.IsNullOrWhiteSpace(detected.Format) ? "DDS" : $"DDS/{detected.Format}";
+        }
+
+        var ascii = ReadAsciiLine(payload.AsSpan(0, Math.Min(payload.Length, 32)), maxLength: 32);
+        if (!string.IsNullOrWhiteSpace(ascii) && ascii.All(static c => c is >= ' ' and <= '~'))
+        {
+            return SanitizeTextSnippet(ascii, maxLength: 32);
+        }
+
+        return detected.Extension;
+    }
+
+    private static bool LooksLikeXmlText(string text)
+    {
+        var trimmed = text.TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        return trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("<", StringComparison.Ordinal) &&
+            (trimmed.Contains("</", StringComparison.Ordinal) || trimmed.Contains("/>", StringComparison.Ordinal));
+    }
+
+    private static bool LooksLikeLuaText(string text)
+    {
+        var lower = text.ToLowerInvariant();
+        return lower.Contains("function ", StringComparison.Ordinal) &&
+            lower.Contains(" end", StringComparison.Ordinal) ||
+            lower.Contains("local ", StringComparison.Ordinal) &&
+            (lower.Contains("function", StringComparison.Ordinal) || lower.Contains("return ", StringComparison.Ordinal));
+    }
+
+    private static string SanitizeTextSnippet(string value, int maxLength)
+    {
+        var builder = new StringBuilder();
+        foreach (var c in value)
+        {
+            if (c is '\r' or '\n' or '\t')
+            {
+                builder.Append(' ');
+            }
+            else if (c is >= ' ' and <= '~')
+            {
+                builder.Append(c);
+            }
+        }
+
+        var sanitized = Regex.Replace(builder.ToString(), @"\s+", " ").Trim();
+        return sanitized.Length <= maxLength ? sanitized : sanitized[..Math.Max(0, maxLength - 1)] + "…";
+    }
+
+    private static List<NifStringCount> ToTopStringCounts(Dictionary<string, int> counts, int take)
+    {
+        return counts
+            .OrderByDescending(static kvp => kvp.Value)
+            .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .Take(take)
+            .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
+            .ToList();
     }
 
     private static Regex PathLikeRegex() => new(
@@ -9467,10 +10338,58 @@ internal static class Program
         var normalized = value.Trim().TrimStart('.').ToLowerInvariant();
         if (normalized.Length == 0 || normalized.Any(c => !(char.IsAsciiLetterOrDigit(c) || c == '_')))
         {
-            throw new ArgumentException("--type must be a simple detected extension/type such as dds, riff, txt, bin, or lzma2.");
+            throw new ArgumentException("--type must be a simple detected extension/type such as dds, riff, txt, lua, xml, bin, nif, or lzma2.");
         }
 
         return normalized;
+    }
+
+    private static string NormalizeSemanticCategoryFilter(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized.Length == 0)
+        {
+            throw new ArgumentException("--semantic-category cannot be blank.");
+        }
+
+        var wildcard = normalized.EndsWith('*');
+        var body = wildcard ? normalized[..^1] : normalized;
+        if (body.Length == 0 ||
+            body.Any(static c => !(char.IsAsciiLetterOrDigit(c) || c is ':' or '-' or '_' or '.')))
+        {
+            throw new ArgumentException("--semantic-category must be a simple category such as hint:map-zone, ref:texture, type:xml, or hint:*.");
+        }
+
+        return normalized;
+    }
+
+    private static bool SemanticCategoryMatches(List<string> categories, List<string> filters)
+    {
+        if (filters.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var filter in filters)
+        {
+            if (filter.EndsWith("*", StringComparison.Ordinal))
+            {
+                var prefix = filter[..^1];
+                if (categories.Any(c => c.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (categories.Any(c => string.Equals(c, filter, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static uint ParseUInt32Flexible(string value, string optionName)
@@ -10032,6 +10951,17 @@ internal static class Program
 
         if (LooksText(data))
         {
+            var textPrefix = Encoding.ASCII.GetString(data[..Math.Min(data.Length, 4096)]);
+            if (LooksLikeXmlText(textPrefix))
+            {
+                return new DetectedFileType("xml");
+            }
+
+            if (LooksLikeLuaText(textPrefix))
+            {
+                return new DetectedFileType("lua");
+            }
+
             return new DetectedFileType("txt");
         }
 
@@ -10124,6 +11054,8 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-archives --root <SourceFolder> --archive 42 --max-per-archive 20");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- scan-compression --root <SourceFolder>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- mine-strings --input <ExtractedFolder>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-asset-signatures --root <SourceFolder> --max-total 100");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- build-asset-semantic-index --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-binary-signatures --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-binary --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
@@ -10172,7 +11104,9 @@ internal static class Program
         Console.WriteLine("                  Mesh payload offset for probe-nif-attribute-extra");
         Console.WriteLine("  --fnv <uint|0xhex>");
         Console.WriteLine("                  Only extract entries with this filename FNV1 hash");
-        Console.WriteLine("  --type <kind>   Only write/inspect detected type such as dds, riff, txt, bin, nif, lzma2");
+        Console.WriteLine("  --type <kind>   Only write/inspect detected type such as dds, riff, txt, lua, xml, bin, nif, lzma2");
+        Console.WriteLine("  --semantic-category <category>");
+        Console.WriteLine("                  Only keep asset semantic-index/signature hits with a category, such as hint:map-zone or hint:*");
         Console.WriteLine("  --group-by-type");
         Console.WriteLine("                  Write extracted files under <out>/<type>/<archive>/...");
         Console.WriteLine("  --manifest-index <n>");
@@ -10292,6 +11226,7 @@ internal static class Program
         List<string> Names,
         string? NamesFile,
         string? TypeFilter,
+        List<string> SemanticCategoryFilters,
         bool GroupByType,
         string? InputPath,
         string? LiveRoot,
@@ -10326,6 +11261,7 @@ internal static class Program
             var names = new List<string>();
             string? namesFile = null;
             string? typeFilter = null;
+            var semanticCategoryFilters = new List<string>();
             var groupByType = false;
             string? inputPath = null;
             string? liveRoot = null;
@@ -10355,6 +11291,8 @@ internal static class Program
                     case "inventory-archives":
                     case "scan-compression":
                     case "mine-strings":
+                    case "inventory-asset-signatures":
+                    case "build-asset-semantic-index":
                     case "inventory-binary-signatures":
                     case "probe-binary":
                     case "probe-nif":
@@ -10474,6 +11412,13 @@ internal static class Program
                             throw new ArgumentException("--type requires a detected type argument.");
                         }
                         typeFilter = args[++i];
+                        break;
+                    case "--semantic-category":
+                        if (i + 1 >= args.Length)
+                        {
+                            throw new ArgumentException("--semantic-category requires a category argument.");
+                        }
+                        semanticCategoryFilters.Add(NormalizeSemanticCategoryFilter(args[++i]));
                         break;
                     case "--manifest-index":
                         if (i + 1 >= args.Length)
@@ -10610,6 +11555,7 @@ internal static class Program
                 names,
                 namesFile,
                 typeFilter,
+                semanticCategoryFilters,
                 groupByType,
                 inputPath,
                 liveRoot,
@@ -10670,6 +11616,127 @@ internal sealed class StringMineRecord(string candidate, int count, List<string>
     public int Count { get; set; } = count;
     public List<string> SampleSources { get; } = sampleSources;
 }
+
+internal sealed record AssetSemanticIndexReport(
+    string SchemaVersion,
+    string GeneratedOutputNotice,
+    string RootDirectory,
+    string ManifestPath,
+    List<string> SemanticCategoryFilters,
+    int InspectedPayloads,
+    int Failed,
+    List<NifStringCount> TypeCounts,
+    List<NifStringCount> SemanticCategoryCounts,
+    List<AssetSignatureGroup> SignatureGroups,
+    List<AssetSemanticIndexEntry> Entries);
+
+internal sealed class AssetSignatureAccumulator(string type, string first4, string first8, string first16, string magicLabel)
+{
+    public string Type { get; } = type;
+    public string First4 { get; } = first4;
+    public string First8 { get; } = first8;
+    public string First16 { get; } = first16;
+    public string MagicLabel { get; } = magicLabel;
+    public int Count { get; set; }
+    public int MinSize { get; set; } = int.MaxValue;
+    public int MaxSize { get; set; }
+    public Dictionary<string, int> SemanticCategoryCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> XmlTagCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> XmlAttributeCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> XmlParseStatusCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> XmlParseWarningCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<AssetSignatureSample> Samples { get; } = [];
+}
+
+internal sealed record AssetSignatureGroup(
+    string Type,
+    string First4,
+    string First8,
+    string First16,
+    string MagicLabel,
+    int Count,
+    int MinSize,
+    int MaxSize,
+    List<NifStringCount> SemanticCategoryCounts,
+    List<NifStringCount> XmlTagCounts,
+    List<NifStringCount> XmlAttributeCounts,
+    List<NifStringCount> XmlParseStatusCounts,
+    List<NifStringCount> XmlParseWarningCounts,
+    List<AssetSignatureSample> Samples);
+
+internal sealed record AssetSignatureSample(
+    string ArchiveName,
+    int EntryIndex,
+    string IdPrefix,
+    int Size,
+    int? ManifestEntryIndex,
+    uint? FilenameFnv1Hash,
+    ushort? PakIndex,
+    uint? PakOffset,
+    List<string> SemanticCategories,
+    List<string> NameCandidates);
+
+internal sealed record AssetSemanticIndexEntry(
+    string AssetIdPrefix,
+    string ArchiveName,
+    int EntryIndex,
+    int? ManifestEntryIndex,
+    uint? FilenameFnv1Hash,
+    ushort? PakIndex,
+    uint? PakOffset,
+    uint CompressedSize,
+    int UnpackedSize,
+    ushort Compression,
+    string DetectedType,
+    string? Format,
+    string? RiffType,
+    int? Width,
+    int? Height,
+    int? MipMapCount,
+    string First4,
+    string First8,
+    string First16,
+    string MagicLabel,
+    List<string> SemanticCategories,
+    List<string> NameCandidates,
+    List<string> ReferenceSamples,
+    List<NifStringCount> XmlTagCounts,
+    List<NifStringCount> XmlAttributeCounts,
+    string? XmlParseStatus,
+    string? XmlParseWarning,
+    int? XmlParseLineNumber,
+    int? XmlParseLinePosition,
+    int? XmlParsedElementCount,
+    int? XmlParsedAttributeNameCount,
+    List<string> TextSnippetSamples);
+
+internal sealed record AssetSemanticProbe(
+    string First4,
+    string First8,
+    string First16,
+    string MagicLabel,
+    List<string> SemanticCategories,
+    List<string> NameCandidates,
+    List<string> ReferenceSamples,
+    List<NifStringCount> XmlTagCounts,
+    List<NifStringCount> XmlAttributeCounts,
+    string? XmlParseStatus,
+    string? XmlParseWarning,
+    int? XmlParseLineNumber,
+    int? XmlParseLinePosition,
+    int? XmlParsedElementCount,
+    int? XmlParsedAttributeNameCount,
+    List<string> TextSnippetSamples);
+
+internal sealed record XmlFamilyProbe(
+    List<NifStringCount> TagCounts,
+    List<NifStringCount> AttributeCounts,
+    string ParseStatus,
+    string? ParseWarning,
+    int? ParseLineNumber,
+    int? ParseLinePosition,
+    int ParsedElementCount,
+    int ParsedAttributeNameCount);
 
 internal sealed record BinarySignatureInventoryReport(
     string RootDirectory,
@@ -10884,6 +11951,7 @@ internal sealed record NifMeshProbePairing(
     string VertexRole,
     int VertexCount,
     double IndexCoverageRatio,
+    int DataStreamMetadataScore,
     int Confidence);
 
 internal sealed record NifMeshPayloadRoleWindow(
@@ -11242,12 +12310,30 @@ internal sealed record NifHeaderInfo(
     List<NifBlockInfo> Blocks,
     List<string> Warnings);
 
-internal sealed record NifBlockTypeInfo(int Index, string Name, string DisplayName, int UsageCount);
+internal sealed record NifBlockTypeNameInfo(
+    int Index,
+    string Name,
+    string DisplayName,
+    string NormalizedName,
+    string? DataStreamUsage,
+    string? DataStreamAccess);
+
+internal sealed record NifBlockTypeInfo(
+    int Index,
+    string Name,
+    string DisplayName,
+    string NormalizedName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
+    int UsageCount);
 
 internal sealed record NifBlockInfo(
     int Index,
     int TypeIndex,
     string TypeName,
+    string TypeDisplayName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     uint Size,
     int DataOffset,
     string First16,
@@ -11261,6 +12347,8 @@ internal sealed record NifBlockReferenceCandidate(
     int PayloadOffset,
     int TargetBlockIndex,
     string TargetTypeName,
+    string? TargetDataStreamUsage,
+    string? TargetDataStreamAccess,
     uint TargetSize,
     string TargetFirst16,
     bool MaybeStringIndex,
@@ -11967,6 +13055,8 @@ internal sealed record NifMeshBoundStreamSummary(
     int MeshPayloadOffset,
     int TargetBlockIndex,
     string TargetTypeName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     uint TargetSize,
     string TargetFirst16,
     uint? DeclaredPayloadBytes,
@@ -11995,6 +13085,7 @@ internal sealed record NifMeshBindingPairingSample(
     string VertexRole,
     int VertexCount,
     double IndexCoverageRatio,
+    int DataStreamMetadataScore,
     int Confidence);
 
 internal sealed record NifMeshAttributeSetSample(
@@ -12006,18 +13097,25 @@ internal sealed record NifMeshAttributeSetSample(
     uint MeshSize,
     int VertexCount,
     int Confidence,
+    int DataStreamMetadataScore,
     NifAttributeTopologyStats Topology,
     int PositionMeshPayloadOffset,
     int PositionBlockIndex,
     uint? PositionDeclaredPayloadBytes,
+    string? PositionDataStreamUsage,
+    string? PositionDataStreamAccess,
     string PositionRole,
     int NormalMeshPayloadOffset,
     int NormalBlockIndex,
     uint? NormalDeclaredPayloadBytes,
+    string? NormalDataStreamUsage,
+    string? NormalDataStreamAccess,
     string NormalRole,
     int UvMeshPayloadOffset,
     int UvBlockIndex,
     uint? UvDeclaredPayloadBytes,
+    string? UvDataStreamUsage,
+    string? UvDataStreamAccess,
     string UvRole,
     List<NifAttributeExtraStreamSample> ExtraStreams);
 
@@ -12025,6 +13123,8 @@ internal sealed record NifAttributeExtraStreamSample(
     int MeshPayloadOffset,
     int BlockIndex,
     uint? DeclaredPayloadBytes,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     string Role,
     int RoleConfidence,
     int? BytesPerVertex,
@@ -12113,15 +13213,18 @@ internal sealed class NifStreamHeaderAccumulator(int headerBytes)
     public int HeaderBytes { get; } = headerBytes;
     public int Count { get; set; }
     public Dictionary<string, int> TypeCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> UsageAccessCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<uint, int> BlockSizeCounts { get; } = [];
     public Dictionary<uint, int> DeclaredPayloadSizeCounts { get; } = [];
     public Dictionary<int, int> PayloadStrideCounts { get; } = [];
     public List<NifStreamHeaderSample> Samples { get; } = [];
 }
 
-internal sealed class NifStreamHeaderFamilyAccumulator(string typeName, uint blockSize, uint declaredPayloadBytes, int headerBytes, string first16, string payloadFirst16)
+internal sealed class NifStreamHeaderFamilyAccumulator(string typeName, string? dataStreamUsage, string? dataStreamAccess, uint blockSize, uint declaredPayloadBytes, int headerBytes, string first16, string payloadFirst16)
 {
     public string TypeName { get; } = typeName;
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
     public uint BlockSize { get; } = blockSize;
     public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
     public int HeaderBytes { get; } = headerBytes;
@@ -12143,6 +13246,7 @@ internal sealed record NifStreamHeaderInventoryReport(
     int DeclaredPayloadBlocks,
     int ValidDeclaredPayloadBlocks,
     int InvalidDeclaredPayloadBlocks,
+    List<NifDataStreamUsageAccessGroup> UsageAccessGroups,
     List<NifStreamHeaderGroup> HeaderGroups,
     List<NifStreamHeaderFamilyGroup> TopFamilies);
 
@@ -12150,6 +13254,7 @@ internal sealed record NifStreamHeaderGroup(
     int HeaderBytes,
     int Count,
     List<NifStringCount> TypeCounts,
+    List<NifStringCount> UsageAccessCounts,
     List<NifSizeCount> BlockSizes,
     List<NifSizeCount> DeclaredPayloadSizes,
     List<NifIntCount> PayloadStrides,
@@ -12157,6 +13262,8 @@ internal sealed record NifStreamHeaderGroup(
 
 internal sealed record NifStreamHeaderFamilyGroup(
     string TypeName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     uint BlockSize,
     uint DeclaredPayloadBytes,
     int HeaderBytes,
@@ -12178,6 +13285,8 @@ internal sealed record NifStreamHeaderSample(
     int? ManifestEntryIndex,
     int BlockIndex,
     string TypeName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     int DataOffset,
     uint BlockSize,
     string First16,
@@ -12186,6 +13295,15 @@ internal sealed record NifStreamHeaderSample(
     string PayloadFirst16,
     List<StrideCandidate> PayloadStrideCandidates);
 
+internal sealed class NifDataStreamUsageAccessAccumulator(string? dataStreamUsage, string? dataStreamAccess)
+{
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
+    public int Count { get; set; }
+}
+
+internal sealed record NifDataStreamUsageAccessGroup(string? DataStreamUsage, string? DataStreamAccess, int Count);
+
 internal sealed class NifStreamBodySizeAccumulator(uint declaredPayloadBytes)
 {
     public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
@@ -12193,14 +13311,17 @@ internal sealed class NifStreamBodySizeAccumulator(uint declaredPayloadBytes)
     public int AllZeroCount { get; set; }
     public long NonZeroByteTotal { get; set; }
     public Dictionary<string, int> ClassificationCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, int> UsageAccessCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<uint, int> BlockSizeCounts { get; } = [];
     public Dictionary<int, int> PayloadStrideCounts { get; } = [];
     public List<NifStreamBodySample> Samples { get; } = [];
 }
 
-internal sealed class NifStreamBodySignatureAccumulator(uint declaredPayloadBytes, string payloadFirst16)
+internal sealed class NifStreamBodySignatureAccumulator(uint declaredPayloadBytes, string? dataStreamUsage, string? dataStreamAccess, string payloadFirst16)
 {
     public uint DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
     public string PayloadFirst16 { get; } = payloadFirst16;
     public int Count { get; set; }
     public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -12218,6 +13339,7 @@ internal sealed record NifStreamBodyInventoryReport(
     int DataStreamBlocks,
     int ValidStreamBodies,
     int InvalidStreamBodies,
+    List<NifDataStreamUsageAccessGroup> UsageAccessGroups,
     List<NifStreamBodySizeGroup> PayloadSizeGroups,
     List<NifStreamBodySignatureGroup> TopBodySignatures);
 
@@ -12227,12 +13349,15 @@ internal sealed record NifStreamBodySizeGroup(
     int AllZeroCount,
     double AverageNonZeroBytes,
     List<NifStringCount> ClassificationCounts,
+    List<NifStringCount> UsageAccessCounts,
     List<NifSizeCount> BlockSizes,
     List<NifIntCount> PayloadStrides,
     List<NifStreamBodySample> Samples);
 
 internal sealed record NifStreamBodySignatureGroup(
     uint DeclaredPayloadBytes,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     string PayloadFirst16,
     int Count,
     int NifPayloads,
@@ -12247,6 +13372,8 @@ internal sealed record NifStreamBodySample(
     int? ManifestEntryIndex,
     int BlockIndex,
     string TypeName,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
     uint BlockSize,
     int HeaderBytes,
     uint DeclaredPayloadBytes,

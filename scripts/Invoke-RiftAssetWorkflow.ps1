@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
+    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
     [string[]] $Mode = @('MeshBindings'),
 
     [string] $Root = '',
@@ -28,6 +28,10 @@ param(
     [int] $MeshBlock = -1,
 
     [int] $ExtraOffset = -1,
+
+    [string] $Type = '',
+
+    [string[]] $SemanticCategory = @(),
 
     [switch] $Full,
 
@@ -54,6 +58,8 @@ if ($Mode -contains 'All') {
 }
 
 $commandMap = @{
+    AssetSignatures = @{ Command = 'inventory-asset-signatures'; Base = 'asset-signature-inventory' }
+    AssetSemanticIndex = @{ Command = 'build-asset-semantic-index'; Base = 'asset-semantic-index' }
     MeshBindings    = @{ Command = 'inventory-nif-mesh-bindings';    Base = 'nif-mesh-binding-inventory' }
     MeshProbe       = @{ Command = 'probe-nif-mesh';                  Base = 'probe-nif-mesh' }
     AttributeExtraProbe = @{ Command = 'probe-nif-attribute-extra';   Base = 'probe-nif-attribute-extra' }
@@ -63,6 +69,17 @@ $commandMap = @{
     IndexCandidates = @{ Command = 'inventory-nif-index-candidates';  Base = 'nif-index-candidate-inventory' }
     StreamEndianness = @{ Command = 'inventory-nif-stream-endianness'; Base = 'nif-stream-endianness-inventory' }
     StreamBodies    = @{ Command = 'inventory-nif-stream-bodies';     Base = 'nif-stream-body-inventory' }
+}
+
+$semanticCategoryArgs = @()
+$typeArgs = @()
+if (-not [string]::IsNullOrWhiteSpace($Type)) {
+    $typeArgs += @('--type', $Type)
+}
+foreach ($category in @($SemanticCategory)) {
+    if (-not [string]::IsNullOrWhiteSpace($category)) {
+        $semanticCategoryArgs += @('--semantic-category', $category)
+    }
 }
 
 function Invoke-Checked {
@@ -190,6 +207,44 @@ function Show-ReportSummary {
     $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
     Write-Host "`n--- $ModeName summary: $Path" -ForegroundColor Green
     switch ($ModeName) {
+        { $_ -in @('AssetSignatures', 'AssetSemanticIndex') } {
+            $entryCount = 0
+            $entriesProperty = $report.PSObject.Properties['Entries']
+            if ($null -ne $entriesProperty -and $null -ne $entriesProperty.Value) {
+                $entryCount = @($entriesProperty.Value).Count
+            }
+
+            Write-Host "schema=$($report.SchemaVersion) inspected=$($report.InspectedPayloads) failed=$($report.Failed) entries=$entryCount"
+            $filtersProperty = $report.PSObject.Properties['SemanticCategoryFilters']
+            if ($null -ne $filtersProperty -and $null -ne $filtersProperty.Value -and @($filtersProperty.Value).Count -gt 0) {
+                Write-Host ('Semantic filters: ' + (@($filtersProperty.Value) -join ', '))
+            }
+            Write-Host ('Types: ' + (Get-TopText $report.TypeCounts { param($g) "$($g.Value)=$($g.Count)" } 10))
+            Write-Host ('Semantic categories: ' + (Get-TopText $report.SemanticCategoryCounts { param($g) "$($g.Value)=$($g.Count)" } 10))
+            Write-Host ('Top signatures: ' + (Get-TopText $report.SignatureGroups { param($g) "$($g.Type) $($g.First16) count=$($g.Count) size=$($g.MinSize)..$($g.MaxSize) magic=$($g.MagicLabel)" } 8))
+            $xmlGroups = @($report.SignatureGroups | Where-Object {
+                $tagProperty = $_.PSObject.Properties['XmlTagCounts']
+                $null -ne $tagProperty -and $null -ne $tagProperty.Value -and @($tagProperty.Value).Count -gt 0
+            })
+            if ($xmlGroups.Count -gt 0) {
+                Write-Host ('XML tag families: ' + (Get-TopText $xmlGroups { param($g) "$($g.Type):" + (Get-TopText $g.XmlTagCounts { param($c) "$($c.Value)=$($c.Count)" } 5) } 5))
+                Write-Host ('XML attribute families: ' + (Get-TopText $xmlGroups { param($g) "$($g.Type):" + (Get-TopText $g.XmlAttributeCounts { param($c) "$($c.Value)=$($c.Count)" } 5) } 5))
+            }
+            $xmlStatusGroups = @($report.SignatureGroups | Where-Object {
+                $statusProperty = $_.PSObject.Properties['XmlParseStatusCounts']
+                $null -ne $statusProperty -and $null -ne $statusProperty.Value -and @($statusProperty.Value).Count -gt 0
+            })
+            if ($xmlStatusGroups.Count -gt 0) {
+                Write-Host ('XML parse statuses: ' + (Get-TopText $xmlStatusGroups { param($g) "$($g.Type):" + (Get-TopText @($g.XmlParseStatusCounts) { param($c) "$($c.Value)=$($c.Count)" } 5) } 5))
+            }
+            $xmlWarningGroups = @($report.SignatureGroups | Where-Object {
+                $warningProperty = $_.PSObject.Properties['XmlParseWarningCounts']
+                $null -ne $warningProperty -and $null -ne $warningProperty.Value -and @($warningProperty.Value).Count -gt 0
+            })
+            if ($xmlWarningGroups.Count -gt 0) {
+                Write-Host ('XML parse warnings: ' + (Get-TopText $xmlWarningGroups { param($g) "$($g.Type):" + (Get-TopText @($g.XmlParseWarningCounts) { param($c) "$($c.Value)=$($c.Count)" } 5) } 5))
+            }
+        }
         'MeshBindings' {
             Write-Host "NIF payloads=$($report.NifPayloads) meshBlocks=$($report.MeshBlocks) links=$($report.CandidateLinks) pairMeshes=$($report.PairCompatibleMeshes) pairLinks=$($report.PairCompatibleLinks)"
             Write-Host ('Top roles: ' + (Get-TopText $report.RoleGroups { param($g) "$($g.Role)=$($g.Count)" }))
@@ -592,13 +647,13 @@ foreach ($modeName in $Mode) {
 
     if (-not $NoSmoke) {
         $smokePath = Join-Path $Out "$base-smoke.json"
-        Invoke-Checked -Label "$modeName smoke" -Args @('run', '--project', $Project, '--', $command, '--root', $Root, '--max-total', [string]$SmokeMaxTotal, '--out', $smokePath, '--limit', [string]$Limit)
+        Invoke-Checked -Label "$modeName smoke" -Args (@('run', '--project', $Project, '--', $command, '--root', $Root, '--max-total', [string]$SmokeMaxTotal, '--out', $smokePath, '--limit', [string]$Limit) + $typeArgs + $semanticCategoryArgs)
         Show-ReportSummary -ModeName $modeName -Path $smokePath
     }
 
     if ($Full) {
         $fullPath = Join-Path $Out "$base.json"
-        Invoke-Checked -Label "$modeName full" -Args @('run', '--project', $Project, '--', $command, '--root', $Root, '--out', $fullPath, '--limit', [string]$Limit)
+        Invoke-Checked -Label "$modeName full" -Args (@('run', '--project', $Project, '--', $command, '--root', $Root, '--out', $fullPath, '--limit', [string]$Limit) + $typeArgs + $semanticCategoryArgs)
         Show-ReportSummary -ModeName $modeName -Path $fullPath
     }
 }

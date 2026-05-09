@@ -1,6 +1,6 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-05-07
+Date: 2026-05-08
 
 ## TL;DR 🧭
 
@@ -9,6 +9,7 @@ Date: 2026-05-07
 | Compression / LZMA2 | ✅ clarified | Full live `TWAD` archive entries still use only compression `0` and `1`; compression `2` remains a manifest Table 0 logical PAK-layer problem. |
 | Model format | ✅ major lead | Repeated Gamebryo payloads are now detected/extracted as `.nif` and parsed for NIF header/block/string-table evidence. |
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
+| Asset signature/semantic index | ✅ new scaffold | `inventory-asset-signatures` now groups all copied payload signatures, and `build-asset-semantic-index` emits generated `asset-semantic-index/v1` packets under ignored `Exports/` with IDs, detected types, signatures, bounded references/snippets, `hint:*` semantic categories, category filters, XML tag/attribute name counts, and XML parse status/boundary metadata with no values/text/raw parse messages. |
 | Model→texture graph | ✅ working | NIF references link `3,224` model assets to `2,514` unique texture manifest assets. |
 | Bundle completion | ✅ newly actionable | A live-read-only archive planner found every currently missing NIF-linked texture asset and ranked the exact `assets.###` chunks needed. |
 | Mesh stream binding | ✅ new proof lead | `inventory-nif-mesh-bindings` found `2,076` pair-compatible meshes and `4,468` same-mesh index/vertex-count-compatible links. |
@@ -60,7 +61,51 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AttributeExtraSiblingProofGuard -SkipBuild
 ```
 
-Helper policy: add modes/options to durable helpers before creating one-off helper apps.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AssetSignatures -SmokeMaxTotal 500 -SkipBuild
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AssetSemanticIndex -SmokeMaxTotal 200 -SkipBuild
+```
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode AssetSemanticIndex -Type xml -SemanticCategory hint:map-zone -SmokeMaxTotal 200 -SkipBuild
+```
+
+```powershell
+python "C:\RIFT MODDING\Assets\scripts\rift_asset_discovery_matrix.py" --skip-build --jobs signature-baseline semantic-xml-map-zone semantic-bin-waypoint-poi --privacy-scan
+```
+
+Helper policy: add modes/options to durable helpers before creating one-off helper apps. New batching/orchestration helpers should be Python-first, but the .NET dumper remains the parser/source of truth and existing PowerShell workflows remain compatibility surfaces until an active bottleneck justifies porting.
+
+## Targeted semantic discovery matrix 🎯
+
+A bounded Python matrix smoke wrote generated reports under ignored `Exports\discovery-matrix\` and validated each emitted `asset-semantic-index/v1` packet with `jsonschema`.
+
+| Job | Payloads inspected | Entries | Signature groups | Current read |
+|---|---:|---:|---:|---|
+| `semantic-xml-map-zone` | `6` | `6` | `1` | XML map-zone/UI/model hints exist, but all XML parses are `partial-with-warning`; use tag/attribute families as structure leads only. |
+| `semantic-bin-waypoint-poi` | `1,000` | `113` | `77` | Strongest current binary text-family lead for waypoint/POI-like terms; many also overlap actor/map/texture hints. |
+| `semantic-bin-map-zone` | `1,000` | `101` | `96` | Binary map/zone-like hints exist and overlap waypoint/actor refs; needs category-aware prefiltering before full-corpus scans. |
+| `semantic-bin-actor-object` | `1,000` | `95` | `77` | Actor/object-like binary hints overlap waypoint/map/texture refs; useful for model/object graph ranking. |
+| `semantic-bin-quest-objective` | `1,000` | `0` | `0` | No early-corpus quest/objective binary hits yet; keep as negative evidence, not final absence. |
+| `semantic-nif-texture-refs` | `500` | `308` | `1` | NIF texture references remain high-value semantic labels for object/zone/model families. |
+| `semantic-nif-model-refs` | `500` | `500` | `1` | NIF model reference extraction is broad and useful for graph enrichment. |
+
+## Gamebryo/NiDataStream normalization 🧬
+
+NIF block-type parsing now preserves raw escaped block-type names while normalizing Gamebryo `NiDataStream` variants that encode usage/access in the block-type string.
+
+| Field | Meaning |
+|---|---|
+| `TypeName` / `NormalizedName` | Parser-friendly block family name, for example `NiDataStream`. |
+| `TypeDisplayName` / `DisplayName` | Escaped raw block-type string, for example `NiDataStream\u00011\u000119`. |
+| `DataStreamUsage` / `DataStreamAccess` | Parsed Gamebryo stream metadata from `NiDataStream<SOH>usage<SOH>access` block-type strings. |
+
+Validated smoke sample `21900d2ee4f931ca` has `NiDataStream\u00010\u000119` and `NiDataStream\u00011\u000119`; the probe now surfaces `usage=0/1` and `access=19` while grouping blocks as normalized `NiDataStream`.
+
+Latest resumed slice: `inventory-nif-stream-headers`, `inventory-nif-stream-bodies`, and `probe-nif-mesh` now carry `DataStreamUsage` / `DataStreamAccess` into generated JSON samples/summaries. A 50-NIF smoke validated `333` parsed streams with `usage=1 access=19` (`278`) and `usage=0 access=19` (`55`), and `probe-nif-mesh` now uses a metadata-completeness tie-breaker (`DataStreamMetadataScore`) without treating usage/access as final geometry semantics.
 
 ## Compression truth 🧊
 
@@ -491,18 +536,18 @@ Validated sample:
 
 Stream roles:
 
-| Mesh offset | Stream block | Payload bytes | Role | Confidence |
-|---:|---:|---:|---|---:|
-| `@216` | `#25` | `288` | `normal-float3-ror1-lead` | `85` |
-| `@292` | `#23?` | `72` | `index-u16be-strip-lead` | `85` |
-| `@300` | `#29` | `192` | `uv-float2-ror1-lead` | `80` |
+| Mesh offset | Stream block | Usage/access | Payload bytes | Role | Confidence |
+|---:|---:|---|---:|---|---:|
+| `@216` | `#25` | `1/19` | `288` | `normal-float3-ror1-lead` | `85` |
+| `@292` | `#23?` | `0/19` | `72` | `index-u16be-strip-lead` | `85` |
+| `@300` | `#29` | `1/19` | `192` | `uv-float2-ror1-lead` | `80` |
 
 Pairing proof:
 
-| Index stream | Max index | Compatible stream | Vertex count | Coverage | Confidence |
-|---|---:|---|---:|---:|---:|
-| `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `95` |
-| `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `90` |
+| Index stream | Max index | Compatible stream | Vertex count | Coverage | Metadata score | Confidence |
+|---|---:|---|---:|---:|---:|---:|
+| `@292/#23` | `23` | `@216/#25` | `24` | `1.00` | `4` | `95` |
+| `@292/#23` | `23` | `@300/#29` | `24` | `1.00` | `4` | `90` |
 
 Mesh payload scan:
 
@@ -510,7 +555,7 @@ Mesh payload scan:
 |---|---:|
 | Rotate-right-1 / little-endian float2/float3 payload windows matching paired vertex count | `0` |
 
-Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing. The mesh payload window scan did not find a simple inline position window for this sample, so the next search should inspect other block types/fields or repeated `position-float3-ror1-lead` families.
+Why this matters: the project now has both full-set mesh-binding inventory and a focused one-mesh proof packet for the top `meshSize=325` family. The byte-rotation rule is strong enough to promote normals/UVs as leads, but not enough to export geometry because the position stream/source is still missing. Usage/access metadata now improves tie-breaking and review visibility, while remaining structural metadata rather than semantic proof. The mesh payload window scan did not find a simple inline position window for this sample, so the next search should inspect other block types/fields or repeated `position-float3-ror1-lead` families.
 
 ## Position/normal/UV attribute-set proof 🧱
 
