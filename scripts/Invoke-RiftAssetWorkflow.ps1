@@ -110,6 +110,11 @@ function Get-JsonValueOrDash {
     return $property.Value
 }
 
+function Format-NifUsageAccess {
+    param([object] $Object, [string] $UsagePropertyName = 'DataStreamUsage', [string] $AccessPropertyName = 'DataStreamAccess')
+    return "usage=$(Get-JsonValueOrDash $Object $UsagePropertyName) access=$(Get-JsonValueOrDash $Object $AccessPropertyName)"
+}
+
 function Get-JsonArrayCountOrDash {
     param([object] $Object, [string] $PropertyName)
     $property = $Object.PSObject.Properties[$PropertyName]
@@ -248,7 +253,11 @@ function Show-ReportSummary {
         'MeshBindings' {
             Write-Host "NIF payloads=$($report.NifPayloads) meshBlocks=$($report.MeshBlocks) links=$($report.CandidateLinks) pairMeshes=$($report.PairCompatibleMeshes) pairLinks=$($report.PairCompatibleLinks)"
             Write-Host ('Top roles: ' + (Get-TopText $report.RoleGroups { param($g) "$($g.Role)=$($g.Count)" }))
-            Write-Host ('Top pairings: ' + (Get-TopText $report.TopPairings { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) $($g.IndexRole)->$($g.VertexRole) v=$($g.VertexCount) max=$($g.MaxIndexObserved)" }))
+            $usageAccessRolesProperty = $report.PSObject.Properties['TopUsageAccessRoles']
+            if ($null -ne $usageAccessRolesProperty -and $null -ne $usageAccessRolesProperty.Value) {
+                Write-Host ('Top usage/access roles: ' + (Get-TopText @($usageAccessRolesProperty.Value) { param($g) "$(Format-NifUsageAccess $g) $($g.Role)=$($g.Count)" } 8))
+            }
+            Write-Host ('Top pairings: ' + (Get-TopText $report.TopPairings { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) index[$(Format-NifUsageAccess $g 'IndexDataStreamUsage' 'IndexDataStreamAccess')] $($g.IndexRole)->vertex[$(Format-NifUsageAccess $g 'VertexDataStreamUsage' 'VertexDataStreamAccess')] $($g.VertexRole) v=$($g.VertexCount) max=$($g.MaxIndexObserved)" }))
             Write-Host ('Top attribute sets: ' + (Get-TopText $report.TopAttributeSets { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) p=$($g.PositionDeclaredPayloadBytes)/n=$($g.NormalDeclaredPayloadBytes)/uv=$($g.UvDeclaredPayloadBytes) v=$($g.VertexCount) topology=$($g.Topology.PrimaryTopology)" }))
             Write-Host ('Top attribute topologies: ' + (Get-TopText $report.TopAttributeTopologies { param($g) "$($g.Topology) v=$($g.VertexCount) count=$($g.Count) list=$(Get-JsonValueOrDash $g 'TriangleListTriangleCount') strip=$(Get-JsonValueOrDash $g 'TriangleStripTriangleCount') quad=$(Get-JsonValueOrDash $g 'QuadListQuadCount')" }))
             Write-Host ('Top attribute extras: ' + (Get-TopText $report.TopAttributeExtraStreams { param($g) "$($g.Topology) v=$($g.VertexCount) extra@$($g.ExtraMeshPayloadOffset) payload=$(Get-JsonValueOrDash $g 'ExtraDeclaredPayloadBytes') $($g.ExtraRole) count=$($g.Count) fit=$($g.FitSummary)" }))

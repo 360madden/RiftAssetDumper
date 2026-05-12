@@ -117,6 +117,18 @@ Follow-up mesh-binding inventory slice: `inventory-nif-mesh-bindings` now emits 
 
 Interpretation: in this bounded smoke, `usage=0 access=19` aligns with compact index-strip leads while `usage=1 access=19` aligns with rotated float normal/UV leads. Top pairings now show the same split as `index[usage=0 access=19] -> vertex[usage=1 access=19]`. Keep this as correlation/ranking evidence only until broader copied-set scans and mesh topology proof agree.
 
+Full copied-set refresh confirmed the same split across `5,111` NIF payloads, `5,507` NiMesh blocks, and `11,564` valid declared mesh-bound data-stream bodies:
+
+| Usage/access | Role | Count |
+|---|---|---:|
+| `1/19` | `uv-float2-ror1-lead` | `4,633` |
+| `1/19` | `normal-float3-ror1-lead` | `4,167` |
+| `0/19` | `index-u16be-strip-lead` | `2,101` |
+| `1/19` | `position-float3-ror1-lead` | `210` |
+| `0/19` | `index-u16be-list-lead` | `112` |
+
+The top pairing groups all follow `index[usage=0 access=19] -> vertex[usage=1 access=19]`; no top-100 pairing exception was found in the generated report. Mixed/non-leading role exceptions remain low-signal and should not drive topology truth: `strided-body` split across `1/19` (`43`) and `0/19` (`38`), `u32-repeated-pattern-body` split across `1/19` (`56`) and `3/3` (`21`), and `index-u16be-lead` split across `0/19` (`3`) and `1/19` (`1`).
+
 ## Compression truth 🧊
 
 | Scope | Count | Compression counts |
