@@ -36,6 +36,7 @@ Do not stage `Source/`, `Extracted/`, `Exports/`, build output, `__pycache__`, o
 | `scripts/Invoke-RiftAssetWorkflow.ps1` | Added `UsageAccessCorrelationGuard` mode that reruns full mesh-binding inventory, validates expected usage/access role aggregates, and rejects top pairing exceptions. |
 | `scripts/Invoke-RiftAssetWorkflow.ps1` | MeshBindings summary now prints position-stream lead cross-tabs by mesh size, payload size, and sample stream references. |
 | `scripts/discovery-matrices/nif-semantic-hints.json` | Added bounded external matrix jobs for NIF `hint:actor-object`, `hint:map-zone`, and `hint:waypoint-poi` leads. |
+| `src/RiftAssetDumper/Program.cs` | Follow-up slice adds group-level top-pairing topology-rank fields: `IndexPairCount`, `TriangleListTriangleCount`, `TriangleStripWindowCount`, and `MaxIndexCoverageRatio`. |
 
 ## Latest full mesh-binding evidence
 
@@ -77,6 +78,16 @@ Top-pairing guard:
 0 exceptions
 Expected pattern: index usage=0 access=19 -> vertex usage=1 access=19
 ```
+
+Top pairing summaries now include topology-rank fields. Current top examples:
+
+| Mesh size | Count | Vertex role | Vertex count | Index pairs | List tris | Strip windows | Coverage |
+|---:|---:|---|---:|---:|---:|---:|---:|
+| 325 | 134 | `normal-float3-ror1-lead` | 24 | 36 | 12 | 34 | 1 |
+| 325 | 118 | `uv-float2-ror1-lead` | 24 | 36 | 12 | 34 | 1 |
+| 321 | 60 | `normal-float3-ror1-lead` | 24 | 36 | 12 | 34 | 1 |
+| 305 | 57 | `uv-float2-ror1-lead` | 4 | 6 | 2 | 4 | 1 |
+| 301 | 50 | `uv-float2-ror1-lead` | 48 | 72 | 24 | 70 | 1 |
 
 Position-stream cross-tab now shown by the workflow:
 
@@ -150,6 +161,8 @@ Both preserve raw-zero-based fitness over subtract-one, no sentinel restarts, an
 | `git diff --check` | Passed; line-ending warning only. |
 | Privacy scans | Passed; no tracked raw username or non-placeholder `C:\Users` paths. |
 
+Follow-up topology-rank slice also passed `dotnet build`, `UsageAccessCorrelationGuard`, `AttributeExtraProofGuard`, `git diff --check`, and privacy scan.
+
 Python source was not changed, so `python -m py_compile` was not required for this slice.
 
 ## Safety boundaries
@@ -172,12 +185,12 @@ Resume in C:\RIFT MODDING\Assets. Work Assets-only. Confirm git status/log first
 | # | Action |
 |---:|---|
 | 1 | Commit this validated Assets-only helper/profile slice. |
-| 2 | Add topology-fitness fields directly to `TopPairings` groups for faster ranking. |
-| 3 | Build a meshSize `325/321` residual-stream report after known index/normal/UV/position/sentinel roles are removed. |
-| 4 | Add a focused `meshSize=325` probe set using current top pairings as seed samples. |
-| 5 | Add a focused `meshSize=321` probe set using current top pairings as seed samples. |
-| 6 | Extend the usage/access guard with a non-failing exception summary for low-count mixed roles. |
-| 7 | Generate a Markdown summary from MeshBindings JSON to avoid manual transcription. |
-| 8 | Convert NIF semantic-hints output into an `asset-semantic-context` packet schema, still hint-only. |
-| 9 | Cross-tab NIF semantic hints by archive/entry family and referenced texture/model strings. |
+| 2 | Build a meshSize `325/321` residual-stream report after known index/normal/UV/position/sentinel roles are removed. |
+| 3 | Add a focused `meshSize=325` probe set using current top pairings as seed samples. |
+| 4 | Add a focused `meshSize=321` probe set using current top pairings as seed samples. |
+| 5 | Extend the usage/access guard with a non-failing exception summary for low-count mixed roles. |
+| 6 | Generate a Markdown summary from MeshBindings JSON to avoid manual transcription. |
+| 7 | Convert NIF semantic-hints output into an `asset-semantic-context` packet schema, still hint-only. |
+| 8 | Cross-tab NIF semantic hints by archive/entry family and referenced texture/model strings. |
+| 9 | Add a guard that rejects generated/copy asset outputs in staged changes before commit. |
 | 10 | Push only after confirming no generated/copy asset outputs are staged. |

@@ -3345,6 +3345,7 @@ internal static class Program
                                     pairing.VertexRole,
                                     pairing.IndexDeclaredPayloadBytes,
                                     pairing.VertexDeclaredPayloadBytes,
+                                    pairing.IndexPairCount,
                                     pairing.IndexDataStreamUsage,
                                     pairing.IndexDataStreamAccess,
                                     pairing.VertexDataStreamUsage,
@@ -3438,6 +3439,10 @@ internal static class Program
                 VertexRole: group.VertexRole,
                 IndexDeclaredPayloadBytes: group.IndexDeclaredPayloadBytes,
                 VertexDeclaredPayloadBytes: group.VertexDeclaredPayloadBytes,
+                IndexPairCount: group.IndexPairCount,
+                TriangleListTriangleCount: group.TriangleListTriangleCount,
+                TriangleStripWindowCount: group.TriangleStripWindowCount,
+                MaxIndexCoverageRatio: group.VertexCount == 0 ? 0 : Math.Round((group.MaxIndexObserved + 1) / (double)group.VertexCount, 4),
                 IndexDataStreamUsage: group.IndexDataStreamUsage,
                 IndexDataStreamAccess: group.IndexDataStreamAccess,
                 VertexDataStreamUsage: group.VertexDataStreamUsage,
@@ -3670,7 +3675,7 @@ internal static class Program
         Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
         Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
         Console.WriteLine($"Top usage/access roles: {string.Join(" | ", report.TopUsageAccessRoles.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role}={g.Count:N0}"))}");
-        Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved}"))}");
+        Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved} pairs={g.IndexPairCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripWindowCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} cov={g.MaxIndexCoverageRatio.ToString("g6", CultureInfo.InvariantCulture)}"))}");
         Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
         Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
         Console.WriteLine($"Top attribute extras: {string.Join(" | ", report.TopAttributeExtraStreams.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} extra@{g.ExtraMeshPayloadOffset} payload={g.ExtraDeclaredPayloadBytes} {g.ExtraRole} count={g.Count:N0} fit={g.FitSummary}"))}");
@@ -12672,6 +12677,7 @@ internal sealed class NifMeshBindingPairingAccumulator(
     string vertexRole,
     uint? indexDeclaredPayloadBytes,
     uint? vertexDeclaredPayloadBytes,
+    int? indexPairCount,
     string? indexDataStreamUsage,
     string? indexDataStreamAccess,
     string? vertexDataStreamUsage,
@@ -12684,6 +12690,9 @@ internal sealed class NifMeshBindingPairingAccumulator(
     public string VertexRole { get; } = vertexRole;
     public uint? IndexDeclaredPayloadBytes { get; } = indexDeclaredPayloadBytes;
     public uint? VertexDeclaredPayloadBytes { get; } = vertexDeclaredPayloadBytes;
+    public int? IndexPairCount { get; } = indexPairCount;
+    public int? TriangleListTriangleCount { get; } = indexPairCount is int pairs && pairs % 3 == 0 ? pairs / 3 : null;
+    public int? TriangleStripWindowCount { get; } = indexPairCount is int pairs && pairs >= 3 ? pairs - 2 : null;
     public string? IndexDataStreamUsage { get; } = indexDataStreamUsage;
     public string? IndexDataStreamAccess { get; } = indexDataStreamAccess;
     public string? VertexDataStreamUsage { get; } = vertexDataStreamUsage;
@@ -13017,6 +13026,10 @@ internal sealed record NifMeshBindingPairingGroup(
     string VertexRole,
     uint? IndexDeclaredPayloadBytes,
     uint? VertexDeclaredPayloadBytes,
+    int? IndexPairCount,
+    int? TriangleListTriangleCount,
+    int? TriangleStripWindowCount,
+    double MaxIndexCoverageRatio,
     string? IndexDataStreamUsage,
     string? IndexDataStreamAccess,
     string? VertexDataStreamUsage,
