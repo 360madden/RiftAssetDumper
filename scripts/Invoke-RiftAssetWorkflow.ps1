@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
+    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'UsageAccessCorrelationGuard', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
     [string[]] $Mode = @('MeshBindings'),
 
     [string] $Root = '',
@@ -65,6 +65,7 @@ $commandMap = @{
     AttributeExtraProbe = @{ Command = 'probe-nif-attribute-extra';   Base = 'probe-nif-attribute-extra' }
     AttributeExtraSiblingProofGuard = @{ Command = 'probe-nif-attribute-extra'; Base = 'probe-nif-attribute-extra' }
     AttributeExtraProofGuard = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
+    UsageAccessCorrelationGuard = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     MeshStreams     = @{ Command = 'inventory-nif-mesh-streams';      Base = 'nif-mesh-stream-inventory' }
     IndexCandidates = @{ Command = 'inventory-nif-index-candidates';  Base = 'nif-index-candidate-inventory' }
     StreamEndianness = @{ Command = 'inventory-nif-stream-endianness'; Base = 'nif-stream-endianness-inventory' }
@@ -153,6 +154,26 @@ function Assert-ProofGuardCondition {
     param([bool] $Condition, [string] $Message)
     if (-not $Condition) {
         throw "AttributeExtraProofGuard failed: $Message"
+    }
+}
+
+function Assert-UsageAccessGuardCondition {
+    param([bool] $Condition, [string] $Message)
+    if (-not $Condition) {
+        throw "UsageAccessCorrelationGuard failed: $Message"
+    }
+}
+
+function Get-UsageAccessGuardInteger {
+    param([object] $Object, [string] $PropertyName, [string] $Context)
+    $property = $Object.PSObject.Properties[$PropertyName]
+    Assert-UsageAccessGuardCondition ($null -ne $property -and $null -ne $property.Value) "$Context is missing $PropertyName."
+
+    try {
+        return [Convert]::ToInt32($property.Value, [Globalization.CultureInfo]::InvariantCulture)
+    }
+    catch {
+        throw "UsageAccessCorrelationGuard failed: $PropertyName on $Context is not an integer: $($property.Value)"
     }
 }
 
@@ -257,6 +278,13 @@ function Show-ReportSummary {
             if ($null -ne $usageAccessRolesProperty -and $null -ne $usageAccessRolesProperty.Value) {
                 Write-Host ('Top usage/access roles: ' + (Get-TopText @($usageAccessRolesProperty.Value) { param($g) "$(Format-NifUsageAccess $g) $($g.Role)=$($g.Count)" } 8))
             }
+            $positionRoleGroups = @($report.RoleGroups | Where-Object { [string](Get-JsonValueOrDash $_ 'Role') -eq 'position-float3-ror1-lead' })
+            if ($positionRoleGroups.Count -gt 0) {
+                $positionRole = $positionRoleGroups[0]
+                Write-Host ('Position stream lead mesh sizes: ' + (Get-TopText $positionRole.MeshSizes { param($g) "meshSize=$($g.Size):$($g.Count)" } 10))
+                Write-Host ('Position stream lead payload sizes: ' + (Get-TopText $positionRole.DeclaredPayloadSizes { param($g) "payload=$($g.Size):$($g.Count)" } 10))
+                Write-Host ('Position stream lead samples: ' + (Get-TopText $positionRole.Samples { param($s) "$($s.IdPrefix) meshSize=$($s.MeshSize) mesh=#$($s.MeshBlockIndex) stream@$($s.Stream.MeshPayloadOffset)/#$($s.Stream.TargetBlockIndex) payload=$($s.Stream.DeclaredPayloadBytes) $(Format-NifUsageAccess $s.Stream)" } 5))
+            }
             Write-Host ('Top pairings: ' + (Get-TopText $report.TopPairings { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) index[$(Format-NifUsageAccess $g 'IndexDataStreamUsage' 'IndexDataStreamAccess')] $($g.IndexRole)->vertex[$(Format-NifUsageAccess $g 'VertexDataStreamUsage' 'VertexDataStreamAccess')] $($g.VertexRole) v=$($g.VertexCount) max=$($g.MaxIndexObserved)" }))
             Write-Host ('Top attribute sets: ' + (Get-TopText $report.TopAttributeSets { param($g) "meshSize=$($g.MeshSize) count=$($g.Count) p=$($g.PositionDeclaredPayloadBytes)/n=$($g.NormalDeclaredPayloadBytes)/uv=$($g.UvDeclaredPayloadBytes) v=$($g.VertexCount) topology=$($g.Topology.PrimaryTopology)" }))
             Write-Host ('Top attribute topologies: ' + (Get-TopText $report.TopAttributeTopologies { param($g) "$($g.Topology) v=$($g.VertexCount) count=$($g.Count) list=$(Get-JsonValueOrDash $g 'TriangleListTriangleCount') strip=$(Get-JsonValueOrDash $g 'TriangleStripTriangleCount') quad=$(Get-JsonValueOrDash $g 'QuadListQuadCount')" }))
@@ -339,6 +367,77 @@ function Show-ReportSummary {
             Write-Host ('Top signatures: ' + (Get-TopText $report.TopSignatures { param($g) "payload=$($g.DeclaredPayloadBytes) count=$($g.Count) first16=$($g.PayloadFirst16)" }))
         }
     }
+}
+
+function Invoke-UsageAccessCorrelationGuard {
+    param([Parameter(Mandatory)] [string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "UsageAccessCorrelationGuard failed: report not found: $Path"
+    }
+
+    $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $usageAccessRolesProperty = $report.PSObject.Properties['TopUsageAccessRoles']
+    Assert-UsageAccessGuardCondition ($null -ne $usageAccessRolesProperty -and $null -ne $usageAccessRolesProperty.Value) 'TopUsageAccessRoles is missing from mesh-binding inventory.'
+    $roleGroups = @($usageAccessRolesProperty.Value)
+
+    $expectedRoles = @(
+        [pscustomobject]@{ Role = 'uv-float2-ror1-lead'; Usage = '1'; Access = '19'; MinCount = 3000; Family = 'vertex UV rotated-float lead' },
+        [pscustomobject]@{ Role = 'normal-float3-ror1-lead'; Usage = '1'; Access = '19'; MinCount = 3000; Family = 'vertex normal rotated-float lead' },
+        [pscustomobject]@{ Role = 'index-u16be-strip-lead'; Usage = '0'; Access = '19'; MinCount = 1500; Family = 'index strip lead' },
+        [pscustomobject]@{ Role = 'position-float3-ror1-lead'; Usage = '1'; Access = '19'; MinCount = 100; Family = 'position rotated-float lead' },
+        [pscustomobject]@{ Role = 'index-u16be-list-lead'; Usage = '0'; Access = '19'; MinCount = 50; Family = 'index list lead' }
+    )
+
+    $results = @()
+    foreach ($expected in $expectedRoles) {
+        $context = "$($expected.Role) usage=$($expected.Usage) access=$($expected.Access)"
+        $matches = @($roleGroups | Where-Object {
+            [string](Get-JsonValueOrDash $_ 'Role') -eq $expected.Role -and
+            [string](Get-JsonValueOrDash $_ 'DataStreamUsage') -eq $expected.Usage -and
+            [string](Get-JsonValueOrDash $_ 'DataStreamAccess') -eq $expected.Access
+        })
+
+        Assert-UsageAccessGuardCondition ($matches.Count -eq 1) "$context expected exactly one usage/access aggregate, found $($matches.Count)."
+        $group = $matches[0]
+        $count = Get-UsageAccessGuardInteger $group 'Count' $context
+        $highConfidence = Get-UsageAccessGuardInteger $group 'HighConfidenceCount' $context
+        Assert-UsageAccessGuardCondition ($count -ge $expected.MinCount) "$context count $count is below expected minimum $($expected.MinCount)."
+        Assert-UsageAccessGuardCondition ($highConfidence -ge $expected.MinCount) "$context high-confidence count $highConfidence is below expected minimum $($expected.MinCount)."
+
+        $results += [pscustomobject]@{
+            Family = $expected.Family
+            Role = $expected.Role
+            Usage = $expected.Usage
+            Access = $expected.Access
+            Count = $count
+            HighConfidence = $highConfidence
+            MinExpected = $expected.MinCount
+        }
+    }
+
+    $topPairingsProperty = $report.PSObject.Properties['TopPairings']
+    Assert-UsageAccessGuardCondition ($null -ne $topPairingsProperty -and $null -ne $topPairingsProperty.Value) 'TopPairings is missing from mesh-binding inventory.'
+    $topPairings = @($topPairingsProperty.Value)
+    Assert-UsageAccessGuardCondition ($topPairings.Count -ge 5) "expected at least 5 top pairings, found $($topPairings.Count)."
+
+    $indexVertexPairings = @($topPairings | Where-Object {
+        [string](Get-JsonValueOrDash $_ 'IndexRole') -like 'index-*' -and
+        [string](Get-JsonValueOrDash $_ 'VertexRole') -match '^(position|normal|uv)-'
+    })
+    Assert-UsageAccessGuardCondition ($indexVertexPairings.Count -ge 5) "expected at least 5 index-to-vertex top pairings, found $($indexVertexPairings.Count)."
+
+    $pairingExceptions = @($indexVertexPairings | Where-Object {
+        [string](Get-JsonValueOrDash $_ 'IndexDataStreamUsage') -ne '0' -or
+        [string](Get-JsonValueOrDash $_ 'IndexDataStreamAccess') -ne '19' -or
+        [string](Get-JsonValueOrDash $_ 'VertexDataStreamUsage') -ne '1' -or
+        [string](Get-JsonValueOrDash $_ 'VertexDataStreamAccess') -ne '19'
+    })
+    Assert-UsageAccessGuardCondition ($pairingExceptions.Count -eq 0) "found $($pairingExceptions.Count) top pairing usage/access exception(s); expected index usage=0 access=19 -> vertex usage=1 access=19."
+
+    Write-Host "`n--- UsageAccessCorrelationGuard NiDataStream usage/access correlation guard" -ForegroundColor Green
+    $results | Sort-Object Count -Descending | Format-Table -AutoSize | Out-Host
+    Write-Host "UsageAccessCorrelationGuard pairing check: $($indexVertexPairings.Count) top index-to-vertex pairings, exceptions=0." -ForegroundColor Green
+    Write-Host 'UsageAccessCorrelationGuard passed: usage/access correlation remains ranking evidence only; no geometry/export truth was promoted.' -ForegroundColor Green
 }
 
 function Invoke-AttributeExtraProofGuard {
@@ -651,6 +750,15 @@ foreach ($modeName in $Mode) {
         Invoke-Checked -Label "$modeName inventory" -Args @('run', '--project', $Project, '--', $command, '--root', $Root, '--out', $guardPath, '--limit', [string]$guardLimit)
         Show-ReportSummary -ModeName 'MeshBindings' -Path $guardPath
         Invoke-AttributeExtraProofGuard -Path $guardPath
+        continue
+    }
+
+    if ($modeName -eq 'UsageAccessCorrelationGuard') {
+        $guardPath = Join-Path $Out "$base.json"
+        $guardLimit = [Math]::Max($Limit, 100)
+        Invoke-Checked -Label "$modeName inventory" -Args @('run', '--project', $Project, '--', $command, '--root', $Root, '--out', $guardPath, '--limit', [string]$guardLimit)
+        Show-ReportSummary -ModeName 'MeshBindings' -Path $guardPath
+        Invoke-UsageAccessCorrelationGuard -Path $guardPath
         continue
     }
 

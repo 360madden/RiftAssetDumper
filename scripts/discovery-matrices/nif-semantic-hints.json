@@ -1,0 +1,31 @@
+{
+  "Jobs": [
+    {
+      "Name": "semantic-nif-actor-object",
+      "Command": "build-asset-semantic-index",
+      "MaxTotal": 500,
+      "Type": "nif",
+      "SemanticCategories": ["hint:actor-object"],
+      "Limit": 100,
+      "TimeoutSeconds": 120
+    },
+    {
+      "Name": "semantic-nif-map-zone",
+      "Command": "build-asset-semantic-index",
+      "MaxTotal": 500,
+      "Type": "nif",
+      "SemanticCategories": ["hint:map-zone"],
+      "Limit": 100,
+      "TimeoutSeconds": 120
+    },
+    {
+      "Name": "semantic-nif-waypoint-poi",
+      "Command": "build-asset-semantic-index",
+      "MaxTotal": 500,
+      "Type": "nif",
+      "SemanticCategories": ["hint:waypoint-poi"],
+      "Limit": 100,
+      "TimeoutSeconds": 120
+    }
+  ]
+}
