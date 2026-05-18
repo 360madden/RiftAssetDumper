@@ -2926,6 +2926,9 @@ internal static class Program
         var usageAccessRoleGroups = new Dictionary<string, NifMeshBindingUsageAccessRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
         var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
         var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var positionSourceSiblingGroups = new Dictionary<string, NifPositionSourceSiblingAccumulator>(StringComparer.OrdinalIgnoreCase);
+        var residualTargetGroups = new Dictionary<uint, NifMeshResidualTargetAccumulator>();
+        var residualStreamGroups = new Dictionary<string, NifMeshResidualStreamAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeSetGroups = new Dictionary<string, NifMeshAttributeSetAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeTopologyGroups = new Dictionary<string, NifAttributeTopologyAccumulator>(StringComparer.OrdinalIgnoreCase);
         var attributeExtraGroups = new Dictionary<string, NifAttributeExtraStreamAccumulator>(StringComparer.OrdinalIgnoreCase);
@@ -3003,6 +3006,19 @@ internal static class Program
 
                         meshBlocksWithCandidates++;
                         var streamSummaries = new List<NifMeshBoundStreamSummary>(candidates.Count);
+                        NifMeshResidualTargetAccumulator? residualTargetGroup = null;
+                        if (IsNifMeshResidualTargetSize(meshBlock.Size))
+                        {
+                            if (!residualTargetGroups.TryGetValue(meshBlock.Size, out residualTargetGroup))
+                            {
+                                residualTargetGroup = new NifMeshResidualTargetAccumulator(meshBlock.Size);
+                                residualTargetGroups.Add(meshBlock.Size, residualTargetGroup);
+                            }
+
+                            residualTargetGroup.MeshBlockCount++;
+                            residualTargetGroup.NifIds.Add(entry.IdPrefix);
+                        }
+
                         foreach (var candidate in candidates)
                         {
                             candidateLinkCount++;
@@ -3085,6 +3101,41 @@ internal static class Program
                                     Stream: summary));
                             }
 
+                            if (declaredPayloadBytes is not null &&
+                                roleStats.PrimaryRole.StartsWith("position-float3", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var positionSiblingKey = $"id={entry.IdPrefix}|target=#{summary.TargetBlockIndex}|payload={declaredPayloadBytes.Value}:{FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess)}|role={roleStats.PrimaryRole}";
+                                if (!positionSourceSiblingGroups.TryGetValue(positionSiblingKey, out var positionSiblingGroup))
+                                {
+                                    positionSiblingGroup = new NifPositionSourceSiblingAccumulator(
+                                        positionSiblingKey,
+                                        entry.IdPrefix,
+                                        summary.TargetBlockIndex,
+                                        declaredPayloadBytes,
+                                        summary.DataStreamUsage,
+                                        summary.DataStreamAccess,
+                                        roleStats.PrimaryRole);
+                                    positionSourceSiblingGroups.Add(positionSiblingKey, positionSiblingGroup);
+                                }
+
+                                positionSiblingGroup.Count++;
+                                positionSiblingGroup.NifIds.Add(entry.IdPrefix);
+                                positionSiblingGroup.MeshBlockIndices.Add(meshBlock.Index);
+                                positionSiblingGroup.MeshPayloadOffsets.Add(summary.MeshPayloadOffset);
+                                positionSiblingGroup.MeshSizeCounts[meshBlock.Size] = positionSiblingGroup.MeshSizeCounts.GetValueOrDefault(meshBlock.Size) + 1;
+                                if (positionSiblingGroup.Samples.Count < 16)
+                                {
+                                    positionSiblingGroup.Samples.Add(new NifMeshBindingStreamSample(
+                                        ArchiveName: archiveName,
+                                        EntryIndex: entry.Index,
+                                        IdPrefix: entry.IdPrefix,
+                                        ManifestEntryIndex: manifestEntry?.Index,
+                                        MeshBlockIndex: meshBlock.Index,
+                                        MeshSize: meshBlock.Size,
+                                        Stream: summary));
+                                }
+                            }
+
                             var usageAccessRoleKey = $"{usageAccessKey}|role={roleStats.PrimaryRole}";
                             if (!usageAccessRoleGroups.TryGetValue(usageAccessRoleKey, out var usageAccessRoleGroup))
                             {
@@ -3117,6 +3168,64 @@ internal static class Program
                                     MeshBlockIndex: meshBlock.Index,
                                     MeshSize: meshBlock.Size,
                                     Stream: summary));
+                            }
+                        }
+
+                        foreach (var residual in streamSummaries.Where(s => IsNifMeshResidualStreamCandidate(meshBlock.Size, s)))
+                        {
+                            var residualKey = $"meshSize={meshBlock.Size}|stream@{residual.MeshPayloadOffset}:size={residual.TargetSize}:payload={residual.DeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(residual.DataStreamUsage, residual.DataStreamAccess)}:role={residual.RoleStats.PrimaryRole}:body={residual.BodyFirst16}:string={residual.StringValue}";
+                            if (!residualStreamGroups.TryGetValue(residualKey, out var residualGroup))
+                            {
+                                residualGroup = new NifMeshResidualStreamAccumulator(
+                                    residualKey,
+                                    meshBlock.Size,
+                                    residual.MeshPayloadOffset,
+                                    residual.TargetSize,
+                                    residual.DeclaredPayloadBytes,
+                                    residual.DataStreamUsage,
+                                    residual.DataStreamAccess,
+                                    residual.RoleStats.PrimaryRole,
+                                    residual.RoleStats.Confidence,
+                                    residual.BodyFirst16,
+                                    residual.StringValue,
+                                    residual.RoleStats.RotatedFloat3Stats?.VectorCount,
+                                    residual.RoleStats.RotatedFloat3Stats?.FiniteVectorRatio,
+                                    residual.RoleStats.RotatedFloat3Stats?.PlausibleValueRatio,
+                                    residual.RoleStats.RotatedFloat3Stats?.NonZeroVectorRatio,
+                                    residual.RoleStats.RotatedFloat3Stats?.MaxExtent,
+                                    residual.RoleStats.RotatedFloat3Stats?.Prefix);
+                                residualStreamGroups.Add(residualKey, residualGroup);
+                            }
+
+                            residualGroup.Count++;
+                            residualGroup.NifIds.Add(entry.IdPrefix);
+                            if (residualTargetGroup is not null)
+                            {
+                                residualTargetGroup.ResidualStreamCount++;
+                                residualTargetGroup.ResidualPatternKeys.Add(residualKey);
+                                if (residualTargetGroup.Samples.Count < 16)
+                                {
+                                    residualTargetGroup.Samples.Add(new NifMeshBindingStreamSample(
+                                        ArchiveName: archiveName,
+                                        EntryIndex: entry.Index,
+                                        IdPrefix: entry.IdPrefix,
+                                        ManifestEntryIndex: manifestEntry?.Index,
+                                        MeshBlockIndex: meshBlock.Index,
+                                        MeshSize: meshBlock.Size,
+                                        Stream: residual));
+                                }
+                            }
+
+                            if (residualGroup.Samples.Count < 16)
+                            {
+                                residualGroup.Samples.Add(new NifMeshBindingStreamSample(
+                                    ArchiveName: archiveName,
+                                    EntryIndex: entry.Index,
+                                    IdPrefix: entry.IdPrefix,
+                                    ManifestEntryIndex: manifestEntry?.Index,
+                                    MeshBlockIndex: meshBlock.Index,
+                                    MeshSize: meshBlock.Size,
+                                    Stream: residual));
                             }
                         }
 
@@ -3416,6 +3525,25 @@ internal static class Program
                 Samples: group.Samples);
         }
 
+        static NifPositionSourceSiblingGroup toPositionSourceSiblingRecord(NifPositionSourceSiblingAccumulator group)
+        {
+            return new NifPositionSourceSiblingGroup(
+                Pattern: group.Pattern,
+                IdPrefix: group.IdPrefix,
+                TargetBlockIndex: group.TargetBlockIndex,
+                DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+                DataStreamUsage: group.DataStreamUsage,
+                DataStreamAccess: group.DataStreamAccess,
+                Role: group.Role,
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
+                DistinctMeshBlocks: group.MeshBlockIndices.Count,
+                MeshBlockIndices: group.MeshBlockIndices.Order().ToList(),
+                MeshSizes: topSizeCounts(group.MeshSizeCounts),
+                MeshPayloadOffsets: group.MeshPayloadOffsets.Order().ToList(),
+                Samples: group.Samples);
+        }
+
         static NifMeshBindingPatternGroup toPatternRecord(NifMeshBindingPatternAccumulator group)
         {
             return new NifMeshBindingPatternGroup(
@@ -3451,6 +3579,48 @@ internal static class Program
                 MaxIndexObserved: group.MaxIndexObserved,
                 AverageConfidence: group.Count == 0 ? 0 : Math.Round(group.ConfidenceTotal / group.Count, 2),
                 AverageIndexCoverageRatio: group.Count == 0 ? 0 : Math.Round(group.IndexCoverageRatioTotal / group.Count, 4),
+                Samples: group.Samples);
+        }
+
+        static NifMeshResidualTargetGroup toResidualTargetRecord(NifMeshResidualTargetAccumulator group)
+        {
+            return new NifMeshResidualTargetGroup(
+                MeshSize: group.MeshSize,
+                MeshBlockCount: group.MeshBlockCount,
+                NifPayloads: group.NifIds.Count,
+                ResidualStreamCount: group.ResidualStreamCount,
+                ResidualPatternCount: group.ResidualPatternKeys.Count,
+                Samples: group.Samples);
+        }
+
+        static NifMeshResidualStreamGroup toResidualStreamRecord(NifMeshResidualStreamAccumulator group)
+        {
+            return new NifMeshResidualStreamGroup(
+                Pattern: group.Pattern,
+                MeshSize: group.MeshSize,
+                MeshPayloadOffset: group.MeshPayloadOffset,
+                TargetSize: group.TargetSize,
+                DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+                DataStreamUsage: group.DataStreamUsage,
+                DataStreamAccess: group.DataStreamAccess,
+                Role: group.Role,
+                RoleConfidence: group.RoleConfidence,
+                BodyFirst16: group.BodyFirst16,
+                StringValue: group.StringValue,
+                RotatedFloat3VectorCount: group.RotatedFloat3VectorCount,
+                RotatedFloat3FiniteVectorRatio: group.RotatedFloat3FiniteVectorRatio,
+                RotatedFloat3PlausibleValueRatio: group.RotatedFloat3PlausibleValueRatio,
+                RotatedFloat3NonZeroVectorRatio: group.RotatedFloat3NonZeroVectorRatio,
+                RotatedFloat3MaxExtent: group.RotatedFloat3MaxExtent,
+                RotatedFloat3Prefix: group.RotatedFloat3Prefix,
+                StrictRotatedFloat3PositionClassifierReview: BuildNifResidualPositionClassifierReview(
+                    group.RotatedFloat3VectorCount,
+                    group.RotatedFloat3FiniteVectorRatio,
+                    group.RotatedFloat3PlausibleValueRatio,
+                    group.RotatedFloat3NonZeroVectorRatio,
+                    group.RotatedFloat3MaxExtent),
+                Count: group.Count,
+                NifPayloads: group.NifIds.Count,
                 Samples: group.Samples);
         }
 
@@ -3608,6 +3778,29 @@ internal static class Program
                 .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
                 .Take(options.Limit > 0 ? options.Limit : 100)
                 .ToList(),
+            TopPositionSourceSiblings: positionSourceSiblingGroups.Values
+                .Where(static g => g.MeshBlockIndices.Count >= 2)
+                .Select(toPositionSourceSiblingRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenByDescending(static g => g.DistinctMeshBlocks)
+                .ThenBy(static g => g.IdPrefix, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static g => g.TargetBlockIndex)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
+            ResidualTargetMeshSizes: residualTargetGroups.Values
+                .Select(toResidualTargetRecord)
+                .OrderByDescending(static g => g.ResidualStreamCount)
+                .ThenByDescending(static g => g.MeshBlockCount)
+                .ThenBy(static g => g.MeshSize)
+                .ToList(),
+            TopResidualStreams: residualStreamGroups.Values
+                .Select(toResidualStreamRecord)
+                .OrderByDescending(static g => g.Count)
+                .ThenBy(static g => g.MeshSize)
+                .ThenBy(static g => g.MeshPayloadOffset)
+                .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
+                .Take(options.Limit > 0 ? options.Limit : 100)
+                .ToList(),
             TopPatterns: patternGroups.Values
                 .Select(toPatternRecord)
                 .OrderByDescending(static g => g.Count)
@@ -3675,6 +3868,9 @@ internal static class Program
         Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
         Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
         Console.WriteLine($"Top usage/access roles: {string.Join(" | ", report.TopUsageAccessRoles.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role}={g.Count:N0}"))}");
+        Console.WriteLine($"Top position source sibling groups: {string.Join(" | ", report.TopPositionSourceSiblings.Take(5).Select(static g => $"{g.IdPrefix} block#{g.TargetBlockIndex} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} count={g.Count:N0} meshes={string.Join(",", g.MeshBlockIndices.Take(4).Select(static i => $"#{i}"))} offsets={string.Join(",", g.MeshPayloadOffsets.Take(4))}"))}");
+        Console.WriteLine($"Residual target mesh sizes: {string.Join(" | ", report.ResidualTargetMeshSizes.Select(static g => $"meshSize={g.MeshSize} meshes={g.MeshBlockCount:N0} residuals={g.ResidualStreamCount:N0} patterns={g.ResidualPatternCount:N0}"))}");
+        Console.WriteLine($"Top residual streams (target mesh sizes, known geometry/sentinel roles removed): {string.Join(" | ", report.TopResidualStreams.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} stream@{g.MeshPayloadOffset} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role} c={g.RoleConfidence} string={g.StringValue ?? "-"} ror3=v{g.RotatedFloat3VectorCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} finite={g.RotatedFloat3FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} plausible={g.RotatedFloat3PlausibleValueRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={g.RotatedFloat3MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} first16={g.BodyFirst16}"))}");
         Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved} pairs={g.IndexPairCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripWindowCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} cov={g.MaxIndexCoverageRatio.ToString("g6", CultureInfo.InvariantCulture)}"))}");
         Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
         Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
@@ -8734,6 +8930,106 @@ internal static class Program
         return left.MeshPayloadOffset == right.MeshPayloadOffset && left.TargetBlockIndex == right.TargetBlockIndex;
     }
 
+    private static NifResidualPositionClassifierReview? BuildNifResidualPositionClassifierReview(
+        int? vectorCount,
+        double? finiteVectorRatio,
+        double? plausibleValueRatio,
+        double? nonZeroVectorRatio,
+        double? maxExtent)
+    {
+        if (vectorCount is null &&
+            finiteVectorRatio is null &&
+            plausibleValueRatio is null &&
+            nonZeroVectorRatio is null &&
+            maxExtent is null)
+        {
+            return null;
+        }
+
+        const int minVectorCount = 3;
+        const double minFiniteVectorRatio = 0.95;
+        const double minPlausibleValueRatio = 0.95;
+        const double minNonZeroVectorRatio = 0.50;
+        const double minMaxExtent = 0.0001;
+
+        static string formatValue(double? value)
+        {
+            return value is null ? "missing" : value.Value.ToString("0.####", CultureInfo.InvariantCulture);
+        }
+
+        var missReasons = new List<string>();
+        if (vectorCount is null || vectorCount.Value < minVectorCount)
+        {
+            missReasons.Add($"VectorCount {vectorCount?.ToString(CultureInfo.InvariantCulture) ?? "missing"} < {minVectorCount}");
+        }
+
+        if (finiteVectorRatio is null || finiteVectorRatio.Value < minFiniteVectorRatio)
+        {
+            missReasons.Add($"FiniteVectorRatio {formatValue(finiteVectorRatio)} < {minFiniteVectorRatio.ToString("0.##", CultureInfo.InvariantCulture)}");
+        }
+
+        if (plausibleValueRatio is null || plausibleValueRatio.Value < minPlausibleValueRatio)
+        {
+            missReasons.Add($"PlausibleValueRatio {formatValue(plausibleValueRatio)} < {minPlausibleValueRatio.ToString("0.##", CultureInfo.InvariantCulture)}");
+        }
+
+        if (maxExtent is null || maxExtent.Value < minMaxExtent)
+        {
+            missReasons.Add($"MaxExtent {formatValue(maxExtent)} < {minMaxExtent.ToString("0.####", CultureInfo.InvariantCulture)}");
+        }
+
+        if (nonZeroVectorRatio is null || nonZeroVectorRatio.Value < minNonZeroVectorRatio)
+        {
+            missReasons.Add($"NonZeroVectorRatio {formatValue(nonZeroVectorRatio)} < {minNonZeroVectorRatio.ToString("0.##", CultureInfo.InvariantCulture)}");
+        }
+
+        var nonPlausibleStrictInputsPass =
+            vectorCount is >= minVectorCount &&
+            finiteVectorRatio is >= minFiniteVectorRatio &&
+            maxExtent is >= minMaxExtent &&
+            nonZeroVectorRatio is >= minNonZeroVectorRatio;
+        var maxPlausibleThresholdForThisSample = nonPlausibleStrictInputsPass ? plausibleValueRatio : null;
+
+        return new NifResidualPositionClassifierReview(
+            ClassifierRole: "position-float3-ror1-lead",
+            CandidateOnly: true,
+            MinVectorCount: minVectorCount,
+            MinFiniteVectorRatio: minFiniteVectorRatio,
+            MinPlausibleValueRatio: minPlausibleValueRatio,
+            MinNonZeroVectorRatio: minNonZeroVectorRatio,
+            MinMaxExtent: minMaxExtent,
+            VectorCount: vectorCount,
+            FiniteVectorRatio: finiteVectorRatio,
+            PlausibleValueRatio: plausibleValueRatio,
+            NonZeroVectorRatio: nonZeroVectorRatio,
+            MaxExtent: maxExtent,
+            PassesStrictClassifier: missReasons.Count == 0,
+            MissReasons: missReasons,
+            MaxPlausibleValueRatioThresholdForThisSample: maxPlausibleThresholdForThisSample,
+            CandidateGuardNote: "Candidate-only residual follow-up can rank repeated leads below the strict PlausibleValueRatio >= 0.95 role threshold; this does not promote geometry truth.");
+    }
+
+    private static bool IsNifMeshResidualStreamCandidate(uint meshSize, NifMeshBoundStreamSummary stream)
+    {
+        return IsNifMeshResidualTargetSize(meshSize) && !IsKnownNifMeshGeometryOrSentinelRole(stream.RoleStats.PrimaryRole);
+    }
+
+    private static bool IsNifMeshResidualTargetSize(uint meshSize)
+    {
+        return meshSize is 297 or 305 or 321 or 325 or 329;
+    }
+
+    private static bool IsKnownNifMeshGeometryOrSentinelRole(string role)
+    {
+        return role.StartsWith("index-", StringComparison.OrdinalIgnoreCase) ||
+            role.StartsWith("normal-float3", StringComparison.OrdinalIgnoreCase) ||
+            role.StartsWith("uv-float2", StringComparison.OrdinalIgnoreCase) ||
+            role.StartsWith("position-float3", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "all-zero-stream", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "u32-sentinel-mask-body", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(role, "sentinel-ffff-u16-body", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static int? GetDivisibleByteRatio(uint? byteCount, int? divisor)
     {
         if (byteCount is null || divisor is null || divisor.Value <= 0)
@@ -12659,6 +12955,81 @@ internal sealed class NifMeshBindingUsageAccessRoleAccumulator(string role, stri
     public List<NifMeshBindingStreamSample> Samples { get; } = [];
 }
 
+internal sealed class NifPositionSourceSiblingAccumulator(
+    string pattern,
+    string idPrefix,
+    int targetBlockIndex,
+    uint? declaredPayloadBytes,
+    string? dataStreamUsage,
+    string? dataStreamAccess,
+    string role)
+{
+    public string Pattern { get; } = pattern;
+    public string IdPrefix { get; } = idPrefix;
+    public int TargetBlockIndex { get; } = targetBlockIndex;
+    public uint? DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
+    public string Role { get; } = role;
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<int> MeshBlockIndices { get; } = [];
+    public HashSet<int> MeshPayloadOffsets { get; } = [];
+    public Dictionary<uint, int> MeshSizeCounts { get; } = [];
+    public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshResidualTargetAccumulator(uint meshSize)
+{
+    public uint MeshSize { get; } = meshSize;
+    public int MeshBlockCount { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public int ResidualStreamCount { get; set; }
+    public HashSet<string> ResidualPatternKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
+internal sealed class NifMeshResidualStreamAccumulator(
+    string pattern,
+    uint meshSize,
+    int meshPayloadOffset,
+    uint targetSize,
+    uint? declaredPayloadBytes,
+    string? dataStreamUsage,
+    string? dataStreamAccess,
+    string role,
+    int roleConfidence,
+    string bodyFirst16,
+    string? stringValue,
+    int? rotatedFloat3VectorCount,
+    double? rotatedFloat3FiniteVectorRatio,
+    double? rotatedFloat3PlausibleValueRatio,
+    double? rotatedFloat3NonZeroVectorRatio,
+    double? rotatedFloat3MaxExtent,
+    List<NifFloatVectorPrefix>? rotatedFloat3Prefix)
+{
+    public string Pattern { get; } = pattern;
+    public uint MeshSize { get; } = meshSize;
+    public int MeshPayloadOffset { get; } = meshPayloadOffset;
+    public uint TargetSize { get; } = targetSize;
+    public uint? DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+    public string? DataStreamUsage { get; } = dataStreamUsage;
+    public string? DataStreamAccess { get; } = dataStreamAccess;
+    public string Role { get; } = role;
+    public int RoleConfidence { get; } = roleConfidence;
+    public string BodyFirst16 { get; } = bodyFirst16;
+    public string? StringValue { get; } = stringValue;
+    public int? RotatedFloat3VectorCount { get; } = rotatedFloat3VectorCount;
+    public double? RotatedFloat3FiniteVectorRatio { get; } = rotatedFloat3FiniteVectorRatio;
+    public double? RotatedFloat3PlausibleValueRatio { get; } = rotatedFloat3PlausibleValueRatio;
+    public double? RotatedFloat3NonZeroVectorRatio { get; } = rotatedFloat3NonZeroVectorRatio;
+    public double? RotatedFloat3MaxExtent { get; } = rotatedFloat3MaxExtent;
+    public List<NifFloatVectorPrefix>? RotatedFloat3Prefix { get; } = rotatedFloat3Prefix is null ? null : [.. rotatedFloat3Prefix];
+    public int Count { get; set; }
+    public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
 internal sealed class NifMeshBindingPatternAccumulator(string pattern, uint meshSize, string meshFirst16)
 {
     public string Pattern { get; } = pattern;
@@ -12982,6 +13353,9 @@ internal sealed record NifMeshBindingInventoryReport(
     int AttributeCompatibleSets,
     List<NifMeshBindingRoleGroup> RoleGroups,
     List<NifMeshBindingUsageAccessRoleGroup> TopUsageAccessRoles,
+    List<NifPositionSourceSiblingGroup> TopPositionSourceSiblings,
+    List<NifMeshResidualTargetGroup> ResidualTargetMeshSizes,
+    List<NifMeshResidualStreamGroup> TopResidualStreams,
     List<NifMeshBindingPatternGroup> TopPatterns,
     List<NifMeshBindingPairingGroup> TopPairings,
     List<NifMeshAttributeSetGroup> TopAttributeSets,
@@ -13007,6 +13381,71 @@ internal sealed record NifMeshBindingUsageAccessRoleGroup(
     List<NifSizeCount> MeshSizes,
     List<NifSizeCount> DeclaredPayloadSizes,
     List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifPositionSourceSiblingGroup(
+    string Pattern,
+    string IdPrefix,
+    int TargetBlockIndex,
+    uint? DeclaredPayloadBytes,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
+    string Role,
+    int Count,
+    int NifPayloads,
+    int DistinctMeshBlocks,
+    List<int> MeshBlockIndices,
+    List<NifSizeCount> MeshSizes,
+    List<int> MeshPayloadOffsets,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifMeshResidualTargetGroup(
+    uint MeshSize,
+    int MeshBlockCount,
+    int NifPayloads,
+    int ResidualStreamCount,
+    int ResidualPatternCount,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifMeshResidualStreamGroup(
+    string Pattern,
+    uint MeshSize,
+    int MeshPayloadOffset,
+    uint TargetSize,
+    uint? DeclaredPayloadBytes,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
+    string Role,
+    int RoleConfidence,
+    string BodyFirst16,
+    string? StringValue,
+    int? RotatedFloat3VectorCount,
+    double? RotatedFloat3FiniteVectorRatio,
+    double? RotatedFloat3PlausibleValueRatio,
+    double? RotatedFloat3NonZeroVectorRatio,
+    double? RotatedFloat3MaxExtent,
+    List<NifFloatVectorPrefix>? RotatedFloat3Prefix,
+    NifResidualPositionClassifierReview? StrictRotatedFloat3PositionClassifierReview,
+    int Count,
+    int NifPayloads,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifResidualPositionClassifierReview(
+    string ClassifierRole,
+    bool CandidateOnly,
+    int MinVectorCount,
+    double MinFiniteVectorRatio,
+    double MinPlausibleValueRatio,
+    double MinNonZeroVectorRatio,
+    double MinMaxExtent,
+    int? VectorCount,
+    double? FiniteVectorRatio,
+    double? PlausibleValueRatio,
+    double? NonZeroVectorRatio,
+    double? MaxExtent,
+    bool PassesStrictClassifier,
+    List<string> MissReasons,
+    double? MaxPlausibleValueRatioThresholdForThisSample,
+    string CandidateGuardNote);
 
 internal sealed record NifMeshBindingPatternGroup(
     string Pattern,
