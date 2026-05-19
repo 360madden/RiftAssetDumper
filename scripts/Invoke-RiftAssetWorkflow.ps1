@@ -1456,6 +1456,18 @@ function Invoke-ResidualPositionClusterProbeReport {
         return ([string]$Value).Replace('|', '\|').Replace("`r", ' ').Replace("`n", ' ')
     }
 
+    function Get-OptionalClusterReport {
+        param([Parameter(Mandatory)] [string] $FileName)
+
+        $path = Join-Path $Out $FileName
+        if (-not (Test-Path -LiteralPath $path)) {
+            Write-Host "ResidualPositionClusterProbeReport note: optional source report is missing: $path" -ForegroundColor Yellow
+            return $null
+        }
+
+        return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    }
+
     function Get-ClusterMeshRow {
         param(
             [Parameter(Mandatory)] [object] $Spec,
@@ -1541,6 +1553,21 @@ function Invoke-ResidualPositionClusterProbeReport {
         }
     }
 
+    $classifierReportPath = Join-Path $Out 'residual-position-classifier-report.json'
+    $familyCrossTabPath = Join-Path $Out 'residual-position-family-crosstab.json'
+    $siblingFamilyPath = Join-Path $Out 'position-source-sibling-family-report.json'
+    $classifierReport = Get-OptionalClusterReport -FileName 'residual-position-classifier-report.json'
+    $familyCrossTabReport = Get-OptionalClusterReport -FileName 'residual-position-family-crosstab.json'
+    $siblingFamilyReport = Get-OptionalClusterReport -FileName 'position-source-sibling-family-report.json'
+    $classifierRows = if ($null -ne $classifierReport) { @((Get-JsonValueOrNull $classifierReport 'Rows')) } else { @() }
+    $familyPayloadRows = if ($null -ne $familyCrossTabReport) { @((Get-JsonValueOrNull $familyCrossTabReport 'PayloadSummary')) } else { @() }
+    $siblingFamilies = if ($null -ne $siblingFamilyReport) { @((Get-JsonValueOrNull $siblingFamilyReport 'Families')) } else { @() }
+    $mesh305SiblingFamily = @($siblingFamilies | Where-Object {
+        [int](Get-JsonValueOrDash $_ 'MeshSize') -eq 305 -and
+        [string](Get-JsonValueOrDash $_ 'MeshBlocks') -eq 'mesh#7, mesh#27' -and
+        [string](Get-JsonValueOrDash $_ 'MeshPayloadOffsets') -eq 'stream@188'
+    } | Select-Object -First 1)
+
     $streamRows = @()
     $meshRows = @()
     foreach ($spec in @($ProbeSpecs | Sort-Object Payload)) {
@@ -1566,12 +1593,32 @@ function Invoke-ResidualPositionClusterProbeReport {
     $payloadRows = @(foreach ($group in @($meshRows | Group-Object Payload)) {
         $items = @($group.Group)
         $stream = @($streamRows | Where-Object { [int]$_.Payload -eq [int]$items[0].Payload } | Select-Object -First 1)[0]
+        $payload = [int]$items[0].Payload
+        $classifierMatch = @($classifierRows | Where-Object { [int](Get-JsonValueOrDash $_ 'Payload') -eq $payload } | Select-Object -First 1)
+        $classifier = if ($classifierMatch.Count -gt 0) { $classifierMatch[0] } else { $null }
+        $familyMatch = @($familyPayloadRows | Where-Object { [int](Get-JsonValueOrDash $_ 'Payload') -eq $payload } | Select-Object -First 1)
+        $family = if ($familyMatch.Count -gt 0) { $familyMatch[0] } else { $null }
+        $siblingFamily = if ($mesh305SiblingFamily.Count -gt 0) { $mesh305SiblingFamily[0] } else { $null }
+        $strictPass = if ($null -ne $classifier) { [bool](Get-JsonValueOrDash $classifier 'StrictPass') } else { $null }
+        $candidateGuard = if ($null -ne $family) { [bool](Get-JsonValueOrDash $family 'CandidateGuard') } else { $null }
         [pscustomobject]@{
-            Payload = [int]$items[0].Payload
+            Payload = $payload
             Id = [string]$items[0].Id
             StreamBlock = [int]$stream.StreamBlock
             StreamClassification = [string]$stream.Classification
             BodyFirst16 = [string]$stream.BodyFirst16
+            ClassifierPlausible = if ($null -ne $classifier) { Get-JsonDoubleOrNull $classifier 'Plausible' } else { $null }
+            ClassifierStrictPass = $strictPass
+            ClassifierMissReasons = if ($null -ne $classifier) { [string](Get-JsonValueOrDash $classifier 'MissReasons') } else { '-' }
+            ClassifierMaxPlausibleThresholdForSample = if ($null -ne $classifier) { Get-JsonDoubleOrNull $classifier 'MaxPlausibleThresholdForSample' } else { $null }
+            ResidualFamilySampleCount = if ($null -ne $family) { [int](Get-JsonValueOrDash $family 'SampleCount') } else { 0 }
+            ResidualFamilyIdCount = if ($null -ne $family) { [int](Get-JsonValueOrDash $family 'IdCount') } else { 0 }
+            ResidualFamilyMesh7And27IdCount = if ($null -ne $family) { [int](Get-JsonValueOrDash $family 'Mesh7And27IdCount') } else { 0 }
+            ResidualFamilyCandidateGuard = $candidateGuard
+            SiblingFamilyEvidenceGroups = if ($null -ne $siblingFamily) { [int](Get-JsonValueOrDash $siblingFamily 'EvidenceGroups') } else { 0 }
+            SiblingFamilyTotalStreamLinks = if ($null -ne $siblingFamily) { [int](Get-JsonValueOrDash $siblingFamily 'TotalStreamLinks') } else { 0 }
+            SiblingFamilyDistinctIds = if ($null -ne $siblingFamily) { [int](Get-JsonValueOrDash $siblingFamily 'DistinctIds') } else { 0 }
+            SiblingFamilyTargetBlocks = if ($null -ne $siblingFamily) { [string](Get-JsonValueOrDash $siblingFamily 'TargetBlocks') } else { '-' }
             MeshBlocks = (($items | Sort-Object MeshBlock | ForEach-Object { "mesh#$($_.MeshBlock)" }) -join ',')
             MeshRoles = (($items | Sort-Object MeshBlock | ForEach-Object { "mesh#$($_.MeshBlock)=$($_.Role)" }) -join '; ')
             AttributeSetTotal = [int](($items | Measure-Object -Property AttributeSetCount -Sum).Sum)
@@ -1595,6 +1642,12 @@ function Invoke-ResidualPositionClusterProbeReport {
         Target = 'meshSize=305 stream@188 StringValue=POSITION usage=1 access=19'
         StrictClassifierThresholdUnchanged = $true
         ExportPromotion = 'blocked'
+        SourceReports = [ordered]@{
+            ResidualClassifier = $classifierReportPath
+            ResidualFamilyCrossTab = $familyCrossTabPath
+            PositionSourceSiblingFamily = $siblingFamilyPath
+        }
+        Mesh305SiblingFamily = if ($mesh305SiblingFamily.Count -gt 0) { $mesh305SiblingFamily[0] } else { $null }
         PayloadRows = @($payloadRows | Sort-Object Payload)
         StreamRows = @($streamRows | Sort-Object Payload)
         MeshRows = @($meshRows | Sort-Object Payload, MeshBlock)
@@ -1607,15 +1660,25 @@ function Invoke-ResidualPositionClusterProbeReport {
         '',
         'Candidate-only focused probe report for `meshSize=305 stream@188 StringValue=POSITION usage=1 access=19`.',
         '',
-        '| Payload | ID | Stream body classifier | Body first16 | Mesh roles | Attribute sets | Pairings | Decision |',
-        '|---:|---|---|---|---|---:|---:|---|'
+        '| Payload | ID | Plausible | Strict pass | Candidate guard | Residual IDs | Sibling family | Stream body classifier | Mesh roles | Attribute sets | Pairings | Decision |',
+        '|---:|---|---:|---|---|---:|---|---|---|---:|---:|---|'
     )
     foreach ($row in @($payloadRows | Sort-Object Payload)) {
-        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |' -f
+        $siblingSummary = if ($row.SiblingFamilyEvidenceGroups -gt 0) {
+            ('groups={0}; links={1}; ids={2}; target={3}' -f $row.SiblingFamilyEvidenceGroups, $row.SiblingFamilyTotalStreamLinks, $row.SiblingFamilyDistinctIds, $row.SiblingFamilyTargetBlocks)
+        }
+        else {
+            '-'
+        }
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} |' -f
             (Format-ClusterMarkdownCell $row.Payload),
             (Format-ClusterMarkdownCell $row.Id),
+            (Format-ClusterMarkdownCell $row.ClassifierPlausible),
+            (Format-ClusterMarkdownCell $row.ClassifierStrictPass),
+            (Format-ClusterMarkdownCell $row.ResidualFamilyCandidateGuard),
+            (Format-ClusterMarkdownCell $row.ResidualFamilyIdCount),
+            (Format-ClusterMarkdownCell $siblingSummary),
             (Format-ClusterMarkdownCell $row.StreamClassification),
-            (Format-ClusterMarkdownCell $row.BodyFirst16),
             (Format-ClusterMarkdownCell $row.MeshRoles),
             (Format-ClusterMarkdownCell $row.AttributeSetTotal),
             (Format-ClusterMarkdownCell $row.PairingTotal),

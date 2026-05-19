@@ -1433,3 +1433,87 @@ Do not stage ignored `Exports/` outputs. Push is not done unless explicitly requ
 | 8 | Re-run `DiscoveryWorkbench` after any cluster report schema change. |
 | 9 | Re-run `GeneratedOutputGuard` before any staging. |
 | 10 | Keep OBJ/export blocked until position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards all agree. |
+
+## Autonomous continuation update — 2026-05-19 02:32:54 -04:00 America/New_York
+
+### Milestone AE — pushed prior residual-cluster slices
+
+Pushed the two already-validated commits to `origin/main` before starting this slice:
+
+```text
+c3614e1 Add candidate-only discovery workbench
+19bf01a Add residual position cluster probe report
+```
+
+Remote `main` is no longer behind those two commits. No generated/copied asset output was staged or pushed.
+
+### Milestone AF — enriched residual cluster report with classifier and sibling-family evidence
+
+Updated `scripts/Invoke-RiftAssetWorkflow.ps1` so `ResidualPositionClusterProbeReport` now cross-links the focused `meshSize=305 stream@188` cluster with existing generated source reports when present:
+
+| Source report | Added evidence in cluster rows |
+|---|---|
+| `Exports/residual-position-classifier-report.json` | Plausible ratio, strict-pass flag, miss reasons, max plausible threshold for the sample. |
+| `Exports/residual-position-family-crosstab.json` | Residual sample/id counts and candidate-guard flag per payload. |
+| `Exports/position-source-sibling-family-report.json` | Repeated mesh #7/#27 sibling-family counts for `meshSize=305 stream@188`. |
+
+Refreshed `Exports/residual-position-cluster-probe-report.md` now reports:
+
+| Payload | Plausible | Strict pass | Candidate guard | Residual IDs | Sibling family | Stream classifier | Attribute sets | Pairings | Decision |
+|---:|---:|---|---|---:|---|---|---:|---:|---|
+| 96 | 0.875 | False | True | 3 | groups=15; links=30; ids=15; target=block#21 | `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 180 | 0.8444 | False | True | 3 | groups=15; links=30; ids=15; target=block#21 | `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 192 | 0.8542 | False | True | 1 | groups=15; links=30; ids=15; target=block#21 | `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 288 | 0.9444 | False | True | 3 | groups=15; links=30; ids=15; target=block#21 | `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 396 | 0.8283 | False | True | 1 | groups=15; links=30; ids=15; target=block#21 | `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+
+Interpretation: payload `288` remains the best candidate by ratio, but it still does not cross the strict `0.95` classifier threshold and still has no complete position + normal/UV + topology/index binding. OBJ/export remains blocked.
+
+### Validation for Milestone AF
+
+| Check | Result |
+|---|---|
+| PowerShell parse of `scripts/Invoke-RiftAssetWorkflow.ps1` | Passed. |
+| `git diff --check` | Passed; Git emitted only the LF-to-CRLF working-copy warning for the workflow script. |
+| `dotnet build .\RiftAssetDumper.slnx --nologo` | Passed; existing `SharpCompress` NU1902 warning still appears. |
+| `ResidualPositionClassifierReport -SkipBuild -PrivacyScan` | Passed. |
+| `PositionSourceSiblingFamilyReport -SkipBuild -PrivacyScan` | Passed. |
+| `ResidualPositionClusterProbeReport -SkipBuild -PrivacyScan` | Passed with enriched classifier/family columns. |
+| `DiscoveryWorkbench -SkipBuild -PrivacyScan` | Passed; top candidate still `residual-305-stream188-payload288`. |
+| `GeneratedOutputGuard -SkipBuild -PrivacyScan` | Passed; generated/copy/build outputs remain untracked and unstaged. |
+
+### Current exact resume step
+
+Commit and push the enriched cluster-report slice after final hygiene checks, staging only:
+
+```text
+scripts/Invoke-RiftAssetWorkflow.ps1
+docs/handoffs/2026-05-17-190655-assets-discovery-resume-handoff.md
+```
+
+Do not stage `Source/`, `Extracted/`, `Exports/`, `bin/`, `obj/`, `__pycache__/`, or `.pyc` files.
+
+### Optional top 20 next best actions
+
+| # | Action |
+|---:|---|
+| 1 | Commit/push the enriched residual-cluster report slice once final hygiene is clean. |
+| 2 | Keep the cluster report as the main resume surface for `meshSize=305 stream@188` instead of opening a new family immediately. |
+| 3 | Add a tiny stale-source-report note if any enrichment source is missing when running the cluster mode standalone. |
+| 4 | Compare payload `288` against payload `96/180/192/396` by body-layout deltas, not only plausible ratio. |
+| 5 | Inspect whether the `uint16-compatible-body` classifier is masking packed/quantized position data. |
+| 6 | Keep strict classifier threshold at `0.95`; do not tune it downward to promote payload `288`. |
+| 7 | Add a guard assertion that enriched cluster rows never claim export readiness. |
+| 8 | Keep `meshSize=329 @304/#57` as separate source-binding evidence only. |
+| 9 | Re-run `DiscoveryWorkbench` after any cluster-report schema change. |
+| 10 | Re-run `GeneratedOutputGuard` before every staging operation. |
+| 11 | Add a compact markdown comparison of `BodyFirst16` values if humans need byte-level triage in the handoff surface. |
+| 12 | Add a JSON-only `SourceReportTimestamps` field later if stale generated reports become confusing. |
+| 13 | Keep source/generated output ignored and never commit extracted RIFT assets. |
+| 14 | Search for a true complete attribute set near repeated payload `288` before considering export paths. |
+| 15 | Use `PositionSourceSiblingRepresentativeProbeReport` only after the enriched cluster report stops yielding value. |
+| 16 | Preserve candidate-only wording in docs until proof guards agree. |
+| 17 | If a new parser hypothesis is added, gate it with bounds, topology/index, normal/UV, and repeated-family checks. |
+| 18 | Avoid broad refactors of `Invoke-RiftAssetWorkflow.ps1` while discovery truth is still moving. |
+| 19 | Track `SharpCompress` NU1902 separately as dependency hygiene, not as part of this discovery slice. |
+| 20 | Keep OBJ/export blocked until position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards all agree. |
