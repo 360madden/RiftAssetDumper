@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'UsageAccessCorrelationGuard', 'ResidualLeadGuard', 'ResidualPositionClassifierReport', 'PositionSourceGapReport', 'PositionSourceSiblingLeadGuard', 'PositionSourceSiblingFamilyReport', 'PositionSourceSiblingProbeReport', 'PositionSourceSiblingRepresentativeProbeReport', 'GeneratedOutputGuard', 'SemanticHintCrossTab', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
+    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'UsageAccessCorrelationGuard', 'ResidualLeadGuard', 'ResidualPositionClassifierReport', 'PositionSourceGapReport', 'PositionSourceSiblingLeadGuard', 'PositionSourceSiblingFamilyReport', 'PositionSourceSiblingProbeReport', 'PositionSourceSiblingRepresentativeProbeReport', 'PositionSourceSiblingSecondaryProbeReport', 'PositionSourceSiblingExtraPositionReport', 'DiscoveryWorkbench', 'GeneratedOutputGuard', 'SemanticHintCrossTab', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
     [string[]] $Mode = @('MeshBindings'),
 
     [string] $Root = '',
@@ -73,6 +73,9 @@ $commandMap = @{
     PositionSourceSiblingFamilyReport = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     PositionSourceSiblingProbeReport = @{ Command = 'probe-nif-mesh'; Base = 'probe-nif-mesh' }
     PositionSourceSiblingRepresentativeProbeReport = @{ Command = 'probe-nif-mesh'; Base = 'probe-nif-mesh' }
+    PositionSourceSiblingSecondaryProbeReport = @{ Command = 'probe-nif-mesh'; Base = 'probe-nif-mesh' }
+    PositionSourceSiblingExtraPositionReport = @{ Command = 'probe-nif-mesh'; Base = 'probe-nif-mesh' }
+    DiscoveryWorkbench = @{ Command = ''; Base = '' }
     GeneratedOutputGuard = @{ Command = ''; Base = '' }
     SemanticHintCrossTab = @{ Command = ''; Base = '' }
     MeshStreams     = @{ Command = 'inventory-nif-mesh-streams';      Base = 'nif-mesh-stream-inventory' }
@@ -389,6 +392,62 @@ function Invoke-SemanticHintCrossTab {
     Write-Host "SemanticHintCrossTab JSON: $jsonPath" -ForegroundColor Green
     Write-Host "SemanticHintCrossTab markdown: $markdownPath" -ForegroundColor Green
     Write-Host 'SemanticHintCrossTab passed: semantic hints remain candidate-only ranking context.' -ForegroundColor Green
+}
+
+function Invoke-DiscoveryWorkbench {
+    $workbenchScript = Join-Path $scriptRoot 'discovery_workbench.py'
+    if (-not (Test-Path -LiteralPath $workbenchScript)) {
+        throw "DiscoveryWorkbench failed: missing helper script $workbenchScript"
+    }
+
+    $pythonArgs = @($workbenchScript, '--root', $repoRoot, '--exports', $Out)
+    if ($PrivacyScan) {
+        $pythonArgs += '--privacy-scan'
+    }
+
+    Write-Host "`n--- DiscoveryWorkbench candidate-only ranked workbench" -ForegroundColor Green
+    Write-Host ('python ' + ($pythonArgs -join ' ')) -ForegroundColor DarkGray
+    & python @pythonArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "DiscoveryWorkbench failed: python exited with $LASTEXITCODE."
+    }
+
+    $scoreboardPath = Join-Path $Out 'discovery-workbench-scoreboard.json'
+    $scoreboardMarkdownPath = Join-Path $Out 'discovery-workbench-scoreboard.md'
+    $queuePath = Join-Path $Out 'discovery-next-probe-queue.json'
+    $queueMarkdownPath = Join-Path $Out 'discovery-next-probe-queue.md'
+    foreach ($requiredPath in @($scoreboardPath, $scoreboardMarkdownPath, $queuePath, $queueMarkdownPath)) {
+        if (-not (Test-Path -LiteralPath $requiredPath)) {
+            throw "DiscoveryWorkbench failed: expected output missing: $requiredPath"
+        }
+    }
+
+    $scoreboard = Get-Content -LiteralPath $scoreboardPath -Raw | ConvertFrom-Json
+    if ($scoreboard.CandidateOnly -ne $true) {
+        throw 'DiscoveryWorkbench failed: scoreboard CandidateOnly flag is not true.'
+    }
+
+    $candidates = @($scoreboard.Candidates)
+    $nonCandidateRows = @($candidates | Where-Object { $_.CandidateOnly -ne $true })
+    if ($nonCandidateRows.Count -gt 0) {
+        throw "DiscoveryWorkbench failed: non-candidate rows found ($($nonCandidateRows.Count))."
+    }
+
+    $crossChecks = @($scoreboard.CrossChecks)
+    $nonCandidateChecks = @($crossChecks | Where-Object { $_.CandidateOnly -ne $true })
+    if ($nonCandidateChecks.Count -gt 0) {
+        throw "DiscoveryWorkbench failed: non-candidate cross-check rows found ($($nonCandidateChecks.Count))."
+    }
+
+    $top = $candidates | Sort-Object -Property Rank | Select-Object -First 1
+    if ($null -ne $top) {
+        Write-Host ("Top candidate: rank={0}; score={1}; id={2}; title={3}" -f $top.Rank, $top.Score, $top.CandidateId, $top.Title) -ForegroundColor Green
+    }
+    Write-Host "DiscoveryWorkbench scoreboard JSON: $scoreboardPath" -ForegroundColor Green
+    Write-Host "DiscoveryWorkbench scoreboard markdown: $scoreboardMarkdownPath" -ForegroundColor Green
+    Write-Host "DiscoveryWorkbench queue JSON: $queuePath" -ForegroundColor Green
+    Write-Host "DiscoveryWorkbench queue markdown: $queueMarkdownPath" -ForegroundColor Green
+    Write-Host 'DiscoveryWorkbench passed: generated candidate-only scoreboard and next-probe queue.' -ForegroundColor Green
 }
 
 function Get-UsageAccessGuardInteger {
@@ -1204,7 +1263,33 @@ function Invoke-ResidualPositionClassifierReport {
         return ([string]$Value).Replace('|', '\|')
     }
 
+    $classifierJsonPath = Join-Path (Split-Path -Parent $Path) 'residual-position-classifier-report.json'
     $markdownPath = Join-Path (Split-Path -Parent $Path) 'residual-position-classifier-report.md'
+    $classifierReport = [ordered]@{
+        Schema = 'residual-position-classifier-report/v1'
+        CandidateOnly = $true
+        Target = 'meshSize=305 stream@188 StringValue=POSITION usage=1 access=19'
+        SourceReport = $Path
+        StrictClassifierRole = 'position-float3-ror1-lead'
+        StrictClassifierThresholds = [ordered]@{
+            VectorCount = '>= 3'
+            FiniteVectorRatio = '>= 0.95'
+            PlausibleValueRatio = '>= 0.95'
+            MaxExtent = '>= 0.0001'
+            NonZeroVectorRatio = '>= 0.50'
+        }
+        Summary = [ordered]@{
+            TargetRows = $rows.Count
+            StrictPassRows = $strictPassCount
+            CandidateGuardRows = $guardRows.Count
+            MinCandidatePlausible = $minPlausible
+            MaxCandidatePlausible = $maxPlausible
+        }
+        Rows = @($rows | Sort-Object {[int]$_.Payload}, Count)
+        CandidateGuardRows = @($guardRows | Sort-Object {[int]$_.Payload}, Count)
+        Interpretation = 'Strict classifier miss report only. Repeated bounded-position-like rows remain candidate-only and do not promote parser roles, geometry truth, or export readiness.'
+    }
+    $classifierReport | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $classifierJsonPath -Encoding UTF8
     $markdown = @(
         '# Residual Position Classifier Report',
         '',
@@ -1352,6 +1437,7 @@ function Invoke-ResidualPositionClassifierReport {
         'Interpretation: `mesh#7+mesh#27` repetition strengthens this as a family-ranking lead, but all rows remain below strict parser role promotion. Keep candidate-only.'
     )
     Set-Content -LiteralPath $crossTabMarkdownPath -Value $familyMarkdown -Encoding UTF8
+    Write-Host "ResidualPositionClassifierReport JSON: $classifierJsonPath" -ForegroundColor Green
     Write-Host "ResidualPositionClassifierReport markdown: $markdownPath" -ForegroundColor Green
     Write-Host "ResidualPositionFamilyCrossTab JSON: $crossTabJsonPath" -ForegroundColor Green
     Write-Host "ResidualPositionFamilyCrossTab markdown: $crossTabMarkdownPath" -ForegroundColor Green
@@ -1894,6 +1980,222 @@ function Invoke-PositionSourceSiblingRepresentativeProbeReport {
     Write-Host "PositionSourceSiblingRepresentativeProbeReport JSON: $jsonPath" -ForegroundColor Green
     Write-Host "PositionSourceSiblingRepresentativeProbeReport markdown: $markdownPath" -ForegroundColor Green
     Write-Host 'PositionSourceSiblingRepresentativeProbeReport passed: representative sibling source leads stayed candidate-only.' -ForegroundColor Green
+}
+
+function Invoke-PositionSourceSiblingSecondaryProbeReport {
+    param([Parameter(Mandatory)] [object[]] $ProbeSpecs)
+
+    $rows = @($ProbeSpecs | ForEach-Object { New-PositionSourceRepresentativeProbeRow -Spec $_ })
+    $pairSummaries = @()
+    foreach ($pair in @($rows | Group-Object Pair)) {
+        $pairRows = @($pair.Group | Sort-Object MeshBlock)
+        if ($pairRows.Count -ne 2) {
+            throw "PositionSourceSiblingSecondaryProbeReport failed: pair '$($pair.Name)' expected exactly two probes, found $($pairRows.Count)."
+        }
+
+        $sharedPositions = @()
+        foreach ($left in @($pairRows[0].PositionStreams)) {
+            foreach ($right in @($pairRows[1].PositionStreams)) {
+                if ([int]$left.TargetBlockIndex -eq [int]$right.TargetBlockIndex -and [int]$left.Payload -eq [int]$right.Payload) {
+                    $sharedPositions += [pscustomobject]@{
+                        TargetBlockIndex = [int]$left.TargetBlockIndex
+                        Payload = [int]$left.Payload
+                        MeshPayloadOffsets = @([int]$left.MeshPayloadOffset, [int]$right.MeshPayloadOffset)
+                    }
+                }
+            }
+        }
+
+        if ($sharedPositions.Count -eq 0) {
+            throw "PositionSourceSiblingSecondaryProbeReport failed: pair '$($pair.Name)' has no shared position stream block/payload."
+        }
+
+        foreach ($row in $pairRows) {
+            $matchingSpec = @($ProbeSpecs | Where-Object {
+                [string]$_.Pair -eq [string]$row.Pair -and
+                [string]$_.Id -eq [string]$row.Id -and
+                [int]$_.MeshBlock -eq [int]$row.MeshBlock
+            })
+            if ($matchingSpec.Count -ne 1) {
+                throw "PositionSourceSiblingSecondaryProbeReport failed: expected one spec for $($row.Id) mesh#$($row.MeshBlock), found $($matchingSpec.Count)."
+            }
+
+            $expectedAttributeSetCount = [int]$matchingSpec[0].ExpectedAttributeSetCount
+            if ([int]$row.AttributeSetCount -ne $expectedAttributeSetCount) {
+                throw "PositionSourceSiblingSecondaryProbeReport failed: $($row.Id) mesh#$($row.MeshBlock) expected $expectedAttributeSetCount complete attribute sets, found $($row.AttributeSetCount)."
+            }
+        }
+
+        $pairSummaries += [pscustomobject]@{
+            Pair = [string]$pair.Name
+            PairLabel = [string]$pairRows[0].PairLabel
+            Id = [string]$pairRows[0].Id
+            MeshBlocks = (@($pairRows | ForEach-Object { "mesh#$($_.MeshBlock)" }) -join ', ')
+            MeshSizes = (@($pairRows | ForEach-Object { [string]$_.MeshSize }) -join ', ')
+            AttributeSetCounts = (@($pairRows | ForEach-Object { "mesh#$($_.MeshBlock)=$($_.AttributeSetCount)" }) -join ', ')
+            SharedPositionStreams = (@($sharedPositions | ForEach-Object { "block#$($_.TargetBlockIndex) payload=$($_.Payload) offsets=$(@($_.MeshPayloadOffsets | ForEach-Object { '@' + $_ }) -join '/')" }) -join ' | ')
+            PrimaryMeshSummary = "mesh#$($pairRows[0].MeshBlock) attr=$($pairRows[0].AttributeSummary); pos=$(Format-PositionSourceStreamList $pairRows[0].PositionStreams); normal=$(Format-PositionSourceStreamList $pairRows[0].NormalStreams); uv=$(Format-PositionSourceStreamList $pairRows[0].UvStreams); side=$(Format-PositionSourceStreamList $pairRows[0].SideStreams)"
+            SiblingMeshSummary = "mesh#$($pairRows[1].MeshBlock) attr=$($pairRows[1].AttributeSummary); pos=$(Format-PositionSourceStreamList $pairRows[1].PositionStreams); normal=$(Format-PositionSourceStreamList $pairRows[1].NormalStreams); uv=$(Format-PositionSourceStreamList $pairRows[1].UvStreams); side=$(Format-PositionSourceStreamList $pairRows[1].SideStreams)"
+            Decision = 'secondary sibling spot-check stayed candidate-only; attribute-set availability is evidence, not geometry truth'
+        }
+    }
+
+    $jsonPath = Join-Path $Out 'position-source-sibling-secondary-probe-comparison.json'
+    $markdownPath = Join-Path $Out 'position-source-sibling-secondary-probe-comparison.md'
+    $summary = [ordered]@{
+        Schema = 'position-source-sibling-secondary-probe-comparison/v1'
+        CandidateOnly = $true
+        PairSummaries = @($pairSummaries | Sort-Object Pair)
+        ProbeRows = @($rows | Sort-Object Pair, MeshBlock)
+        Interpretation = 'Secondary sibling-family spot checks for meshSize 305/321/329. Shared position sources remain source-binding search evidence only; observed attribute-set availability is guarded without promoting geometry/export truth.'
+    }
+    $summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
+
+    $markdown = @(
+        '# Position Source Sibling Secondary Probe Comparison',
+        '',
+        'Candidate-only comparison of secondary parser-derived sibling leads for meshSize `305`, `321`, and `329`.',
+        '',
+        'Generated under ignored `Exports/`; do not stage generated discovery output.',
+        '',
+        '| Family | ID | Meshes | Mesh sizes | Attribute sets | Shared position | Primary mesh summary | Sibling mesh summary | Decision |',
+        '|---|---|---|---|---|---|---|---|---|'
+    )
+    foreach ($pairSummary in @($pairSummaries | Sort-Object Pair)) {
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |' -f
+            (Format-WorkflowMarkdownCell $pairSummary.PairLabel),
+            (Format-WorkflowMarkdownCell $pairSummary.Id),
+            (Format-WorkflowMarkdownCell $pairSummary.MeshBlocks),
+            (Format-WorkflowMarkdownCell $pairSummary.MeshSizes),
+            (Format-WorkflowMarkdownCell $pairSummary.AttributeSetCounts),
+            (Format-WorkflowMarkdownCell $pairSummary.SharedPositionStreams),
+            (Format-WorkflowMarkdownCell $pairSummary.PrimaryMeshSummary),
+            (Format-WorkflowMarkdownCell $pairSummary.SiblingMeshSummary),
+            (Format-WorkflowMarkdownCell $pairSummary.Decision))
+    }
+
+    $markdown += @(
+        '',
+        'Interpretation: these secondary probes check whether the representative sibling pattern repeats. They remain candidate-only because shared position streams do not by themselves prove complete position+normal+UV binding, topology truth, geometry truth, or OBJ/export readiness.'
+    )
+    Set-Content -LiteralPath $markdownPath -Value $markdown -Encoding UTF8
+
+    Write-Host "`n--- PositionSourceSiblingSecondaryProbeReport candidate-only secondary sibling probes" -ForegroundColor Green
+    $pairSummaries | Sort-Object Pair | Select-Object PairLabel, Id, MeshBlocks, MeshSizes, AttributeSetCounts, SharedPositionStreams, Decision | Format-Table -AutoSize | Out-Host
+    Write-Host "PositionSourceSiblingSecondaryProbeReport JSON: $jsonPath" -ForegroundColor Green
+    Write-Host "PositionSourceSiblingSecondaryProbeReport markdown: $markdownPath" -ForegroundColor Green
+    Write-Host 'PositionSourceSiblingSecondaryProbeReport passed: secondary sibling source leads stayed candidate-only.' -ForegroundColor Green
+}
+
+function Invoke-PositionSourceSiblingExtraPositionReport {
+    param([Parameter(Mandatory)] [object[]] $ProbeSpecs)
+
+    $rows = @($ProbeSpecs | ForEach-Object { New-PositionSourceRepresentativeProbeRow -Spec $_ })
+    $pairSummaries = @()
+    foreach ($pair in @($rows | Group-Object Pair)) {
+        $pairRows = @($pair.Group | Sort-Object MeshBlock)
+        if ($pairRows.Count -ne 2) {
+            throw "PositionSourceSiblingExtraPositionReport failed: pair '$($pair.Name)' expected exactly two probes, found $($pairRows.Count)."
+        }
+
+        $primary = @($pairRows | Where-Object { [int]$_.MeshBlock -eq 7 })
+        $sibling = @($pairRows | Where-Object { [int]$_.MeshBlock -eq 34 })
+        if ($primary.Count -ne 1 -or $sibling.Count -ne 1) {
+            throw "PositionSourceSiblingExtraPositionReport failed: pair '$($pair.Name)' expected mesh#7 and mesh#34 rows."
+        }
+
+        if ([int]$primary[0].AttributeSetCount -ne 1) {
+            throw "PositionSourceSiblingExtraPositionReport failed: $($primary[0].Id) mesh#7 expected one complete attribute set, found $($primary[0].AttributeSetCount)."
+        }
+
+        if ([int]$sibling[0].AttributeSetCount -ne 0) {
+            throw "PositionSourceSiblingExtraPositionReport failed: $($sibling[0].Id) mesh#34 unexpectedly has complete attribute sets; review before keeping the old interpretation."
+        }
+
+        $sharedPrimaryPositions = @()
+        foreach ($left in @($primary[0].PositionStreams)) {
+            foreach ($right in @($sibling[0].PositionStreams)) {
+                if ([int]$left.TargetBlockIndex -eq 28 -and [int]$right.TargetBlockIndex -eq 28 -and [int]$left.Payload -eq [int]$right.Payload) {
+                    $sharedPrimaryPositions += [pscustomobject]@{
+                        TargetBlockIndex = [int]$left.TargetBlockIndex
+                        Payload = [int]$left.Payload
+                        MeshPayloadOffsets = @([int]$left.MeshPayloadOffset, [int]$right.MeshPayloadOffset)
+                    }
+                }
+            }
+        }
+
+        if ($sharedPrimaryPositions.Count -eq 0) {
+            throw "PositionSourceSiblingExtraPositionReport failed: pair '$($pair.Name)' no longer shares meshSize=329 primary position stream block#28."
+        }
+
+        $extraPositionStreams = @($sibling[0].PositionStreams | Where-Object {
+            [int]$_.MeshPayloadOffset -eq 304 -and
+            [int]$_.TargetBlockIndex -eq 57 -and
+            [string]$_.Role -eq 'position-float3-ror1-lead'
+        })
+        if ($extraPositionStreams.Count -ne 1) {
+            throw "PositionSourceSiblingExtraPositionReport failed: $($sibling[0].Id) mesh#34 expected one extra position-like stream at @304/#57, found $($extraPositionStreams.Count)."
+        }
+
+        if (@($sibling[0].UvStreams).Count -ne 0) {
+            throw "PositionSourceSiblingExtraPositionReport failed: $($sibling[0].Id) mesh#34 unexpectedly has UV stream candidates; review source-binding interpretation."
+        }
+
+        $pairSummaries += [pscustomobject]@{
+            Pair = [string]$pair.Name
+            PairLabel = [string]$pairRows[0].PairLabel
+            Id = [string]$primary[0].Id
+            SharedPrimaryPosition = (@($sharedPrimaryPositions | ForEach-Object { "block#$($_.TargetBlockIndex) payload=$($_.Payload) offsets=$(@($_.MeshPayloadOffsets | ForEach-Object { '@' + $_ }) -join '/')" }) -join ' | ')
+            Mesh34ExtraPosition = (@($extraPositionStreams | ForEach-Object { "@$($_.MeshPayloadOffset)/#$($_.TargetBlockIndex) payload=$($_.Payload) $($_.Role)" }) -join ' | ')
+            Mesh7Summary = "mesh#7 attr=$($primary[0].AttributeSummary); pos=$(Format-PositionSourceStreamList $primary[0].PositionStreams); normal=$(Format-PositionSourceStreamList $primary[0].NormalStreams); uv=$(Format-PositionSourceStreamList $primary[0].UvStreams); side=$(Format-PositionSourceStreamList $primary[0].SideStreams)"
+            Mesh34Summary = "mesh#34 attr=$($sibling[0].AttributeSummary); pos=$(Format-PositionSourceStreamList $sibling[0].PositionStreams); normal=$(Format-PositionSourceStreamList $sibling[0].NormalStreams); uv=$(Format-PositionSourceStreamList $sibling[0].UvStreams); side=$(Format-PositionSourceStreamList $sibling[0].SideStreams)"
+            Decision = 'mesh#34 extra @304/#57 position-like stream repeats; candidate-only source-binding oddity, not geometry truth'
+        }
+    }
+
+    $jsonPath = Join-Path $Out 'position-source-sibling-extra-position-report.json'
+    $markdownPath = Join-Path $Out 'position-source-sibling-extra-position-report.md'
+    $summary = [ordered]@{
+        Schema = 'position-source-sibling-extra-position-report/v1'
+        CandidateOnly = $true
+        PairSummaries = @($pairSummaries | Sort-Object Pair)
+        ProbeRows = @($rows | Sort-Object Pair, MeshBlock)
+        Interpretation = 'Focused meshSize=329 mesh#7/#34 report for the repeated mesh#34 @304/#57 position-like stream. This is source-binding search evidence only and does not promote geometry/export truth.'
+    }
+    $summary | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
+
+    $markdown = @(
+        '# Position Source Sibling Extra Position Report',
+        '',
+        'Candidate-only meshSize `329` mesh `#7/#34` report for repeated sibling mesh `#34` extra position-like stream `@304/#57`.',
+        '',
+        'Generated under ignored `Exports/`; do not stage generated discovery output.',
+        '',
+        '| ID | Shared primary position | mesh#34 extra position | mesh#7 summary | mesh#34 summary | Decision |',
+        '|---|---|---|---|---|---|'
+    )
+    foreach ($pairSummary in @($pairSummaries | Sort-Object Pair)) {
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} |' -f
+            (Format-WorkflowMarkdownCell $pairSummary.Id),
+            (Format-WorkflowMarkdownCell $pairSummary.SharedPrimaryPosition),
+            (Format-WorkflowMarkdownCell $pairSummary.Mesh34ExtraPosition),
+            (Format-WorkflowMarkdownCell $pairSummary.Mesh7Summary),
+            (Format-WorkflowMarkdownCell $pairSummary.Mesh34Summary),
+            (Format-WorkflowMarkdownCell $pairSummary.Decision))
+    }
+
+    $markdown += @(
+        '',
+        'Interpretation: the repeated `@304/#57` stream is a useful source-binding clue for meshSize `329`, but mesh `#34` still lacks complete attribute-set binding. Keep this separate from residual-stream truth and do not use it for OBJ/export promotion.'
+    )
+    Set-Content -LiteralPath $markdownPath -Value $markdown -Encoding UTF8
+
+    Write-Host "`n--- PositionSourceSiblingExtraPositionReport candidate-only mesh#34 extra position stream" -ForegroundColor Green
+    $pairSummaries | Sort-Object Pair | Select-Object Id, SharedPrimaryPosition, Mesh34ExtraPosition, Decision | Format-Table -AutoSize | Out-Host
+    Write-Host "PositionSourceSiblingExtraPositionReport JSON: $jsonPath" -ForegroundColor Green
+    Write-Host "PositionSourceSiblingExtraPositionReport markdown: $markdownPath" -ForegroundColor Green
+    Write-Host 'PositionSourceSiblingExtraPositionReport passed: mesh#34 extra position-like stream stayed candidate-only.' -ForegroundColor Green
 }
 
 function Invoke-PositionSourceSiblingLeadGuard {
@@ -2463,7 +2765,7 @@ function Invoke-AttributeExtraSiblingProofGuard {
     }
 }
 
-$noBuildModes = @('GeneratedOutputGuard', 'SemanticHintCrossTab')
+$noBuildModes = @('DiscoveryWorkbench', 'GeneratedOutputGuard', 'SemanticHintCrossTab')
 if (-not $SkipBuild -and @($Mode | Where-Object { $noBuildModes -notcontains $_ }).Count -gt 0) {
     Invoke-Checked -Label 'build' -Args @('build', $Solution, '--nologo')
 }
@@ -2480,6 +2782,11 @@ foreach ($modeName in $Mode) {
 
     if ($modeName -eq 'SemanticHintCrossTab') {
         Invoke-SemanticHintCrossTab
+        continue
+    }
+
+    if ($modeName -eq 'DiscoveryWorkbench') {
+        Invoke-DiscoveryWorkbench
         continue
     }
 
@@ -2536,6 +2843,65 @@ foreach ($modeName in $Mode) {
         }
 
         Invoke-PositionSourceSiblingRepresentativeProbeReport -ProbeSpecs $probeSpecsWithPaths
+        continue
+    }
+
+    if ($modeName -eq 'PositionSourceSiblingSecondaryProbeReport') {
+        $secondaryProbeSpecs = @(
+            [pscustomobject]@{ Pair = 'mesh329stream212secondary'; PairLabel = 'meshSize 329 secondary shared stream@212 sibling'; Id = '04de901531a091ab'; MeshBlock = 7; ExpectedAttributeSetCount = 1 },
+            [pscustomobject]@{ Pair = 'mesh329stream212secondary'; PairLabel = 'meshSize 329 secondary shared stream@212 sibling'; Id = '04de901531a091ab'; MeshBlock = 34; ExpectedAttributeSetCount = 0 },
+            [pscustomobject]@{ Pair = 'mesh305stream188secondary'; PairLabel = 'meshSize 305 secondary shared stream@188 sibling'; Id = '0d9a25c9a6af7b18'; MeshBlock = 7; ExpectedAttributeSetCount = 0 },
+            [pscustomobject]@{ Pair = 'mesh305stream188secondary'; PairLabel = 'meshSize 305 secondary shared stream@188 sibling'; Id = '0d9a25c9a6af7b18'; MeshBlock = 27; ExpectedAttributeSetCount = 0 },
+            [pscustomobject]@{ Pair = 'mesh321stream204secondary'; PairLabel = 'meshSize 321 secondary shared stream@204 sibling'; Id = '1dc433d4d2e4db64'; MeshBlock = 7; ExpectedAttributeSetCount = 1 },
+            [pscustomobject]@{ Pair = 'mesh321stream204secondary'; PairLabel = 'meshSize 321 secondary shared stream@204 sibling'; Id = '1dc433d4d2e4db64'; MeshBlock = 31; ExpectedAttributeSetCount = 0 }
+        )
+
+        $probeSpecsWithPaths = @()
+        foreach ($secondaryProbe in $secondaryProbeSpecs) {
+            $probePath = Join-Path $Out "$base-$($secondaryProbe.Id)-mesh$($secondaryProbe.MeshBlock).json"
+            $probeArgs = @('run', '--project', $Project, '--', $command, '--root', $Root, '--id', [string]$secondaryProbe.Id, '--mesh-block', [string]$secondaryProbe.MeshBlock, '--out', $probePath)
+            Invoke-Checked -Label "$modeName $($secondaryProbe.Id) mesh#$($secondaryProbe.MeshBlock)" -Args $probeArgs
+            Show-ReportSummary -ModeName 'MeshProbe' -Path $probePath
+            $probeSpecsWithPaths += [pscustomobject]@{
+                Pair = $secondaryProbe.Pair
+                PairLabel = $secondaryProbe.PairLabel
+                Id = $secondaryProbe.Id
+                MeshBlock = $secondaryProbe.MeshBlock
+                ExpectedAttributeSetCount = $secondaryProbe.ExpectedAttributeSetCount
+                Path = $probePath
+            }
+        }
+
+        Invoke-PositionSourceSiblingSecondaryProbeReport -ProbeSpecs $probeSpecsWithPaths
+        continue
+    }
+
+    if ($modeName -eq 'PositionSourceSiblingExtraPositionReport') {
+        $extraPositionProbeSpecs = @(
+            [pscustomobject]@{ Pair = 'mesh329extra0364'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '0364ea142bc00ce7'; MeshBlock = 7 },
+            [pscustomobject]@{ Pair = 'mesh329extra0364'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '0364ea142bc00ce7'; MeshBlock = 34 },
+            [pscustomobject]@{ Pair = 'mesh329extra04de'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '04de901531a091ab'; MeshBlock = 7 },
+            [pscustomobject]@{ Pair = 'mesh329extra04de'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '04de901531a091ab'; MeshBlock = 34 },
+            [pscustomobject]@{ Pair = 'mesh329extra066f'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '066fa520a8ce62e3'; MeshBlock = 7 },
+            [pscustomobject]@{ Pair = 'mesh329extra066f'; PairLabel = 'meshSize 329 mesh#34 extra @304/#57'; Id = '066fa520a8ce62e3'; MeshBlock = 34 }
+        )
+
+        $probeSpecsWithPaths = @()
+        foreach ($extraPositionProbe in $extraPositionProbeSpecs) {
+            $probePath = Join-Path $Out "$base-$($extraPositionProbe.Id)-mesh$($extraPositionProbe.MeshBlock).json"
+            $probeArgs = @('run', '--project', $Project, '--', $command, '--root', $Root, '--id', [string]$extraPositionProbe.Id, '--mesh-block', [string]$extraPositionProbe.MeshBlock, '--out', $probePath)
+            Invoke-Checked -Label "$modeName $($extraPositionProbe.Id) mesh#$($extraPositionProbe.MeshBlock)" -Args $probeArgs
+            Show-ReportSummary -ModeName 'MeshProbe' -Path $probePath
+            $probeSpecsWithPaths += [pscustomobject]@{
+                Pair = $extraPositionProbe.Pair
+                PairLabel = $extraPositionProbe.PairLabel
+                Id = $extraPositionProbe.Id
+                MeshBlock = $extraPositionProbe.MeshBlock
+                Path = $probePath
+            }
+        }
+
+        Invoke-PositionSourceSiblingExtraPositionReport -ProbeSpecs $probeSpecsWithPaths
         continue
     }
 
