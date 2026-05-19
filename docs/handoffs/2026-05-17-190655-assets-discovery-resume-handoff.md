@@ -1348,3 +1348,88 @@ M docs/handoffs/2026-05-17-190655-assets-discovery-resume-handoff.md
 M scripts/Invoke-RiftAssetWorkflow.ps1
 ?? scripts/discovery_workbench.py
 ```
+
+
+## Autonomous continuation update — 2026-05-19 02:21:37 -04:00 America/New_York
+
+### Milestone AB — saved DiscoveryWorkbench slice before expanding probes
+
+The previously validated DiscoveryWorkbench/handoff slice was committed before starting the residual-cluster probe expansion:
+
+```text
+c3614e1 Add candidate-only discovery workbench
+```
+
+No generated/copied asset output was staged in that commit.
+
+### Milestone AC — repeatable residual-position cluster probe workflow mode
+
+Added repeatable workflow mode:
+
+```text
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode ResidualPositionClusterProbeReport -SkipBuild -PrivacyScan
+```
+
+The mode probes the repeated `meshSize=305 stream@188` residual payload cluster that DiscoveryWorkbench and the residual classifier ranked highest. It writes ignored outputs:
+
+```text
+Exports/residual-position-cluster-probe-report.json
+Exports/residual-position-cluster-probe-report.md
+Exports/probe-residual-position-payload96-75cea2f2254e8a76-stream21.json
+Exports/probe-residual-position-payload180-14924c7e9f7f03a9-stream21.json
+Exports/probe-residual-position-payload192-5a4f390f196037c6-stream21.json
+Exports/probe-residual-position-payload288-014e1ff60d8508f1-stream21.json
+Exports/probe-residual-position-payload396-b4de91a46cb7d4bc-stream21.json
+```
+
+Focused payload result:
+
+| Payload | ID | Stream body classifier | Mesh #7/#27 role at `@188 -> #21` | Attribute sets | Pairings | Decision |
+|---:|---|---|---|---:|---:|---|
+| 96 | `75cea2f2254e8a76` | `uint16-compatible-body` | both `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 180 | `14924c7e9f7f03a9` | `uint16-compatible-body` | both `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 192 | `5a4f390f196037c6` | `uint16-compatible-body` | both `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 288 | `014e1ff60d8508f1` | `uint16-compatible-body` | both `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+| 396 | `b4de91a46cb7d4bc` | `uint16-compatible-body` | both `uint16-compatible-body` | 0 | 0 | candidate-only; no complete geometry binding |
+
+Interpretation: probing payloads `96/180/192/288/396` confirms that this residual cluster repeats across mesh #7/#27, but focused probes still do not recover a complete geometry binding. Do not promote parser roles, geometry truth, or OBJ/export readiness from this evidence.
+
+### Milestone AD — workbench refreshed after residual-cluster probes
+
+Re-ran:
+
+```text
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode DiscoveryWorkbench -SkipBuild -PrivacyScan
+```
+
+Result remained:
+
+| Metric | Result |
+|---|---:|
+| Candidates ranked | 28 |
+| Probe queue items | 12 |
+| Top candidate | `residual-305-stream188-payload288` |
+| Top score | 100 |
+
+Why the top candidate did not promote: DiscoveryWorkbench ranks next discovery value. It does not override strict classifier results, complete-attribute-set checks, topology/index proof, normal/UV proof, bounds checks, or export gates.
+
+### Current exact resume step
+
+Next safest offline slice: add a compact residual-cluster comparison/crosstab that compares these five probed payloads against the residual classifier plausible ratios and sibling-family counts in one generated report. Keep it strictly candidate-only unless a later parser/proof guard recovers position + normal + UV + topology/index + bounds agreement.
+
+Do not stage ignored `Exports/` outputs. Push is not done unless explicitly requested.
+
+### Optional top 10 next best actions
+
+| # | Action |
+|---:|---|
+| 1 | Run final validation/hygiene checks for the residual-cluster mode. |
+| 2 | If validation passes, commit the coherent residual-cluster workflow/handoff slice separately from `c3614e1`. |
+| 3 | Keep generated `Exports/` outputs ignored and unstaged. |
+| 4 | Use the cluster report to compare payload `288` against `96/180/192/396` rather than probing a new family yet. |
+| 5 | Add classifier-ratio columns to the cluster report if the report becomes the main resume surface. |
+| 6 | Keep `meshSize=329 @304/#57` as source-binding evidence only. |
+| 7 | Do not lower strict classifier threshold below `0.95`. |
+| 8 | Re-run `DiscoveryWorkbench` after any cluster report schema change. |
+| 9 | Re-run `GeneratedOutputGuard` before any staging. |
+| 10 | Keep OBJ/export blocked until position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards all agree. |

@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'UsageAccessCorrelationGuard', 'ResidualLeadGuard', 'ResidualPositionClassifierReport', 'PositionSourceGapReport', 'PositionSourceSiblingLeadGuard', 'PositionSourceSiblingFamilyReport', 'PositionSourceSiblingProbeReport', 'PositionSourceSiblingRepresentativeProbeReport', 'PositionSourceSiblingSecondaryProbeReport', 'PositionSourceSiblingExtraPositionReport', 'DiscoveryWorkbench', 'GeneratedOutputGuard', 'SemanticHintCrossTab', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
+    [ValidateSet('AssetSignatures', 'AssetSemanticIndex', 'MeshBindings', 'MeshProbe', 'AttributeExtraProbe', 'AttributeExtraSiblingProofGuard', 'AttributeExtraProofGuard', 'UsageAccessCorrelationGuard', 'ResidualLeadGuard', 'ResidualPositionClassifierReport', 'ResidualPositionClusterProbeReport', 'PositionSourceGapReport', 'PositionSourceSiblingLeadGuard', 'PositionSourceSiblingFamilyReport', 'PositionSourceSiblingProbeReport', 'PositionSourceSiblingRepresentativeProbeReport', 'PositionSourceSiblingSecondaryProbeReport', 'PositionSourceSiblingExtraPositionReport', 'DiscoveryWorkbench', 'GeneratedOutputGuard', 'SemanticHintCrossTab', 'MeshStreams', 'IndexCandidates', 'StreamEndianness', 'StreamBodies', 'All')]
     [string[]] $Mode = @('MeshBindings'),
 
     [string] $Root = '',
@@ -68,6 +68,7 @@ $commandMap = @{
     UsageAccessCorrelationGuard = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     ResidualLeadGuard = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     ResidualPositionClassifierReport = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
+    ResidualPositionClusterProbeReport = @{ Command = ''; Base = '' }
     PositionSourceGapReport = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     PositionSourceSiblingLeadGuard = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
     PositionSourceSiblingFamilyReport = @{ Command = 'inventory-nif-mesh-bindings'; Base = 'nif-mesh-binding-inventory' }
@@ -1446,6 +1447,196 @@ function Invoke-ResidualPositionClassifierReport {
     Write-Host 'ResidualPositionClassifierReport passed: strict classifier misses are explained without changing role promotion or proof guards.' -ForegroundColor Green
 }
 
+function Invoke-ResidualPositionClusterProbeReport {
+    param([Parameter(Mandatory)] [object[]] $ProbeSpecs)
+
+    function Format-ClusterMarkdownCell {
+        param([object] $Value)
+        if ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value)) { return '-' }
+        return ([string]$Value).Replace('|', '\|').Replace("`r", ' ').Replace("`n", ' ')
+    }
+
+    function Get-ClusterMeshRow {
+        param(
+            [Parameter(Mandatory)] [object] $Spec,
+            [Parameter(Mandatory)] [string] $Path
+        )
+
+        if (-not (Test-Path -LiteralPath $Path)) {
+            throw "ResidualPositionClusterProbeReport failed: mesh probe output missing: $Path"
+        }
+
+        $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        $meshRows = @($report.Meshes | Where-Object { [int](Get-JsonValueOrDash $_ 'MeshBlockIndex') -eq [int]$Spec.MeshBlock })
+        if ($meshRows.Count -ne 1) {
+            throw "ResidualPositionClusterProbeReport failed: expected one mesh#$($Spec.MeshBlock) row in $Path, found $($meshRows.Count)."
+        }
+
+        $mesh = $meshRows[0]
+        $links = @((Get-JsonValueOrNull $mesh 'Streams'))
+        $targetLinks = @($links | Where-Object {
+            [int](Get-JsonValueOrDash $_ 'MeshPayloadOffset') -eq [int]$Spec.MeshPayloadOffset -and
+            [int](Get-JsonValueOrDash $_ 'TargetBlockIndex') -eq [int]$Spec.StreamBlock
+        })
+        if ($targetLinks.Count -ne 1) {
+            throw "ResidualPositionClusterProbeReport failed: expected one stream@$($Spec.MeshPayloadOffset)->#$($Spec.StreamBlock) row for $($Spec.Id) mesh#$($Spec.MeshBlock), found $($targetLinks.Count)."
+        }
+
+        $link = $targetLinks[0]
+        $attributeSetCount = @((Get-JsonValueOrNull $mesh 'AttributeSets')).Count
+        $pairingCount = @((Get-JsonValueOrNull $mesh 'Pairings')).Count
+        [pscustomobject]@{
+            Payload = [int]$Spec.Payload
+            Id = [string]$Spec.Id
+            MeshBlock = [int]$Spec.MeshBlock
+            MeshSize = [int](Get-JsonValueOrDash $mesh 'MeshSize')
+            MeshPayloadOffset = [int](Get-JsonValueOrDash $link 'MeshPayloadOffset')
+            TargetBlock = [int](Get-JsonValueOrDash $link 'TargetBlockIndex')
+            StreamPayload = [int](Get-JsonValueOrDash $link 'DeclaredPayloadBytes')
+            StringValue = [string](Get-JsonValueOrDash $link 'StringValue')
+            Role = [string](Get-JsonValueOrDash (Get-JsonValueOrNull $link 'RoleStats') 'PrimaryRole')
+            Confidence = [int](Get-JsonValueOrDash (Get-JsonValueOrNull $link 'RoleStats') 'Confidence')
+            AttributeSetCount = $attributeSetCount
+            PairingCount = $pairingCount
+            ReviewRequired = ($attributeSetCount -gt 0 -or $pairingCount -gt 0)
+            Decision = if ($attributeSetCount -gt 0 -or $pairingCount -gt 0) {
+                'review-required; focused evidence changed but remains candidate-only'
+            }
+            else {
+                'candidate-only; no complete geometry binding'
+            }
+            OutputPath = $Path
+        }
+    }
+
+    function Get-ClusterStreamRow {
+        param(
+            [Parameter(Mandatory)] [object] $Spec,
+            [Parameter(Mandatory)] [string] $Path
+        )
+
+        if (-not (Test-Path -LiteralPath $Path)) {
+            throw "ResidualPositionClusterProbeReport failed: stream-body output missing: $Path"
+        }
+
+        $report = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        $streamRows = @($report.StreamBodies | Where-Object { [int](Get-JsonValueOrDash $_ 'BlockIndex') -eq [int]$Spec.StreamBlock })
+        if ($streamRows.Count -ne 1) {
+            throw "ResidualPositionClusterProbeReport failed: expected one stream body #$($Spec.StreamBlock) row in $Path, found $($streamRows.Count)."
+        }
+
+        $stream = $streamRows[0]
+        $stats = Get-JsonValueOrNull $stream 'Stats'
+        [pscustomobject]@{
+            Payload = [int]$Spec.Payload
+            Id = [string]$Spec.Id
+            StreamBlock = [int]$Spec.StreamBlock
+            DeclaredPayloadBytes = [int](Get-JsonValueOrDash $stream 'DeclaredPayloadBytes')
+            Classification = [string](Get-JsonValueOrDash $stats 'Classification')
+            BodyFirst16 = [string](Get-JsonValueOrDash $stats 'First16')
+            FiniteFloat32Count = [int](Get-JsonValueOrDash $stats 'FiniteFloat32Count')
+            PlausibleFloat32Count = [int](Get-JsonValueOrDash $stats 'PlausibleFloat32Count')
+            UInt16Distinct = [int](Get-JsonValueOrDash $stats 'UInt16Distinct')
+            OutputPath = $Path
+        }
+    }
+
+    $streamRows = @()
+    $meshRows = @()
+    foreach ($spec in @($ProbeSpecs | Sort-Object Payload)) {
+        $streamPath = Join-Path $Out ("probe-residual-position-payload{0}-{1}-stream{2}.json" -f $spec.Payload, $spec.Id, $spec.StreamBlock)
+        Invoke-Checked -Label "ResidualPositionClusterProbeReport payload $($spec.Payload) stream body" -Args @('run', '--project', $Project, '--', 'probe-nif-stream-body', '--root', $Root, '--id', [string]$spec.Id, '--stream-block', [string]$spec.StreamBlock, '--out', $streamPath)
+        $streamRows += Get-ClusterStreamRow -Spec $spec -Path $streamPath
+
+        foreach ($meshBlock in @(7, 27)) {
+            $meshPath = Join-Path $Out ("probe-nif-mesh-{0}-mesh{1}.json" -f $spec.Id, $meshBlock)
+            Invoke-Checked -Label "ResidualPositionClusterProbeReport payload $($spec.Payload) mesh#$meshBlock" -Args @('run', '--project', $Project, '--', 'probe-nif-mesh', '--root', $Root, '--id', [string]$spec.Id, '--mesh-block', [string]$meshBlock, '--out', $meshPath)
+            Show-ReportSummary -ModeName 'MeshProbe' -Path $meshPath
+            $meshSpec = [pscustomobject]@{
+                Payload = $spec.Payload
+                Id = $spec.Id
+                MeshBlock = $meshBlock
+                MeshPayloadOffset = $spec.MeshPayloadOffset
+                StreamBlock = $spec.StreamBlock
+            }
+            $meshRows += Get-ClusterMeshRow -Spec $meshSpec -Path $meshPath
+        }
+    }
+
+    $payloadRows = @(foreach ($group in @($meshRows | Group-Object Payload)) {
+        $items = @($group.Group)
+        $stream = @($streamRows | Where-Object { [int]$_.Payload -eq [int]$items[0].Payload } | Select-Object -First 1)[0]
+        [pscustomobject]@{
+            Payload = [int]$items[0].Payload
+            Id = [string]$items[0].Id
+            StreamBlock = [int]$stream.StreamBlock
+            StreamClassification = [string]$stream.Classification
+            BodyFirst16 = [string]$stream.BodyFirst16
+            MeshBlocks = (($items | Sort-Object MeshBlock | ForEach-Object { "mesh#$($_.MeshBlock)" }) -join ',')
+            MeshRoles = (($items | Sort-Object MeshBlock | ForEach-Object { "mesh#$($_.MeshBlock)=$($_.Role)" }) -join '; ')
+            AttributeSetTotal = [int](($items | Measure-Object -Property AttributeSetCount -Sum).Sum)
+            PairingTotal = [int](($items | Measure-Object -Property PairingCount -Sum).Sum)
+            ReviewRequired = @($items | Where-Object { $_.ReviewRequired }).Count -gt 0
+            Decision = if (@($items | Where-Object { $_.ReviewRequired }).Count -gt 0) {
+                'review-required; keep candidate-only until guards agree'
+            }
+            else {
+                'candidate-only; no complete geometry binding'
+            }
+        }
+    })
+
+    $reviewRows = @($payloadRows | Where-Object { $_.ReviewRequired })
+    $reportPath = Join-Path $Out 'residual-position-cluster-probe-report.json'
+    $markdownPath = Join-Path $Out 'residual-position-cluster-probe-report.md'
+    $report = [ordered]@{
+        Schema = 'residual-position-cluster-probe-report/v1'
+        CandidateOnly = $true
+        Target = 'meshSize=305 stream@188 StringValue=POSITION usage=1 access=19'
+        StrictClassifierThresholdUnchanged = $true
+        ExportPromotion = 'blocked'
+        PayloadRows = @($payloadRows | Sort-Object Payload)
+        StreamRows = @($streamRows | Sort-Object Payload)
+        MeshRows = @($meshRows | Sort-Object Payload, MeshBlock)
+        Interpretation = 'Focused residual-cluster probe report only. Do not promote parser roles, geometry truth, or OBJ/export readiness from this report.'
+    }
+    $report | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+
+    $markdown = @(
+        '# Residual Position Cluster Probe Report',
+        '',
+        'Candidate-only focused probe report for `meshSize=305 stream@188 StringValue=POSITION usage=1 access=19`.',
+        '',
+        '| Payload | ID | Stream body classifier | Body first16 | Mesh roles | Attribute sets | Pairings | Decision |',
+        '|---:|---|---|---|---|---:|---:|---|'
+    )
+    foreach ($row in @($payloadRows | Sort-Object Payload)) {
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} |' -f
+            (Format-ClusterMarkdownCell $row.Payload),
+            (Format-ClusterMarkdownCell $row.Id),
+            (Format-ClusterMarkdownCell $row.StreamClassification),
+            (Format-ClusterMarkdownCell $row.BodyFirst16),
+            (Format-ClusterMarkdownCell $row.MeshRoles),
+            (Format-ClusterMarkdownCell $row.AttributeSetTotal),
+            (Format-ClusterMarkdownCell $row.PairingTotal),
+            (Format-ClusterMarkdownCell $row.Decision))
+    }
+    $markdown += @(
+        '',
+        'Interpretation: this report compares repeated residual payload clusters against focused mesh#7/mesh#27 probes. It is search evidence only; strict classifier thresholds and export gates remain unchanged.'
+    )
+    Set-Content -LiteralPath $markdownPath -Value $markdown -Encoding UTF8
+
+    Write-Host "`n--- ResidualPositionClusterProbeReport candidate-only residual cluster probes" -ForegroundColor Green
+    $payloadRows | Sort-Object Payload | Format-Table -AutoSize | Out-Host
+    Write-Host "ResidualPositionClusterProbeReport JSON: $reportPath" -ForegroundColor Green
+    Write-Host "ResidualPositionClusterProbeReport markdown: $markdownPath" -ForegroundColor Green
+    if ($reviewRows.Count -gt 0) {
+        Write-Host "ResidualPositionClusterProbeReport review-required rows: $($reviewRows.Count). Candidate-only boundary preserved." -ForegroundColor Yellow
+    }
+    Write-Host 'ResidualPositionClusterProbeReport passed: strict thresholds unchanged and OBJ/export remains blocked.' -ForegroundColor Green
+}
+
 function Invoke-PositionSourceGapReport {
     param([Parameter(Mandatory)] [string] $Path)
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -2787,6 +2978,18 @@ foreach ($modeName in $Mode) {
 
     if ($modeName -eq 'DiscoveryWorkbench') {
         Invoke-DiscoveryWorkbench
+        continue
+    }
+
+    if ($modeName -eq 'ResidualPositionClusterProbeReport') {
+        $clusterProbeSpecs = @(
+            [pscustomobject]@{ Payload = 96; Id = '75cea2f2254e8a76'; StreamBlock = 21; MeshPayloadOffset = 188 },
+            [pscustomobject]@{ Payload = 180; Id = '14924c7e9f7f03a9'; StreamBlock = 21; MeshPayloadOffset = 188 },
+            [pscustomobject]@{ Payload = 192; Id = '5a4f390f196037c6'; StreamBlock = 21; MeshPayloadOffset = 188 },
+            [pscustomobject]@{ Payload = 288; Id = '014e1ff60d8508f1'; StreamBlock = 21; MeshPayloadOffset = 188 },
+            [pscustomobject]@{ Payload = 396; Id = 'b4de91a46cb7d4bc'; StreamBlock = 21; MeshPayloadOffset = 188 }
+        )
+        Invoke-ResidualPositionClusterProbeReport -ProbeSpecs $clusterProbeSpecs
         continue
     }
 
