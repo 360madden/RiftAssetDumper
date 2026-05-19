@@ -1517,3 +1517,83 @@ Do not stage `Source/`, `Extracted/`, `Exports/`, `bin/`, `obj/`, `__pycache__/`
 | 18 | Avoid broad refactors of `Invoke-RiftAssetWorkflow.ps1` while discovery truth is still moving. |
 | 19 | Track `SharpCompress` NU1902 separately as dependency hygiene, not as part of this discovery slice. |
 | 20 | Keep OBJ/export blocked until position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards all agree. |
+
+## Autonomous continuation update — 2026-05-19 02:40:41 -04:00 America/New_York
+
+### Milestone AG — action #1-20 residual-cluster proof-surface hardening
+
+Worked the next safe action set from the previous top-20 list while keeping the lane offline, candidate-only, and non-exporting.
+
+Changed `scripts/Invoke-RiftAssetWorkflow.ps1` in `ResidualPositionClusterProbeReport` to add:
+
+| Action area | Result |
+|---|---|
+| Stale/missing enrichment source handling | Added source-report status rows with existence, UTC write time, and a missing-report note that keeps enrichment omitted rather than failing open. |
+| Export-readiness safety | Added per-row `ExportReady=false`, `GeometryTruthPromoted=false`, and a fail-closed assertion that throws if any cluster row ever claims export readiness or promoted geometry truth. |
+| Payload `288` byte-layout comparison | Added `BodyComparisonRows` comparing payloads `96/180/192/288/396` against baseline payload `288` using first-128-byte common prefix, diff counts, length deltas, and preferred stride summaries. |
+| Packed/quantized review flag | Added `PackedOrQuantizedReview=true` when a row is `uint16-compatible-body`, has high plausible ratio, has no strict pass, and still lacks attribute/pairing proof. This is review evidence only. |
+| Focused attribute/index binding search | Added `FocusedAttributeBindingSearchRows`; all five focused payloads still show `0` attribute sets and `0` pairings, so no complete binding was found. |
+| Secondary lead separation | Added boundary notes that keep `meshSize=329 @304/#57` separate as source-binding evidence only. |
+| Source freshness | Added `SourceReportStatuses` to the generated JSON report so stale source-report confusion is easier to spot in later runs. |
+
+Current generated cluster evidence after validation:
+
+| Payload | Common prefix vs 288 | Diff bytes / compared | Length delta | Packed/quantized review | Focused complete binding |
+|---:|---:|---:|---:|---|---|
+| 96 | 0 | 57/96 | -192 | True | False |
+| 180 | 1 | 43/128 | -108 | True | False |
+| 192 | 15 | 56/128 | -96 | True | False |
+| 288 | 128 | 0/128 | 0 | True | False |
+| 396 | 9 | 55/128 | 108 | True | False |
+
+Interpretation: the `uint16-compatible-body` rows remain plausible enough to justify packed/quantized-position review, but there is still no strict classifier pass, no complete focused attribute/index binding, and no export readiness. Payload `288` remains the best-ranked candidate but stays below the strict `0.95` plausible threshold.
+
+### Validation for Milestone AG
+
+| Check | Result |
+|---|---|
+| Current branch/status before work | Clean `main...origin/main` at `ec82115`. |
+| Latest handoff/recent commits reviewed | Done; resumed from Milestone AF and recent commit `ec82115`. |
+| PowerShell parse of `scripts/Invoke-RiftAssetWorkflow.ps1` | Passed. |
+| `dotnet build .\RiftAssetDumper.slnx --nologo` | Passed; existing `SharpCompress` NU1902 warning remains. |
+| `ResidualPositionClassifierReport -SkipBuild -PrivacyScan` | Passed. |
+| `PositionSourceSiblingFamilyReport -SkipBuild -PrivacyScan` | Passed. |
+| `ResidualPositionClusterProbeReport -SkipBuild -PrivacyScan` | Passed with byte-layout and focused binding rows. |
+| `DiscoveryWorkbench -SkipBuild -PrivacyScan` | Passed; top candidate remains `residual-305-stream188-payload288`. |
+| `GeneratedOutputGuard -SkipBuild -PrivacyScan` | Passed; tracked/staged generated/copy/build outputs are zero. |
+
+### Current exact resume step
+
+Run final git hygiene, then commit/push only this coherent code + handoff slice:
+
+```text
+scripts/Invoke-RiftAssetWorkflow.ps1
+docs/handoffs/2026-05-17-190655-assets-discovery-resume-handoff.md
+```
+
+Do not stage generated output under `Source/`, `Extracted/`, `Exports/`, `bin/`, `obj/`, `__pycache__/`, or `.pyc`.
+
+### Optional top 20 next best actions
+
+| # | Action |
+|---:|---|
+| 1 | Commit/push this proof-surface hardening slice if final hygiene remains clean. |
+| 2 | Add a small machine-readable assertion test for `ExportReady=false` / `GeometryTruthPromoted=false` in cluster JSON. |
+| 3 | Promote the byte-comparison table into DiscoveryWorkbench scoring only as ranking context, not proof. |
+| 4 | Add a packed/quantized parser hypothesis behind a separate fail-closed report mode, not in exporter code. |
+| 5 | Compare `UInt16TriplesPrefix` patterns for payloads `96/180/192/288/396`. |
+| 6 | Add min/max/range summaries for `UInt16TriplesPrefix` to avoid relying on raw hex alone. |
+| 7 | Keep strict plausible threshold at `0.95`; do not tune it downward. |
+| 8 | Search for a complete position + normal + UV + topology/index bundle near payload `288` before any promotion. |
+| 9 | Keep `meshSize=329 @304/#57` separate until it has its own proof guard. |
+| 10 | Re-run `DiscoveryWorkbench` after any schema or scoring change. |
+| 11 | Re-run `GeneratedOutputGuard` before every staging operation. |
+| 12 | Keep generated outputs ignored and untracked. |
+| 13 | Add source-report age warnings only if stale timestamps cause real confusion. |
+| 14 | Avoid broad workflow-script refactors until this discovery lane stabilizes. |
+| 15 | Keep report schemas backward-compatible for existing generated JSON consumers. |
+| 16 | Preserve candidate-only wording in docs and generated reports. |
+| 17 | Track `SharpCompress` NU1902 separately from geometry discovery. |
+| 18 | Prefer one new guarded evidence surface per commit. |
+| 19 | Keep live/export work out of scope until proof guards agree. |
+| 20 | Stop at candidate evidence if position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards do not all agree. |

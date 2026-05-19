@@ -1456,16 +1456,117 @@ function Invoke-ResidualPositionClusterProbeReport {
         return ([string]$Value).Replace('|', '\|').Replace("`r", ' ').Replace("`n", ' ')
     }
 
+    function Get-HexByteArray {
+        param([string] $Hex)
+
+        if ([string]::IsNullOrWhiteSpace($Hex)) {
+            return @()
+        }
+
+        $clean = $Hex.Trim()
+        if (($clean.Length % 2) -ne 0 -or $clean -notmatch '^[0-9a-fA-F]+$') {
+            return @()
+        }
+
+        $bytes = @()
+        for ($i = 0; $i -lt $clean.Length; $i += 2) {
+            $bytes += [Convert]::ToInt32($clean.Substring($i, 2), 16)
+        }
+        return $bytes
+    }
+
+    function Get-HexByteComparison {
+        param(
+            [Parameter(Mandatory)] [object] $Row,
+            [Parameter(Mandatory)] [object] $Baseline
+        )
+
+        $rowBytes = @(Get-HexByteArray -Hex ([string]$Row.StreamBodyFirst128))
+        $baselineBytes = @(Get-HexByteArray -Hex ([string]$Baseline.StreamBodyFirst128))
+        $compared = [Math]::Min($rowBytes.Count, $baselineBytes.Count)
+        $prefix = 0
+        $diff = 0
+        for ($i = 0; $i -lt $compared; $i++) {
+            if ($rowBytes[$i] -eq $baselineBytes[$i]) {
+                if ($prefix -eq $i) {
+                    $prefix++
+                }
+            }
+            else {
+                $diff++
+            }
+        }
+
+        $lengthDelta = [int]$Row.StreamByteLength - [int]$Baseline.StreamByteLength
+        $diffRatio = if ($compared -gt 0) { [Math]::Round(($diff / $compared), 4) } else { $null }
+        $packedReview = (
+            [string]$Row.StreamClassification -eq 'uint16-compatible-body' -and
+            $null -ne $Row.ClassifierPlausible -and
+            [double]$Row.ClassifierPlausible -ge 0.8 -and
+            $Row.ClassifierStrictPass -eq $false -and
+            [int]$Row.AttributeSetTotal -eq 0 -and
+            [int]$Row.PairingTotal -eq 0
+        )
+
+        [pscustomobject]@{
+            Payload = [int]$Row.Payload
+            BaselinePayload = [int]$Baseline.Payload
+            BodyFirst16 = [string]$Row.BodyFirst16
+            ComparedBytes = $compared
+            CommonPrefixBytes = $prefix
+            DiffBytes = $diff
+            DiffRatio = $diffRatio
+            StreamByteLength = [int]$Row.StreamByteLength
+            BaselineStreamByteLength = [int]$Baseline.StreamByteLength
+            StreamByteLengthDelta = $lengthDelta
+            PreferredStrides = [string]$Row.PreferredStrideSummary
+            PackedOrQuantizedReview = $packedReview
+            Decision = if ($packedReview) {
+                'packed/quantized-position hypothesis needs parser proof; candidate-only'
+            }
+            else {
+                'candidate-only byte-layout evidence'
+            }
+        }
+    }
+
+    $missingSourceReports = [System.Collections.Generic.List[string]]::new()
     function Get-OptionalClusterReport {
         param([Parameter(Mandatory)] [string] $FileName)
 
         $path = Join-Path $Out $FileName
         if (-not (Test-Path -LiteralPath $path)) {
             Write-Host "ResidualPositionClusterProbeReport note: optional source report is missing: $path" -ForegroundColor Yellow
+            [void]$missingSourceReports.Add($FileName)
             return $null
         }
 
         return Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    }
+
+    function Get-ClusterSourceReportStatus {
+        param([Parameter(Mandatory)] [string] $FileName)
+
+        $path = Join-Path $Out $FileName
+        if (-not (Test-Path -LiteralPath $path)) {
+            [pscustomobject]@{
+                FileName = $FileName
+                Path = $path
+                Exists = $false
+                LastWriteTimeUtc = $null
+                Note = 'missing; enrichment omitted and candidate-only boundary preserved'
+            }
+            return
+        }
+
+        $item = Get-Item -LiteralPath $path
+        [pscustomobject]@{
+            FileName = $FileName
+            Path = $path
+            Exists = $true
+            LastWriteTimeUtc = $item.LastWriteTimeUtc.ToString('o')
+            Note = 'used for candidate-only enrichment'
+        }
     }
 
     function Get-ClusterMeshRow {
@@ -1539,6 +1640,15 @@ function Invoke-ResidualPositionClusterProbeReport {
 
         $stream = $streamRows[0]
         $stats = Get-JsonValueOrNull $stream 'Stats'
+        $preferredStrideCandidates = @((Get-JsonValueOrNull $stream 'PreferredStrideCandidates'))
+        $preferredStrideSummary = if ($preferredStrideCandidates.Count -gt 0) {
+            (($preferredStrideCandidates | Select-Object -First 6 | ForEach-Object {
+                ('{0}x{1}' -f (Get-JsonValueOrDash $_ 'Stride'), (Get-JsonValueOrDash $_ 'Count'))
+            }) -join ',')
+        }
+        else {
+            '-'
+        }
         [pscustomobject]@{
             Payload = [int]$Spec.Payload
             Id = [string]$Spec.Id
@@ -1546,6 +1656,9 @@ function Invoke-ResidualPositionClusterProbeReport {
             DeclaredPayloadBytes = [int](Get-JsonValueOrDash $stream 'DeclaredPayloadBytes')
             Classification = [string](Get-JsonValueOrDash $stats 'Classification')
             BodyFirst16 = [string](Get-JsonValueOrDash $stats 'First16')
+            BodyFirst128 = [string](Get-JsonValueOrDash $stream 'BodyFirst128')
+            ByteLength = [int](Get-JsonValueOrDash $stats 'ByteLength')
+            PreferredStrideSummary = $preferredStrideSummary
             FiniteFloat32Count = [int](Get-JsonValueOrDash $stats 'FiniteFloat32Count')
             PlausibleFloat32Count = [int](Get-JsonValueOrDash $stats 'PlausibleFloat32Count')
             UInt16Distinct = [int](Get-JsonValueOrDash $stats 'UInt16Distinct')
@@ -1559,6 +1672,11 @@ function Invoke-ResidualPositionClusterProbeReport {
     $classifierReport = Get-OptionalClusterReport -FileName 'residual-position-classifier-report.json'
     $familyCrossTabReport = Get-OptionalClusterReport -FileName 'residual-position-family-crosstab.json'
     $siblingFamilyReport = Get-OptionalClusterReport -FileName 'position-source-sibling-family-report.json'
+    $sourceReportStatuses = @(
+        Get-ClusterSourceReportStatus -FileName 'residual-position-classifier-report.json'
+        Get-ClusterSourceReportStatus -FileName 'residual-position-family-crosstab.json'
+        Get-ClusterSourceReportStatus -FileName 'position-source-sibling-family-report.json'
+    )
     $classifierRows = if ($null -ne $classifierReport) { @((Get-JsonValueOrNull $classifierReport 'Rows')) } else { @() }
     $familyPayloadRows = if ($null -ne $familyCrossTabReport) { @((Get-JsonValueOrNull $familyCrossTabReport 'PayloadSummary')) } else { @() }
     $siblingFamilies = if ($null -ne $siblingFamilyReport) { @((Get-JsonValueOrNull $siblingFamilyReport 'Families')) } else { @() }
@@ -1607,6 +1725,9 @@ function Invoke-ResidualPositionClusterProbeReport {
             StreamBlock = [int]$stream.StreamBlock
             StreamClassification = [string]$stream.Classification
             BodyFirst16 = [string]$stream.BodyFirst16
+            StreamBodyFirst128 = [string]$stream.BodyFirst128
+            StreamByteLength = [int]$stream.ByteLength
+            PreferredStrideSummary = [string]$stream.PreferredStrideSummary
             ClassifierPlausible = if ($null -ne $classifier) { Get-JsonDoubleOrNull $classifier 'Plausible' } else { $null }
             ClassifierStrictPass = $strictPass
             ClassifierMissReasons = if ($null -ne $classifier) { [string](Get-JsonValueOrDash $classifier 'MissReasons') } else { '-' }
@@ -1624,6 +1745,8 @@ function Invoke-ResidualPositionClusterProbeReport {
             AttributeSetTotal = [int](($items | Measure-Object -Property AttributeSetCount -Sum).Sum)
             PairingTotal = [int](($items | Measure-Object -Property PairingCount -Sum).Sum)
             ReviewRequired = @($items | Where-Object { $_.ReviewRequired }).Count -gt 0
+            ExportReady = $false
+            GeometryTruthPromoted = $false
             Decision = if (@($items | Where-Object { $_.ReviewRequired }).Count -gt 0) {
                 'review-required; keep candidate-only until guards agree'
             }
@@ -1634,6 +1757,34 @@ function Invoke-ResidualPositionClusterProbeReport {
     })
 
     $reviewRows = @($payloadRows | Where-Object { $_.ReviewRequired })
+    $unsafePromotionRows = @($payloadRows | Where-Object { $_.ExportReady -or $_.GeometryTruthPromoted })
+    if ($unsafePromotionRows.Count -gt 0) {
+        throw "ResidualPositionClusterProbeReport failed: cluster rows must never claim export readiness or promoted geometry truth."
+    }
+
+    $baselineRows = @($payloadRows | Where-Object { [int]$_.Payload -eq 288 } | Select-Object -First 1)
+    if ($baselineRows.Count -ne 1) {
+        throw "ResidualPositionClusterProbeReport failed: expected payload 288 baseline row for byte-layout comparison, found $($baselineRows.Count)."
+    }
+
+    $bodyComparisonRows = @($payloadRows | Sort-Object Payload | ForEach-Object {
+        Get-HexByteComparison -Row $_ -Baseline $baselineRows[0]
+    })
+    $attributeBindingSearchRows = @($payloadRows | Sort-Object Payload | ForEach-Object {
+        [pscustomobject]@{
+            Payload = [int]$_.Payload
+            MeshBlocks = [string]$_.MeshBlocks
+            AttributeSetTotal = [int]$_.AttributeSetTotal
+            PairingTotal = [int]$_.PairingTotal
+            CompleteBindingFound = ([int]$_.AttributeSetTotal -gt 0 -and [int]$_.PairingTotal -gt 0)
+            Decision = if ([int]$_.AttributeSetTotal -gt 0 -and [int]$_.PairingTotal -gt 0) {
+                'review-required; possible complete binding evidence changed'
+            }
+            else {
+                'no complete focused attribute/index binding found'
+            }
+        }
+    })
     $reportPath = Join-Path $Out 'residual-position-cluster-probe-report.json'
     $markdownPath = Join-Path $Out 'residual-position-cluster-probe-report.md'
     $report = [ordered]@{
@@ -1642,13 +1793,24 @@ function Invoke-ResidualPositionClusterProbeReport {
         Target = 'meshSize=305 stream@188 StringValue=POSITION usage=1 access=19'
         StrictClassifierThresholdUnchanged = $true
         ExportPromotion = 'blocked'
+        ExportReadinessAssertion = 'blocked-for-all-rows'
         SourceReports = [ordered]@{
             ResidualClassifier = $classifierReportPath
             ResidualFamilyCrossTab = $familyCrossTabPath
             PositionSourceSiblingFamily = $siblingFamilyPath
         }
+        SourceReportStatuses = @($sourceReportStatuses)
+        MissingSourceReports = @($missingSourceReports)
+        BoundaryNotes = @(
+            'meshSize=305 stream@188 remains candidate-only search evidence',
+            'meshSize=329 @304/#57 remains separate source-binding evidence only',
+            'strict residual classifier threshold remains 0.95',
+            'OBJ/export remains blocked'
+        )
         Mesh305SiblingFamily = if ($mesh305SiblingFamily.Count -gt 0) { $mesh305SiblingFamily[0] } else { $null }
         PayloadRows = @($payloadRows | Sort-Object Payload)
+        BodyComparisonRows = @($bodyComparisonRows)
+        FocusedAttributeBindingSearchRows = @($attributeBindingSearchRows)
         StreamRows = @($streamRows | Sort-Object Payload)
         MeshRows = @($meshRows | Sort-Object Payload, MeshBlock)
         Interpretation = 'Focused residual-cluster probe report only. Do not promote parser roles, geometry truth, or OBJ/export readiness from this report.'
@@ -1685,6 +1847,56 @@ function Invoke-ResidualPositionClusterProbeReport {
             (Format-ClusterMarkdownCell $row.Decision))
     }
     $markdown += @(
+        '',
+        '## Byte-layout comparison against payload 288',
+        '',
+        '| Payload | Common prefix bytes | Diff bytes / compared | Length delta | Preferred strides | Packed/quantized review | Decision |',
+        '|---:|---:|---:|---:|---|---|---|'
+    )
+    foreach ($row in @($bodyComparisonRows | Sort-Object Payload)) {
+        $markdown += ('| {0} | {1} | {2}/{3} | {4} | {5} | {6} | {7} |' -f
+            (Format-ClusterMarkdownCell $row.Payload),
+            (Format-ClusterMarkdownCell $row.CommonPrefixBytes),
+            (Format-ClusterMarkdownCell $row.DiffBytes),
+            (Format-ClusterMarkdownCell $row.ComparedBytes),
+            (Format-ClusterMarkdownCell $row.StreamByteLengthDelta),
+            (Format-ClusterMarkdownCell $row.PreferredStrides),
+            (Format-ClusterMarkdownCell $row.PackedOrQuantizedReview),
+            (Format-ClusterMarkdownCell $row.Decision))
+    }
+    $markdown += @(
+        '',
+        '## Focused attribute/index binding search',
+        '',
+        '| Payload | Mesh blocks | Attribute sets | Pairings | Complete binding found | Decision |',
+        '|---:|---|---:|---:|---|---|'
+    )
+    foreach ($row in @($attributeBindingSearchRows | Sort-Object Payload)) {
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} | {5} |' -f
+            (Format-ClusterMarkdownCell $row.Payload),
+            (Format-ClusterMarkdownCell $row.MeshBlocks),
+            (Format-ClusterMarkdownCell $row.AttributeSetTotal),
+            (Format-ClusterMarkdownCell $row.PairingTotal),
+            (Format-ClusterMarkdownCell $row.CompleteBindingFound),
+            (Format-ClusterMarkdownCell $row.Decision))
+    }
+    $markdown += @(
+        '',
+        '## Source report freshness',
+        '',
+        '| Source report | Exists | Last write UTC | Note |',
+        '|---|---|---|---|'
+    )
+    foreach ($row in @($sourceReportStatuses)) {
+        $markdown += ('| {0} | {1} | {2} | {3} |' -f
+            (Format-ClusterMarkdownCell $row.FileName),
+            (Format-ClusterMarkdownCell $row.Exists),
+            (Format-ClusterMarkdownCell $row.LastWriteTimeUtc),
+            (Format-ClusterMarkdownCell $row.Note))
+    }
+    $markdown += @(
+        '',
+        'Boundary notes: `meshSize=329 @304/#57` remains separate source-binding evidence only; strict residual classifier threshold remains `0.95`; OBJ/export remains blocked.',
         '',
         'Interpretation: this report compares repeated residual payload clusters against focused mesh#7/mesh#27 probes. It is search evidence only; strict classifier thresholds and export gates remain unchanged.'
     )
