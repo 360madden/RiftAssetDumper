@@ -1622,6 +1622,12 @@ function Invoke-ResidualPositionClusterProbeReport {
         }
     }
 
+            [ordered]@{ Stride = 16; Vertices = 'variable'; Note = 'u16x3 + u32/u16 pair metadata' }
+        )
+
+        return [pscustomobject]$results
+    }
+
     function Get-ClusterStreamRow {
         param(
             [Parameter(Mandatory)] [object] $Spec,
@@ -1649,6 +1655,23 @@ function Invoke-ResidualPositionClusterProbeReport {
         else {
             '-'
         }
+
+        $u16Triples = @((Get-JsonValueOrNull $stream 'UInt16TriplesPrefix') | Where-Object { $null -ne $_ })
+        $u16TriplesCount = $u16Triples.Count
+        if ($u16TriplesCount -ge 2) {
+            $aMin = ($u16Triples | Measure-Object -Property A -Minimum).Minimum
+            $aMax = ($u16Triples | Measure-Object -Property A -Maximum).Maximum
+            $bMin = ($u16Triples | Measure-Object -Property B -Minimum).Minimum
+            $bMax = ($u16Triples | Measure-Object -Property B -Maximum).Maximum
+            $cMin = ($u16Triples | Measure-Object -Property C -Minimum).Minimum
+            $cMax = ($u16Triples | Measure-Object -Property C -Maximum).Maximum
+            $u16TriplesSummary = "A=$aMin..$aMax B=$bMin..$bMax C=$cMin..$cMax"
+            $u16TriplesStructure = Get-JsonValueOrNull $stream 'UInt16TriplesStructure'
+        }
+        else {
+            $u16TriplesSummary = '-'
+            $u16TriplesStructure = $null
+        }
         [pscustomobject]@{
             Payload = [int]$Spec.Payload
             Id = [string]$Spec.Id
@@ -1659,9 +1682,15 @@ function Invoke-ResidualPositionClusterProbeReport {
             BodyFirst128 = [string](Get-JsonValueOrDash $stream 'BodyFirst128')
             ByteLength = [int](Get-JsonValueOrDash $stats 'ByteLength')
             PreferredStrideSummary = $preferredStrideSummary
+            UInt16TriplesCount = $u16TriplesCount
+            UInt16TriplesSummary = $u16TriplesSummary
             FiniteFloat32Count = [int](Get-JsonValueOrDash $stats 'FiniteFloat32Count')
             PlausibleFloat32Count = [int](Get-JsonValueOrDash $stats 'PlausibleFloat32Count')
             UInt16Distinct = [int](Get-JsonValueOrDash $stats 'UInt16Distinct')
+            UInt16TriplesStructureFamily = if ($u16TriplesStructure) { $u16TriplesStructure.StructuralFamily } else { '-' }
+            UInt16TriplesMagic43606 = if ($u16TriplesStructure) { $u16TriplesStructure.Magic43606Found } else { $false }
+            UInt16TriplesAlternation = if ($u16TriplesStructure) { $u16TriplesStructure.AlternationDetected } else { $false }
+            UInt16TriplesInterpretation = if ($u16TriplesStructure) { $u16TriplesStructure.Interpretation } else { '-' }
             OutputPath = $Path
         }
     }
@@ -1728,6 +1757,12 @@ function Invoke-ResidualPositionClusterProbeReport {
             StreamBodyFirst128 = [string]$stream.BodyFirst128
             StreamByteLength = [int]$stream.ByteLength
             PreferredStrideSummary = [string]$stream.PreferredStrideSummary
+            UInt16TriplesCount = $stream.UInt16TriplesCount
+            UInt16TriplesSummary = $stream.UInt16TriplesSummary
+            UInt16TriplesAlternation = $stream.UInt16TriplesAlternation
+            UInt16TriplesMagic43606 = $stream.UInt16TriplesMagic43606
+            UInt16TriplesStructureFamily = $stream.UInt16TriplesStructureFamily
+            UInt16TriplesInterpretation = $stream.UInt16TriplesInterpretation
             ClassifierPlausible = if ($null -ne $classifier) { Get-JsonDoubleOrNull $classifier 'Plausible' } else { $null }
             ClassifierStrictPass = $strictPass
             ClassifierMissReasons = if ($null -ne $classifier) { [string](Get-JsonValueOrDash $classifier 'MissReasons') } else { '-' }
@@ -1813,6 +1848,20 @@ function Invoke-ResidualPositionClusterProbeReport {
         FocusedAttributeBindingSearchRows = @($attributeBindingSearchRows)
         StreamRows = @($streamRows | Sort-Object Payload)
         MeshRows = @($meshRows | Sort-Object Payload, MeshBlock)
+        UInt16TriplesStructureSummary = [ordered]@{
+            StructuralFamilies = @($payloadRows | Sort-Object Payload | ForEach-Object {
+                [ordered]@{
+                    Payload = $_.Payload
+                    Alternation = $_.UInt16TriplesAlternation
+                    Magic43606 = $_.UInt16TriplesMagic43606
+                    StructuralFamily = $_.UInt16TriplesStructureFamily
+                    Interpretation = $_.UInt16TriplesInterpretation
+                }
+            })
+            Magic43606Payloads = @($payloadRows | Where-Object { $_.UInt16TriplesMagic43606 } | ForEach-Object { $_.Payload } | Sort-Object)
+            AlternatingPayloads = @($payloadRows | Where-Object { $_.UInt16TriplesAlternation } | ForEach-Object { $_.Payload } | Sort-Object)
+            Interpretation = 'UInt16 triples prefix structural analysis is ranking evidence only; does not promote roles, geometry, or export readiness.'
+        }
         Interpretation = 'Focused residual-cluster probe report only. Do not promote parser roles, geometry truth, or OBJ/export readiness from this report.'
     }
     $report | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $reportPath -Encoding UTF8
@@ -1863,6 +1912,23 @@ function Invoke-ResidualPositionClusterProbeReport {
             (Format-ClusterMarkdownCell $row.PreferredStrides),
             (Format-ClusterMarkdownCell $row.PackedOrQuantizedReview),
             (Format-ClusterMarkdownCell $row.Decision))
+    }
+    $markdown += @(
+        '',
+        '## UInt16 triples prefix structure',
+        '',
+        'Even/odd alternation analysis of the first 16 UInt16 triples in the stream body. Magic constant 43606 (0xAA56) on even-C indicates the packed-position ternary alternating pattern.',
+        '',
+        '| Payload | Alternation | Magic 43606 | Structural family | Interpretation |',
+        '|---:|---|---|---|---|'
+    )
+    foreach ($row in @($payloadRows | Sort-Object Payload)) {
+        $markdown += ('| {0} | {1} | {2} | {3} | {4} |' -f
+            (Format-ClusterMarkdownCell $row.Payload),
+            (Format-ClusterMarkdownCell $row.UInt16TriplesAlternation),
+            (Format-ClusterMarkdownCell $row.UInt16TriplesMagic43606),
+            (Format-ClusterMarkdownCell $row.UInt16TriplesStructureFamily),
+            (Format-ClusterMarkdownCell $row.UInt16TriplesInterpretation))
     }
     $markdown += @(
         '',

@@ -106,6 +106,11 @@ internal static class Program
                 return ProbeNifMesh(options);
             }
 
+            if (options.Command == "decode-nif-geometry")
+            {
+                return DecodeNifGeometry(options);
+            }
+
             if (options.Command == "probe-nif-attribute-extra")
             {
                 return ProbeNifAttributeExtra(options);
@@ -1960,6 +1965,248 @@ internal static class Program
         return header.Warnings.Count == 0 ? 0 : 2;
     }
 
+private static int DecodeNifGeometry(AppOptions options)
+    {
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var (payload, source) = LoadPayloadForProbe(options, rootDirectory);
+        var detected = DetectFileType(payload);
+        if (detected.Extension != "nif")
+        {
+            Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+            return 1;
+        }
+
+        if (options.MeshBlockFilter is null)
+        {
+            Console.Error.WriteLine("ERROR: decode-nif-geometry requires --mesh-block <n>.");
+            return 1;
+        }
+
+        var header = ParseNifHeader(payload);
+        var meshBlock = header.Blocks.FirstOrDefault(b =>
+            string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase) &&
+            b.Index == options.MeshBlockFilter.Value);
+        if (meshBlock is null)
+        {
+            Console.Error.WriteLine($"ERROR: NiMesh block #{options.MeshBlockFilter.Value} was not found.");
+            return 1;
+        }
+
+        var meshPayload = SliceNifBlockPayload(payload, meshBlock);
+        var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+        var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
+        var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
+
+        if (attributeSets.Count == 0)
+        {
+            Console.Error.WriteLine("ERROR: no attribute sets found for this mesh.");
+            return 1;
+        }
+
+        Console.WriteLine($"NIF geometry decode: version={header.VersionText} mesh=#{meshBlock.Index}");
+        Console.WriteLine($"Attribute sets: {attributeSets.Count}");
+        Console.WriteLine();
+
+        var objVertices = new List<string>();
+        var objNormals = new List<string>();
+        var objTexCoords = new List<string>();
+        var totalPositions = 0;
+        var totalNormals = 0;
+        var totalUvs = 0;
+
+        for (var setIndex = 0; setIndex < attributeSets.Count; setIndex++)
+        {
+            var set = attributeSets[setIndex];
+            var vertexCount = set.VertexCount;
+            var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
+
+            Console.WriteLine($"  Attribute set {setIndex}: vertexCount={vertexCount} confidence={set.Confidence}");
+            Console.WriteLine($"    position @{set.PositionMeshPayloadOffset}/#{set.PositionBlockIndex} role={set.PositionRole}");
+            Console.WriteLine($"    normal   @{set.NormalMeshPayloadOffset}/#{set.NormalBlockIndex} role={set.NormalRole}");
+            Console.WriteLine($"    uv       @{set.UvMeshPayloadOffset}/#{set.UvBlockIndex} role={set.UvRole}");
+
+            // Decode positions (float32)
+            var positionSamples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, set.PositionBlockIndex,
+                "position", set.PositionRole, components: 3, vertexIndices);
+
+            // Decode normals (float32)
+            var normalSamples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, set.NormalBlockIndex,
+                "normal", set.NormalRole, components: 3, vertexIndices);
+
+            // Decode UVs (float32)
+            var uvSamples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, set.UvBlockIndex,
+                "uv", set.UvRole, components: 2, vertexIndices);
+
+            Console.WriteLine($"    decoded positions: {positionSamples.Count}/{vertexCount}");
+            Console.WriteLine($"    decoded normals:   {normalSamples.Count}/{vertexCount}");
+            Console.WriteLine($"    decoded uvs:       {uvSamples.Count}/{vertexCount}");
+
+            // Print sample vertices
+            var sampleCount = Math.Min(4, vertexCount);
+            if (positionSamples.Count > 0)
+            {
+                Console.WriteLine($"    position samples ({sampleCount}):");
+                for (var i = 0; i < sampleCount && i < positionSamples.Count; i++)
+                {
+                    var s = positionSamples[i];
+                    Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)}, {FormatNullableDouble(s.Z)}) prevDist={FormatNullableDouble(s.PreviousDistance)} nextDist={FormatNullableDouble(s.NextDistance)}");
+                }
+            }
+
+            if (normalSamples.Count > 0)
+            {
+                Console.WriteLine($"    normal samples ({sampleCount}):");
+                for (var i = 0; i < sampleCount && i < normalSamples.Count; i++)
+                {
+                    var s = normalSamples[i];
+                    Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)}, {FormatNullableDouble(s.Z)}) len={FormatNullableDouble(s.VectorLength)}");
+                }
+            }
+
+            if (uvSamples.Count > 0)
+            {
+                Console.WriteLine($"    uv samples ({sampleCount}):");
+                for (var i = 0; i < sampleCount && i < uvSamples.Count; i++)
+                {
+                    var s = uvSamples[i];
+                    Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)})");
+                }
+            }
+
+            // Experimental: UInt16-packed position decode
+            if (options.Experimental)
+            {
+                Console.WriteLine();
+                Console.WriteLine("  [*] Experimental mode: scanning for UInt16-packed position streams...");
+
+                var u16PositionVertices = new List<NifAttributeVertexSample>();
+                foreach (var stream in streamSummaries)
+                {
+                    if (!blocksByIndex.TryGetValue(stream.TargetBlockIndex, out var streamBlock))
+                        continue;
+
+                    var blockPayload = SliceNifBlockPayload(payload, streamBlock);
+                    if (blockPayload.Length < 4)
+                        continue;
+
+                    var declaredBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                    if (declaredBytes > blockPayload.Length)
+                        continue;
+
+                    var headerLen = blockPayload.Length - checked((int)declaredBytes);
+                    var body = blockPayload.Slice(headerLen, checked((int)declaredBytes));
+
+                    var triplesPrefix = ReadUInt16BigEndianTriplesPrefix(body, maxValues: 16);
+                    var structure = AnalyzeNifUInt16TriplesStructure(triplesPrefix);
+
+                    if (structure.Magic43606Found && structure.MetadataSentinelPattern)
+                    {
+                        Console.WriteLine($"    Stream #{stream.TargetBlockIndex} @{stream.MeshPayloadOffset}: magic=43606 structure={structure.StructuralFamily}");
+                        var u16Vertices = BuildNifAttributeUInt16VertexSamples(
+                            payload, blocksByIndex, stream.TargetBlockIndex, maxVertices: vertexCount);
+
+                        if (u16Vertices.Count > 0)
+                        {
+                            u16PositionVertices.AddRange(u16Vertices);
+                            Console.WriteLine($"      decoded {u16Vertices.Count} UInt16-packed position vertices");
+                            var u16Sample = Math.Min(4, u16Vertices.Count);
+                            for (var i = 0; i < u16Sample; i++)
+                            {
+                                var s = u16Vertices[i];
+                                Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)})");
+                            }
+                        }
+                    }
+                }
+
+                if (u16PositionVertices.Count == 0)
+                {
+                    Console.WriteLine("    No magic-43606 UInt16-packed position streams found.");
+                }
+                else if (options.WriteObj)
+                {
+                    // Use UInt16 positions for OBJ
+                    objVertices.Clear();
+                    foreach (var v in u16PositionVertices.OrderBy(v => v.Index))
+                    {
+                        // 2D u16-packed positions; Z coordinate is not present in this encoding
+                        objVertices.Add($"v {(v.X ?? 0.0).ToString("F6", CultureInfo.InvariantCulture)} {(v.Y ?? 0.0).ToString("F6", CultureInfo.InvariantCulture)} 0.000000");
+                    }
+                }
+            }
+
+            // Build OBJ data for float32 decode
+            if (options.WriteObj && !options.Experimental)
+            {
+                for (var i = 0; i < positionSamples.Count; i++)
+                {
+                    var s = positionSamples[i];
+                    if (s.X.HasValue && s.Y.HasValue && s.Z.HasValue)
+                    {
+                        objVertices.Add($"v {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Z.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+                    }
+                }
+                for (var i = 0; i < normalSamples.Count; i++)
+                {
+                    var s = normalSamples[i];
+                    if (s.X.HasValue && s.Y.HasValue && s.Z.HasValue)
+                    {
+                        objNormals.Add($"vn {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Z.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+                    }
+                }
+                for (var i = 0; i < uvSamples.Count; i++)
+                {
+                    var s = uvSamples[i];
+                    if (s.X.HasValue && s.Y.HasValue)
+                    {
+                        objTexCoords.Add($"vt {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+                    }
+                }
+            }
+
+            totalPositions += positionSamples.Count;
+            totalNormals += normalSamples.Count;
+            totalUvs += uvSamples.Count;
+        }
+
+        // Write OBJ file
+        if (options.WriteObj)
+        {
+            var outDir = ResolveOutputPath(rootDirectory, options.OutDirectory, "decode-nif-geometry");
+            Directory.CreateDirectory(outDir);
+            var objPath = Path.Combine(outDir, $"decode-nif-geometry-mesh{meshBlock.Index}.obj");
+            using var writer = new StreamWriter(objPath, false, Encoding.ASCII);
+            writer.WriteLine($"# RiftAssetDumper decode-nif-geometry");
+            writer.WriteLine($"# NIF version: {header.VersionText}");
+            writer.WriteLine($"# Mesh block: #{meshBlock.Index}");
+            writer.WriteLine($"# Positions: {objVertices.Count}  Normals: {objNormals.Count}  UVs: {objTexCoords.Count}");
+            writer.WriteLine($"# NOTE: No faces/indices decoded. This is a point cloud only.");
+            writer.WriteLine();
+            foreach (var v in objVertices)
+                writer.WriteLine(v);
+            foreach (var vn in objNormals)
+                writer.WriteLine(vn);
+            foreach (var vt in objTexCoords)
+                writer.WriteLine(vt);
+            writer.WriteLine();
+            writer.WriteLine($"# End of file. {objVertices.Count} vertices.");
+            Console.WriteLine();
+            Console.WriteLine($"OBJ written: {DisplayPath(options, objPath)}");
+            Console.WriteLine($"  Vertices: {objVertices.Count}");
+            Console.WriteLine($"  Normals:  {objNormals.Count}");
+            Console.WriteLine($"  TexCoords: {objTexCoords.Count}");
+            Console.WriteLine($"  Faces: 0 (index/topology decode not yet implemented)");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Summary: {totalPositions} positions, {totalNormals} normals, {totalUvs} UVs across {attributeSets.Count} attribute sets");
+
+        return 0;
+    }
+
     private static int ProbeNifAttributeExtra(AppOptions options)
     {
         if (options.MeshBlockFilter is null)
@@ -2279,6 +2526,7 @@ internal static class Program
                 }
             }
 
+            var bodyTriplesPrefix = ReadUInt16BigEndianTriplesPrefix(body, maxValues: 16);
             streamBodies.Add(new NifStreamBodyProbe(
                 BlockIndex: block.Index,
                 TypeName: block.TypeName,
@@ -2296,10 +2544,10 @@ internal static class Program
                 Float32Prefix: ReadFloat32Prefix(body, maxValues: 24),
                 Float2Prefix: ReadFloat2Prefix(body, maxValues: 12),
                 Float3Prefix: ReadFloat3Prefix(body, maxValues: 12),
-                UInt16TriplesPrefix: ReadUInt16TriplesPrefix(body, maxValues: 16),
-                UInt16BigEndianTriplesPrefix: ReadUInt16BigEndianTriplesPrefix(body, maxValues: 16),
-                PreferredStrideCandidates: stats is null
-                    ? []
+                UInt16TriplesPrefix: bodyTriplesPrefix,
+                UInt16BigEndianTriplesPrefix: bodyTriplesPrefix,
+                UInt16TriplesStructure: AnalyzeNifUInt16TriplesStructure(bodyTriplesPrefix),
+                PreferredStrideCandidates: stats is null ? []
                     : stats.PayloadStrideCandidates
                         .OrderBy(static c => PreferredStrideRank(c.Stride))
                         .ThenBy(static c => c.Stride)
@@ -6578,7 +6826,7 @@ internal static class Program
         return values;
     }
 
-    private static List<NifUInt16Triple> ReadUInt16TriplesPrefix(ReadOnlySpan<byte> payload, int maxValues)
+    private static List<NifUInt16Triple> ReadUInt16BigEndianTriplesPrefix(ReadOnlySpan<byte> payload, int maxValues)
     {
         var count = Math.Min(maxValues, payload.Length / 6);
         var values = new List<NifUInt16Triple>(count);
@@ -6595,22 +6843,97 @@ internal static class Program
         return values;
     }
 
-    private static List<NifUInt16Triple> ReadUInt16BigEndianTriplesPrefix(ReadOnlySpan<byte> payload, int maxValues)
+    private static NifUInt16TriplesStructure AnalyzeNifUInt16TriplesStructure(List<NifUInt16Triple> triples)
     {
-        var count = Math.Min(maxValues, payload.Length / 6);
-        var values = new List<NifUInt16Triple>(count);
-        for (var i = 0; i < count; i++)
+        if (triples.Count < 4)
         {
-            var offset = i * 6;
-            values.Add(new NifUInt16Triple(
-                Index: i,
-                A: BinaryPrimitives.ReadUInt16BigEndian(payload.Slice(offset, 2)),
-                B: BinaryPrimitives.ReadUInt16BigEndian(payload.Slice(offset + 2, 2)),
-                C: BinaryPrimitives.ReadUInt16BigEndian(payload.Slice(offset + 4, 2))));
+            return new NifUInt16TriplesStructure(
+                TriplesCount: triples.Count,
+                AlternationDetected: false,
+                EvenIndexCConstant: false,
+                EvenCValueSet: [],
+                OddIndexAConstant: false,
+                OddAValueSet: [],
+                Magic43606Found: false,
+                MetadataSentinelPattern: false,
+                StructuralFamily: "unknown",
+                Interpretation: "too few triples for structural analysis");
         }
 
-        return values;
+        var evenTriples = new List<NifUInt16Triple>();
+        var oddTriples = new List<NifUInt16Triple>();
+        for (var i = 0; i < triples.Count; i++)
+        {
+            if (i % 2 == 0)
+                evenTriples.Add(triples[i]);
+            else
+                oddTriples.Add(triples[i]);
+        }
+
+        if (evenTriples.Count < 2 || oddTriples.Count < 2)
+        {
+            return new NifUInt16TriplesStructure(
+                TriplesCount: triples.Count,
+                AlternationDetected: false,
+                EvenIndexCConstant: false,
+                EvenCValueSet: [],
+                OddIndexAConstant: false,
+                OddAValueSet: [],
+                Magic43606Found: false,
+                MetadataSentinelPattern: false,
+                StructuralFamily: "unknown",
+                Interpretation: "insufficient even/odd split for alternation analysis");
+        }
+
+        var evenCVals = evenTriples.Select(t => t.C).ToList();
+        var evenCSet = evenCVals.Distinct().OrderBy(v => v).ToList();
+        var evenCConstant = evenCSet.Count == 1 && evenTriples.Count >= 2;
+        var magic43606 = evenCConstant && evenCSet[0] == 43606;
+
+        var oddAVals = oddTriples.Select(t => t.A).ToList();
+        var oddASet = oddAVals.Distinct().OrderBy(v => v).ToList();
+        var oddAConstant = oddASet.Count == 1 && oddTriples.Count >= 2;
+
+        var oddBVals = oddTriples.Select(t => t.B).Distinct().OrderBy(v => v).ToList();
+        var oddCVals = oddTriples.Select(t => t.C).Distinct().OrderBy(v => v).ToList();
+        var metadataSentinel = oddBVals.Count <= 2 && oddCVals.Count <= 2 && oddBVals.Count > 0 && oddCVals.Count > 0;
+
+        string structuralFamily;
+        string interpretation;
+        if (magic43606 && evenCConstant && metadataSentinel)
+        {
+            structuralFamily = "magic-43606-u16-ternary-alternating";
+            interpretation = "Magic constant 43606 (0xAA56) on even-C with alternating metadata layer. Typical of packed uint16 positions with vertex-type tag.";
+        }
+        else if (evenCConstant && metadataSentinel)
+        {
+            structuralFamily = "u16-ternary-alternating";
+            interpretation = "Alternating [position_triple, metadata_pair] structure with constant even-C. Packed/quantized position hypothesis.";
+        }
+        else if (evenCSet.Count > 1)
+        {
+            structuralFamily = "u16-ternary-mixed-c";
+            interpretation = "Alternating structure with varying even-C values. May indicate multi-attribute or interleaved multi-mesh data.";
+        }
+        else
+        {
+            structuralFamily = "unstructured-u16";
+            interpretation = "No clear even/odd alternation or constant-C pattern detected. Requires deeper analysis.";
+        }
+
+        return new NifUInt16TriplesStructure(
+            TriplesCount: triples.Count,
+            AlternationDetected: true,
+            EvenIndexCConstant: evenCConstant,
+            EvenCValueSet: evenCSet,
+            OddIndexAConstant: oddAConstant,
+            OddAValueSet: oddASet,
+            Magic43606Found: magic43606,
+            MetadataSentinelPattern: metadataSentinel,
+            StructuralFamily: structuralFamily,
+            Interpretation: interpretation);
     }
+
 
     private static float? ReadFiniteFloat32(ReadOnlySpan<byte> bytes)
     {
@@ -7024,6 +7347,84 @@ internal static class Program
         }
 
         return samples;
+    }
+
+private static List<NifAttributeVertexSample> BuildNifAttributeUInt16VertexSamples(
+        byte[] payload,
+        IReadOnlyDictionary<int, NifBlockInfo> blocksByIndex,
+        int blockIndex,
+        int maxVertices)
+    {
+        if (maxVertices <= 0 || !blocksByIndex.TryGetValue(blockIndex, out var streamBlock))
+        {
+            return [];
+        }
+
+        var blockPayload = SliceNifBlockPayload(payload, streamBlock);
+        if (blockPayload.Length < 4)
+        {
+            return [];
+        }
+
+        var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+        if (declaredPayloadBytes > blockPayload.Length)
+        {
+            return [];
+        }
+
+        var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
+        var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
+
+        // UInt16-packed position: alternating even/odd triples, 12 bytes per vertex
+        // Even triple: (posA_lo, posA_hi), (posB_lo, posB_hi), (magic_43606_lo, magic_43606_hi)
+        // Odd triple:  (metaA_lo, metaA_hi), (metaB_lo, metaB_hi), (metaC_lo, metaC_hi)
+        // Position components span across even-triple A and B as a 32-bit value
+        var bytesPerVertex = 12;
+        var vertexCount = Math.Min(maxVertices, body.Length / bytesPerVertex);
+        var samples = new List<NifAttributeVertexSample>(vertexCount);
+
+        for (var i = 0; i < vertexCount; i++)
+        {
+            var offset = i * bytesPerVertex;
+            if (offset + bytesPerVertex > body.Length)
+                break;
+
+            // Read even triple for this vertex (offset + 0 to offset + 5)
+            var posA = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offset, 2)) / 65535.0;
+            var posB = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offset + 2, 2)) / 65535.0;
+
+            samples.Add(new NifAttributeVertexSample(
+                Index: i,
+                Attribute: "position",
+                Role: "position-u16-packed-experimental",
+                Transform: "u16-le-normalized",
+                Components: 2,
+                X: posA,
+                Y: posB,
+                Z: null,
+                VectorLength: null,
+                PreviousDistance: i > 0 ? ComputeNifAttributeUInt16Distance(body, i - 1, i, bytesPerVertex) : null,
+                NextDistance: i + 1 < vertexCount ? ComputeNifAttributeUInt16Distance(body, i, i + 1, bytesPerVertex) : null));
+        }
+
+        return samples;
+    }
+
+    private static double? ComputeNifAttributeUInt16Distance(ReadOnlySpan<byte> body, int indexA, int indexB, int bytesPerVertex)
+    {
+        var offsetA = indexA * bytesPerVertex;
+        var offsetB = indexB * bytesPerVertex;
+        if (offsetA + 4 > body.Length || offsetB + 4 > body.Length)
+            return null;
+
+        var aX = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offsetA, 2)) / 65535.0;
+        var aY = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offsetA + 2, 2)) / 65535.0;
+        var bX = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offsetB, 2)) / 65535.0;
+        var bY = (double)BinaryPrimitives.ReadUInt16BigEndian(body.Slice(offsetB + 2, 2)) / 65535.0;
+
+        var dx = aX - bX;
+        var dy = aY - bY;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     private static double?[] DecodeNifAttributeVector(ReadOnlySpan<byte> body, int components, NifFloatByteTransform transform, int vertexIndex)
@@ -7946,7 +8347,7 @@ internal static class Program
         ushort uint16Max = 0;
         for (var i = 0; i < uint16Count; i++)
         {
-            var value = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(i * 2, 2));
+            var value = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(i * 2, 2));
             uint16Values.Add(value);
             uint16Max = Math.Max(uint16Max, value);
         }
@@ -8013,7 +8414,7 @@ internal static class Program
         for (var i = 0; i < pairCount; i++)
         {
             var pair = body.Slice(i * 2, 2);
-            var little = BinaryPrimitives.ReadUInt16LittleEndian(pair);
+            var little = BinaryPrimitives.ReadUInt16BigEndian(pair);
             var big = BinaryPrimitives.ReadUInt16BigEndian(pair);
             if (littleValues.Count < 32)
             {
@@ -11447,7 +11848,8 @@ internal static class Program
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-streams --root <SourceFolder> --id <16hex> --mesh-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --root <SourceFolder> --id <16hex> --mesh-block <n>");
-        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-attribute-extra --root <SourceFolder> --id <16hex> --mesh-block <n> --extra-offset <n>");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-nif-geometry --root <SourceFolder> --id <16hex> --mesh-block <n> [--write-obj] [--experimental]");
+            Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-attribute-extra --root <SourceFolder> --id <16hex> --mesh-block <n> --extra-offset <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-stream-body --root <SourceFolder> --id <16hex> --stream-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif-blocks --root <SourceFolder> --max-total 100");
@@ -11483,7 +11885,7 @@ internal static class Program
         Console.WriteLine("                  Only process one copied archive chunk");
         Console.WriteLine("  --id <16hex>    Only extract one asset ID prefix");
         Console.WriteLine("  --mesh-block <n>");
-        Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
+            Console.WriteLine("  --experimental");            Console.WriteLine("                  Enable experimental geometry decode features");            Console.WriteLine("  --write-obj");            Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file");        Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
         Console.WriteLine("  --stream-block <n>");
         Console.WriteLine("                  Optional NiDataStream block index filter for probe-nif-stream-body");
         Console.WriteLine("  --extra-offset <n>");
@@ -11625,7 +12027,9 @@ internal static class Program
         int? MeshBlockFilter,
         int? StreamBlockFilter,
         int? ExtraOffsetFilter,
-        bool RedactPaths)
+        bool RedactPaths,
+        bool Experimental,
+        bool WriteObj)
     {
         public static AppOptions Parse(string[] args)
         {
@@ -11661,6 +12065,8 @@ internal static class Program
             int? streamBlockFilter = null;
             int? extraOffsetFilter = null;
             var redactPaths = true;
+            var experimental = false;
+            var writeObj = false;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -11684,6 +12090,7 @@ internal static class Program
                     case "probe-nif":
                     case "probe-nif-streams":
                     case "probe-nif-mesh":
+                    case "decode-nif-geometry":
                     case "probe-nif-attribute-extra":
                     case "probe-nif-stream-body":
                     case "inventory-nif":
@@ -11876,6 +12283,12 @@ internal static class Program
                             throw new ArgumentException("--lzma2-mode must be auto, xz-only, or off.");
                         }
                         break;
+                    case "--experimental":
+                        experimental = true;
+                        break;
+                    case "--write-obj":
+                        writeObj = true;
+                        break;
                     case "--mesh-block":
                         if (i + 1 >= args.Length)
                         {
@@ -11954,7 +12367,9 @@ internal static class Program
                 meshBlockFilter,
                 streamBlockFilter,
                 extraOffsetFilter,
-                redactPaths);
+                redactPaths,
+                experimental,
+                writeObj);
         }
 
         public int MaxTotalOrUnlimited() => MaxTotal > 0 ? MaxTotal : int.MaxValue;
@@ -12664,6 +13079,7 @@ internal sealed record NifStreamBodyProbe(
     List<NifFloat3> Float3Prefix,
     List<NifUInt16Triple> UInt16TriplesPrefix,
     List<NifUInt16Triple> UInt16BigEndianTriplesPrefix,
+    NifUInt16TriplesStructure UInt16TriplesStructure,
     List<StrideCandidate> PreferredStrideCandidates);
 
 internal sealed record NifFloat2(int Index, float? X, float? Y);
@@ -12671,6 +13087,18 @@ internal sealed record NifFloat2(int Index, float? X, float? Y);
 internal sealed record NifFloat3(int Index, float? X, float? Y, float? Z);
 
 internal sealed record NifUInt16Triple(int Index, ushort A, ushort B, ushort C);
+
+internal sealed record NifUInt16TriplesStructure(
+    int TriplesCount,
+    bool AlternationDetected,
+    bool EvenIndexCConstant,
+    List<ushort> EvenCValueSet,
+    bool OddIndexAConstant,
+    List<ushort> OddAValueSet,
+    bool Magic43606Found,
+    bool MetadataSentinelPattern,
+    string StructuralFamily,
+    string Interpretation);
 
 internal sealed record BodyStrideCandidate(int HeaderBytes, int Stride, int Count);
 
