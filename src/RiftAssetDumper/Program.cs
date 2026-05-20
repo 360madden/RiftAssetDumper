@@ -111,6 +111,11 @@ internal static class Program
                 return DecodeNifGeometry(options);
             }
 
+            if (options.Command == "validate-uint16-positions")
+            {
+                return ValidateUInt16Positions(options);
+            }
+
             if (options.Command == "probe-nif-attribute-extra")
             {
                 return ProbeNifAttributeExtra(options);
@@ -2279,6 +2284,273 @@ private static int DecodeNifGeometry(AppOptions options)
         return 0;
     }
 
+    private static int ValidateUInt16Positions(AppOptions options)
+    {
+        if (options.IdFilter is null)
+        {
+            Console.Error.WriteLine("ERROR: validate-uint16-positions requires --id <16hex>.");
+            return 1;
+        }
+
+        if (options.MeshBlockFilter is null)
+        {
+            Console.Error.WriteLine("ERROR: validate-uint16-positions requires --mesh-block <n>.");
+            return 1;
+        }
+
+        var rootDirectory = Path.GetFullPath(options.RootDirectory);
+        var (payload, source) = LoadPayloadForProbe(options, rootDirectory);
+        var detected = DetectFileType(payload);
+        if (detected.Extension != "nif")
+        {
+            Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+            return 1;
+        }
+
+        var header = ParseNifHeader(payload);
+        var meshBlock = header.Blocks.FirstOrDefault(b =>
+            string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase) &&
+            b.Index == options.MeshBlockFilter.Value);
+        if (meshBlock is null)
+        {
+            Console.Error.WriteLine($"ERROR: NiMesh block #{options.MeshBlockFilter.Value} was not found.");
+            return 1;
+        }
+
+        var meshPayload = SliceNifBlockPayload(payload, meshBlock);
+        var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+        var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
+        var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
+
+        if (attributeSets.Count == 0)
+        {
+            Console.Error.WriteLine("ERROR: no attribute sets found for this mesh.");
+            return 1;
+        }
+
+        Console.WriteLine($"NIF packed positions cross-validation: version={header.VersionText} mesh=#{meshBlock.Index}");
+        Console.WriteLine($"Attribute sets: {attributeSets.Count}");
+        Console.WriteLine();
+
+        for (var setIndex = 0; setIndex < attributeSets.Count; setIndex++)
+        {
+            var set = attributeSets[setIndex];
+            var vertexCount = set.VertexCount;
+            var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
+
+            // Decode Float32 Positions
+            var float32Samples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, set.PositionBlockIndex,
+                "position", set.PositionRole, components: 3, vertexIndices);
+
+            // Decode experimental UInt16 Positions
+            List<NifAttributeVertexSample>? u16Samples = null;
+            var u16BlockIndex = -1;
+            foreach (var stream in streamSummaries)
+            {
+                if (!blocksByIndex.TryGetValue(stream.TargetBlockIndex, out var streamBlock))
+                    continue;
+
+                var blockPayload = SliceNifBlockPayload(payload, streamBlock);
+                if (blockPayload.Length < 4)
+                    continue;
+
+                var declaredBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+                if (declaredBytes > blockPayload.Length)
+                    continue;
+
+                var headerLen = blockPayload.Length - checked((int)declaredBytes);
+                var body = blockPayload.Slice(headerLen, checked((int)declaredBytes));
+
+                var triplesPrefix = ReadUInt16BigEndianTriplesPrefix(body, maxValues: 16);
+                var structure = AnalyzeNifUInt16TriplesStructure(triplesPrefix);
+
+                if (structure.Magic43606Found && structure.MetadataSentinelPattern)
+                {
+                    u16Samples = BuildNifAttributeUInt16VertexSamples(
+                        payload, blocksByIndex, stream.TargetBlockIndex, maxVertices: vertexCount);
+                    u16BlockIndex = stream.TargetBlockIndex;
+                    break;
+                }
+            }
+
+            if (float32Samples.Count == 0 || u16Samples == null || u16Samples.Count == 0)
+            {
+                Console.WriteLine($"[WARNING] Attribute set {setIndex}: missing one or both position streams.");
+                continue;
+            }
+
+            if (float32Samples.Count != u16Samples.Count)
+            {
+                Console.WriteLine($"[WARNING] Attribute set {setIndex}: vertex count mismatch! Float32 count = {float32Samples.Count}, UInt16 count = {u16Samples.Count}");
+                continue;
+            }
+
+            // OLS Fitting helper
+            static UInt16ValidationFitStats FitDimension(List<double> u, List<double> f)
+            {
+                var N = u.Count;
+                double sumU = 0, sumF = 0, sumUU = 0, sumFF = 0, sumUF = 0;
+                var minF = double.MaxValue;
+                var maxF = double.MinValue;
+                for (var i = 0; i < N; i++)
+                {
+                    var ui = u[i];
+                    var fi = f[i];
+                    sumU += ui;
+                    sumF += fi;
+                    sumUU += ui * ui;
+                    sumFF += fi * fi;
+                    sumUF += ui * fi;
+                    if (fi < minF) minF = fi;
+                    if (fi > maxF) maxF = fi;
+                }
+
+                var span = maxF - minF;
+                var meanF = sumF / N;
+
+                double a, b;
+                var denominator = N * sumUU - sumU * sumU;
+                if (Math.Abs(denominator) < 1e-12)
+                {
+                    a = 1.0;
+                    b = 0.0;
+                }
+                else
+                {
+                    a = (N * sumUF - sumU * sumF) / denominator;
+                    b = (sumF - a * sumU) / N;
+                }
+
+                double sse = 0;
+                double sst = 0;
+                double maxError = 0;
+                for (var i = 0; i < N; i++)
+                {
+                    var ui = u[i];
+                    var fi = f[i];
+                    var fit = a * ui + b;
+                    var error = fit - fi;
+                    sse += error * error;
+                    sst += (fi - meanF) * (fi - meanF);
+                    var absErr = Math.Abs(error);
+                    if (absErr > maxError)
+                        maxError = absErr;
+                }
+
+                var rms = Math.Sqrt(sse / N);
+                var r2 = 1.0;
+                if (sst > 1e-12)
+                {
+                    r2 = 1.0 - (sse / sst);
+                }
+                else
+                {
+                    r2 = Math.Abs(sse) < 1e-12 ? 1.0 : 0.0;
+                }
+
+                var threshold = 0.001 * span;
+                if (threshold < 1e-6) threshold = 1e-6;
+
+                var outliers = 0;
+                for (var i = 0; i < N; i++)
+                {
+                    var fit = a * u[i] + b;
+                    if (Math.Abs(fit - f[i]) > threshold)
+                    {
+                        outliers++;
+                    }
+                }
+
+                return new UInt16ValidationFitStats(
+                    Scale: a,
+                    Translation: b,
+                    RSquared: r2,
+                    RmsError: rms,
+                    MaxError: maxError,
+                    Span: span,
+                    OutlierThreshold: threshold,
+                    OutlierCount: outliers);
+            }
+
+            var uX = u16Samples.Select(s => s.X ?? 0.0).ToList();
+            var uY = u16Samples.Select(s => s.Y ?? 0.0).ToList();
+            var fX = float32Samples.Select(s => s.X ?? 0.0).ToList();
+            var fY = float32Samples.Select(s => s.Y ?? 0.0).ToList();
+
+            var statsX = FitDimension(uX, fX);
+            var statsY = FitDimension(uY, fY);
+
+            // Display Table
+            Console.WriteLine("==========================================================================");
+            Console.WriteLine("          UInt16-Packed Position Cross-Validation Summary                 ");
+            Console.WriteLine("==========================================================================");
+            Console.WriteLine($"Asset ID:      {options.IdFilter}");
+            Console.WriteLine($"Mesh Block:    #{options.MeshBlockFilter.Value}");
+            Console.WriteLine($"Vertex Count:  {vertexCount}");
+            Console.WriteLine($"Float32 Block: #{set.PositionBlockIndex}  Role: {set.PositionRole}");
+            Console.WriteLine($"UInt16 Block:  #{u16BlockIndex}  Role: position-u16-packed-experimental");
+            Console.WriteLine("--------------------------------------------------------------------------");
+            Console.WriteLine(" Dimension |    Scale   |  Translate |    R²    | RMS Error  | Outliers / Total");
+            Console.WriteLine("--------------------------------------------------------------------------");
+            Console.WriteLine($"     X     | {statsX.Scale,10:F4} | {statsX.Translation,10:F4} | {statsX.RSquared,8:F6} | {statsX.RmsError,10:F6} | {statsX.OutlierCount,3} / {vertexCount}");
+            Console.WriteLine($"     Y     | {statsY.Scale,10:F4} | {statsY.Translation,10:F4} | {statsY.RSquared,8:F6} | {statsY.RmsError,10:F6} | {statsY.OutlierCount,3} / {vertexCount}");
+            Console.WriteLine("==========================================================================");
+            Console.WriteLine();
+
+            // Prepare Vertices detailed list
+            var vertices = new List<UInt16ValidationVertex>();
+            for (var i = 0; i < vertexCount; i++)
+            {
+                var f32 = float32Samples[i];
+                var u16 = u16Samples[i];
+                var fitX = statsX.Scale * (u16.X ?? 0.0) + statsX.Translation;
+                var fitY = statsY.Scale * (u16.Y ?? 0.0) + statsY.Translation;
+                var errX = fitX - (f32.X ?? 0.0);
+                var errY = fitY - (f32.Y ?? 0.0);
+                var isOut = Math.Abs(errX) > statsX.OutlierThreshold || Math.Abs(errY) > statsY.OutlierThreshold;
+
+                vertices.Add(new UInt16ValidationVertex(
+                    Index: i,
+                    Float32: new UInt16ValidationCoordinate3D(f32.X ?? 0.0, f32.Y ?? 0.0, f32.Z ?? 0.0),
+                    UInt16Normalized: new UInt16ValidationCoordinate2D(u16.X ?? 0.0, u16.Y ?? 0.0),
+                    Fitted: new UInt16ValidationCoordinate2D(fitX, fitY),
+                    Delta: new UInt16ValidationCoordinate2D(errX, errY),
+                    IsOutlier: isOut));
+            }
+
+            var fitSuccess = statsX.RSquared >= 0.99 && statsY.RSquared >= 0.99 && statsX.OutlierCount == 0 && statsY.OutlierCount == 0;
+
+            var report = new UInt16ValidationReport(
+                AssetId: options.IdFilter,
+                MeshBlock: options.MeshBlockFilter.Value,
+                VertexCount: vertexCount,
+                AttributeSetIndex: setIndex,
+                Float32BlockIndex: set.PositionBlockIndex,
+                UInt16BlockIndex: u16BlockIndex,
+                FitResults: new Dictionary<string, UInt16ValidationFitStats>
+                {
+                    { "X", statsX },
+                    { "Y", statsY }
+                },
+                Overall: new UInt16ValidationOverallStats(
+                    TotalOutliers: statsX.OutlierCount + statsY.OutlierCount,
+                    FitSuccess: fitSuccess),
+                Vertices: vertices);
+
+            // Write report JSON
+            var defaultName = $"uint16-validation-{options.IdFilter}-mesh{options.MeshBlockFilter.Value}.json";
+            var defaultDirName = Path.Combine("discovery-plan", "stage1", "validation", defaultName);
+            var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, defaultDirName);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+            File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+            Console.WriteLine($"Detailed validation report saved: {DisplayPath(options, outPath)}");
+        }
+
+        return 0;
+    }
+
     private static int ProbeNifAttributeExtra(AppOptions options)
     {
         if (options.MeshBlockFilter is null)
@@ -2327,7 +2599,7 @@ private static int DecodeNifGeometry(AppOptions options)
                     s.MeshPayloadOffset == extra.MeshPayloadOffset &&
                     s.TargetBlockIndex == extra.BlockIndex);
                 var roleStats = extraSummary?.RoleStats;
-                var isIndexRole = roleStats?.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) == true;
+                var isIndexRole = roleStats?.IndexStats is not null;
                 blocksByIndex.TryGetValue(extra.BlockIndex, out var extraBlock);
                 var blockPayload = extraBlock is null
                     ? ReadOnlySpan<byte>.Empty
@@ -3674,8 +3946,7 @@ private static int DecodeNifGeometry(AppOptions options)
                                 var extraSummary = streamSummaries.FirstOrDefault(s =>
                                     s.MeshPayloadOffset == extra.MeshPayloadOffset &&
                                     s.TargetBlockIndex == extra.BlockIndex);
-                                if (extraSummary?.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) == true &&
-                                    extraSummary.RoleStats.IndexStats is not null &&
+                                if (extraSummary?.RoleStats.IndexStats is not null &&
                                     blocksByIndex.TryGetValue(extra.BlockIndex, out var extraBlock))
                                 {
                                     var extraPayload = SliceNifBlockPayload(payload.Bytes, extraBlock);
@@ -3692,70 +3963,67 @@ private static int DecodeNifGeometry(AppOptions options)
                                             var subtractOneFitness = positionFitness.FirstOrDefault(static f => string.Equals(f.MappingName, "subtract-one", StringComparison.OrdinalIgnoreCase));
                                             var preferredMapping = GetNifAttributeMappingFitnessPreference(rawFitness, subtractOneFitness);
 
-                                            if (preferredMapping != "insufficient")
+                                            var fitnessKey = $"meshSize={meshBlock.Size}|topology={attributeSet.Topology.PrimaryTopology}|vertexCount={attributeSet.VertexCount}|extra@{extra.MeshPayloadOffset}:payload={extra.DeclaredPayloadBytes}:role={extra.Role}";
+                                            if (!attributeExtraMappingFitnessGroups.TryGetValue(fitnessKey, out var fitnessGroup))
                                             {
-                                                var fitnessKey = $"meshSize={meshBlock.Size}|topology={attributeSet.Topology.PrimaryTopology}|vertexCount={attributeSet.VertexCount}|extra@{extra.MeshPayloadOffset}:payload={extra.DeclaredPayloadBytes}:role={extra.Role}";
-                                                if (!attributeExtraMappingFitnessGroups.TryGetValue(fitnessKey, out var fitnessGroup))
-                                                {
-                                                    fitnessGroup = new NifAttributeExtraMappingFitnessAccumulator(
-                                                        fitnessKey,
-                                                        meshBlock.Size,
-                                                        attributeSet.Topology.PrimaryTopology,
-                                                        attributeSet.VertexCount,
-                                                        extra.MeshPayloadOffset,
-                                                        extra.Role,
-                                                        extra.DeclaredPayloadBytes);
-                                                    attributeExtraMappingFitnessGroups.Add(fitnessKey, fitnessGroup);
-                                                }
-
-                                                fitnessGroup.Count++;
-                                                fitnessGroup.NifIds.Add(entry.IdPrefix);
-                                                fitnessGroup.AddFitness(rawFitness, subtractOneFitness, preferredMapping);
-                                                if (indexCompatibility?.StripStructure is not null)
-                                                {
-                                                    fitnessGroup.AddStripStructure(indexCompatibility.StripStructure);
-                                                }
-
-                                                if (fitnessGroup.Samples.Count < 16)
-                                                {
-                                                    fitnessGroup.Samples.Add(new NifAttributeExtraMappingFitnessSample(
-                                                        ArchiveName: archiveName,
-                                                        EntryIndex: entry.Index,
-                                                        IdPrefix: entry.IdPrefix,
-                                                        ManifestEntryIndex: manifestEntry?.Index,
-                                                        MeshBlockIndex: meshBlock.Index,
-                                                        MeshSize: meshBlock.Size,
-                                                        VertexCount: attributeSet.VertexCount,
-                                                        ExtraMeshPayloadOffset: extra.MeshPayloadOffset,
-                                                        ExtraBlockIndex: extra.BlockIndex,
-                                                        ExtraRole: extra.Role,
-                                                        RawMedianMaxEdge: rawFitness?.MedianMaxEdge,
-                                                        SubtractOneMedianMaxEdge: subtractOneFitness?.MedianMaxEdge,
-                                                        RawSegmentedMedianMaxEdge: rawFitness?.SegmentedMedianMaxEdge,
-                                                        SubtractOneSegmentedMedianMaxEdge: subtractOneFitness?.SegmentedMedianMaxEdge,
-                                                        RawSegmentedMedianNormalDelta: rawFitness?.SegmentedMedianNormalDelta,
-                                                        SubtractOneSegmentedMedianNormalDelta: subtractOneFitness?.SegmentedMedianNormalDelta,
-                                                        RawSegmentedMedianUvDelta: rawFitness?.SegmentedMedianUvDelta,
-                                                        SubtractOneSegmentedMedianUvDelta: subtractOneFitness?.SegmentedMedianUvDelta,
-                                                        RawSegmentedMedianTriangleArea: rawFitness?.SegmentedMedianTriangleArea,
-                                                        SubtractOneSegmentedMedianTriangleArea: subtractOneFitness?.SegmentedMedianTriangleArea,
-                                                        RawFirstSegmentProofFlags: rawFitness is null ? [] : rawFitness.FirstSegmentProofReview.ReviewFlags,
-                                                        SubtractOneFirstSegmentProofFlags: subtractOneFitness is null ? [] : subtractOneFitness.FirstSegmentProofReview.ReviewFlags,
-                                                        RawFirstSegmentDominantPlaneSwitchCount: rawFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
-                                                        SubtractOneFirstSegmentDominantPlaneSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
-                                                        RawFirstSegmentDominantSignedAreaSignSwitchCount: rawFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
-                                                        SubtractOneFirstSegmentDominantSignedAreaSignSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
-                                                        RawFirstSegmentNonAlternatingParityTransitionCount: rawFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
-                                                        SubtractOneFirstSegmentNonAlternatingParityTransitionCount: subtractOneFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
-                                                        RawP95MaxEdge: rawFitness?.P95MaxEdge,
-                                                        SubtractOneP95MaxEdge: subtractOneFitness?.P95MaxEdge,
-                                                        SegmentCount: rawFitness?.SegmentCount ?? subtractOneFitness?.SegmentCount,
-                                                        SegmentedTriangleWindowCount: rawFitness?.SegmentedTriangleWindowCount ?? subtractOneFitness?.SegmentedTriangleWindowCount,
-                                                        DroppedDegenerateWindowCount: rawFitness?.DroppedDegenerateWindowCount ?? subtractOneFitness?.DroppedDegenerateWindowCount,
-                                                        DroppedCrossSegmentWindowCount: rawFitness?.DroppedCrossSegmentWindowCount ?? subtractOneFitness?.DroppedCrossSegmentWindowCount,
-                                                        PreferredMapping: preferredMapping));
-                                                }
+                                                fitnessGroup = new NifAttributeExtraMappingFitnessAccumulator(
+                                                    fitnessKey,
+                                                    meshBlock.Size,
+                                                    attributeSet.Topology.PrimaryTopology,
+                                                    attributeSet.VertexCount,
+                                                    extra.MeshPayloadOffset,
+                                                    extra.Role,
+                                                    extra.DeclaredPayloadBytes);
+                                                attributeExtraMappingFitnessGroups.Add(fitnessKey, fitnessGroup);
                                             }
+
+                                            fitnessGroup.Count++;
+                                            fitnessGroup.NifIds.Add(entry.IdPrefix);
+                                            fitnessGroup.AddFitness(rawFitness, subtractOneFitness, preferredMapping);
+                                            if (indexCompatibility?.StripStructure is not null)
+                                            {
+                                                fitnessGroup.AddStripStructure(indexCompatibility.StripStructure);
+                                            }
+
+                                            if (fitnessGroup.Samples.Count < 16)
+                                            {
+                                                fitnessGroup.Samples.Add(new NifAttributeExtraMappingFitnessSample(
+                                                    ArchiveName: archiveName,
+                                                    EntryIndex: entry.Index,
+                                                    IdPrefix: entry.IdPrefix,
+                                                    ManifestEntryIndex: manifestEntry?.Index,
+                                                    MeshBlockIndex: meshBlock.Index,
+                                                    MeshSize: meshBlock.Size,
+                                                    VertexCount: attributeSet.VertexCount,
+                                                    ExtraMeshPayloadOffset: extra.MeshPayloadOffset,
+                                                    ExtraBlockIndex: extra.BlockIndex,
+                                                    ExtraRole: extra.Role,
+                                                    RawMedianMaxEdge: rawFitness?.MedianMaxEdge,
+                                                    SubtractOneMedianMaxEdge: subtractOneFitness?.MedianMaxEdge,
+                                                    RawSegmentedMedianMaxEdge: rawFitness?.SegmentedMedianMaxEdge,
+                                                    SubtractOneSegmentedMedianMaxEdge: subtractOneFitness?.SegmentedMedianMaxEdge,
+                                                    RawSegmentedMedianNormalDelta: rawFitness?.SegmentedMedianNormalDelta,
+                                                    SubtractOneSegmentedMedianNormalDelta: subtractOneFitness?.SegmentedMedianNormalDelta,
+                                                    RawSegmentedMedianUvDelta: rawFitness?.SegmentedMedianUvDelta,
+                                                    SubtractOneSegmentedMedianUvDelta: subtractOneFitness?.SegmentedMedianUvDelta,
+                                                    RawSegmentedMedianTriangleArea: rawFitness?.SegmentedMedianTriangleArea,
+                                                    SubtractOneSegmentedMedianTriangleArea: subtractOneFitness?.SegmentedMedianTriangleArea,
+                                                    RawFirstSegmentProofFlags: rawFitness is null ? [] : rawFitness.FirstSegmentProofReview.ReviewFlags,
+                                                    SubtractOneFirstSegmentProofFlags: subtractOneFitness is null ? [] : subtractOneFitness.FirstSegmentProofReview.ReviewFlags,
+                                                    RawFirstSegmentDominantPlaneSwitchCount: rawFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
+                                                    SubtractOneFirstSegmentDominantPlaneSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantPlaneSwitchCount,
+                                                    RawFirstSegmentDominantSignedAreaSignSwitchCount: rawFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
+                                                    SubtractOneFirstSegmentDominantSignedAreaSignSwitchCount: subtractOneFitness?.FirstSegmentProofReview.DominantSignedAreaSignSwitchCount,
+                                                    RawFirstSegmentNonAlternatingParityTransitionCount: rawFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
+                                                    SubtractOneFirstSegmentNonAlternatingParityTransitionCount: subtractOneFitness?.FirstSegmentProofReview.NonAlternatingParityTransitionCount,
+                                                    RawP95MaxEdge: rawFitness?.P95MaxEdge,
+                                                    SubtractOneP95MaxEdge: subtractOneFitness?.P95MaxEdge,
+                                                    SegmentCount: rawFitness?.SegmentCount ?? subtractOneFitness?.SegmentCount,
+                                                    SegmentedTriangleWindowCount: rawFitness?.SegmentedTriangleWindowCount ?? subtractOneFitness?.SegmentedTriangleWindowCount,
+                                                    DroppedDegenerateWindowCount: rawFitness?.DroppedDegenerateWindowCount ?? subtractOneFitness?.DroppedDegenerateWindowCount,
+                                                    DroppedCrossSegmentWindowCount: rawFitness?.DroppedCrossSegmentWindowCount ?? subtractOneFitness?.DroppedCrossSegmentWindowCount,
+                                                    PreferredMapping: preferredMapping));
+                                                }
                                         }
                                     }
                                 }
@@ -12180,6 +12448,7 @@ private static List<NifAttributeVertexSample> BuildNifAttributeUInt16VertexSampl
                     case "extract-nif-bundles":
                     case "inventory-nif-bundles":
                     case "plan-nif-bundle-archives":
+                    case "validate-uint16-positions":
                         command = arg;
                         break;
                     case "--help" or "-h" or "/?":
@@ -15205,3 +15474,42 @@ internal sealed record ArchiveEntrySample(
     ushort Compression,
     string Sha1,
     bool IsNull);
+
+internal sealed record UInt16ValidationFitStats(
+    double Scale,
+    double Translation,
+    double RSquared,
+    double RmsError,
+    double MaxError,
+    double Span,
+    double OutlierThreshold,
+    int OutlierCount);
+
+internal sealed record UInt16ValidationCoordinate3D(
+    double X, double Y, double Z);
+
+internal sealed record UInt16ValidationCoordinate2D(
+    double X, double Y);
+
+internal sealed record UInt16ValidationVertex(
+    int Index,
+    UInt16ValidationCoordinate3D Float32,
+    UInt16ValidationCoordinate2D UInt16Normalized,
+    UInt16ValidationCoordinate2D Fitted,
+    UInt16ValidationCoordinate2D Delta,
+    bool IsOutlier);
+
+internal sealed record UInt16ValidationOverallStats(
+    int TotalOutliers,
+    bool FitSuccess);
+
+internal sealed record UInt16ValidationReport(
+    string AssetId,
+    int MeshBlock,
+    int VertexCount,
+    int AttributeSetIndex,
+    int Float32BlockIndex,
+    int UInt16BlockIndex,
+    Dictionary<string, UInt16ValidationFitStats> FitResults,
+    UInt16ValidationOverallStats Overall,
+    List<UInt16ValidationVertex> Vertices);

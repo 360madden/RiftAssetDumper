@@ -1,6 +1,6 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-05-19
+Date: 2026-05-20
 
 ## 🐍 Python migration status (PS→Py phase 1)
 
@@ -10,23 +10,9 @@ Date: 2026-05-19
 | `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing |
 | `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
 | `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
-| `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` + `attribute_extra_sibling_proof_guard` ported from PS |
+| `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` (dual-path: fitness/stream) + `attribute_extra_sibling_proof_guard` (dual-path: index-role/body-role) ported from PS. Fitness path now validates @264 aggregate edge/area/normal/parity/strip-structure regressions. |
 | Guard/report functions (remaining 11) | ⏳ deferred | `usage-access-correlation-guard`, `residual-lead-guard`, `residual-position-classifier-report`, `residual-position-cluster-probe-report`, `position-source-gap-report`, `position-source-sibling-lead-guard`, `position-source-sibling-family-report`, `position-source-sibling-probe-report`, `position-source-sibling-representative-probe-report`, `position-source-sibling-secondary-probe-report`, `position-source-sibling-extra-position-report` |
 | `scripts/Invoke-RiftAssetWorkflow.ps1` (legacy) | ⚠️ deprecated | Still available as fallback for unported complex modes |
-
-**Key commands (Python):**
-
-```powershell
-# Thin PS wrapper (recommended entry point)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-bindings
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 all --full
-
-# Direct Python (alternative)
-python scripts/rift_workflow.py mesh-bindings --full
-python scripts/rift_workflow.py semantic-hint-crosstab
-python scripts/rift_workflow.py discovery-workbench --privacy-scan
-```
 
 **Key commands (Python):**
 
@@ -51,6 +37,14 @@ python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc0170
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
 ```
+
+**2026-05-20 — C# gate fixes + fitness guard completion:**
+- Fixed two `StartsWith("index-")` gates in `Program.cs` (inventory loop L3949, probe loop L2602) → now use `IndexStats is not null`. This was the root cause preventing `TopAttributeExtraMappingFitness` from populating for `uint16-compatible-body` extra streams.
+- Removed the `if (preferredMapping != "insufficient")` gate so fitness accumulation runs unconditionally.
+- Added `required_json_boolean()` + boolean rejection in `required_json_number()`/`required_json_integer()` to `rift_workflow_utils.py`.
+- Implemented `_attribute_extra_proof_guard_fitness()` — validates @264 aggregate edge-delta, area-gap, strip-structure, segment, parity, and sentinel regressions against 4 vertex-count groups.
+- `attribute_extra_proof_guard()` now routes to fitness path when data available, falls back to stream-level guard.
+- JSON field names verified against actual C# output; all match. Proof guard passes on both limited and full inventories.
 
 Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd wrappers/runner only. All helper logic lives in Python modules under `scripts/`.
 
