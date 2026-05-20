@@ -5,6 +5,8 @@
 .DESCRIPTION
   Delegates to Python modules under scripts/ for all heavy lifting.
   PowerShell remains only for thin entry points and terminal convenience.
+  Accepts both legacy PS mode names (MeshBindings, MeshProbe, etc.) and
+  kebab-case Python names (mesh-bindings, mesh-probe, etc.).
   See docs/current-status.md for migration progress.
 #>
 
@@ -17,9 +19,44 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Resolve-Path (Join-Path $ScriptDir "..")
 $PythonScript = Join-Path $ScriptDir "rift_workflow.py"
 
+# Translation map: legacy PS mode name → kebab-case Python command name
+$PSModeToKebab = @{
+    'AssetSignatures' = 'asset-signatures'
+    'AssetSemanticIndex' = 'asset-semantic-index'
+    'MeshBindings' = 'mesh-bindings'
+    'MeshProbe' = 'mesh-probe'
+    'AttributeExtraProbe' = 'attribute-extra-probe'
+    'AttributeExtraProofGuard' = 'attribute-extra-proof-guard'
+    'AttributeExtraSiblingProofGuard' = 'attribute-extra-sibling-proof-guard'
+    'UsageAccessCorrelationGuard' = 'usage-access-correlation-guard'
+    'ResidualLeadGuard' = 'residual-lead-guard'
+    'ResidualPositionClassifierReport' = 'residual-position-classifier-report'
+    'ResidualPositionClusterProbeReport' = 'residual-position-cluster-probe-report'
+    'PositionSourceGapReport' = 'position-source-gap-report'
+    'PositionSourceSiblingLeadGuard' = 'position-source-sibling-lead-guard'
+    'PositionSourceSiblingFamilyReport' = 'position-source-sibling-family-report'
+    'PositionSourceSiblingProbeReport' = 'position-source-sibling-probe-report'
+    'PositionSourceSiblingRepresentativeProbeReport' = 'position-source-sibling-representative-probe-report'
+    'PositionSourceSiblingSecondaryProbeReport' = 'position-source-sibling-secondary-probe-report'
+    'PositionSourceSiblingExtraPositionReport' = 'position-source-sibling-extra-position-report'
+    'DiscoveryWorkbench' = 'discovery-workbench'
+    'GeneratedOutputGuard' = 'generated-output-guard'
+    'SemanticHintCrossTab' = 'semantic-hint-crosstab'
+    'MeshStreams' = 'mesh-streams'
+    'IndexCandidates' = 'index-candidates'
+    'StreamEndianness' = 'stream-endianness'
+    'StreamBodies' = 'stream-bodies'
+    'All' = 'all'
+}
+
+# Translate legacy PS mode name if recognized
+$PythonCommand = $Command
+if ($PSModeToKebab.ContainsKey($Command)) {
+    $PythonCommand = $PSModeToKebab[$Command]
+}
+
 function Invoke-PythonWorkflow {
     param([string] $Script, [string[]] $Args)
-    $pyCmd = @("python", $Script) + $Args
     $exitCode = 0
     & python $Script @Args 2>&1 | ForEach-Object {
         if ($_ -is [System.Management.Automation.ErrorRecord]) {
@@ -32,26 +69,18 @@ function Invoke-PythonWorkflow {
     return $exitCode
 }
 
-# === Generated output safety guard (Python) ===
-Write-Host "`n--- GeneratedOutputGuard (Python)" -ForegroundColor Cyan
-$guardResult = & python -c @"
-import sys; sys.path.insert(0, '$RepoRoot')
-from scripts.rift_workflow_utils import generated_output_guard
-generated_output_guard()
-"@ 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host $guardResult -ForegroundColor Red
-    throw "GeneratedOutputGuard failed (Python)."
-}
-Write-Host $guardResult
-
-# === Delegate workflow command to Python ===
-if ($Command) {
-    Write-Host "`n==> $Command (Python)" -ForegroundColor Cyan
-    $exitCode = Invoke-PythonWorkflow -Script $PythonScript -Args @($Command) + $RemainingArgs
+# === Delegate to Python (GeneratedOutputGuard runs inside rift_workflow.py) ===
+if ($PythonCommand) {
+    Write-Host "`n==> $PythonCommand (Python)" -ForegroundColor Cyan
+    $exitCode = Invoke-PythonWorkflow -Script $PythonScript -Args @($PythonCommand) + $RemainingArgs
     exit $exitCode
 }
 else {
     Write-Host "Usage: .\Invoke-RiftWorkflow.ps1 <command> [args...]"
     Write-Host "  Commands are handled by scripts/rift_workflow.py"
+    Write-Host ""
+    Write-Host "Available commands (kebab-case or legacy PS names):"
+    $PSModeToKebab.GetEnumerator() | Sort-Object Name | ForEach-Object {
+        Write-Host ("  {0}  (or {1})" -f $_.Value, $_.Name)
+    }
 }

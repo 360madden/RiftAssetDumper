@@ -1,6 +1,42 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-05-08
+Date: 2026-05-19
+
+## 🐍 Python migration status (PS→Py phase 1)
+
+| Component | Status | Notes |
+|---|---|---|
+| `scripts/rift_workflow_utils.py` (49 unit tests) | ✅ complete | All utility functions ported and tested |
+| `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing |
+| `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
+| `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
+| Guard/report functions (remaining 13) | ⏳ deferred | `usage-access-correlation-guard`, `residual-lead-guard`, `residual-position-classifier-report`, `residual-position-cluster-probe-report`, `position-source-gap-report`, `position-source-sibling-lead-guard`, `position-source-sibling-family-report`, `position-source-sibling-probe-report`, `position-source-sibling-representative-probe-report`, `position-source-sibling-secondary-probe-report`, `position-source-sibling-extra-position-report`, `attribute-extra-proof-guard`, `attribute-extra-sibling-proof-guard` |
+| `scripts/Invoke-RiftAssetWorkflow.ps1` (legacy) | ⚠️ deprecated | Still available as fallback for unported complex modes |
+
+**Key commands (Python):**
+
+```powershell
+# Thin PS wrapper (recommended entry point)
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-bindings
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 all --full
+
+# Direct Python (alternative)
+python scripts/rift_workflow.py mesh-bindings --full
+python scripts/rift_workflow.py semantic-hint-crosstab
+python scripts/rift_workflow.py discovery-workbench --privacy-scan
+```
+
+**Unported modes still use legacy PS:**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode AttributeExtraProofGuard -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
+```
+
+Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd wrappers/runner only. All helper logic lives in Python modules under `scripts/`.
+
+---
 
 ## TL;DR 🧭
 
