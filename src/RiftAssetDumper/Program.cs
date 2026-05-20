@@ -12189,6 +12189,7 @@ private static List<NifAttributeVertexSample> BuildNifAttributeUInt16VertexSampl
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-streams --root <SourceFolder> --id <16hex> --mesh-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --root <SourceFolder> --id <16hex> --mesh-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-nif-geometry --root <SourceFolder> --id <16hex> --mesh-block <n> [--write-obj] [--experimental]");
+        Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- validate-uint16-positions --root <SourceFolder> --id <16hex> --mesh-block <n>");
             Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-attribute-extra --root <SourceFolder> --id <16hex> --mesh-block <n> --extra-offset <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-stream-body --root <SourceFolder> --id <16hex> --stream-block <n>");
         Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- inventory-nif --root <SourceFolder> --max-total 100");
