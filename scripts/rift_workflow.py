@@ -67,6 +67,10 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     checked_run,
     generated_output_guard,
 )
+from scripts.rift_workflow_guards import (  # noqa: E402
+    attribute_extra_proof_guard,
+    attribute_extra_sibling_proof_guard,
+)
 from scripts.rift_workflow_reports import (  # noqa: E402
     discovery_workbench,
     semantic_hint_cross_tab,
@@ -366,13 +370,84 @@ def _run_command(args: argparse.Namespace) -> None:
             )
         return
 
+    # --- AttributeExtraProofGuard: inventory + Python guard assertion ---
+
+    if command == "attribute-extra-proof-guard":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("attribute-extra-proof-guard (inventory)", dotnet_args)
+
+        # Run guard assertion
+        attribute_extra_proof_guard(str(out_path))
+        return
+
+    # --- AttributeExtraSiblingProofGuard: probe + Python guard assertion ---
+
+    if command == "attribute-extra-sibling-proof-guard":
+        if not args.id:
+            print(
+                "ERROR: 'attribute-extra-sibling-proof-guard' requires --id <16hex>",
+                file=sys.stderr,
+            )
+            print(
+                "  Known sibling IDs: 6fc01704d4a509d5, caa9a88e94ec8db0",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run probe-nif-attribute-extra for the given asset
+        asset_id = args.id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"probe-nif-attribute-extra-{asset_id}-mesh6-extra264.json"
+        dotnet_args = [
+            "run", "--project", str(project), "--",
+            "probe-nif-attribute-extra",
+            "--root", str(root),
+            "--id", asset_id,
+            "--mesh-block", "6",
+            "--extra-offset", "264",
+            "--out", str(out_path),
+        ]
+        checked_run(f"attribute-extra-sibling-proof-guard {asset_id}", dotnet_args)
+
+        # Run guard assertion
+        attribute_extra_sibling_proof_guard(str(out_path), asset_id)
+        return
+
     # --- Complex multi-step modes (ported incrementally) ---
 
     # These commands need their guard/report functions ported from PowerShell.
     # Until then, they fall through to a "not yet ported" message.
     complex_modes = {
-        "attribute-extra-proof-guard",
-        "attribute-extra-sibling-proof-guard",
         "usage-access-correlation-guard",
         "residual-lead-guard",
         "residual-position-classifier-report",

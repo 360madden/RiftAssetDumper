@@ -9,6 +9,7 @@ from scripts.rift_workflow_utils import (
     measure_sum_or_zero,
     json_array_count_or_dash,
     required_json_value,
+    required_json_boolean,
     required_json_number,
     required_json_integer,
     usage_access_guard_integer,
@@ -67,6 +68,16 @@ check_raises("required_json_value None", lambda: required_json_value(None, "x", 
 check("required_json_number", required_json_number({"x": "3.14"}, "x", "test"), 3.14)
 check_raises("required_json_number bad", lambda: required_json_number({"x": "abc"}, "x", "test"))
 check("required_json_integer", required_json_integer({"x": "42"}, "x", "test"), 42)
+check("required_json_integer(int)", required_json_integer({"x": 99}, "x", "test"), 99)
+check_raises("required_json_number rejects bool True", lambda: required_json_number({"x": True}, "x", "test"))
+check_raises("required_json_number rejects bool False", lambda: required_json_number({"x": False}, "x", "test"))
+check_raises("required_json_integer inherits bool rejection", lambda: required_json_integer({"x": True}, "x", "test"))
+print("=== Boolean accessor ===")
+check("required_json_boolean(True)", required_json_boolean({"x": True}, "x", "test"), True)
+check("required_json_boolean(False)", required_json_boolean({"x": False}, "x", "test"), False)
+check_raises("required_json_boolean rejects int 1", lambda: required_json_boolean({"x": 1}, "x", "test"))
+check_raises("required_json_boolean rejects string", lambda: required_json_boolean({"x": "true"}, "x", "test"))
+check_raises("required_json_boolean rejects None", lambda: required_json_boolean({"x": None}, "x", "test"))
 check("usage_access_guard_integer", usage_access_guard_integer({"x": 10}, "x", "test"), 10)
 check_raises("usage_access_guard integer missing", lambda: usage_access_guard_integer({}, "x", "test"))
 

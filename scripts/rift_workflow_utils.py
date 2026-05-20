@@ -121,9 +121,15 @@ def required_json_value(obj: Any, key: str, context: str) -> Any:  # noqa: ANN40
 def required_json_number(obj: Any, key: str, context: str) -> float:
     """Extract a required numeric property.
 
+    Rejects booleans (Python float(True)==1.0 would silently accept them).
+
     Mirrors: Get-RequiredJsonNumber
     """
     value = required_json_value(obj, key, context)
+    if isinstance(value, bool):
+        raise ValueError(
+            f"AttributeExtraProofGuard failed: {key} on {context} is boolean, not numeric: {value}"
+        )
     try:
         return float(value)
     except (ValueError, TypeError) as exc:
@@ -135,10 +141,28 @@ def required_json_number(obj: Any, key: str, context: str) -> float:
 def required_json_integer(obj: Any, key: str, context: str) -> int:
     """Extract a required integer property.
 
+    Inherits boolean rejection from required_json_number.
+
     Mirrors: Get-RequiredJsonInteger
     """
     value = required_json_number(obj, key, context)
     return int(value)
+
+
+def required_json_boolean(obj: Any, key: str, context: str) -> bool:
+    """Extract a required boolean property, rejecting non-boolean JSON values.
+
+    Python bool('false') == True would silently accept strings,
+    so we explicitly reject anything that is not a Python bool.
+
+    Mirrors: [bool]::Parse in PowerShell (which rejects non-boolean strings).
+    """
+    value = required_json_value(obj, key, context)
+    if not isinstance(value, bool):
+        raise ValueError(
+            f"AttributeExtraProofGuard failed: {key} on {context} is not boolean: {type(value).__name__} {value!r}"
+        )
+    return value
 
 
 def usage_access_guard_integer(obj: Any, key: str, context: str) -> int:
@@ -169,6 +193,9 @@ def usage_access_guard_integer(obj: Any, key: str, context: str) -> int:
 
 def assert_proof_guard(condition: bool, message: str) -> None:
     """Raise AttributeExtraProofGuard on false condition.
+
+    Note: condition must be a pre-validated bool; callers should use
+    required_json_boolean() for JSON boolean fields before passing here.
 
     Mirrors: Assert-ProofGuardCondition
     """

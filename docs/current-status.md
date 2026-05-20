@@ -10,7 +10,8 @@ Date: 2026-05-19
 | `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing |
 | `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
 | `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
-| Guard/report functions (remaining 13) | ⏳ deferred | `usage-access-correlation-guard`, `residual-lead-guard`, `residual-position-classifier-report`, `residual-position-cluster-probe-report`, `position-source-gap-report`, `position-source-sibling-lead-guard`, `position-source-sibling-family-report`, `position-source-sibling-probe-report`, `position-source-sibling-representative-probe-report`, `position-source-sibling-secondary-probe-report`, `position-source-sibling-extra-position-report`, `attribute-extra-proof-guard`, `attribute-extra-sibling-proof-guard` |
+| `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` + `attribute_extra_sibling_proof_guard` ported from PS |
+| Guard/report functions (remaining 11) | ⏳ deferred | `usage-access-correlation-guard`, `residual-lead-guard`, `residual-position-classifier-report`, `residual-position-cluster-probe-report`, `position-source-gap-report`, `position-source-sibling-lead-guard`, `position-source-sibling-family-report`, `position-source-sibling-probe-report`, `position-source-sibling-representative-probe-report`, `position-source-sibling-secondary-probe-report`, `position-source-sibling-extra-position-report` |
 | `scripts/Invoke-RiftAssetWorkflow.ps1` (legacy) | ⚠️ deprecated | Still available as fallback for unported complex modes |
 
 **Key commands (Python):**
@@ -27,10 +28,27 @@ python scripts/rift_workflow.py semantic-hint-crosstab
 python scripts/rift_workflow.py discovery-workbench --privacy-scan
 ```
 
+**Key commands (Python):**
+
+```powershell
+# Thin PS wrapper (recommended entry point)
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-bindings
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 all --full
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 attribute-extra-proof-guard --full --skip-build
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.ps1 attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
+
+# Direct Python (alternative)
+python scripts/rift_workflow.py mesh-bindings --full
+python scripts/rift_workflow.py semantic-hint-crosstab
+python scripts/rift_workflow.py discovery-workbench --privacy-scan
+python scripts/rift_workflow.py attribute-extra-proof-guard --full --skip-build
+python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
+```
+
 **Unported modes still use legacy PS:**
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode AttributeExtraProofGuard -SkipBuild
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
 ```
 
