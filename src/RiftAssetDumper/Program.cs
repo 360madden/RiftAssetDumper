@@ -2010,9 +2010,11 @@ private static int DecodeNifGeometry(AppOptions options)
         var objVertices = new List<string>();
         var objNormals = new List<string>();
         var objTexCoords = new List<string>();
+        var objFaces = new List<string>();
         var totalPositions = 0;
         var totalNormals = 0;
         var totalUvs = 0;
+        var objVertexBase = 0;
 
         for (var setIndex = 0; setIndex < attributeSets.Count; setIndex++)
         {
@@ -2170,6 +2172,70 @@ private static int DecodeNifGeometry(AppOptions options)
             totalPositions += positionSamples.Count;
             totalNormals += normalSamples.Count;
             totalUvs += uvSamples.Count;
+
+            // Generate triangle faces from UInt16 big-endian index strip at @264 extra stream
+            if (options.WriteObj && !options.Experimental)
+            {
+                var extra264Found = false;
+                var extra264Skipped = 0;
+                foreach (var extra in set.ExtraStreams)
+                {
+                    if (extra.MeshPayloadOffset != 264)
+                        continue;
+                    if (extra264Found)
+                    {
+                        extra264Skipped++;
+                        continue;
+                    }
+                    if (!blocksByIndex.TryGetValue(extra.BlockIndex, out var extraBlock))
+                        continue;
+                    var extraPayload = SliceNifBlockPayload(payload, extraBlock);
+                    if (extraPayload.Length < 4)
+                        continue;
+                    var declaredBytes = BinaryPrimitives.ReadUInt32LittleEndian(extraPayload[..4]);
+                    if (declaredBytes > extraPayload.Length)
+                        continue;
+                    var headerLen = extraPayload.Length - checked((int)declaredBytes);
+                    var body = extraPayload.Slice(headerLen, checked((int)declaredBytes));
+                    var indices = ReadUInt16BigEndianValues(body);
+                    if (indices.Count < 3)
+                        continue;
+
+                    // Walk as degenerate-bridge triangle strip (raw-zero-based mapping)
+                    var vc = set.VertexCount;
+                    var pairCount = indices.Count - 1;
+                    var windowCount = Math.Max(0, pairCount - 1);
+                    var facesGenerated = 0;
+                    for (var w = 0; w < windowCount; w++)
+                    {
+                        var a = (int)indices[w];
+                        var b = (int)indices[w + 1];
+                        var c = (int)indices[w + 2];
+                        // Skip degenerate triangles (any two equal vertices) — closes the strip segment
+                        if (a == b || a == c || b == c)
+                            continue;
+                        // Skip out-of-range indices
+                        if (a >= vc || b >= vc || c >= vc)
+                            continue;
+                        // OBJ uses 1-based indices; raw-zero-based strip indices match OBJ vertex order
+                        var oa = objVertexBase + a + 1;
+                        var ob = objVertexBase + b + 1;
+                        var oc = objVertexBase + c + 1;
+                        // Even windows maintain winding (a,b,c), odd windows flip (a,c,b) for strip consistency
+                        if ((w & 1) == 0)
+                            objFaces.Add($"f {oa}/{oa}/{oa} {ob}/{ob}/{ob} {oc}/{oc}/{oc}");
+                        else
+                            objFaces.Add($"f {oa}/{oa}/{oa} {oc}/{oc}/{oc} {ob}/{ob}/{ob}");
+                        facesGenerated++;
+                    }
+
+                    if (facesGenerated > 0)
+                        Console.WriteLine($"    @264 strip faces: {facesGenerated} (indices={indices.Count}, windows={windowCount}, vertexBase={objVertexBase})");
+                    break; // Use first @264 extra stream found
+                }
+            }
+
+            objVertexBase = objVertices.Count;
         }
 
         // Write OBJ file
@@ -2183,7 +2249,7 @@ private static int DecodeNifGeometry(AppOptions options)
             writer.WriteLine($"# NIF version: {header.VersionText}");
             writer.WriteLine($"# Mesh block: #{meshBlock.Index}");
             writer.WriteLine($"# Positions: {objVertices.Count}  Normals: {objNormals.Count}  UVs: {objTexCoords.Count}");
-            writer.WriteLine($"# NOTE: No faces/indices decoded. This is a point cloud only.");
+            writer.WriteLine($"# Faces: {objFaces.Count}  (degenerate-bridge UInt16BE strip @264)");
             writer.WriteLine();
             foreach (var v in objVertices)
                 writer.WriteLine(v);
@@ -2191,14 +2257,20 @@ private static int DecodeNifGeometry(AppOptions options)
                 writer.WriteLine(vn);
             foreach (var vt in objTexCoords)
                 writer.WriteLine(vt);
+            if (objFaces.Count > 0)
+            {
+                writer.WriteLine();
+                foreach (var f in objFaces)
+                    writer.WriteLine(f);
+            }
             writer.WriteLine();
-            writer.WriteLine($"# End of file. {objVertices.Count} vertices.");
+            writer.WriteLine($"# End of file. {objVertices.Count} vertices, {objFaces.Count} faces.");
             Console.WriteLine();
             Console.WriteLine($"OBJ written: {DisplayPath(options, objPath)}");
             Console.WriteLine($"  Vertices: {objVertices.Count}");
             Console.WriteLine($"  Normals:  {objNormals.Count}");
             Console.WriteLine($"  TexCoords: {objTexCoords.Count}");
-            Console.WriteLine($"  Faces: 0 (index/topology decode not yet implemented)");
+            Console.WriteLine($"  Faces: {objFaces.Count}");
         }
 
         Console.WriteLine();
