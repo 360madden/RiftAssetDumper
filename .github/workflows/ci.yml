@@ -50,7 +50,7 @@ jobs:
           pip install ruff mypy pytest
 
       - name: Python syntax check
-        run: python -m py_compile scripts/*.py
+        run: python -c "import py_compile, glob; [py_compile.compile(f) for f in glob.glob('scripts/*.py')]"
 
       - name: ruff lint
         run: ruff check scripts/
