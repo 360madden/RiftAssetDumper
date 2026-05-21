@@ -92,6 +92,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Position fallback faces (Stage 5) | ✅ complete | Experimental-position-source path now generates UInt16BE degenerate-bridge triangle-strip OBJ faces from index-stream pairings (`FindNifMeshProbePairings`); 4 `WriteObj`→`WriteObj||ExportObj` guard fixes ensure OBJ data populates under `--export-obj`; tested on 2 fallback meshes, build clean, 6/6 tests pass. |
 | Pairing validation (Stage 6) | 🔬 concluded | Investigated why pairings=0 for 0-attribute-set meshes; detailed stream analysis proved `index-u16be-lead` classification is a false positive (4 distinct values, 99% degenerate); strict `vertexCount > IndexMax` check is correct; no valid 0-attr+pairing meshes exist in the inventory. Reverted lenient-fallback attempt. |
 | False-positive `index-u16be-lead` classifier fix (Stage 7) | ✅ complete | Raised `BigEndianDistinctIndexCount` threshold 3→8; added degenerate-ratio gate (≤90%) in catch-all else branch; lowered confidence 70→60. Validated on both false-positive meshes — sentinel bodies now correctly classified as `strided-body`/`uv-float2-ror1-lead`/`normal-float3-ror1-lead`. Build 0 errors, tests 6/6, code review clean. |
+| Endian-analysis root-cause fix (Stage 9) | ✅ complete | Fixed pre-existing bug where `AnalyzeNifStreamEndian` read both `little` and `big` as big-endian (line 9322: `ReadUInt16BigEndian`→`ReadUInt16LittleEndian`), making the endian classifier unable to distinguish them and always returning `ambiguous-small-u16` for small-value streams. Added `ambiguous-small-u16` safety-net handler (≥8 distinct, triangle-aligned, ≤50% degenerate → `index-u16be-lead` c=55). Added guards to `little-endian-u16-lead` gate (≥8 distinct, triangle-aligned, ≤90% degenerate → `index-u16le-lead` c=45) to prevent sentinel misclassification. Updated proof guard baselines for new role/topology values. **PairCompatibleMeshes restored to 1,949** (from 0 post-Stage 7). Build 0 errors, tests 6/6, proof guard PASSED, code review clean. |
 
 ## Approved operating mode 🚀
 
@@ -1330,6 +1331,38 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - **Build:** 0 errors, Tests: 6/6 pass.
 
 - **Key insight for future work:** The `AnalyzeNifUInt16BeIndex` function's `BigEndianDistinctIndexCount` and `DegenerateTriangleRatio` metrics should be used as additional classification gates in `AnalyzeNifMeshBoundStreamRole` to prevent false-positive `index-u16be-lead` classifications on sentinel/repeated-pattern bodies.
+
+**2026-06-03 — Stage 9: Root cause fix — endian-analysis bug + `ambiguous-small-u16`/`little-endian-u16-lead` guards (complete):**
+
+- **Root cause discovered:** The `AnalyzeNifStreamEndian` function (line 9322) had a copy-paste bug: `var little = BinaryPrimitives.ReadUInt16BigEndian(pair)` should have been `ReadUInt16LittleEndian`. Both `little` and `big` variables were reading big-endian, making them **identical**. The endian classifier could never distinguish big-endian from little-endian, always returning `"ambiguous-small-u16"` for streams where both interpretations produced mostly small values (< 4096).
+
+- **Cascading impact:** This pre-existing bug meant NO stream in the entire copied set ever received `"big-endian-u16-lead"` classification. The legitimate `@264` index stream on `6fc01704d4a509d5` (127 distinct values, big-endian prefix `1,2,2,1,3...`) was classified as `"ambiguous-small-u16"` and previously reached `index-u16be-strip-lead` through a complex chain of secondary metrics (triangle alignment, strip degeneracy, etc.).
+
+- **Why Stage 7 appeared to regress:** Stage 7 raised the `BigEndianDistinctIndexCount` threshold from 3→8 in the `big-endian-u16-lead` gate. But that gate was **never matching** the @264 stream (it was `ambiguous-small-u16`, not `big-endian-u16-lead`). The real regression was that Stage 7's `else`-branch degenerate-ratio gate (≤90%) didn't have an `ambiguous-small-u16` counterpart — so streams fell through to `uint16-compatible-body`.
+
+- **Fix 1 — Endian bug (line 9322):** `ReadUInt16BigEndian` → `ReadUInt16LittleEndian` for the `little` variable. After this fix, legitimate big-endian index streams (low-value ratio ≈ 1.0 in big-endian, ≈ 0.5 in little-endian) now correctly receive `"big-endian-u16-lead"` classification.
+
+- **Fix 2 — `ambiguous-small-u16` safety net (new block after line 9618):** Added an else-if handler for streams where endianness is genuinely ambiguous (both BE and LE values are mostly < 4096). When `BigEndianDistinctIndexCount >= 8` AND `TriangleAligned` AND `DegenerateTriangleRatio <= 0.50`, classifies as `index-u16be-lead` with confidence 55. Uses the stricter 0.50 degenerate threshold because endianness is uncertain; lower confidence reflects the ambiguity.
+
+- **Fix 3 — `little-endian-u16-lead` guards (line 9630):** The little-endian gate previously had NO guards — after the endian fix, sentinel bodies (e.g., `eccc388`) were newly being classified as `index-u16le-lead`. Added: `indexStats is not null`, `BigEndianDistinctIndexCount >= 8`, `TriangleAligned`, `DegenerateTriangleRatio <= 0.90`. Confidence lowered from 55→45. Uses big-endian metrics for gating because little-endian DegenerateTriangleRatio isn't separately tracked, and the key concern is filtering false positives.
+
+- **Fix 4 — Proof guard baselines updated (`rift_workflow_guards.py`):**
+  - `ExtraRole` assertion: now accepts `"index-u16be-strip-lead"` and `"index-u16be-lead"` alongside the old `"uint16-compatible-body"`
+  - `Topology` assertion: now accepts `"explicit-index-candidate-present"` alongside `"implicit-strip-or-quad-candidate"` and `"implicit-triangle-strip-or-fan-candidate"`
+  - `PrimaryTopology` assertion (sibling guard): now accepts both old and new values
+  - Expected fitness groups updated: all 4 vertex-count groups (v=128, v=95, v=80, v=64) now expect `Topology: "explicit-index-candidate-present"`
+  - Fitness function `extra_role` check: now accepts all three role values
+
+- **Validation — three target meshes, full inventory, proof guard:**
+  - `6fc01704d4a509d5` mesh#6 (the @264 mesh): `index-u16be-strip-lead` c=85 ✅ — fully restored, 3 pairings, 1 attribute set, 128 vertices
+  - `eccc38820fa28775` mesh#6 (Stage 6 false positive): All streams now non-index (correct: `strided-body` / `uv-float2-ror1-lead` / `normal-float3-ror1-lead`) ✅
+  - `6b721f7a56a8e7e1` mesh#6 (Stage 6 false positive): No index classification ✅
+  - Full inventory (`inventory-nif-mesh-bindings`): **PairCompatibleMeshes restored to 1,949** (from 0 post-Stage 7), `index-u16be-strip-lead` at 1,977 occurrences
+  - Proof guard (`attribute-extra-proof-guard --full --skip-build`): **PASSED** ✅
+
+- **Files changed:** `Program.cs` (~28 lines: 20 additions, 8 deletions), `rift_workflow_guards.py` (~19 lines: 10 additions, 9 deletions)
+
+- **Build:** 0 errors, Tests: 6/6 pass, Code review: clean.
 
 **2026-06-03 — Stage 7: Fix false-positive `index-u16be-lead` classifier (complete):**
 

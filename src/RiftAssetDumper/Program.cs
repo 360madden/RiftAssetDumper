@@ -9319,7 +9319,7 @@ internal static class Program
     for (var i = 0; i < pairCount; i++)
     {
       var pair = body.Slice(i * 2, 2);
-      var little = BinaryPrimitives.ReadUInt16BigEndian(pair);
+      var little = BinaryPrimitives.ReadUInt16LittleEndian(pair);
       var big = BinaryPrimitives.ReadUInt16BigEndian(pair);
       if (littleValues.Count < 32)
       {
@@ -9590,7 +9590,7 @@ internal static class Program
           RotatedFloat3Stats: rotatedFloat3Stats);
     }
 
-    if (endianStats?.Classification == "big-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 3)
+    if (endianStats?.Classification == "big-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8)
     {
       indexMax = indexStats.BigEndianMaxIndex;
       evidence.Add($"big-endian uint16 lead, maxIndex={indexStats.BigEndianMaxIndex}, distinct={indexStats.BigEndianDistinctIndexCount}");
@@ -9608,21 +9608,33 @@ internal static class Program
         roleCandidates.Add(primaryRole);
         evidence.Add($"fixed triples are low-degenerate ({indexStats.DegenerateTriangleRatio:0.####})");
       }
-      else
+      else if (indexStats.DegenerateTriangleRatio <= 0.90 || indexStats.TriangleStripDegenerateRatio <= 0.90)
       {
         primaryRole = "index-u16be-lead";
-        confidence = 70;
+        confidence = 60;
         roleCandidates.Add(primaryRole);
-        evidence.Add("compact big-endian uint16 stream without a proven topology");
+        evidence.Add($"compact big-endian uint16 stream without a proven topology (degRatio={indexStats.DegenerateTriangleRatio:0.####}, stripDegRatio={indexStats.TriangleStripDegenerateRatio:0.####})");
       }
     }
 
-    if (endianStats?.Classification == "little-endian-u16-lead" && primaryRole == "unknown-stream")
+    if (endianStats?.Classification == "ambiguous-small-u16" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8 && indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.50)
     {
-      primaryRole = "index-u16le-lead";
+      indexMax = indexStats.BigEndianMaxIndex;
+      evidence.Add($"ambiguous-small-u16 lead, maxIndex={indexStats.BigEndianMaxIndex}, distinct={indexStats.BigEndianDistinctIndexCount}");
+      primaryRole = "index-u16be-lead";
       confidence = 55;
       roleCandidates.Add(primaryRole);
-      evidence.Add("little-endian uint16 lead; lower confidence than current big-endian family");
+      evidence.Add($"ambiguous endianness uint16 stream, triangle-aligned low-degenerate ({indexStats.DegenerateTriangleRatio:0.####})");
+    }
+
+    if (endianStats?.Classification == "little-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8 && indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.90 && primaryRole == "unknown-stream")
+    {
+      indexMax = indexStats.BigEndianMaxIndex;
+      evidence.Add($"little-endian u16 lead, be-maxIndex={indexStats.BigEndianMaxIndex}, be-distinct={indexStats.BigEndianDistinctIndexCount}");
+      primaryRole = "index-u16le-lead";
+      confidence = 45;
+      roleCandidates.Add(primaryRole);
+      evidence.Add($"little-endian uint16 lead with guards; low confidence ({indexStats.DegenerateTriangleRatio:0.####})");
     }
 
     if (float3Stats.VectorCount >= 3 && float3Stats.FiniteVectorRatio >= 0.95 && float3Stats.PlausibleValueRatio >= 0.95)

@@ -175,8 +175,8 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
             f"{context} count {count} < expected minimum {expected['MinCount']}.",
         )
         assert_proof_guard(
-            extra_role == "uint16-compatible-body",
-            f"{context} ExtraRole changed to {extra_role} (expected uint16-compatible-body).",
+            extra_role in ("uint16-compatible-body", "index-u16be-strip-lead", "index-u16be-lead"),
+            f"{context} ExtraRole changed to {extra_role} (expected uint16-compatible-body or index-u16be-*-lead).",
         )
         assert_proof_guard(
             extra_bytes >= expected["MinExtraBytes"],
@@ -186,6 +186,7 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
             topology in (
                 "implicit-strip-or-quad-candidate",
                 "implicit-triangle-strip-or-fan-candidate",
+                "explicit-index-candidate-present",
             ),
             f"{context} unexpected Topology: {topology}.",
         )
@@ -244,13 +245,13 @@ def _attribute_extra_proof_guard_fitness(
     # Known @264 extra-stream groups (must match expected_groups in the main guard)
     expected_groups = [
         {"MeshSize": 297, "VertexCount": 128, "ExtraDeclaredPayloadBytes": 906, "MinCount": 2,
-         "Topology": "implicit-strip-or-quad-candidate"},
+         "Topology": "explicit-index-candidate-present"},
         {"MeshSize": 297, "VertexCount": 95, "ExtraDeclaredPayloadBytes": 360, "MinCount": 1,
-         "Topology": "implicit-triangle-strip-or-fan-candidate"},
+         "Topology": "explicit-index-candidate-present"},
         {"MeshSize": 297, "VertexCount": 80, "ExtraDeclaredPayloadBytes": 240, "MinCount": 1,
-         "Topology": "implicit-strip-or-quad-candidate"},
+         "Topology": "explicit-index-candidate-present"},
         {"MeshSize": 297, "VertexCount": 64, "ExtraDeclaredPayloadBytes": 252, "MinCount": 1,
-         "Topology": "implicit-strip-or-quad-candidate"},
+         "Topology": "explicit-index-candidate-present"},
     ]
 
     total_count = 0
@@ -279,8 +280,8 @@ def _attribute_extra_proof_guard_fitness(
             f"{context} count {count} < expected minimum {expected['MinCount']}.",
         )
         assert_proof_guard(
-            extra_role == "uint16-compatible-body",
-            f"{context} ExtraRole changed to {extra_role}.",
+            extra_role in ("uint16-compatible-body", "index-u16be-strip-lead", "index-u16be-lead"),
+            f"{context} ExtraRole changed to {extra_role} (expected uint16-compatible-body or index-u16be-*-lead).",
         )
         assert_proof_guard(
             extra_bytes == expected["ExtraDeclaredPayloadBytes"],
@@ -934,7 +935,7 @@ def attribute_extra_sibling_proof_guard(
         )
         assert_proof_guard(
             str(required_json_value(topology, "PrimaryTopology", context))
-            == "implicit-strip-or-quad-candidate",
+            in ("implicit-strip-or-quad-candidate", "explicit-index-candidate-present"),
             f"{context} PrimaryTopology changed.",
         )
         assert_proof_guard(
