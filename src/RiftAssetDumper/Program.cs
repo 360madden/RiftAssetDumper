@@ -2012,16 +2012,6 @@ internal static class Program
     var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
 
-    if (attributeSets.Count == 0)
-    {
-      Console.Error.WriteLine("ERROR: no attribute sets found for this mesh.");
-      return 1;
-    }
-
-    Console.WriteLine($"NIF geometry decode: version={header.VersionText} mesh=#{meshBlock.Index}");
-    Console.WriteLine($"Attribute sets: {attributeSets.Count}");
-    Console.WriteLine();
-
     var objVertices = new List<string>();
     var objNormals = new List<string>();
     var objTexCoords = new List<string>();
@@ -2030,6 +2020,79 @@ internal static class Program
     var totalNormals = 0;
     var totalUvs = 0;
     var objVertexBase = 0;
+
+    if (attributeSets.Count == 0)
+    {
+      if (options.ExperimentalPositionSource)
+      {
+        Console.WriteLine("  [*] ExperimentalPositionSource mode: scanning linked streams for position candidates...");
+        var linkedCandidates = ScanNifLinkedStreamPositionCandidates(payload, header, streamSummaries);
+        Console.WriteLine($"    linked stream candidates: {linkedCandidates.Count}");
+        var float32Candidates = linkedCandidates.Where(static c => c.PositionType == "float32").ToList();
+        if (float32Candidates.Count > 0)
+        {
+          Console.WriteLine($"    float32 position candidates: {float32Candidates.Count}");
+          foreach (var candidate in float32Candidates.Take(4))
+          {
+            Console.WriteLine($"      #{candidate.BlockIndex} offset=@{candidate.MeshPayloadOffset} type={candidate.PositionType} vertexCount={candidate.VertexCount} role={candidate.Role}");
+          }
+
+          // Decode positions from the first float32 candidate
+          var leadCandidate = float32Candidates[0];
+          var vertexCount = leadCandidate.VertexCount;
+          var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
+          var positionSamples = BuildNifAttributeFloatVertexSamples(
+              payload, blocksByIndex, leadCandidate.BlockIndex,
+              "position", leadCandidate.Role, components: 3, vertexIndices);
+          Console.WriteLine($"    decoded positions: {positionSamples.Count}/{vertexCount}");
+
+          // Print sample vertices
+          var sampleCount = Math.Min(4, vertexCount);
+          if (positionSamples.Count > 0)
+          {
+            Console.WriteLine($"    position samples ({sampleCount}):");
+            for (var i = 0; i < sampleCount && i < positionSamples.Count; i++)
+            {
+              var s = positionSamples[i];
+              Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)}, {FormatNullableDouble(s.Z)}) prevDist={FormatNullableDouble(s.PreviousDistance)} nextDist={FormatNullableDouble(s.NextDistance)}");
+            }
+          }
+
+          // Build OBJ data
+          if (options.WriteObj)
+          {
+            for (var i = 0; i < positionSamples.Count; i++)
+            {
+              var s = positionSamples[i];
+              if (s.X.HasValue && s.Y.HasValue && s.Z.HasValue)
+              {
+                objVertices.Add($"v {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Z.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+              }
+            }
+          }
+
+          totalPositions += positionSamples.Count;
+        }
+        else
+        {
+          Console.Error.WriteLine("ERROR: no float32 position candidates found in linked streams.");
+          Console.WriteLine($"  Found {linkedCandidates.Count} non-float32 candidates: {string.Join(", ", linkedCandidates.Select(static c => c.PositionType).Distinct())}");
+        }
+      }
+      else
+      {
+        Console.Error.WriteLine("ERROR: no attribute sets found for this mesh. Use --experimental-position-source to probe linked streams.");
+      }
+
+      if (objVertices.Count == 0)
+      {
+        return 1;
+      }
+    }
+
+    Console.WriteLine($"NIF geometry decode: version={header.VersionText} mesh=#{meshBlock.Index}");
+    Console.WriteLine($"Attribute sets: {attributeSets.Count}");
+    Console.WriteLine();
 
     for (var setIndex = 0; setIndex < attributeSets.Count; setIndex++)
     {
@@ -12534,7 +12597,7 @@ internal static class Program
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif --root <SourceFolder> --id <16hex>");
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-streams --root <SourceFolder> --id <16hex> --mesh-block <n>");
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --root <SourceFolder> --id <16hex> --mesh-block <n>");
-    Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-nif-geometry --root <SourceFolder> --id <16hex> --mesh-block <n> [--write-obj] [--experimental]");
+    Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-nif-geometry --root <SourceFolder> --id <16hex> --mesh-block <n> [--write-obj] [--experimental] [--experimental-position-source]");
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-position-source --root <SourceFolder> --id <16hex> --mesh-block <n>");
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- validate-uint16-positions --root <SourceFolder> --id <16hex> --mesh-block <n>");
     Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- probe-nif-attribute-extra --root <SourceFolder> --id <16hex> --mesh-block <n> --extra-offset <n>");
@@ -12573,7 +12636,8 @@ internal static class Program
     Console.WriteLine("                  Only process one copied archive chunk");
     Console.WriteLine("  --id <16hex>    Only extract one asset ID prefix");
     Console.WriteLine("  --mesh-block <n>");
-    Console.WriteLine("  --experimental"); Console.WriteLine("                  Enable experimental geometry decode features"); Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file"); Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
+    Console.WriteLine("  --experimental"); Console.WriteLine("                  Enable experimental geometry decode features"); Console.WriteLine("  --experimental-position-source"); Console.WriteLine("                  Use linked-stream position-source probe when no attribute sets found");
+      Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file"); Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
     Console.WriteLine("  --stream-block <n>");
     Console.WriteLine("                  Optional NiDataStream block index filter for probe-nif-stream-body");
     Console.WriteLine("  --extra-offset <n>");
@@ -12717,6 +12781,7 @@ internal static class Program
       int? ExtraOffsetFilter,
       bool RedactPaths,
       bool Experimental,
+      bool ExperimentalPositionSource,
       bool WriteObj)
   {
     public static AppOptions Parse(string[] args)
@@ -12754,6 +12819,7 @@ internal static class Program
       int? extraOffsetFilter = null;
       var redactPaths = true;
       var experimental = false;
+      var experimentalPositionSource = false;
       var writeObj = false;
 
       for (var i = 0; i < args.Length; i++)
@@ -12976,6 +13042,9 @@ internal static class Program
           case "--experimental":
             experimental = true;
             break;
+          case "--experimental-position-source":
+            experimentalPositionSource = true;
+            break;
           case "--write-obj":
             writeObj = true;
             break;
@@ -13059,6 +13128,7 @@ internal static class Program
           extraOffsetFilter,
           redactPaths,
           experimental,
+          experimentalPositionSource,
           writeObj);
     }
 
