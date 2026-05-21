@@ -2059,7 +2059,7 @@ internal static class Program
           }
 
           // Build OBJ data
-          if (options.WriteObj)
+          if (options.WriteObj || options.ExportObj)
           {
             for (var i = 0; i < positionSamples.Count; i++)
             {
@@ -2096,7 +2096,7 @@ internal static class Program
               }
             }
 
-            if (options.WriteObj)
+            if (options.WriteObj || options.ExportObj)
             {
               for (var i = 0; i < normalSamples.Count; i++)
               {
@@ -2123,7 +2123,7 @@ internal static class Program
                 "uv", uvCandidate.Role, components: 2, vertexIndices);
             Console.WriteLine($"    decoded uvs: {uvSamples.Count}/{vertexCount}");
 
-            if (options.WriteObj)
+            if (options.WriteObj || options.ExportObj)
             {
               for (var i = 0; i < uvSamples.Count; i++)
               {
@@ -2137,6 +2137,96 @@ internal static class Program
 
             totalUvs += uvSamples.Count;
           }
+
+          // Generate triangle faces from paired index streams (ExperimentalPositionSource fallback)
+          if ((options.WriteObj || options.ExportObj) && objVertices.Count > 0)
+          {
+            var pairings = FindNifMeshProbePairings(streamSummaries);
+            var confidentPairings = pairings
+                .Where(static p => p.Confidence >= 80 && p.IndexMax < ushort.MaxValue)
+                .OrderByDescending(static p => p.Confidence)
+                .ThenByDescending(static p => p.IndexCoverageRatio)
+                .ToList();
+
+            Console.WriteLine($"    index-vertex pairings: {pairings.Count} total, {confidentPairings.Count} confident (minimum 80)");
+
+            if (confidentPairings.Count > 0)
+            {
+              var bestPairing = confidentPairings[0];
+              Console.WriteLine($"    best pairing: index=#{bestPairing.IndexBlockIndex} role={bestPairing.IndexRole} max={bestPairing.IndexMax} vertexCount={bestPairing.VertexCount} coverage={bestPairing.IndexCoverageRatio:0.####} confidence={bestPairing.Confidence}");
+
+              if (blocksByIndex.TryGetValue(bestPairing.IndexBlockIndex, out var indexStreamBlock))
+              {
+                var indexPayload = SliceNifBlockPayload(payload, indexStreamBlock);
+                if (indexPayload.Length >= 4)
+                {
+                  var indexDeclaredBytes = BinaryPrimitives.ReadUInt32LittleEndian(indexPayload[..4]);
+                  if (indexDeclaredBytes > 0 && indexDeclaredBytes <= indexPayload.Length - 4)
+                  {
+                    var indexHeaderLen = indexPayload.Length - checked((int)indexDeclaredBytes);
+                    var indexBody = indexPayload.Slice(indexHeaderLen, checked((int)indexDeclaredBytes));
+                    var indices = ReadUInt16BigEndianValues(indexBody);
+
+                    if (indices.Count >= 3)
+                    {
+                      var vc = vertexCount;
+                      var facesGenerated = 0;
+                      for (var w = 0; w < indices.Count - 2; w++)
+                      {
+                        var a = (int)indices[w];
+                        var b = (int)indices[w + 1];
+                        var c = (int)indices[w + 2];
+                        // Skip degenerate triangles (any two equal vertices)
+                        if (a == b || a == c || b == c)
+                          continue;
+                        // Skip out-of-range indices
+                        if (a >= vc || b >= vc || c >= vc)
+                          continue;
+                        var oa = objVertexBase + a + 1;
+                        var ob = objVertexBase + b + 1;
+                        var oc = objVertexBase + c + 1;
+                        if ((w & 1) == 0)
+                          objFaces.Add($"f {oa}/{oa}/{oa} {ob}/{ob}/{ob} {oc}/{oc}/{oc}");
+                        else
+                          objFaces.Add($"f {oa}/{oa}/{oa} {oc}/{oc}/{oc} {ob}/{ob}/{ob}");
+                        facesGenerated++;
+                      }
+
+                      if (facesGenerated > 0)
+                        Console.WriteLine($"    paired strip faces: {facesGenerated} (indices={indices.Count}, vertexBase={objVertexBase})");
+                      else
+                        Console.WriteLine("    paired strip produced 0 non-degenerate faces");
+                    }
+                    else
+                    {
+                      Console.WriteLine($"    index stream #{bestPairing.IndexBlockIndex} has only {indices.Count} indices (need minimum 3)");
+                    }
+                  }
+                  else
+                  {
+                    Console.WriteLine($"    index stream #{bestPairing.IndexBlockIndex}: declared bytes {indexDeclaredBytes} out of range");
+                  }
+                }
+                else
+                {
+                  Console.WriteLine($"    index stream #{bestPairing.IndexBlockIndex}: payload too short ({indexPayload.Length} bytes)");
+                }
+              }
+              else
+              {
+                Console.WriteLine($"    index stream block #{bestPairing.IndexBlockIndex} not found in block map");
+              }
+            }
+            else if (pairings.Count > 0)
+            {
+              Console.WriteLine($"    all {pairings.Count} pairings below confidence 80; top confidence={pairings[0].Confidence}");
+            }
+            else
+            {
+              Console.WriteLine("    no index-vertex pairings found; OBJ will have vertices but no faces");
+            }
+          }
+
         }
         else
         {
@@ -2392,7 +2482,7 @@ internal static class Program
       writer.WriteLine($"# NIF version: {header.VersionText}");
       writer.WriteLine($"# Mesh block: #{meshBlock.Index}");
       writer.WriteLine($"# Positions: {objVertices.Count}  Normals: {objNormals.Count}  UVs: {objTexCoords.Count}");
-      writer.WriteLine($"# Faces: {objFaces.Count}  (degenerate-bridge UInt16BE strip @264)");
+      writer.WriteLine($"# Faces: {objFaces.Count}  (degenerate-bridge UInt16BE strip)");
       writer.WriteLine();
       foreach (var v in objVertices)
         writer.WriteLine(v);

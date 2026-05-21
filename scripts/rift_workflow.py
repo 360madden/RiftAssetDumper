@@ -37,12 +37,14 @@ Commands (kebab-case):
     stream-endianness            — inventory-nif-stream-endianness + summary
     stream-bodies                — inventory-nif-stream-bodies + summary
     decode-geometry              — decode-nif-geometry + summary (needs --id --mesh-block; supports --experimental-position-source)
+    batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
 
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -206,6 +208,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "needs_id": True,
         "needs_mesh_block": True,
     },
+    "batch-export-264": {
+        "dotnet": "",
+        "base": "",
+    },
 }
 
 
@@ -240,6 +246,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "StreamEndianness": "stream-endianness",
     "StreamBodies": "stream-bodies",
     "DecodeGeometry": "decode-geometry",
+    "BatchExport264": "batch-export-264",
     "All": "all",
 }
 
@@ -703,6 +710,149 @@ def _run_command(args: argparse.Namespace) -> None:
         )
         return
 
+    # --- batch-export-264: export all @264-indexed meshes via --export-obj ---
+
+    if command == "batch-export-264":
+        _KNOWN_264_IDS: list[dict[str, int | str]] = [
+            {"id": "6fc01704d4a509d5", "v": 128},
+            {"id": "caa9a88e94ec8db0", "v": 128},
+            {"id": "dfa4b4fccd826b59", "v": 64},
+            {"id": "0603cce7cee15eb8", "v": 80},
+            {"id": "3de9c1236fe20520", "v": 95},
+        ]
+
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        results: list[dict[str, object]] = []
+        mesh_block = args.mesh_block if args.mesh_block >= 0 else 6
+
+        print()
+        print("=" * 70)
+        print("  Batch Export: @264 Indexed OBJs")
+        print("=" * 70)
+        print()
+        print(f"  Mesh block:  {mesh_block}")
+        print(f"  Output dir:  {out_dir}")
+        print(f"  Asset count: {len(_KNOWN_264_IDS)}")
+        print()
+
+        for entry_item in _KNOWN_264_IDS:
+            asset_id: str = str(entry_item["id"])
+            vertex_count: int = int(entry_item["v"])  # type: ignore[arg-type]
+            label = f"export-obj {asset_id} (v={vertex_count})"
+
+            dotnet_args: list[str] = [
+                "run", "--project", str(project), "--",
+                "decode-nif-geometry",
+                "--root", str(root),
+                "--id", asset_id,
+                "--mesh-block", str(mesh_block),
+                "--export-obj",
+            ]
+
+            # Output path: use a directory (no file extension) so ResolveOutputPath
+            # treats it as a directory, and the OBJ lands at {outDir}/decode-nif-geometry-mesh6.obj
+            out_dir_path = out_dir / f"decode-nif-geometry-{asset_id}"
+            dotnet_args += ["--out", str(out_dir_path)]
+
+            print(f"\n{'-' * 60}")
+            print(f"  {label}")
+            print(f"{'-' * 60}")
+
+            try:
+                result = subprocess.run(
+                    ["dotnet", *dotnet_args],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    cwd=str(REPO_ROOT),
+                )
+
+                if result.returncode != 0:
+                    print(f"  FAILED (exit code {result.returncode})")
+                    if result.stderr:
+                        stderr_lines = result.stderr.strip().splitlines()
+                        for line in stderr_lines[-8:]:
+                            print(f"    {line}")
+                    results.append({
+                        "id": asset_id,
+                        "v": vertex_count,
+                        "status": "FAIL",
+                        "exitCode": result.returncode,
+                    })
+                    continue
+
+                # Show dotnet output in verbose mode
+                if args.verbose and result.stdout:
+                    for line in result.stdout.strip().splitlines():
+                        print(f"    {line}")
+
+                # Check OBJ was produced — ResolveOutputPath nests into a
+                # "decode-nif-geometry" subdirectory when --out is a dir.
+                obj_path = out_dir_path / "decode-nif-geometry" / f"decode-nif-geometry-mesh{mesh_block}.obj"
+                obj_exists = obj_path.exists()
+                obj_size = obj_path.stat().st_size if obj_exists else 0
+
+                if obj_exists and obj_size > 0:
+                    print(f"  [OK] OBJ written: {obj_path.name} ({obj_size:,} bytes)")
+                    results.append({
+                        "id": asset_id,
+                        "v": vertex_count,
+                        "status": "OK",
+                        "objBytes": obj_size,
+                    })
+                else:
+                    print(f"  [WARN] OBJ NOT FOUND at {obj_path}")
+                    results.append({
+                        "id": asset_id,
+                        "v": vertex_count,
+                        "status": "NO_OBJ",
+                    })
+
+            except Exception as exc:
+                print(f"  [ERROR] {exc}")
+                if args.verbose:
+                    import traceback
+                    traceback.print_exc()
+                results.append({
+                    "id": asset_id,
+                    "v": vertex_count,
+                    "status": "ERROR",
+                    "error": str(exc),
+                })
+
+        # --- Summary ---
+        print()
+        print("=" * 70)
+        print("  Batch Export Summary")
+        print("=" * 70)
+        ok_count = sum(1 for r in results if r.get("status") == "OK")
+        fail_count = sum(1 for r in results if r.get("status") != "OK")
+        total_bytes = sum(int(r.get("objBytes", 0)) for r in results)  # type: ignore[arg-type]
+        print(f"  Passed: {ok_count}/{len(results)}")
+        print(f"  Failed: {fail_count}/{len(results)}")
+        print(f"  Total OBJ bytes: {total_bytes:,}")
+        print()
+        for r_item in results:
+            sid = r_item.get("id", "?")
+            sv = r_item.get("v", "?")
+            sstatus = r_item.get("status", "?")
+            sobj = int(r_item.get("objBytes", 0))
+            marker = "[OK]" if sstatus == "OK" else "[!!]"
+            print(f"  {marker} {sid}  v={sv}  status={sstatus}  obj={sobj:,}B")
+        print()
+        return
+
     # Validate required args
     if entry.get("needs_id") and not args.id:
         print(f"ERROR: '{command}' requires --id <16hex>", file=sys.stderr)
@@ -858,6 +1008,11 @@ Examples:
         "--privacy-scan",
         action="store_true",
         help="Enable privacy scan (discovery-workbench)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show full dotnet output for batch commands",
     )
 
     args = parser.parse_args()

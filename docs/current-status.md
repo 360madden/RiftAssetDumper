@@ -1,13 +1,13 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-06-01
+Date: 2026-06-03
 
 ## 🐍 Python migration status (PS→Py phase 1)
 
 | Component | Status | Notes |
 |---|---|---|
 | `scripts/rift_workflow_utils.py` (49 unit tests) | ✅ complete | All utility functions ported and tested |
-| `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing, `decode-geometry` with `--experimental-position-source` |
+| `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing, `decode-geometry` with `--experimental-position-source`, `batch-export-264` batch OBJ exporter |
 | `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
 | `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
 | `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` (dual-path: fitness/stream) + `attribute_extra_sibling_proof_guard` (dual-path: index-role/body-role) ported from PS. Fitness path now validates @264 aggregate edge/area/normal/parity/strip-structure regressions. |
@@ -32,6 +32,7 @@ python scripts/rift_workflow.py attribute-extra-proof-guard --full --skip-build
 python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
 python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-block 6 --full
 python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-block 6 --experimental-position-source --write-obj
+python scripts/rift_workflow.py batch-export-264 --skip-build
 ```
 
 **Unported modes still use legacy PS:**
@@ -87,6 +88,8 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
 | Attribute extra streams | ✅ split truth | Focused probing down-ranked low-variation `@272/#25` and `@296` side streams, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like, first-segment proof samples include area/parity plus compact review flags, and the aggregate + focused sibling proof guards now fail if those proof signals silently flip. |
 | Position source fallback (Stage 2) | ✅ complete | `--experimental-position-source` decodes normals+UVs+positions; `--write-obj` wired; end-to-end validated on 2 real fallback meshes; `triage-fallback-candidates` command added. Build/test/code-review clean. |
+| @264 batch OBJ export (Stage 4) | ✅ complete | `batch-export-264` command exports all 5 known `@264`-indexed meshes (v=128/128/95/80/64) via `--export-obj`; 5/5 passed, 71,435 bytes total. |
+| Position fallback faces (Stage 5) | ✅ complete | Experimental-position-source path now generates UInt16BE degenerate-bridge triangle-strip OBJ faces from index-stream pairings (`FindNifMeshProbePairings`); 4 `WriteObj`→`WriteObj||ExportObj` guard fixes ensure OBJ data populates under `--export-obj`; tested on 2 fallback meshes, build clean, 6/6 tests pass. |
 
 ## Approved operating mode 🚀
 
@@ -1258,6 +1261,45 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - Face format uses raw-zero-based indexing (+1 for OBJ), consistent with the proven degenerate-bridge strip hypothesis.
 - Only `@264` extra streams are decoded for faces; other index sources are not yet wired.
 
+**2026-06-03 — Stage 5: Pairing-based face generation for experimental-position-source path (complete):**
+
+- Added index-stream pairing face generation to the 0-attribute-set (`ExperimentalPositionSource`) fallback path in `DecodeNifGeometry`.
+- Calls `FindNifMeshProbePairings` to find index+vertex pairings, filters to `Confidence >= 80` and `IndexMax < ushort.MaxValue`, selects the best pairing by confidence and index-coverage ratio.
+- Reads the index stream's UInt16BE strip body, validates declared bytes and header boundary, then generates degenerate-bridge triangle-strip OBJ faces — identical strip semantics to the attribute-set `@264` path.
+- Logs pairing diagnostics: `"index-vertex pairings: {N} total, {M} confident (minimum 80)"` and best-pairing details (index block, role, vertex count, coverage, confidence).
+- **Bug fix:** 4 guard conditions in the experimental path checked `options.WriteObj` but not `options.ExportObj`, causing OBJ data to never populate when using `--export-obj` and the function to return 1. Changed all 4 to `options.WriteObj || options.ExportObj` (position OBJ build, normal OBJ build, UV OBJ build, pairing face guard).
+- **End-to-end validated** on 2 real 0-attribute-set meshes:
+  - `32627573da8985b8` mesh#6: 22 positions + 22 normals, 0 pairings found, OBJ written ✅
+  - `4ab9985fe8846184` mesh#6: 24 positions + 24 normals, 0 pairings found, OBJ written ✅
+  - Both meshes correctly report pairings=0 and skip face generation; the code path runs without crash.
+- File cleanup: removed temp helper scripts (`scripts/_insert_pairing_faces.py`, `scripts/_validate_objs.py`), cleared test OBJ output.
+- Build: 0 errors, Tests: 6/6 pass, Code review: clean.
+
+**Known limitations:**
+- No 0-attribute-set mesh with index pairings was found in the current copied archive subset (the `pair-compatible meshes` count in the mesh-binding inventory is 2,076 but those pairings are with vertex streams that are not position streams). The code path is in place and tested to degrade gracefully (reports "all below threshold" or "no pairings found" and skips faces).
+- If a future mesh does have pairings in the experimental path, the index-body validation requires the stream header's first uint32 to be ≤ `payload.Length - 4`; malformed streams will be skipped with a console message.
+- Face format uses +1 vertex offset (OBJ 1-based) and degenerate-bridge triangle-strip walking, consistent with the `@264` attribute-set path.
+
+**2026-06-03 — Stage 4: batch-export-264 command (complete):**
+- Added `batch-export-264` Python workflow command — batch exports all 5 known `@264`-indexed meshes via `--export-obj`.
+- Uses hardcoded known-good IDs from mesh-binding inventory: all `meshSize=297`, `meshBlock=6`, `extra@264`, `index-u16be-strip-lead`.
+- Each mesh gets its own output subdirectory under `Exports/decode-nif-geometry-{id}/` to avoid overwrites.
+- ASCII-safe output for Windows cp1252 console compatibility (replaced Unicode box-drawing characters).
+- `--verbose` flag shows full dotnet stdout; stderr displayed on failure.
+- `--skip-build` supported for iterative runs.
+- **Batch results (all 5 passed):**
+
+| Asset ID | Vertex count | OBJ size | Status |
+|---|---:|---:|---|
+| `6fc01704d4a509d5` | 128 | 20,939 B | [OK] |
+| `caa9a88e94ec8db0` | 128 | 20,939 B | [OK] |
+| `dfa4b4fccd826b59` | 64 | 8,198 B | [OK] |
+| `0603cce7cee15eb8` | 80 | 9,476 B | [OK] |
+| `3de9c1236fe20520` | 95 | 11,883 B | [OK] |
+
+- **Total: 5/5 passed, 71,435 bytes.** Build: 0 errors, Tests: 6/6 pass, Syntax check: clean.
+- Usage: `python scripts/rift_workflow.py batch-export-264 --skip-build`
+
 ## Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
@@ -1272,5 +1314,6 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 10. ✅ Added `--write-obj` flag to Python workflow orchestrator for easy CLI access.
 11. ✅ `--export-obj` experimental gate for attribute-set `@264` indexed OBJ exporter.
 12. Open the first `--export-obj` output in external 3D viewer (Blender/MeshLab) for visual validation.
-13. Scale to all 5 @264-indexed meshes (`meshSize=297` family, v=128/95/80/64) and batch-test.
-14. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+13. ✅ Scale to all 5 @264-indexed meshes (`meshSize=297` family, v=128/95/80/64) — `batch-export-264` command complete.
+14. Open the first `--export-obj` output in external 3D viewer (Blender/MeshLab) for visual validation.
+15. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
