@@ -90,6 +90,8 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Position source fallback (Stage 2) | ✅ complete | `--experimental-position-source` decodes normals+UVs+positions; `--write-obj` wired; end-to-end validated on 2 real fallback meshes; `triage-fallback-candidates` command added. Build/test/code-review clean. |
 | @264 batch OBJ export (Stage 4) | ✅ complete | `batch-export-264` command exports all 5 known `@264`-indexed meshes (v=128/128/95/80/64) via `--export-obj`; 5/5 passed, 71,435 bytes total. |
 | Position fallback faces (Stage 5) | ✅ complete | Experimental-position-source path now generates UInt16BE degenerate-bridge triangle-strip OBJ faces from index-stream pairings (`FindNifMeshProbePairings`); 4 `WriteObj`→`WriteObj||ExportObj` guard fixes ensure OBJ data populates under `--export-obj`; tested on 2 fallback meshes, build clean, 6/6 tests pass. |
+| Pairing validation (Stage 6) | 🔬 concluded | Investigated why pairings=0 for 0-attribute-set meshes; detailed stream analysis proved `index-u16be-lead` classification is a false positive (4 distinct values, 99% degenerate); strict `vertexCount > IndexMax` check is correct; no valid 0-attr+pairing meshes exist in the inventory. Reverted lenient-fallback attempt. |
+| False-positive `index-u16be-lead` classifier fix (Stage 7) | ✅ complete | Raised `BigEndianDistinctIndexCount` threshold 3→8; added degenerate-ratio gate (≤90%) in catch-all else branch; lowered confidence 70→60. Validated on both false-positive meshes — sentinel bodies now correctly classified as `strided-body`/`uv-float2-ror1-lead`/`normal-float3-ror1-lead`. Build 0 errors, tests 6/6, code review clean. |
 
 ## Approved operating mode 🚀
 
@@ -1299,6 +1301,55 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 - **Total: 5/5 passed, 71,435 bytes.** Build: 0 errors, Tests: 6/6 pass, Syntax check: clean.
 - Usage: `python scripts/rift_workflow.py batch-export-264 --skip-build`
+
+**2026-06-03 — Stage 6: Pairing validation for 0-attribute-set meshes (concluded — negative result):**
+
+- **Investigation goal:** Determine why `FindNifMeshProbePairings` returns 0 pairings for meshes with 0 attribute sets, despite some having `index-u16be-lead` classified streams. If valid pairings exist, wire them into the experimental-position-source OBJ face path.
+
+- **Hypothesis tested:** `IndexMax` from `AnalyzeNifUInt16BeIndex` might be inflated by non-index metadata bytes at the start of NiDataStream blocks or degenerate-bridge sentinel values. A lenient fallback could use the largest vertex-count candidate when no vertex count exceeds `IndexMax`.
+
+- **Lenient fallback attempt (reverted):**
+  - Modified `FindNifMeshProbePairings` to use `OrderByDescending` (largest vertex count candidate) when `compatibleVertexCount <= 0`, with a 20-point confidence penalty.
+  - Lowered the experimental-path confidence threshold from 80→60→55.
+  - Tested on `eccc38820fa28775` mesh#6 and `6b721f7a56a8e7e1` mesh#6.
+  - **Result:** Pairings were found at confidence 55, but face generation produced **0 faces** because `IndexMax=512` far exceeded `vertexCount=116`/`122` — all indices were out-of-range.
+
+- **Root cause discovered:** Deep stream analysis proved the `index-u16be-lead` classification on these meshes is a **false positive**:
+  - `eccc38820fa28775`: 232 index pairs, only **4 distinct values**, 228/230 strip windows degenerate (99.1%).
+  - `6b721f7a56a8e7e1`: 362 index pairs, only **4 distinct values**, 358/360 strip windows degenerate (99.4%).
+  - The streams contain repeated sentinel-like patterns, not real index data.
+
+- **Full inventory verification:** Scanned the entire `nif-mesh-binding-inventory.json` — all 100 `TopPatterns` have `PairCompatibleCount=0`. **No mesh in the copied archive set** has both 0 attribute sets AND valid index-vertex pairings (where `vertexCount > IndexMax` and the index stream is genuine).
+
+- **Conclusion:** The strict `vertexCount > IndexMax` check in `FindNifMeshProbePairings` is correct. The lenient fallback was fully reverted. The `index-u16be-lead` role classifier needs improvement (distinct-count / degenerate-ratio thresholds) but that is a separate task.
+
+- **Impact on Stage 5:** The Stage 5 pairing-based face generation code path remains in place and correctly degrades (reports "0 pairings" and skips faces) for all known 0-attribute-set meshes. No behavioral change to production code.
+
+- **Files changed:** `Program.cs` (lenient fallback added, tested, fully reverted — net-zero diff).
+
+- **Build:** 0 errors, Tests: 6/6 pass.
+
+- **Key insight for future work:** The `AnalyzeNifUInt16BeIndex` function's `BigEndianDistinctIndexCount` and `DegenerateTriangleRatio` metrics should be used as additional classification gates in `AnalyzeNifMeshBoundStreamRole` to prevent false-positive `index-u16be-lead` classifications on sentinel/repeated-pattern bodies.
+
+**2026-06-03 — Stage 7: Fix false-positive `index-u16be-lead` classifier (complete):**
+
+- **Problem:** Streams with 4 distinct `uint16` values and 99% degenerate triangle ratios were incorrectly classified as `index-u16be-lead` (confidence 70). This caused `FindNifMeshProbePairings` to treat them as real index data, producing pairings with wildly inflated `IndexMax` values (e.g., 512 vs actual vertex count ~116), which then failed the `vertexCount > IndexMax` check.
+
+- **Fix — two targeted gates in `AnalyzeNifMeshBoundStreamRole` (lines 9593, 9611-9617):**
+  1. **Entry gate:** Raised `BigEndianDistinctIndexCount` threshold from `>= 3` to `>= 8`. A real index buffer references many distinct vertices; sentinel/repeated-pattern bodies have 4 or fewer. Real index streams (e.g., `@264` family) have 64–127+ distinct values.
+  2. **Else-branch degenerate-ratio gate:** The catch-all `else` (for streams without proven strip or list topology) now checks `DegenerateTriangleRatio <= 0.90 || TriangleStripDegenerateRatio <= 0.90` before classifying as `index-u16be-lead`. Streams with ≥99% degenerate ratios (sentinel bodies) are excluded. Confidence lowered from 70 to 60 to reflect unproven topology. Evidence string now includes both degenerate ratios for traceability.
+
+- **Validation — tested on both Stage 6 false-positive meshes:**
+  - `eccc38820fa28775` mesh#6: Previously had `index-u16be-lead` (confidence 70). Now correctly has **no index role** — stream roles are `strided-body` / `uv-float2-ror1-lead` / `normal-float3-ror1-lead`.
+  - `6b721f7a56a8e7e1` mesh#6: Previously had `index-u16be-lead` (confidence 70). Now correctly has **no index role** — same non-index role pattern.
+
+- **Impact:** Fewer false-positive index classifications mean less noise in mesh pairing inventory, more accurate `PairCompatibleCount` metrics, and no wasted cycles on pairing checks against sentinel bodies.
+
+- **Real index streams unaffected:** Known-good streams (e.g., `@264/#15` on `6fc01704d4a509d5` with 127 distinct values, 29–48% degenerate) pass both gates and continue to classify as `index-u16be-strip-lead` (confidence 85).
+
+- **Files changed:** `Program.cs` — 2 lines modified (distinct threshold + else-branch gate).
+
+- **Build:** 0 errors, Tests: 6/6 pass, Code review: clean.
 
 ## Current safest next direction 🛡️
 
