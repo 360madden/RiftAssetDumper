@@ -15,10 +15,9 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 REPORT_FILES = {
     "inventory": "nif-mesh-binding-inventory.json",
@@ -61,7 +60,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def utc_from_timestamp(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(timestamp, tz=UTC).isoformat()
 
 
 def sha256_file(path: Path) -> str:
@@ -366,7 +365,10 @@ def build_extra_position_candidate(reports: dict[str, LoadedReport], repo_root: 
     if not pairs:
         return []
     ids = [str(row.get("Id")) for row in pairs if row.get("Id")]
-    payloads = [str(re.search(r"payload=(\d+)", str(row.get("Mesh34ExtraPosition") or "")).group(1)) for row in pairs if re.search(r"payload=(\d+)", str(row.get("Mesh34ExtraPosition") or ""))]
+    def _extract_payload(row: dict[str, Any]) -> str | None:
+        match = re.search(r"payload=(\d+)", str(row.get("Mesh34ExtraPosition") or ""))
+        return match.group(1) if match else None
+    payloads = [p for row in pairs if (p := _extract_payload(row)) is not None]
     commands = [repo_command(repo_root, "PositionSourceSiblingExtraPositionReport", "-SkipBuild", "-PrivacyScan")]
     for asset_id in ids[:2]:
         commands.append(mesh_probe_command(repo_root, asset_id, 7))
@@ -793,7 +795,7 @@ def main() -> int:
     queue_json = exports / "discovery-next-probe-queue.json"
     queue_md = exports / "discovery-next-probe-queue.md"
 
-    generated_at = datetime.now(timezone.utc).isoformat()
+    generated_at = datetime.now(UTC).isoformat()
     scoreboard_payload = {
         "Schema": "discovery-workbench-scoreboard/v1",
         "CandidateOnly": True,

@@ -1,0 +1,28 @@
+# top-most EditorConfig file
+root = true
+
+[*]
+indent_style = space
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+[*.{cs,csproj,slnx}]
+indent_size = 2
+indent_style = space
+
+[*.{py,toml,yml,yaml}]
+indent_size = 4
+indent_style = space
+
+[*.ps1]
+indent_size = 4
+indent_style = space
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{json,jsonl}]
+indent_size = 2
+indent_style = space

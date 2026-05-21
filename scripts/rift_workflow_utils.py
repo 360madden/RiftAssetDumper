@@ -12,10 +12,10 @@ stays low-friction.
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +55,22 @@ def json_value_or_none(obj: Any, key: str) -> Any:  # noqa: ANN401 - mirror PS f
     if not isinstance(obj, dict):
         return None
     return obj.get(key)
+
+
+def safe_int(value: object) -> int:
+    """Safely convert a JSON/object value to int, returning 0 for non-numeric types.
+
+    Handles int, float, str, and None inputs without triggering mypy
+    call-overload errors on int(object).
+    """
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return 0
+    return 0
 
 
 def json_double_or_none(obj: Any, key: str) -> float | None:
@@ -288,7 +304,7 @@ def generated_output_guard(repo_root: Path | None = None) -> None:
             f"GeneratedOutputGuard failed: staged generated/copy/build output paths found ({len(staged_generated)})."
         )
 
-    print(f"\n--- GeneratedOutputGuard")
+    print("\n--- GeneratedOutputGuard")
     print(f"Tracked generated/copy/build output paths: {len(tracked_generated)}")
     print(f"Staged generated/copy/build output paths: {len(staged_generated)}")
     print(
@@ -336,7 +352,7 @@ def format_markdown_cell(value: Any) -> str:  # noqa: ANN401 - stringify anythin
 
 def top_text(
     items: list[Any],
-    formatter: callable,  # type: ignore[type-arg]
+    formatter: Callable[[Any], str],
     take: int = 5,
 ) -> str:
     """Apply formatter to first `take` items, join with ' | '.
@@ -475,10 +491,12 @@ def semantic_hint_bucket(path: str) -> str:
 # JSON load helper
 # ============================================================================
 
-def load_json_report(path: str | Path) -> dict[str, Any]:
+def load_json_report(path: str | Path) -> Any:
     """Load a JSON report file, raising on missing/parse errors.
 
     Mirrors the common pattern: Get-Content ... -Raw | ConvertFrom-Json
+
+    Returns Any (dict, list, etc.) depending on what the JSON contains.
     """
     path = Path(path)
     if not path.exists():

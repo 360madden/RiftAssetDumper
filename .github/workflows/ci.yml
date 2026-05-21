@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dotnet:
+    name: .NET Build & Test
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: dotnet build
+        run: dotnet build RiftAssetDumper.slnx --nologo
+
+      - name: dotnet format (check)
+        run: dotnet format RiftAssetDumper.slnx --verify-no-changes
+
+      - name: dotnet test
+        run: dotnet test RiftAssetDumper.slnx --nologo
+
+  python:
+    name: Python Lint & Test
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy pytest
+
+      - name: Python syntax check
+        run: python -m py_compile scripts/*.py
+
+      - name: ruff lint
+        run: ruff check scripts/
+
+      - name: mypy type check
+        run: mypy scripts/ --no-error-summary
+
+      - name: Python tests
+        run: python scripts/test_rift_workflow_utils.py
+
+  final:
+    name: Summary
+    needs: [dotnet, python]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check status
+        run: |
+          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ]; then
+            echo "✅ All CI checks passed"
+          else
+            echo "❌ Some CI checks failed"
+            echo "  dotnet: ${{ needs.dotnet.result }}"
+            echo "  python: ${{ needs.python.result }}"
+            exit 1
+          fi

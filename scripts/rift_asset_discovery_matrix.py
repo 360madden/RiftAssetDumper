@@ -11,16 +11,15 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
-import os
 import re
 import subprocess
 import sys
 import time
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROOT = REPO_ROOT / "Source"
@@ -185,7 +184,7 @@ def build_tool(args: argparse.Namespace) -> Path:
         run = subprocess.run(["dotnet", "build", str(solution), "--nologo"], text=True)
         if run.returncode != 0:
             raise RuntimeError(f"Build failed with exit code {run.returncode}.")
-    tool_path = project.parent / "bin" / args.configuration / args.framework / "RiftAssetDumper.exe"
+    tool_path = project.parent / "bin" / str(args.configuration) / str(args.framework) / "RiftAssetDumper.exe"
     if not tool_path.exists():
         raise FileNotFoundError(f"Built tool not found at {tool_path}; run without --skip-build or adjust configuration/framework.")
     return tool_path
@@ -213,20 +212,20 @@ def merge_group_counts(groups: Any, field_name: str, take: int = 12) -> list[dic
     return [{"Value": value, "Count": count} for value, count in counter.most_common(take)]
 
 
-def load_schema_validator(args: argparse.Namespace):
+def load_schema_validator(args: argparse.Namespace) -> Callable[[Any], None] | None:
     if args.no_schema_validate:
         return None
     if not SEMANTIC_SCHEMA.exists():
         return None
     try:
-        import jsonschema  # type: ignore[import-not-found]
+        import jsonschema
     except Exception:
         return None
     schema = json.loads(SEMANTIC_SCHEMA.read_text(encoding="utf-8-sig"))
     return lambda report: jsonschema.validate(report, schema)
 
 
-def run_job(job: DiscoveryJob, tool_path: Path, root: Path, out_dir: Path, validate_schema) -> DiscoveryResult:
+def run_job(job: DiscoveryJob, tool_path: Path, root: Path, out_dir: Path, validate_schema: Callable[[Any], None] | None) -> DiscoveryResult:
     output_name = job.output or f"{safe_file_name(job.name)}.json"
     output_path = Path(output_name)
     if not output_path.is_absolute():
@@ -350,7 +349,7 @@ def run_privacy_scan(repo_root: Path) -> None:
 
 
 def print_summary_table(results: list[DiscoveryResult]) -> None:
-    columns = [
+    columns: list[tuple[str, int, Callable[[DiscoveryResult], str]]] = [
         ("Name", 30, lambda r: r.name),
         ("Exit", 4, lambda r: str(r.exit_code)),
         ("TO", 2, lambda r: "Y" if r.timed_out else "N"),

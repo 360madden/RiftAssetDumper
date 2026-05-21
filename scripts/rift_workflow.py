@@ -20,7 +20,8 @@ Commands (kebab-case):
     residual-lead-guard          — inventory + residual guard
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
-    position-source-gap-report   — inventory + gap report
+    PositionSourceGapReport     — inventory + gap report
+    position-gap-report        — Python gap analysis (needs existing inventory)
     position-source-sibling-lead-guard — inventory + sibling guard
     position-source-sibling-family-report — inventory + family report
     position-source-sibling-probe-report — multi-probe + report
@@ -40,7 +41,6 @@ Commands (kebab-case):
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -63,10 +63,6 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 # Imports (deferred so path setup happens first)
 # ---------------------------------------------------------------------------
 
-from scripts.rift_workflow_utils import (  # noqa: E402
-    checked_run,
-    generated_output_guard,
-)
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
@@ -75,6 +71,10 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     discovery_workbench,
     semantic_hint_cross_tab,
     show_report_summary,
+)
+from scripts.rift_workflow_utils import (  # noqa: E402
+    checked_run,
+    generated_output_guard,
 )
 
 # ============================================================================
@@ -166,6 +166,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "position-gap-report": {
+        "dotnet": "",
+        "base": "nif-mesh-binding-inventory",
+    },
     "discovery-workbench": {
         "dotnet": "",
         "base": "",
@@ -209,7 +213,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ResidualLeadGuard": "residual-lead-guard",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
-    "PositionSourceGapReport": "position-source-gap-report",
+    "position-gap-report": "position-gap-report",
     "PositionSourceSiblingLeadGuard": "position-source-sibling-lead-guard",
     "PositionSourceSiblingFamilyReport": "position-source-sibling-family-report",
     "PositionSourceSiblingProbeReport": "position-source-sibling-probe-report",
@@ -331,6 +335,21 @@ def _run_command(args: argparse.Namespace) -> None:
     if command == "generated-output-guard":
         generated_output_guard()
         return
+
+    if command == "position-gap-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+        if not inventory_path.exists():
+            print(
+                "ERROR: position-gap-report requires an existing mesh-binding inventory.\n"
+                f"  Run 'python scripts/rift_workflow.py mesh-bindings --full' first.\n"
+                f"  Expected: {inventory_path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        from scripts.rift_position_gap_report import main as gap_report_main
+        sys.argv = ["rift_position_gap_report.py", str(inventory_path), "--out", str(out_dir / "position-gap-report.json")]
+        sys.exit(gap_report_main())
 
     if command == "semantic-hint-crosstab":
         out_dir = Path(args.out) if args.out else DEFAULT_OUT

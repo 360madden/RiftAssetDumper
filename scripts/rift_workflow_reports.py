@@ -12,10 +12,8 @@ All functions use the utility layer from rift_workflow_utils.py.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -29,8 +27,8 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     format_vector_sample,
     json_array_count_or_dash,
     json_value_or_dash,
-    json_value_or_none,
     load_json_report,
+    safe_int,
     semantic_hint_bucket,
     semantic_hint_primary_model,
     top_text,
@@ -839,7 +837,7 @@ def show_report_summary(mode_name: str, report_path: str) -> None:
     """
     try:
         report = load_json_report(report_path)
-    except (FileNotFoundError, ValueError) as exc:
+    except (FileNotFoundError, ValueError):
         print(f"No report found: {report_path}", file=sys.stderr)
         return
 
@@ -952,7 +950,7 @@ def semantic_hint_cross_tab(out_dir: str) -> None:
             }
             for bucket, group in bucket_groups.items()
         ],
-        key=lambda b: (-b["Count"], b["Bucket"]),
+        key=lambda b: (-safe_int(b["Count"]), b["Bucket"]),
     )
 
     # Overlap rows

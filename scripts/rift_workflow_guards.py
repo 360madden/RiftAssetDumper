@@ -48,8 +48,8 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     required_json_integer,
     required_json_number,
     required_json_value,
+    safe_int,
 )
-
 
 # ============================================================================
 # AttributeExtraProofGuard  (inventory-level, rewritten for C# v2 output)
@@ -93,7 +93,7 @@ def _test_json_array_equals(actual: list[Any], expected: list[Any]) -> bool:
     """
     if len(actual) != len(expected):
         return False
-    return all(a == e for a, e in zip(actual, expected))
+    return all(a == e for a, e in zip(actual, expected, strict=True))
 
 
 # ============================================================================
@@ -171,7 +171,7 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
         topology = str(required_json_value(group, "Topology", context))
 
         assert_proof_guard(
-            count >= expected["MinCount"],
+            count >= safe_int(expected["MinCount"]),
             f"{context} count {count} < expected minimum {expected['MinCount']}.",
         )
         assert_proof_guard(
@@ -198,7 +198,7 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
     )
 
     # Report
-    print(f"\n--- AttributeExtraProofGuard @264 extra-stream existence guard")
+    print("\n--- AttributeExtraProofGuard @264 extra-stream existence guard")
     for eg in sorted(expected_groups, key=lambda x: -x["VertexCount"]):
         g = by_vc[eg["VertexCount"]]
         print(
@@ -258,7 +258,7 @@ def _attribute_extra_proof_guard_fitness(
     total_sub1_preferred = 0
 
     for expected in expected_groups:
-        key = (expected["MeshSize"], 264, expected["VertexCount"])
+        key = (safe_int(expected["MeshSize"]), 264, safe_int(expected["VertexCount"]))
         vc = expected["VertexCount"]
         context = f"fitness @264 v={vc}"
 
@@ -275,7 +275,7 @@ def _attribute_extra_proof_guard_fitness(
         topology = str(required_json_value(g, "Topology", context))
 
         assert_proof_guard(
-            count >= expected["MinCount"],
+            count >= safe_int(expected["MinCount"]),
             f"{context} count {count} < expected minimum {expected['MinCount']}.",
         )
         assert_proof_guard(
@@ -295,7 +295,7 @@ def _attribute_extra_proof_guard_fitness(
         # --- Mapping preference ---
         raw_pref = required_json_integer(g, "RawZeroBasedPreferredCount", context)
         sub1_pref = required_json_integer(g, "SubtractOnePreferredCount", context)
-        tie_count = required_json_integer(g, "TieCount", context)
+        _tie_count = required_json_integer(g, "TieCount", context)
         preferred = str(required_json_value(g, "PreferredMapping", context))
 
         total_raw_preferred += raw_pref
@@ -313,8 +313,8 @@ def _attribute_extra_proof_guard_fitness(
 
         # --- Fitness deltas: raw should beat subtract-one ---
         seg_delta = g.get("AverageSegmentedMedianMaxEdgeDelta")
-        norm_gap = g.get("AverageSegmentedMedianNormalDeltaGap")
-        uv_gap = g.get("AverageSegmentedMedianUvDeltaGap")
+        _norm_gap = g.get("AverageSegmentedMedianNormalDeltaGap")
+        _uv_gap = g.get("AverageSegmentedMedianUvDeltaGap")
         area_gap = g.get("AverageSegmentedMedianTriangleAreaGap")
 
         if seg_delta is not None:
@@ -367,7 +367,7 @@ def _attribute_extra_proof_guard_fitness(
 
         # --- Sentinel / zero-index count ---
         sentinels = g.get("SentinelRestartValueCountTotal")
-        zeros = g.get("ZeroIndexValueCountTotal")
+        _zeros = g.get("ZeroIndexValueCountTotal")
         if sentinels is not None:
             assert_proof_guard(
                 isinstance(sentinels, (int, float)) and int(sentinels) >= 0,

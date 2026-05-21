@@ -1,34 +1,36 @@
 """Smoke test for rift_workflow_utils.py ported functions."""
 import sys
+from collections.abc import Callable
+from typing import Any
+
 sys.path.insert(0, ".")
 
 from scripts.rift_workflow_utils import (
-    json_value_or_dash,
-    json_value_or_none,
-    json_double_or_none,
-    measure_sum_or_zero,
-    json_array_count_or_dash,
-    required_json_value,
-    required_json_boolean,
-    required_json_number,
-    required_json_integer,
-    usage_access_guard_integer,
     assert_proof_guard,
     assert_usage_access_guard,
-    is_generated_output_path,
     format_markdown_cell,
-    top_text,
     format_nif_usage_access,
-    format_vector_sample,
     format_proof_review_summary,
-    semantic_hint_primary_model,
+    format_vector_sample,
+    is_generated_output_path,
+    json_array_count_or_dash,
+    json_double_or_none,
+    json_value_or_dash,
+    json_value_or_none,
+    measure_sum_or_zero,
+    required_json_boolean,
+    required_json_integer,
+    required_json_number,
+    required_json_value,
     semantic_hint_bucket,
-    load_json_report,
+    semantic_hint_primary_model,
+    top_text,
+    usage_access_guard_integer,
 )
 
 failed = 0
 
-def check(desc: str, actual, expected):
+def check(desc: str, actual: Any, expected: Any) -> None:
     global failed
     if actual == expected:
         print(f"  PASS: {desc}")
@@ -36,7 +38,7 @@ def check(desc: str, actual, expected):
         print(f"  FAIL: {desc}  expected={expected!r}  actual={actual!r}")
         failed += 1
 
-def check_raises(desc: str, fn, exc_type=ValueError):
+def check_raises(desc: str, fn: Callable[[], Any], exc_type: type[Exception] = ValueError) -> None:
     global failed
     try:
         fn()

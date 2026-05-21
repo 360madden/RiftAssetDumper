@@ -11,4 +11,8 @@
     <PackageReference Include="SharpCompress" Version="0.41.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="RiftAssetDumper.Tests" />
+  </ItemGroup>
+
 </Project>
