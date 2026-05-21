@@ -1,5 +1,7 @@
 # RiftAssetDumper workspace
 
+[![CI](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml/badge.svg)](https://github.com/360madden/RiftAssetDumper/actions)
+
 Read-only RIFT asset archive research workspace.
 
 ## Operating mode 🚀
