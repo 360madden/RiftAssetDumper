@@ -40,16 +40,21 @@ python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-blo
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
 ```
 
-**2026-06-02 — Stage 2: `--experimental-position-source` fallback extended with normals + UVs + `--write-obj`:**
+**2026-06-02 — Stage 2: Position-source fallback + triage + end-to-end validation (complete):**
 - Extended `ExperimentalPositionSource` fallback to decode **normals** and **UVs** from linked NiDataStream blocks, not just positions. Candidates filtered by `Role.StartsWith("normal-")` and `Role.StartsWith("uv-")` for safer matching.
 - Normals validated via `VectorLength` in console samples, identical to the attribute-set decode pattern.
 - OBJ writing now produces `vn` (normals) and `vt` (UVs) lines for all fallback-decoded meshes.
 - Summary line shows `"linked-stream fallback"` instead of `"0 attribute sets"` when the fallback path was used.
 - Added `--write-obj` flag to Python workflow orchestrator (`rift_workflow.py`) — wired through `COMMAND_MAP`, `_run_dotnet_and_summarize`, and `decode-geometry` handler.
-- End-to-end validated on `e3de1077a37d0337` mesh#6: OBJ written with 71 vertices, normals, UVs, and trivial fan faces.
-- Build: 0 errors, Tests: 6/6 pass on first try, Code review: clean.
+- **End-to-end validated on real 0-attribute-set meshes:**
+  - `084c1e91726a2aea` mesh#6: 24 positions + 24 normals decoded, OBJ written ✅
+  - `1601c1f75e0a6022` mesh#6: 30 positions + 30 UVs decoded, OBJ written ✅
+  - Both produce OBJ with `v` / `vn` / `vt` lines + trivial fan faces
+- Added `triage-fallback-candidates` Python command: reads fresh mesh-binding inventory and cross-references position/normal/UV float32 candidates across RoleGroups. Outputs classification (position-only vs position+normal+uv), top-16 sample listing, and ready-to-run test commands. Usage: `python scripts/rift_workflow.py triage-fallback-candidates --full`
+- Full inventory analysis: **5,507 NiMesh blocks, 5,455 (99%) have 0 attribute sets**, 210 position-float3 candidates, 0 with complete position+normal+UV triple (companion streams don't co-occur in the same mesh block).
+- Build: 0 errors, Tests: 6/6 pass, Code review: clean.
 
-**Known limitations (v2):**
+**Known limitations:**
 - Faces are trivial triangle fan (vertex 0 to consecutive pairs) since no index stream is available in this fallback mode.
 - Only the first float32 candidate per role (position/normal/UV) is used; multiple candidates are skipped.
 - 5,455 meshes (99%) have 0 attribute sets — the fallback now handles these for meshes where linked streams contain float32 data.
@@ -81,7 +86,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
 | Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
 | Attribute extra streams | ✅ split truth | Focused probing down-ranked low-variation `@272/#25` and `@296` side streams, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like, first-segment proof samples include area/parity plus compact review flags, and the aggregate + focused sibling proof guards now fail if those proof signals silently flip. |
-| Position source fallback | ✅ extended | `--experimental-position-source` now decodes normals + UVs + positions from linked streams; `--write-obj` wired through Python orchestrator. Validated OBJ export with all three vertex components. Build: 0 errors, Tests: 6/6 pass. |
+| Position source fallback (Stage 2) | ✅ complete | `--experimental-position-source` decodes normals+UVs+positions; `--write-obj` wired; end-to-end validated on 2 real fallback meshes; `triage-fallback-candidates` command added. Build/test/code-review clean. |
 
 ## Approved operating mode 🚀
 
@@ -1252,6 +1257,7 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 8. Add index-family topology scoring directly to mesh-binding pair reports.
 9. ✅ Extended `--experimental-position-source` fallback to decode normals + UVs from linked streams.
 10. ✅ Added `--write-obj` flag to Python workflow orchestrator for easy CLI access.
-11. Add a disabled experimental exporter only after one lane has positions, normals, UVs, and topology/index proof.
+11. Add a disabled experimental exporter (Stage 3 candidate) — now that fallback provides positions+normals+UVs, the attribute-set path (`@264` indexed) is the next exporter target.
 12. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
 13. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+14. Scope and define Stage 3 — candidate: experimental OBJ exporter for attribute-set `@264` indexed path, or scaling fallback across all 5,455 zero-attribute-set meshes.

@@ -22,6 +22,7 @@ Commands (kebab-case):
     residual-position-cluster-probe-report — cluster probe
     PositionSourceGapReport     — inventory + gap report
     position-gap-report        — Python gap analysis (needs existing inventory)
+    triage-fallback-candidates — List 0-attribute-set meshes with float32 position/normal/UV candidates from existing inventory
     position-source-sibling-lead-guard — inventory + sibling guard
     position-source-sibling-family-report — inventory + family report
     position-source-sibling-probe-report — multi-probe + report
@@ -168,6 +169,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "base": "",
     },
     "position-gap-report": {
+        "dotnet": "",
+        "base": "nif-mesh-binding-inventory",
+    },
+    "triage-fallback-candidates": {
         "dotnet": "",
         "base": "nif-mesh-binding-inventory",
     },
@@ -365,6 +370,148 @@ def _run_command(args: argparse.Namespace) -> None:
         from scripts.rift_position_gap_report import main as gap_report_main
         sys.argv = ["rift_position_gap_report.py", str(inventory_path), "--out", str(out_dir / "position-gap-report.json")]
         sys.exit(gap_report_main())
+
+    if command == "triage-fallback-candidates":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+        if not inventory_path.exists():
+            print(
+                "ERROR: triage-fallback-candidates requires an existing mesh-binding inventory.\n"
+                f"  Run 'python scripts/rift_workflow.py mesh-bindings --full' first.\n"
+                f"  Expected: {inventory_path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        import json
+        with open(inventory_path, 'r', encoding='utf-8-sig') as f:
+            data = json.load(f)
+
+        # --- Gather metrics ---
+        mesh_block_count = data.get('MeshBlockCount', data.get('MeshBlocks', 0))
+        attr_compatible = data.get('AttributeCompatibleMeshes', data.get('AttributeCompatibleSets', 0))
+        zero_attr_count = mesh_block_count - attr_compatible
+
+        role_groups = data.get('RoleGroups', [])
+
+        def _find_role(role_name: str) -> dict | None:
+            for rg in role_groups:
+                if rg.get('Role') == role_name:
+                    return rg
+            return None
+
+        pos_role = _find_role('position-float3-ror1-lead')
+        normal_role = _find_role('normal-float3-ror1-lead')
+        uv_role = _find_role('uv-float2-ror1-lead')
+
+        pos_count = pos_role.get('Count', 0) if pos_role else 0
+        normal_count = normal_role.get('Count', 0) if normal_role else 0
+        uv_count = uv_role.get('Count', 0) if uv_role else 0
+        pos_high_conf = pos_role.get('HighConfidenceCount', '?') if pos_role else '-'
+
+        # Attribute-set meshes also have position/normal/UV. Subtract them.
+        # approximate: most position-float3 samples are on 0-attr-set meshes
+        pos_samples = (pos_role.get('Samples', []) if pos_role else [])
+        normal_samples = (normal_role.get('Samples', []) if normal_role else [])
+        uv_samples = (uv_role.get('Samples', []) if uv_role else [])
+
+        # --- Display summary ---
+        print()
+        print("=" * 70)
+        print("  Triage: Fallback Candidates (0-Attribute-Set Meshes with Float32 Streams)")
+        print("=" * 70)
+        print()
+        print(f"  Total NiMesh blocks:     {mesh_block_count:>6}")
+        print(f"  Attribute-compatible:     {attr_compatible:>6}")
+        print(f"  0-attribute-set meshes:  {zero_attr_count:>6}")
+        print()
+        print(f"  --- Float32 candidates across ALL meshes ---")
+        print(f"  position-float3-ror1-lead: {pos_count:>5} (high confidence: {pos_high_conf})")
+        print(f"  normal-float3-ror1-lead:   {normal_count:>5}")
+        print(f"  uv-float2-ror1-lead:       {uv_count:>5}")
+        print()
+
+        # Show top 0-attr-set meshes with position float32 candidates
+        print("  --- Top 0-attr-set meshes with position-float3 candidates ---")
+        if pos_samples:
+            printed = 0
+            for s in pos_samples:
+                id_pref = s.get('IdPrefix', s.get('id', '?'))
+                mesh_size = s.get('MeshSize', s.get('meshSize', '?'))
+                mesh_idx = s.get('MeshBlockIndex', s.get('meshBlockIndex', '?'))
+                # Check if this mesh has normal/UV too
+                pos_norm = '[ ]' 
+                pos_uv = '[ ]'
+                # Match by ID to check companion streams
+                for ns in normal_samples:
+                    if ns.get('IdPrefix') == id_pref and ns.get('MeshBlockIndex') == mesh_idx:
+                        pos_norm = '[Y]'
+                        break
+                for us in uv_samples:
+                    if us.get('IdPrefix') == id_pref and us.get('MeshBlockIndex') == mesh_idx:
+                        pos_uv = '[Y]'
+                        break
+                print(f"    ID={id_pref} mesh#{mesh_idx} size={mesh_size}  norm={pos_norm} uv={pos_uv}")
+                printed += 1
+                if printed >= 16:
+                    remaining = len(pos_samples) - printed
+                    if remaining > 0:
+                        print(f"    ... and {remaining} more")
+                    break
+        else:
+            print("    (none)")
+
+        print()
+        print("  --- Quick test commands ---")
+        test_ids = set()
+        for s in pos_samples[:8]:
+            test_ids.add(s.get('IdPrefix', ''))
+        for tid in sorted(test_ids):
+            if tid:
+                print(f"    python scripts/rift_workflow.py decode-geometry --id {tid} --mesh-block 6 --experimental-position-source --write-obj")
+        print()
+
+        # Summary statistics
+        print("  --- Cross-reference summary ---")
+        # Count meshes that have both pos and at least one companion (norm or uv)
+        pos_only = 0
+        pos_norm = 0
+        pos_uv = 0
+        pos_both = 0
+        for s in pos_samples:
+            id_pref = s.get('IdPrefix', '')
+            mesh_idx = s.get('MeshBlockIndex')
+            has_norm = any(
+                ns.get('IdPrefix') == id_pref and ns.get('MeshBlockIndex') == mesh_idx
+                for ns in normal_samples
+            )
+            has_uv = any(
+                us.get('IdPrefix') == id_pref and us.get('MeshBlockIndex') == mesh_idx
+                for us in uv_samples
+            )
+            if has_norm and has_uv:
+                pos_both += 1
+            elif has_norm:
+                pos_norm += 1
+            elif has_uv:
+                pos_uv += 1
+            else:
+                pos_only += 1
+
+        print(f"    Position only:                   {pos_only:>4}")
+        print(f"    Position + Normal:               {pos_norm:>4}")
+        print(f"    Position + UV:                   {pos_uv:>4}")
+        print(f"    Position + Normal + UV:          {pos_both:>4}")
+        print(f"    Total position-candidate meshes: {pos_count:>4}")
+        print()
+        print(f"  Interpretation: {pos_both} meshes have full position+normal+UV float32 streams")
+        print(f"  and can be decoded with --experimental-position-source.")
+        print(f"  {pos_norm} more have position+normal (no UV), "
+              f"{pos_uv} have position+UV (no normal).")
+        print(f"  These are concentrated across {len(pos_samples)} unique sample entries")
+        print(f"  from the full mesh-binding inventory.")
+        print()
+        return
 
     if command == "semantic-hint-crosstab":
         out_dir = Path(args.out) if args.out else DEFAULT_OUT
@@ -604,6 +751,7 @@ Examples:
   python scripts/rift_workflow.py all --full
   python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6
   python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6 --experimental-position-source --full
+  python scripts/rift_workflow.py triage-fallback-candidates --full
         """,
     )
     parser.add_argument(
