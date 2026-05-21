@@ -55,7 +55,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exports", default="", help="Generated report directory; defaults to <root>/Exports.")
     parser.add_argument("--top", type=int, default=20, help="Maximum candidates in Markdown scoreboard.")
     parser.add_argument("--queue-size", type=int, default=12, help="Maximum next-probe queue items.")
-    parser.add_argument("--privacy-scan", action="store_true", help="Fail if generated outputs contain local user-profile paths.")
+    parser.add_argument(
+        "--privacy-scan", action="store_true", help="Fail if generated outputs contain local user-profile paths."
+    )
     return parser.parse_args()
 
 
@@ -78,7 +80,9 @@ def load_json_report(key: str, path: Path) -> LoadedReport:
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))
         if not isinstance(data, dict):
-            return LoadedReport(key, path, True, None, utc_from_timestamp(path.stat().st_mtime), sha256_file(path), "not a JSON object")
+            return LoadedReport(
+                key, path, True, None, utc_from_timestamp(path.stat().st_mtime), sha256_file(path), "not a JSON object"
+            )
         return LoadedReport(key, path, True, data, utc_from_timestamp(path.stat().st_mtime), sha256_file(path))
     except Exception as exc:  # noqa: BLE001 - report load failures as data, do not hide them.
         mtime = utc_from_timestamp(path.stat().st_mtime) if path.exists() else None
@@ -97,7 +101,7 @@ def as_int(value: Any, default: int = 0) -> int:
         if value is None or value == "-":
             return default
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -106,7 +110,7 @@ def as_float(value: Any, default: float = 0.0) -> float:
         if value is None or value == "-":
             return default
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -144,7 +148,9 @@ def repo_command(repo_root: Path, mode: str, *extra: str) -> str:
 
 
 def mesh_probe_command(repo_root: Path, asset_id: str, mesh_block: int | str) -> str:
-    return repo_command(repo_root, "MeshProbe", "-Id", str(asset_id), "-MeshBlock", str(mesh_block), "-SkipBuild", "-PrivacyScan")
+    return repo_command(
+        repo_root, "MeshProbe", "-Id", str(asset_id), "-MeshBlock", str(mesh_block), "-SkipBuild", "-PrivacyScan"
+    )
 
 
 def candidate(
@@ -258,7 +264,9 @@ def build_residual_candidates(reports: dict[str, LoadedReport], repo_root: Path)
         commands: list[str] = []
         if payload in commands_by_payload:
             commands.append(commands_by_payload[payload])
-        paired_rows = [item for item in id_mesh_by_payload.get(payload, []) if str(item.get("PairStatus")) == "mesh#7+mesh#27"]
+        paired_rows = [
+            item for item in id_mesh_by_payload.get(payload, []) if str(item.get("PairStatus")) == "mesh#7+mesh#27"
+        ]
         if paired_rows:
             id_prefix = str(paired_rows[0].get("IdPrefix"))
             commands.append(mesh_probe_command(repo_root, id_prefix, 7))
@@ -287,7 +295,10 @@ def build_residual_candidates(reports: dict[str, LoadedReport], repo_root: Path)
                     f"strictPass={strict_pass}",
                     f"miss={row.get('MissReasons') or '-'}",
                 ],
-                rationale="Best current residual-position lane; rank for follow-up without lowering strict classifier thresholds.",
+                rationale=(
+                    "Best current residual-position lane; rank for follow-up "
+                    "without lowering strict classifier thresholds."
+                ),
                 commands=commands,
                 source_reports=["residual-position-classifier-report.json", "residual-position-family-crosstab.json"],
             )
@@ -332,9 +343,10 @@ def build_sibling_family_candidates(reports: dict[str, LoadedReport], repo_root:
             for block in mesh_blocks[:2]:
                 commands.append(mesh_probe_command(repo_root, rep, block))
 
+        sid_candidate = f"sibling-family-{mesh_size}-{'-'.join(str(b) for b in mesh_blocks)}-{re.sub(r'[^0-9]+', '-', offsets).strip('-')}"
         result.append(
             candidate(
-                candidate_id=f"sibling-family-{mesh_size}-{'-'.join(str(b) for b in mesh_blocks)}-{re.sub(r'[^0-9]+', '-', offsets).strip('-')}",
+                candidate_id=sid_candidate,
                 title=title,
                 category="position-source-sibling-family",
                 priority=priority,
@@ -351,7 +363,9 @@ def build_sibling_family_candidates(reports: dict[str, LoadedReport], repo_root:
                     f"payloads={fam.get('PayloadBytes') or '-'}",
                     f"representatives={', '.join(reps) or '-'}",
                 ],
-                rationale=str(fam.get("Decision") or "Repeated source-binding family; candidate-only ranking evidence."),
+                rationale=str(
+                    fam.get("Decision") or "Repeated source-binding family; candidate-only ranking evidence."
+                ),
                 commands=commands,
                 source_reports=["position-source-sibling-family-report.json"],
             )
@@ -365,9 +379,11 @@ def build_extra_position_candidate(reports: dict[str, LoadedReport], repo_root: 
     if not pairs:
         return []
     ids = [str(row.get("Id")) for row in pairs if row.get("Id")]
+
     def _extract_payload(row: dict[str, Any]) -> str | None:
         match = re.search(r"payload=(\d+)", str(row.get("Mesh34ExtraPosition") or ""))
         return match.group(1) if match else None
+
     payloads = [p for row in pairs if (p := _extract_payload(row)) is not None]
     commands = [repo_command(repo_root, "PositionSourceSiblingExtraPositionReport", "-SkipBuild", "-PrivacyScan")]
     for asset_id in ids[:2]:
@@ -390,7 +406,10 @@ def build_extra_position_candidate(reports: dict[str, LoadedReport], repo_root: 
                 f"mesh34ExtraPayloads={', '.join(payloads)}",
                 "sharedPrimaryPosition=block#28 offsets=@212/@212",
             ],
-            rationale="Repeated mesh#34 extra position-like stream is a source-binding clue only; keep separate from residual evidence.",
+            rationale=(
+                "Repeated mesh#34 extra position-like stream is a "
+                "source-binding clue only; keep separate from residual evidence."
+            ),
             commands=commands,
             source_reports=["position-source-sibling-extra-position-report.json"],
         )
@@ -518,7 +537,9 @@ def build_topology_candidates(reports: dict[str, LoadedReport], repo_root: Path)
 
 def build_freshness(reports: dict[str, LoadedReport]) -> list[dict[str, Any]]:
     inventory = reports.get("inventory")
-    inventory_mtime = inventory.path.stat().st_mtime if inventory and inventory.exists and inventory.path.exists() else None
+    inventory_mtime = (
+        inventory.path.stat().st_mtime if inventory and inventory.exists and inventory.path.exists() else None
+    )
     rows: list[dict[str, Any]] = []
     for report in reports.values():
         stale = False
@@ -584,11 +605,7 @@ def build_cross_checks(scoreboard: list[dict[str, Any]]) -> list[dict[str, Any]]
         None,
     )
     extra_329 = next(
-        (
-            row
-            for row in scoreboard
-            if row.get("CandidateId") == "sibling-extra-329-mesh34-304-57"
-        ),
+        (row for row in scoreboard if row.get("CandidateId") == "sibling-extra-329-mesh34-304-57"),
         None,
     )
 
@@ -599,16 +616,29 @@ def build_cross_checks(scoreboard: list[dict[str, Any]]) -> list[dict[str, Any]]
             {
                 "CheckId": "mesh305-residual-vs-sibling-family",
                 "CandidateOnly": True,
-                "Decision": "Probe the highest-ranked meshSize=305 residual payload before moving to another family; compare results against the #7/#27 sibling-family surface, but do not merge the evidence lanes.",
+                "Decision": (
+                    "Probe the highest-ranked meshSize=305 residual payload before "
+                    "moving to another family; compare results against the "
+                    "#7/#27 sibling-family surface, but do not merge the evidence lanes."
+                ),
                 "TopResidualCandidateId": top.get("CandidateId"),
                 "TopResidualPayload": top.get("Payload"),
                 "ResidualPayloadsByScore": [
-                    {"Payload": row.get("Payload"), "Score": row.get("Score"), "StrictClassifierPass": row.get("StrictClassifierPass")}
+                    {
+                        "Payload": row.get("Payload"),
+                        "Score": row.get("Score"),
+                        "StrictClassifierPass": row.get("StrictClassifierPass"),
+                    }
                     for row in residual_305[:5]
                 ],
                 "SiblingFamilyCandidateId": sibling_305.get("CandidateId") if sibling_305 else None,
                 "SiblingFamilyEvidence": sibling_305.get("Evidence") if sibling_305 else [],
-                "Guardrail": "Residual stream plausibility and TopPositionSourceSiblings repetition answer different questions; require focused mesh probes plus normal/UV/topology/proof agreement before promotion.",
+                "Guardrail": (
+                    "Residual stream plausibility and TopPositionSourceSiblings "
+                    "repetition answer different questions; require focused "
+                    "mesh probes plus normal/UV/topology/proof agreement before "
+                    "promotion."
+                ),
                 "SourceReports": [
                     "residual-position-classifier-report.json",
                     "residual-position-family-crosstab.json",
@@ -622,7 +652,11 @@ def build_cross_checks(scoreboard: list[dict[str, Any]]) -> list[dict[str, Any]]
             {
                 "CheckId": "mesh329-extra-position-boundary",
                 "CandidateOnly": True,
-                "Decision": "Keep meshSize=329 mesh#34 @304/#57 as source-binding search evidence only; do not combine it with residual-position evidence or exporter readiness.",
+                "Decision": (
+                    "Keep meshSize=329 mesh#34 @304/#57 as source-binding "
+                    "search evidence only; do not combine it with "
+                    "residual-position evidence or exporter readiness."
+                ),
                 "CandidateId": extra_329.get("CandidateId"),
                 "Evidence": extra_329.get("Evidence"),
                 "Guardrail": "mesh#34 lacks a complete attribute-set binding in guarded rows.",
@@ -635,7 +669,10 @@ def build_cross_checks(scoreboard: list[dict[str, Any]]) -> list[dict[str, Any]]
             "CheckId": "export-promotion-block",
             "CandidateOnly": True,
             "Decision": "OBJ/export remains blocked.",
-            "Guardrail": "Position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards must all agree before exporter promotion.",
+            "Guardrail": (
+                "Position, topology/index, normal/UV, bounds, repeated-family "
+                "evidence, and proof guards must all agree before exporter promotion."
+            ),
             "SourceReports": [],
         }
     )
@@ -676,7 +713,10 @@ def write_scoreboard_markdown(
     lines = [
         "# Discovery Workbench Scoreboard",
         "",
-        "Candidate-only ranked discovery view. This file is generated under ignored `Exports/`; do not stage generated discovery output.",
+        (
+            "Candidate-only ranked discovery view. This file is generated "
+            "under ignored `Exports/`; do not stage generated discovery output."
+        ),
         "",
         "| Rank | Score | Priority | Category | Candidate | Mesh | Stream | Payload | Noise | Evidence |",
         "|---:|---:|---|---|---|---:|---|---:|---|---|",
@@ -684,7 +724,8 @@ def write_scoreboard_markdown(
     for row in scoreboard[:top]:
         evidence = "; ".join(str(item) for item in row.get("Evidence", [])[:3])
         lines.append(
-            "| {rank} | {score} | {priority} | {category} | {title} | {mesh} | {stream} | {payload} | {noise} | {evidence} |".format(
+            "| {rank} | {score} | {priority} | {category} | {title} | {mesh} | "
+            "{stream} | {payload} | {noise} | {evidence} |".format(
                 rank=row["Rank"],
                 score=row["Score"],
                 priority=md_cell(row["Priority"]),
@@ -702,7 +743,10 @@ def write_scoreboard_markdown(
         "",
         "## Cross-checks",
         "",
-        "These guardrails keep residual-position evidence, sibling source-binding evidence, and export readiness separate.",
+        (
+            "These guardrails keep residual-position evidence, sibling "
+            "source-binding evidence, and export readiness separate."
+        ),
         "",
         "| Check | Decision | Guardrail |",
         "|---|---|---|",
@@ -772,7 +816,9 @@ def privacy_scan(paths: list[Path]) -> None:
                 findings.append(f"{path}:{lineno}: {line.strip()}")
     if findings:
         joined = "\n".join(findings[:20])
-        raise RuntimeError(f"Privacy scan failed: generated outputs contain local user-profile/account fragments:\n{joined}")
+        raise RuntimeError(
+            f"Privacy scan failed: generated outputs contain local user-profile/account fragments:\n{joined}"
+        )
 
 
 def main() -> int:
@@ -781,10 +827,7 @@ def main() -> int:
     exports = Path(args.exports).resolve() if args.exports else repo_root / "Exports"
     exports.mkdir(parents=True, exist_ok=True)
 
-    reports = {
-        key: load_json_report(key, exports / filename)
-        for key, filename in REPORT_FILES.items()
-    }
+    reports = {key: load_json_report(key, exports / filename) for key, filename in REPORT_FILES.items()}
     scoreboard = build_scoreboard(reports, repo_root)
     queue = build_probe_queue(scoreboard, args.queue_size)
     freshness = build_freshness(reports)
@@ -805,7 +848,10 @@ def main() -> int:
         "Inputs": freshness,
         "Candidates": scoreboard,
         "CrossChecks": cross_checks,
-        "Interpretation": "Ranked discovery workbench only; no parser role, geometry truth, or OBJ/export readiness is promoted.",
+        "Interpretation": (
+            "Ranked discovery workbench only; no parser role, geometry truth, "
+            "or OBJ/export readiness is promoted."
+        ),
     }
     queue_payload = {
         "Schema": "discovery-next-probe-queue/v1",
@@ -813,7 +859,10 @@ def main() -> int:
         "GeneratedAtUtc": generated_at,
         "SourceScoreboard": str(scoreboard_json),
         "Queue": queue,
-        "Interpretation": "Commands are candidate-only discovery actions. Review generated outputs and guards before drawing conclusions.",
+        "Interpretation": (
+            "Commands are candidate-only discovery actions. Review generated "
+            "outputs and guards before drawing conclusions."
+        ),
     }
 
     scoreboard_json.write_text(json.dumps(scoreboard_payload, indent=2), encoding="utf-8")

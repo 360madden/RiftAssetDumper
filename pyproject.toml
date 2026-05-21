@@ -19,6 +19,7 @@ select = [
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
 ]
+ignore = ["E501"]  # line length enforced by ruff format, not lint
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = [
