@@ -2072,6 +2072,71 @@ internal static class Program
           }
 
           totalPositions += positionSamples.Count;
+
+          // Decode normals from linked streams
+          var normalCandidates = float32Candidates
+              .Where(static c => c.Role.StartsWith("normal-", StringComparison.OrdinalIgnoreCase))
+              .ToList();
+          if (normalCandidates.Count > 0)
+          {
+            var normalCandidate = normalCandidates[0];
+            var normalSamples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, normalCandidate.BlockIndex,
+                "normal", normalCandidate.Role, components: 3, vertexIndices);
+            Console.WriteLine($"    decoded normals: {normalSamples.Count}/{vertexCount}");
+
+            if (normalSamples.Count > 0)
+            {
+              var normalSampleCount = Math.Min(sampleCount, normalSamples.Count);
+              Console.WriteLine($"    normal samples ({normalSampleCount}):");
+              for (var i = 0; i < normalSampleCount && i < normalSamples.Count; i++)
+              {
+                var s = normalSamples[i];
+                Console.WriteLine($"      v{s.Index}: ({FormatNullableDouble(s.X)}, {FormatNullableDouble(s.Y)}, {FormatNullableDouble(s.Z)}) len={FormatNullableDouble(s.VectorLength)}");
+              }
+            }
+
+            if (options.WriteObj)
+            {
+              for (var i = 0; i < normalSamples.Count; i++)
+              {
+                var s = normalSamples[i];
+                if (s.X.HasValue && s.Y.HasValue && s.Z.HasValue)
+                {
+                  objNormals.Add($"vn {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Z.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+                }
+              }
+            }
+
+            totalNormals += normalSamples.Count;
+          }
+
+          // Decode UVs from linked streams
+          var uvCandidates = float32Candidates
+              .Where(static c => c.Role.StartsWith("uv-", StringComparison.OrdinalIgnoreCase))
+              .ToList();
+          if (uvCandidates.Count > 0)
+          {
+            var uvCandidate = uvCandidates[0];
+            var uvSamples = BuildNifAttributeFloatVertexSamples(
+                payload, blocksByIndex, uvCandidate.BlockIndex,
+                "uv", uvCandidate.Role, components: 2, vertexIndices);
+            Console.WriteLine($"    decoded uvs: {uvSamples.Count}/{vertexCount}");
+
+            if (options.WriteObj)
+            {
+              for (var i = 0; i < uvSamples.Count; i++)
+              {
+                var s = uvSamples[i];
+                if (s.X.HasValue && s.Y.HasValue)
+                {
+                  objTexCoords.Add($"vt {s.X.Value.ToString("F6", CultureInfo.InvariantCulture)} {s.Y.Value.ToString("F6", CultureInfo.InvariantCulture)}");
+                }
+              }
+            }
+
+            totalUvs += uvSamples.Count;
+          }
         }
         else
         {
@@ -2351,8 +2416,9 @@ internal static class Program
       Console.WriteLine($"  Faces: {objFaces.Count}");
     }
 
+    var sourceLabel = attributeSets.Count > 0 ? $"{attributeSets.Count} attribute sets" : "linked-stream fallback";
     Console.WriteLine();
-    Console.WriteLine($"Summary: {totalPositions} positions, {totalNormals} normals, {totalUvs} UVs across {attributeSets.Count} attribute sets");
+    Console.WriteLine($"Summary: {totalPositions} positions, {totalNormals} normals, {totalUvs} UVs across {sourceLabel}");
 
     return 0;
   }

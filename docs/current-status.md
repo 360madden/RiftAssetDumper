@@ -1,13 +1,13 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-05-20
+Date: 2026-06-01
 
 ## 🐍 Python migration status (PS→Py phase 1)
 
 | Component | Status | Notes |
 |---|---|---|
 | `scripts/rift_workflow_utils.py` (49 unit tests) | ✅ complete | All utility functions ported and tested |
-| `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing |
+| `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing, `decode-geometry` with `--experimental-position-source` |
 | `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
 | `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
 | `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` (dual-path: fitness/stream) + `attribute_extra_sibling_proof_guard` (dual-path: index-role/body-role) ported from PS. Fitness path now validates @264 aggregate edge/area/normal/parity/strip-structure regressions. |
@@ -30,6 +30,8 @@ python scripts/rift_workflow.py semantic-hint-crosstab
 python scripts/rift_workflow.py discovery-workbench --privacy-scan
 python scripts/rift_workflow.py attribute-extra-proof-guard --full --skip-build
 python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
+python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-block 6 --full
+python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-block 6 --experimental-position-source --write-obj
 ```
 
 **Unported modes still use legacy PS:**
@@ -37,6 +39,21 @@ python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc0170
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
 ```
+
+**2026-06-02 — Stage 2: `--experimental-position-source` fallback extended with normals + UVs + `--write-obj`:**
+- Extended `ExperimentalPositionSource` fallback to decode **normals** and **UVs** from linked NiDataStream blocks, not just positions. Candidates filtered by `Role.StartsWith("normal-")` and `Role.StartsWith("uv-")` for safer matching.
+- Normals validated via `VectorLength` in console samples, identical to the attribute-set decode pattern.
+- OBJ writing now produces `vn` (normals) and `vt` (UVs) lines for all fallback-decoded meshes.
+- Summary line shows `"linked-stream fallback"` instead of `"0 attribute sets"` when the fallback path was used.
+- Added `--write-obj` flag to Python workflow orchestrator (`rift_workflow.py`) — wired through `COMMAND_MAP`, `_run_dotnet_and_summarize`, and `decode-geometry` handler.
+- End-to-end validated on `e3de1077a37d0337` mesh#6: OBJ written with 71 vertices, normals, UVs, and trivial fan faces.
+- Build: 0 errors, Tests: 6/6 pass on first try, Code review: clean.
+
+**Known limitations (v2):**
+- Faces are trivial triangle fan (vertex 0 to consecutive pairs) since no index stream is available in this fallback mode.
+- Only the first float32 candidate per role (position/normal/UV) is used; multiple candidates are skipped.
+- 5,455 meshes (99%) have 0 attribute sets — the fallback now handles these for meshes where linked streams contain float32 data.
+- Output path overlap: `--write-obj` writes OBJ to subdirectory under the probe-report JSON path; this is cosmetic and pre-existing.
 
 **2026-05-20 — C# gate fixes + fitness guard completion:**
 - Fixed two `StartsWith("index-")` gates in `Program.cs` (inventory loop L3949, probe loop L2602) → now use `IndexStats is not null`. This was the root cause preventing `TopAttributeExtraMappingFitness` from populating for `uint16-compatible-body` extra streams.
@@ -64,6 +81,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
 | Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
 | Attribute extra streams | ✅ split truth | Focused probing down-ranked low-variation `@272/#25` and `@296` side streams, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like, first-segment proof samples include area/parity plus compact review flags, and the aggregate + focused sibling proof guards now fail if those proof signals silently flip. |
+| Position source fallback | ✅ extended | `--experimental-position-source` now decodes normals + UVs + positions from linked streams; `--write-obj` wired through Python orchestrator. Validated OBJ export with all three vertex components. Build: 0 errors, Tests: 6/6 pass. |
 
 ## Approved operating mode 🚀
 
@@ -1227,10 +1245,13 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
 2. For the attribute-set lane, promote `@264/#15` on `6fc01704d4a509d5` as the next topology-bearing lead, while keeping `@272/#25` and repeated `@296` bodies as guardrail/negative evidence.
 3. Promote `@264/#15` raw-zero-based plus degenerate-bridge stitching as the current best topology hypothesis, and review the emitted bounded `FirstSegmentTriangles` proof before any exporter.
-4. Continue the `meshSize=325` and `meshSize=321` indexed-family position-source search; normals and UVs are strong rotate-right-1 leads, but positions remain unproven.
-5. Run and extend `AttributeExtraProofGuard` plus `AttributeExtraSiblingProofGuard` whenever mesh-binding, mapping fitness, or topology-probe code changes so future probe changes cannot silently flip the current `@264` topology hypothesis.
-6. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
-7. Add index-family topology scoring directly to mesh-binding pair reports.
-8. Add a disabled experimental exporter only after one lane has positions, normals, UVs, and topology/index proof.
-9. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
-10. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
+4. Run `decode-geometry --experimental-position-source` on target meshes (e.g., `meshSize=325` family) to validate linked-stream position fallback; decode OBJ and inspect in a 3D viewer.
+5. Continue the `meshSize=325` and `meshSize=321` indexed-family position-source search; normals and UVs are strong rotate-right-1 leads, but positions remain unproven.
+6. Run and extend `AttributeExtraProofGuard` plus `AttributeExtraSiblingProofGuard` whenever mesh-binding, mapping fitness, or topology-probe code changes so future probe changes cannot silently flip the current `@264` topology hypothesis.
+7. Preserve both little-endian and big-endian `uint16` views while testing compact/index-like bodies.
+8. Add index-family topology scoring directly to mesh-binding pair reports.
+9. ✅ Extended `--experimental-position-source` fallback to decode normals + UVs from linked streams.
+10. ✅ Added `--write-obj` flag to Python workflow orchestrator for easy CLI access.
+11. Add a disabled experimental exporter only after one lane has positions, normals, UVs, and topology/index proof.
+12. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
+13. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

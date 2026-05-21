@@ -35,6 +35,7 @@ Commands (kebab-case):
     index-candidates             — inventory-nif-index-candidates + summary
     stream-endianness            — inventory-nif-stream-endianness + summary
     stream-bodies                — inventory-nif-stream-bodies + summary
+    decode-geometry              — decode-nif-geometry + summary (needs --id --mesh-block; supports --experimental-position-source)
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
 
@@ -194,6 +195,12 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "inventory-nif-stream-bodies",
         "base": "nif-stream-body-inventory",
     },
+    "decode-geometry": {
+        "dotnet": "decode-nif-geometry",
+        "base": "decode-nif-geometry",
+        "needs_id": True,
+        "needs_mesh_block": True,
+    },
 }
 
 
@@ -227,6 +234,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "IndexCandidates": "index-candidates",
     "StreamEndianness": "stream-endianness",
     "StreamBodies": "stream-bodies",
+    "DecodeGeometry": "decode-geometry",
     "All": "all",
 }
 
@@ -248,6 +256,7 @@ def _get_summary_mode_name(command: str) -> str:
         "index-candidates": "IndexCandidates",
         "stream-endianness": "StreamEndianness",
         "stream-bodies": "StreamBodies",
+        "decode-geometry": "DecodeGeometry",
     }
     return mapping.get(command, command)
 
@@ -265,6 +274,8 @@ def _run_dotnet_and_summarize(
     asset_type: str,
     semantic_categories: list[str],
     full: bool,
+    experimental_position_source: bool = False,
+    write_obj: bool = False,
 ) -> None:
     """Run dotnet command and show report summary."""
     entry = COMMAND_MAP[command]
@@ -294,6 +305,10 @@ def _run_dotnet_and_summarize(
         dotnet_args += ["--id", asset_id]
     if mesh_block >= 0:
         dotnet_args += ["--mesh-block", str(mesh_block)]
+    if experimental_position_source:
+        dotnet_args += ["--experimental-position-source"]
+    if write_obj:
+        dotnet_args += ["--write-obj"]
     if extra_offset >= 0:
         dotnet_args += ["--extra-offset", str(extra_offset)]
     if asset_type:
@@ -503,6 +518,40 @@ def _run_command(args: argparse.Namespace) -> None:
         print(f"Available: {', '.join(sorted(COMMAND_MAP))}", file=sys.stderr)
         sys.exit(1)
 
+    # --- decode-geometry: needs --id and --mesh-block; passes --experimental-position-source ---
+
+    if command == "decode-geometry":
+        if not args.id:
+            print("ERROR: 'decode-geometry' requires --id <16hex>", file=sys.stderr)
+            sys.exit(1)
+        if args.mesh_block < 0:
+            print("ERROR: 'decode-geometry' requires --mesh-block <n>", file=sys.stderr)
+            sys.exit(1)
+
+        # Optional dotnet build step (unless --skip-build)
+        if not args.skip_build:
+            solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+            if solution.exists():
+                checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        _run_dotnet_and_summarize(
+            command=command,
+            out_dir=Path(args.out) if args.out else DEFAULT_OUT,
+            project=Path(args.project) if args.project else DEFAULT_PROJECT,
+            root=Path(args.root) if args.root else DEFAULT_ROOT,
+            smoke_max_total=args.smoke_max_total,
+            limit=args.limit,
+            asset_id=args.id or "",
+            mesh_block=args.mesh_block,
+            extra_offset=args.extra_offset,
+            asset_type=args.type or "",
+            semantic_categories=args.semantic_category or [],
+            full=args.full,
+            experimental_position_source=args.experimental_position_source,
+            write_obj=args.write_obj,
+        )
+        return
+
     # Validate required args
     if entry.get("needs_id") and not args.id:
         print(f"ERROR: '{command}' requires --id <16hex>", file=sys.stderr)
@@ -553,6 +602,8 @@ Examples:
   python scripts/rift_workflow.py asset-signatures --smoke-max-total 500
   python scripts/rift_workflow.py semantic-hint-crosstab
   python scripts/rift_workflow.py all --full
+  python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6
+  python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6 --experimental-position-source --full
         """,
     )
     parser.add_argument(
@@ -608,6 +659,16 @@ Examples:
         type=int,
         default=-1,
         help="Extra stream offset for attribute-extra-probe",
+    )
+    parser.add_argument(
+        "--experimental-position-source",
+        action="store_true",
+        help="Enable experimental position-source fallback for decode-geometry",
+    )
+    parser.add_argument(
+        "--write-obj",
+        action="store_true",
+        help="Write OBJ file (decode-geometry)",
     )
     parser.add_argument(
         "--type",
