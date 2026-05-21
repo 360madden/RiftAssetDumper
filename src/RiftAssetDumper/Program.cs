@@ -2284,7 +2284,7 @@ internal static class Program
       }
 
       // Build OBJ data for float32 decode
-      if (options.WriteObj && !options.Experimental)
+      if ((options.WriteObj || options.ExportObj) && !options.Experimental)
       {
         for (var i = 0; i < positionSamples.Count; i++)
         {
@@ -2317,7 +2317,7 @@ internal static class Program
       totalUvs += uvSamples.Count;
 
       // Generate triangle faces from UInt16 big-endian index strip at @264 extra stream
-      if (options.WriteObj && !options.Experimental)
+      if ((options.WriteObj || options.ExportObj) && !options.Experimental)
       {
         var extra264Found = false;
         var extra264Skipped = 0;
@@ -2382,7 +2382,7 @@ internal static class Program
     }
 
     // Write OBJ file
-    if (options.WriteObj)
+    if (options.WriteObj || options.ExportObj)
     {
       var outDir = ResolveOutputPath(rootDirectory, options.OutDirectory, "decode-nif-geometry");
       Directory.CreateDirectory(outDir);
@@ -12848,6 +12848,7 @@ internal static class Program
       bool RedactPaths,
       bool Experimental,
       bool ExperimentalPositionSource,
+      bool ExportObj,
       bool WriteObj)
   {
     public static AppOptions Parse(string[] args)
@@ -12886,6 +12887,7 @@ internal static class Program
       var redactPaths = true;
       var experimental = false;
       var experimentalPositionSource = false;
+      var exportObj = false;
       var writeObj = false;
 
       for (var i = 0; i < args.Length; i++)
@@ -13111,6 +13113,9 @@ internal static class Program
           case "--experimental-position-source":
             experimentalPositionSource = true;
             break;
+          case "--export-obj":
+            exportObj = true;
+            break;
           case "--write-obj":
             writeObj = true;
             break;
@@ -13195,6 +13200,7 @@ internal static class Program
           redactPaths,
           experimental,
           experimentalPositionSource,
+          exportObj,
           writeObj);
     }
 

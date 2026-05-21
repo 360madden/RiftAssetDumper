@@ -1245,6 +1245,19 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- inventory-nif-blocks --root "C:\RIFT MODDING\Assets\Source" --out "C:\RIFT MODDING\Assets\Exports\nif-block-inventory.json"
 ```
 
+**2026-06-02 — Stage 3: `--export-obj` experimental gate for @264 indexed OBJ exporter (complete):**
+
+- Added standalone `--export-obj` CLI flag to `decode-nif-geometry` command — independent of `--write-obj` and `--experimental`, targets only the attribute-set `@264` indexed path.
+- C# changes: Added `bool ExportObj` to `AppOptions` record, `--export-obj` parsing, updated 3 gate conditions to include `ExportObj || WriteObj` (OBJ data building, @264 face generation, OBJ file write).
+- Python wiring: Added `--export-obj` argument to `decode-geometry` handler in `rift_workflow.py`, forwarded through `_run_dotnet_and_summarize`.
+- **End-to-end validated** on `6fc01704d4a509d5` mesh#6: 1 attribute set, 128 vertices, 128 normals, 128 UVs, 318 @264 strip faces, OBJ written with `f v/vn/vt` format.
+- Build: 0 errors, Tests: 6/6 pass, Code review: clean.
+
+**Known limitations:**
+- `--export-obj` only works for meshes with attribute sets (position+normal+UV); 0-attribute-set meshes will produce an empty OBJ.
+- Face format uses raw-zero-based indexing (+1 for OBJ), consistent with the proven degenerate-bridge strip hypothesis.
+- Only `@264` extra streams are decoded for faces; other index sources are not yet wired.
+
 ## Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
@@ -1257,7 +1270,7 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 8. Add index-family topology scoring directly to mesh-binding pair reports.
 9. ✅ Extended `--experimental-position-source` fallback to decode normals + UVs from linked streams.
 10. ✅ Added `--write-obj` flag to Python workflow orchestrator for easy CLI access.
-11. Add a disabled experimental exporter (Stage 3 candidate) — now that fallback provides positions+normals+UVs, the attribute-set path (`@264` indexed) is the next exporter target.
-12. Open the top-3 batch outputs in external NIF/Gamebryo tooling for visual validation after one mesh family has stronger role proof.
-13. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.
-14. Scope and define Stage 3 — candidate: experimental OBJ exporter for attribute-set `@264` indexed path, or scaling fallback across all 5,455 zero-attribute-set meshes.
+11. ✅ `--export-obj` experimental gate for attribute-set `@264` indexed OBJ exporter.
+12. Open the first `--export-obj` output in external 3D viewer (Blender/MeshLab) for visual validation.
+13. Scale to all 5 @264-indexed meshes (`meshSize=297` family, v=128/95/80/64) and batch-test.
+14. Keep LZMA2 work focused on manifest/PAK reconstruction rather than `TWAD` entry extraction.

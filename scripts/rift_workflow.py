@@ -281,6 +281,7 @@ def _run_dotnet_and_summarize(
     full: bool,
     experimental_position_source: bool = False,
     write_obj: bool = False,
+    export_obj: bool = False,
 ) -> None:
     """Run dotnet command and show report summary."""
     entry = COMMAND_MAP[command]
@@ -314,6 +315,8 @@ def _run_dotnet_and_summarize(
         dotnet_args += ["--experimental-position-source"]
     if write_obj:
         dotnet_args += ["--write-obj"]
+    if export_obj:
+        dotnet_args += ["--export-obj"]
     if extra_offset >= 0:
         dotnet_args += ["--extra-offset", str(extra_offset)]
     if asset_type:
@@ -696,6 +699,7 @@ def _run_command(args: argparse.Namespace) -> None:
             full=args.full,
             experimental_position_source=args.experimental_position_source,
             write_obj=args.write_obj,
+            export_obj=args.export_obj,
         )
         return
 
@@ -817,6 +821,11 @@ Examples:
         "--write-obj",
         action="store_true",
         help="Write OBJ file (decode-geometry)",
+    )
+    parser.add_argument(
+        "--export-obj",
+        action="store_true",
+        help="Enable experimental @264 indexed OBJ export (attribute-set path)",
     )
     parser.add_argument(
         "--type",
