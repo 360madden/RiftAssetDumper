@@ -1,5 +1,5 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
-
+Date: 2026-06-07 (updated 2026-06-07)
 Date: 2026-06-03 (updated 2026-05-22)
 
 ## 🐍 Python migration status (PS→Py phase 1)
@@ -152,6 +152,11 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Scaling to all remaining families (Stage 12) | ✅ complete | **8 new faced OBJs from 3 new families** — meshSize=309 (48v/189f ×3), meshSize=405 (15v/39f ×3), meshSize=280 (32v/30f ×2). **Total: 29 OBJs, 23 faced, 3,177 faces across 8 families, 6 position-only across 4 families.** meshSize=465 (10 pairings) probed but all 3 samples missing from copied archives. 12 of 13 unprobed sizes have PairCompatible=0 — exhaustive probe complete. All 4 proof guards PASSED. CI green. |
 | Baseline verification + integrity check (Stage 13) | ✅ complete | Full discovery suite refresh (8.1s, 3 inline guards PASSED). All 4 proof guards PASSED — attribute-extra (@264 groups intact, raw-zero-based 5/5), usage-access, position-source-sibling, residual-lead. OBJ inventory verified: **29 OBJs (23 faced, 6 pos-only), 3,177 faces, 1,881 vertices across 13 families.** meshSize=465 confirmed dead end (no sample IDs in copied archive). CI green (build 0e, tests 6/6, ruff 0). |
 
+| Discovery resume + family coverage audit (Stage 14) | ✅ complete | Full discovery suite refresh (~25s, all 7 stages green). OBJ inventory: **56 unique meshes** (deduplicated). All 4 proof guards PASSED. magic-43606 lead re-investigated and confirmed dead end. CI green (build 0e, tests 6/6, ruff 0). |
+| mypy 2.1.0 CI fix + meshSize=465 investigation (Stage 15) | ✅ complete | Resolved 163 mypy 2.1.0 regressions (0 errors). Investigated meshSize=465: all 13 samples confirmed dead end (no position/index streams, uint16-packed tangent-space data only). CI green (build 0e, tests 6/6, ruff 0, mypy 0). |
+| New mesh families + aggressive lead pursuit (Stage 16) | ✅ complete | **4 new faced families discovered** — meshSize=267 (5v/2f), 345 (137-149v/414-424f), 361 (151v/414f), 365 (138-176v/414-464f). **73 OBJs, 47 faced, 7,744 faces, 4,649 vertices across 17 families.** meshSize=465 confirmed dead end (no position/index streams). Targeted inventory query for index-stream sizes was the breakthrough methodology. All 4 guards PASSED. CI green. |
+| OBJ manifest + remaining unexplored sizes (Stage 17) | ✅ complete | **1 new faced family** — meshSize=354 (24v/22f). OBJ manifest with SHA256 hashes (`Exports/obj-manifest-stage17.json`). **76 OBJs, 48 faced, 7,766 faces, 4,695 vertices across 18 families.** 2 mesh sizes confirmed dead ends (330, 370). All 4 guards PASSED. CI green. |
+| Batch-sweep runner + OBJ integrity + candidate exhaustion (Stage 18) | ✅ complete | `batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building. **94 OBJs, 65 faced, 10,795 faces, 6,079 vertices across 18+ families. 0 structural issues. 0 unexported candidates remain.** All 4 proof guards PASSED. CI green (build 0e, tests 6/6, ruff 0, mypy 0). |
 ## Approved operating mode 🚀
 
 This repo is now following the approved **Aggressive Evidence Workflow**:
