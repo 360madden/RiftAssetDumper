@@ -146,7 +146,8 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Pairing validation (Stage 6) | 🔬 concluded | Investigated why pairings=0 for 0-attribute-set meshes; detailed stream analysis proved `index-u16be-lead` classification is a false positive (4 distinct values, 99% degenerate); strict `vertexCount > IndexMax` check is correct; no valid 0-attr+pairing meshes exist in the inventory. Reverted lenient-fallback attempt. |
 | False-positive `index-u16be-lead` classifier fix (Stage 7) | ✅ complete | Raised `BigEndianDistinctIndexCount` threshold 3→8; added degenerate-ratio gate (≤90%) in catch-all else branch; lowered confidence 70→60. Validated on both false-positive meshes — sentinel bodies now correctly classified as `strided-body`/`uv-float2-ror1-lead`/`normal-float3-ror1-lead`. Build 0 errors, tests 6/6, code review clean. |
 | Endian-analysis root-cause fix (Stage 9) | ✅ complete | Fixed pre-existing bug where `AnalyzeNifStreamEndian` read both `little` and `big` as big-endian (line 9322: `ReadUInt16BigEndian`→`ReadUInt16LittleEndian`), making the endian classifier unable to distinguish them and always returning `ambiguous-small-u16` for small-value streams. Added `ambiguous-small-u16` safety-net handler (≥8 distinct, triangle-aligned, ≤50% degenerate → `index-u16be-lead` c=55). Added guards to `little-endian-u16-lead` gate (≥8 distinct, triangle-aligned, ≤90% degenerate → `index-u16le-lead` c=45) to prevent sentinel misclassification. Updated proof guard baselines for new role/topology values. **PairCompatibleMeshes restored to 1,949** (from 0 post-Stage 7). Build 0 errors, tests 6/6, proof guard PASSED, code review clean. |
-| Full-scale OBJ export + guard validation (Stage 10) | ✅ complete | 13 OBJs across 11 unique assets decoded. **5 @264 faced** OBJs: 128v/318f (×2), 95v/118f, 80v/78f, 64v/82f. **1 breakthrough pairing face**: `084c1e91726a2aea` mesh#6 — first non-@264 mesh with working face generation (24v/22f) via `FindNifMeshProbePairings`; stream roles: position-float3-ror1 (#16, 24v), normal-float3-ror1 (#17, 24v), index-u16be-strip (#15, 6v u16be). **6 position-only** meshes with ExperimentalPositionSource: 168v, 93v (×2), 71v (×2), 48v, 30v. **All 4 proof guards PASSED**. CI: build 0 errors, tests 6/6, ruff 0 violations. |
+| Full-scale OBJ export + guard validation (Stage 10) | ✅ complete | 13 OBJs across 11 unique assets decoded. **5 @264 faced** OBJs: 128v/318f (×2), 95v/118f, 80v/78f, 64v/82f. **1 breakthrough pairing face**: `084c1e91726a2aea` mesh#6 — first non-@264 mesh with working face generation (24v/22f) via `FindNifMeshProbePairings`. **6 position-only** meshes. All 4 proof guards PASSED. |
+| Scaling to new mesh families (Stage 11) | ✅ complete | **9 new faced OBJs from 3 new families** — meshSize=301 (48v/46f ×3), meshSize=321 (24v/22f ×3), meshSize=367 (130v/431f ×3). **Total: 21 OBJs, 15 faced, 2,433 faces across 5 families.** Key insight: the C#-level `FindNifMeshProbePairings` in `decode-geometry` finds pairings that the aggregated inventory `TopPairings` misses. All 4 proof guards PASSED. CI green. |
 
 ## Approved operating mode 🚀
 
@@ -1469,6 +1470,70 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - **Files changed:** `docs/current-status.md` (this entry), `.gitignore` (1 line). No source code changes — all work was decode/validation/analysis.
 
 - **Bottom line:** 11 unique assets decoded to OBJ, 5 @264 faced + 1 breakthrough pairing face. All proof guard baselines hold. Pairing-based face path proven functional. Next: open OBJs in 3D viewer; scale to more 0-attribute-set meshes with pairings.
+
+**2026-05-22 — Stage 11: Scaling to new mesh families — 9 new faced OBJs from 3 families (complete):**
+
+- **Goal:** Scale the Stage 10 breakthrough (`084c1e91726a2aea`, meshSize=276, 24v/22f) by finding and decoding other mesh sizes with C#-level `FindNifMeshProbePairings` — pairings the aggregated inventory `TopPairings` aggregation misses.
+
+- **Key insight discovered:** The inventory's `TopPairings` (100 entries) contains **zero index→position pairings** — all are index-u16be-strip-lead → normal-float3-ror1-lead or index-u16be-strip-lead → uv-float2-ror1-lead. The per-mesh `decode-geometry` path does deeper probing that finds unique index→vertex (position-containing) pairings not captured in the aggregated inventory.
+
+- **MeshSize=301 — 3 samples, all 48v/46f:**
+
+| Asset ID | Vertices | Faces | OBJ | Pairings |
+|---|---:|---:|---|
+| `f7faf735f55928f5` | 48 | 46 | 5,513 B / 199 L | 2 confident, index-u16be-strip-lead |
+| `576b4ac4263c2d92` | 48 | 46 | 5,513 B / 199 L | 2 confident, index-u16be-strip-lead |
+| `297cbfea6f7198db` | 48 | 46 | 5,513 B / 199 L | 2 confident, index-u16be-strip-lead |
+
+- Inventory had 310 index-u16be-strip-lead + 76 index-u16be-list-lead for meshSize=301. Top pairings: 50 index→UV (v=48, maxIdx=47, cov=1.0), 49 index→normal (v=48, maxIdx=47, cov=1.0). Position stream discovered at decode-time by the experimental path.
+
+- **MeshSize=321 — 3 samples, all 24v/22f:**
+
+| Asset ID | Vertices | Faces | OBJ | Pairings |
+|---|---:|---:|---|
+| `77ab4b0615c8583d` | 24 | 22 | 2,825 B / 103 L | 2 confident, index-u16be-strip-lead |
+| `e0cec743605583c9` | 24 | 22 | 2,831 B / 103 L | 2 confident, index-u16be-strip-lead |
+| `f85e7d6b8ffd2781` | 24 | 22 | 2,825 B / 103 L | 2 confident, index-u16be-strip-lead |
+
+- Inventory: 60 index→normal pairings (v=24, maxIdx=23, cov=1.0) for meshSize=321.
+
+- **MeshSize=367 — 3 samples, all 130v/431f (largest meshes decoded to date!):**
+
+| Asset ID | Vertices | Faces | OBJ | Pairings |
+|---|---:|---:|---|
+| `96bedfae4bd7dd40` | 130 | 431 | 21,643 B / 700 L | 2 confident, index-u16be-strip-lead |
+| `51d6c99244779406` | 130 | 431 | 21,643 B / 700 L | 2 confident, index-u16be-strip-lead |
+| `9a813814bba6478e` | 130 | 431 | 21,643 B / 700 L | 2 confident, index-u16be-strip-lead |
+
+- Note: meshSize=367 samples have 130 positions + 130 normals but **0 UVs** in the header — faces still use `f v/vt/vn` format (UV indices present but may be default 0).
+
+- **meshSize=276 batch attempt (negative):** Three inventory-listed samples (`2c85cfa17543443b`, `593ea328978bde38`, `07f37c99a80da009`) all failed — either build error or "NiMesh block #6 was not found". The breakthrough `084c1e91726a2aea` appears to be from a different mesh-binding pattern.
+
+- **All face formats:** `f v/vt/vn` with `degenerate-bridge UInt16BE strip` — consistent with the proven @264 degenerate-bridge-stitch topology hypothesis.
+
+- **Proof guard suite (all 4 PASSED):**
+  - attribute-extra-proof-guard: ✅ 4 @264 vertex groups (v=128×2, 95, 80, 64), raw-zero-based 5/5
+  - usage-access-correlation-guard: ✅ 5 roles, 0 pairing exceptions
+  - position-source-sibling-lead-guard: ✅ Known sibling leads intact
+  - residual-lead-guard: ✅ 5 mesh sizes, meshSize=305: 119 residuals, 5 @188 candidates (confirmed negative)
+
+- **CI gate:** Build 0 errors, Tests 6/6, Ruff 0 violations.
+
+- **Total Stage 11 output:**
+
+| Metric | Value |
+|---|---:|
+| Total OBJs | **21** |
+| Faced OBJs | **15** |
+| Position-only OBJs | **6** |
+| Total vertices | **1,628** |
+| Total faces | **2,433** |
+| Unique mesh families with faces | **5** (@264, meshSize=276, 301, 321, 367) |
+| Unique assets decoded | **20** |
+
+- **Files changed:** `docs/current-status.md` (this entry). No source code changes — all work was decode/validation/analysis.
+
+- **Bottom line:** The pairing-based face generation path scales across mesh families. The key enabler is the C#-level `FindNifMeshProbePairings` which performs deeper per-mesh probing than the aggregated inventory. Next steps: open the largest meshes in a 3D viewer; continue probing remaining mesh size families (meshSize=465 with 30 pairings, meshSize=405 with 24 pairings, meshSize=309 with 18 pairings).
 
 ## Current safest next direction 🛡️
 
