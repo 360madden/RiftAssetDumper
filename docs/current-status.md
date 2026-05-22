@@ -149,7 +149,8 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Full-scale OBJ export + guard validation (Stage 10) | ✅ complete | 13 OBJs across 11 unique assets decoded. **5 @264 faced** OBJs: 128v/318f (×2), 95v/118f, 80v/78f, 64v/82f. **1 breakthrough pairing face**: `084c1e91726a2aea` mesh#6 — first non-@264 mesh with working face generation (24v/22f) via `FindNifMeshProbePairings`. **6 position-only** meshes. All 4 proof guards PASSED. |
 | Scaling to new mesh families (Stage 11) | ✅ complete | **9 new faced OBJs from 3 new families** — meshSize=301 (48v/46f ×3), meshSize=321 (24v/22f ×3), meshSize=367 (130v/431f ×3). **Total: 21 OBJs, 15 faced, 2,433 faces across 5 families.** Key insight: the C#-level  in  finds pairings that the aggregated inventory  misses. All 4 proof guards PASSED. CI green. |
 | Scaling to all remaining families (Stage 12) | ✅ complete | **8 new faced OBJs from 3 new families** — meshSize=309 (48v/189f ×3), meshSize=405 (15v/39f ×3), meshSize=280 (32v/30f ×2). **Total: 29 OBJs, 23 faced, 3,177 faces across 8 families, 6 position-only across 4 families.** meshSize=465 (10 pairings) probed but all 3 samples missing from copied archives. 12 of 13 unprobed sizes have PairCompatible=0 — exhaustive probe complete. All 4 proof guards PASSED. CI green. |
-| Scaling to all remaining families (Stage 12) | ✅ complete | **8 new faced OBJs from 3 new families** — meshSize=309 (48v/189f ×3), meshSize=405 (15v/39f ×3), meshSize=280 (32v/30f ×2). **Total: 29 OBJs, 23 faced, 3,177 faces across 8 families + 6 position-only.** 17 mesh sizes remain unprobed (15 with PairCompatible=0). All 4 proof guards PASSED. CI green. |
+| Scaling to all remaining families (Stage 12) | ✅ complete | **8 new faced OBJs from 3 new families** — meshSize=309 (48v/189f ×3), meshSize=405 (15v/39f ×3), meshSize=280 (32v/30f ×2). **Total: 29 OBJs, 23 faced, 3,177 faces across 8 families, 6 position-only across 4 families.** meshSize=465 (10 pairings) probed but all 3 samples missing from copied archives. 12 of 13 unprobed sizes have PairCompatible=0 — exhaustive probe complete. All 4 proof guards PASSED. CI green. |
+| Baseline verification + integrity check (Stage 13) | ✅ complete | Full discovery suite refresh (8.1s, 3 inline guards PASSED). All 4 proof guards PASSED — attribute-extra (@264 groups intact, raw-zero-based 5/5), usage-access, position-source-sibling, residual-lead. OBJ inventory verified: **29 OBJs (23 faced, 6 pos-only), 3,177 faces, 1,881 vertices across 13 families.** meshSize=465 confirmed dead end (no sample IDs in copied archive). CI green (build 0e, tests 6/6, ruff 0). |
 
 ## Approved operating mode 🚀
 
@@ -1585,7 +1586,48 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 - **Bottom line:** The pairing-based face generation path has been exhaustively tested against all 23 mesh sizes in the copied archive set. 8 families produce faced OBJs; 4 produce position-only; 11 produce nothing (no pairings or no archive matches). The C#-level  decoder finds valid index→vertex pairings where the aggregated inventory sees only index→normal/UV pairings. All proof guard baselines hold. Next: open the largest OBJs in a 3D viewer; investigate live archive sampling to reach meshSize=465 and other families whose samples are missing from the copied set.
 
-## Current safest next direction 🛡️
+## 
+**2026-06-03 — Stage 13: Baseline verification and integrity sweep (complete):**
+
+- **Goal:** After the exhaustive Stage 12 probe of all 23 mesh sizes, refresh the full discovery pipeline, run all 4 proof guards, verify the OBJ inventory, and confirm no regressions.
+
+- **Discovery suite refresh:** Ran  — completed in 8.1s. All 3 inline guards (usage-access, position-source-sibling, residual-lead) PASSED. Mesh-binding inventory metrics stable.
+
+- **Proof guard suite (all 4 PASSED):**
+  - : PASSED — all 4 @264 vertex groups intact (v=128×2, 95×1, 80×1, 64×1), raw-zero-based fitness 5/5, degenerate-bridge-stitch structure, parity breaks 0/0, sentinel count 0.
+  - : PASSED — 5 roles with correct usage/access splits, 0 pairing exceptions.
+  - : PASSED — guarded leads intact.
+  - : PASSED — meshSize=305 stream@188 residuals stable.
+
+- **OBJ inventory verified — 29 OBJs across 13 families:**
+
+| MeshSize | OBJs | Faced | Pos-only | Vertex counts | Face counts |
+|---:|---:|---:|---:|---|---|
+| **264** (@297) | 5 | 5 | 0 | [64, 80, 95, 128] | [78, 82, 118, 318] |
+| **272** | 1 | 0 | 1 | [48] | — |
+| **276** | 1 | 1 | 0 | [24] | [22] |
+| **280** | 2 | 2 | 0 | [32] | [30] |
+| **297** | 1 | 0 | 1 | [30] | — |
+| **301** | 3 | 3 | 0 | [48] | [46] |
+| **305** | 2 | 0 | 2 | [93] | — |
+| **309** | 3 | 3 | 0 | [48] | [189] |
+| **321** | 3 | 3 | 0 | [24] | [22] |
+| **325** | 1 | 0 | 1 | [71] | — |
+| **329** | 1 | 0 | 1 | [168] | — |
+| **367** | 3 | 3 | 0 | [130] | [431] |
+| **405** | 3 | 3 | 0 | [15] | [39] |
+
+- **Total: 29 OBJs (23 faced, 6 pos-only), 3,177 faces, 1,881 vertices.**
+
+- **meshSize=465:** Confirmed dead end — 0 sample IDs in inventory (all 3 assets missing from copied archives). The only remaining mesh family that showed PairCompatible > 0 in inventory but can't be probed without live archives.
+
+- **CI gate:** dotnet build 0 errors, dotnet test 6/6 passed, ruff 0 violations.
+
+- **Files changed:**  (this entry). No source code changes.
+
+- **Bottom line:** All 23 mesh sizes exhaustively probed. 8 families produce faced OBJs, 5 produce position-only. All 4 proof guard baselines hold. Discovery pipeline and CI are green. The geometry decoding pipeline is end-to-end verified and ready for the next phase.
+
+Current safest next direction 🛡️
 
 1. Use `scripts\Invoke-RiftAssetWorkflow.ps1` for repeatable smoke/full mesh-binding cycles.
 2. For the attribute-set lane, promote `@264/#15` on `6fc01704d4a509d5` as the next topology-bearing lead, while keeping `@272/#25` and repeated `@296` bodies as guardrail/negative evidence.
