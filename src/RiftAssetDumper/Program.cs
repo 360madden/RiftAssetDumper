@@ -12805,7 +12805,7 @@ internal static class Program
     Console.WriteLine("  --id <16hex>    Only extract one asset ID prefix");
     Console.WriteLine("  --mesh-block <n>");
     Console.WriteLine("  --experimental"); Console.WriteLine("                  Enable experimental geometry decode features"); Console.WriteLine("  --experimental-position-source"); Console.WriteLine("                  Use linked-stream position-source probe when no attribute sets found");
-      Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file"); Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
+    Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file"); Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");
     Console.WriteLine("  --stream-block <n>");
     Console.WriteLine("                  Optional NiDataStream block index filter for probe-nif-stream-body");
     Console.WriteLine("  --extra-offset <n>");

@@ -3,6 +3,8 @@
 ## What this project is
 Read-only **RIFT** game asset archive research workspace. Reverse-engineers the game's custom binary archive format (`TWAM` manifests + `TWAD` archives) to extract and decode assets — textures (DDS), models (Gamebryo NIF v20.6.0.0), audio (OGG/RIFF), XML data, etc. The primary goal is geometry/model export (OBJ) from NIF meshes via `NiMesh` → `NiDataStream` binding analysis.
 
+The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-discovery-workflow.md`) — small focused probes → smoke runs → full copied-set inventory → ranked evidence → documented truth → commit → next lead. All task routing follows a safety policy (see `docs/task-routing-safety-policy.md`) that reserves high/extra-high reasoning for truth, proof, guards, runtime, and commit decisions.
+
 ## Quickstart
 
 ### .NET (main dumper CLI)
@@ -14,42 +16,93 @@ Read-only **RIFT** game asset archive research workspace. Reverse-engineers the 
 | `dotnet format RiftAssetDumper.slnx --verify-no-changes` | Check formatting |
 | `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- --help` | Run CLI |
 
-### PowerShell workflow helper (preferred runner)
+### PowerShell workflow helper (recommended runner — thin wrapper only)
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftAssetWorkflow.ps1" -Mode <Mode> [options]
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftWorkflow.ps1" -Mode <Mode> [options]
 ```
 
-### Python (scripting/discovery orchestration)
+All complex modes have been ported to Python. The legacy `Invoke-RiftAssetWorkflow.ps1` still exists but is no longer needed as fallback.
+
+### Python (scripting/discovery orchestration — primary orchestrator)
+
+| Command | Purpose |
+|---------|---------|
+| `python scripts/rift_workflow.py <command> [options]` | Run any workflow command (kebab-case) |
+| `python scripts/rift_workflow.py discovery-suite --full` | Run unified 7-step pipeline |
+| `python scripts/rift_workflow.py all --full` | Run all inventory commands |
+| `python scripts/rift_workflow.py decode-geometry --id <hex> --mesh-block <n> --experimental-position-source --write-obj` | Decode + export OBJ |
+| `python scripts/rift_workflow.py batch-export-264` | Batch export all @264-indexed meshes |
+| `python scripts/rift_workflow.py mesh-probe --id <hex> --mesh-block <n>` | Probe one mesh |
+| `python scripts/rift_workflow.py attribute-extra-proof-guard --full` | Run proof guard suite |
+| `python scripts/rift_workflow.py discovery-workbench --privacy-scan` | Generate discovery workbench |
+| `ruff check scripts/` | Python lint |
+| `mypy scripts/ --no-error-summary` | Python type check |
+| `python scripts/test_rift_workflow_utils.py` | Python tests |
+
+### Python helper scripts (direct)
 
 | Command | Purpose |
 |---------|---------|
 | `python scripts/rift_asset_discovery_matrix.py --skip-build` | Run discovery matrix jobs |
-| `ruff check scripts/` | Python lint |
-| `mypy scripts/ --no-error-summary` | Python type check |
-| `python scripts/test_rift_workflow_utils.py` | Python tests |
+| `python scripts/rift_position_gap_report.py <inventory.json>` | Generate position gap report |
+| `python scripts/extract_live_nifs.py` | Extract NIFs from live TWAD archives |
+| `python scripts/flatten_nifs.py` | Flatten NIFs into single directory |
+| `python scripts/live_inventory.py` | Live archive NIF inventory |
+| `python scripts/discovery_workbench.py` | Aggregated discovery workbench |
 
 ## Architecture
 
 ### .NET CLI (`src/RiftAssetDumper/`)
 - **Target:** .NET 9.0, C# with nullable enabled, implicit usings
-- **Key dependency:** `SharpCompress` (XZ/LZMA2 decompression)
+- **Key dependency:** `SharpCompress` v0.41.0 (XZ/LZMA2 decompression)
 - **Single-file entry point:** `Program.cs` (~15K lines, contains ALL command handlers inline)
 - **Commands** dispatched via `AppOptions.Parse(args)` then `if/else if` chain in `Main()`
-- **Key commands:** `probe`, `match-ids`, `list-paks`, `list-entries`, `extract-archives`, `hash-name`, `match-names`, `inventory-archives`, `scan-compression`, `mine-strings`, `probe-binary`, `probe-nif`, `probe-nif-streams`, `probe-nif-mesh`, `decode-nif-geometry`, `probe-nif-position-source`, `inventory-nif*`, `extract-nif-bundle`, `extract-nif-bundles`, `link-nif-textures`, `plan-nif-bundle-archives`
-- **Tests:** xUnit in `src/RiftAssetDumper.Tests/`
+- **Key commands (inventory):** `inventory-nif-mesh-bindings`, `inventory-nif-mesh-streams`, `inventory-nif-stream-headers`, `inventory-nif-stream-bodies`, `inventory-nif-stream-endianness`, `inventory-nif-index-candidates`, `inventory-nif-blocks`, `inventory-asset-signatures`, `inventory-archives`
+- **Key commands (probe):** `probe-nif-mesh`, `probe-nif-streams`, `probe-nif-stream-body`, `probe-nif-attribute-extra`, `probe-nif`, `probe-binary`, `probe`
+- **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`)
+- **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`
+- **Key commands (utility):** `hash-name`, `match-ids`, `match-names`, `list-paks`, `list-entries`, `scan-compression`, `mine-strings`
+- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (6 tests, all pass)
 
 ### Python scripts (`scripts/`)
 - **Target:** Python 3.14 (ruff + mypy strict)
-- **Roles:** discovery orchestration, workflow helpers, guard/proof-validaton scripts
-- **Scripts** use `scripts.__init__`; PS→Py ports use underscore-prefixed function names (allowed by ruff per-file-ignores)
+- **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports
+- **Entry point:** `scripts/rift_workflow.py` — kebab-case command dispatch with 30+ commands
+- **Guards:** `scripts/rift_workflow_guards.py` — 4 proof guards (attribute-extra, usage-access-correlation, position-source-sibling-lead, residual-lead)
+- **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
+- **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
+- **Tests:** `scripts/test_rift_workflow_utils.py` (49 unit tests)
+- **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
+
+### Proof guards (Python, `scripts/rift_workflow_guards.py`)
+
+| Guard | Purpose | Status |
+|-------|---------|--------|
+| `attribute_extra_proof_guard` | Validates @264 aggregate edge/area/normal/parity/strip-structure regressions against 4 vertex-count groups | ✅ PASSED |
+| `attribute_extra_sibling_proof_guard` | Validates focused sibling probes (v=128) have exact stream/block shape, index prefix, mapping candidates, stitch structure | ✅ PASSED |
+| `usage_access_correlation_guard` | Validates 5 roles + 0 pairing exceptions | ✅ PASSED |
+| `position_source_sibling_lead_guard` | Validates guarded leads intact for sibling families | ✅ PASSED |
+| `residual_lead_guard` | Validates residual position classifier baselines (meshSize=305: 119 residuals, 5 @188 candidates) | ✅ PASSED |
+
+### Discovery suite (`discovery-suite` command)
+A unified 7-step pipeline orchestrator in `rift_workflow.py`:
+1. Mesh-binding inventory (or reuse via `--quick`)
+2. Position-source gap report
+3. Position-source sibling family report
+4. Residual position classifier report
+5. Proof guards (3 inline: usage-access-correlation, residual-lead, position-source-sibling-lead)
+6. Discovery workbench
+7. Summary report + structured JSON output
+
+Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all 7 stages.
 
 ### Key directories (gitignored)
 | Path | Contents |
 |------|----------|
 | `Source/` | Local copied game files (`assets.manifest`, `Assets/assets.###` archives) |
-| `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) |
-| `Exports/` | JSON/JSONL reports, inventories, and matrices |
+| `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) and NIF texture bundles |
+| `Exports/` | JSON/JSONL reports, inventories, matrices, and OBJ exports |
 | `RecoveredNames/` | Generated filename matches (`recovered-names.jsonl`) |
 | `Candidates/` | Candidate filename lists for hash matching |
 | `docs/handoffs/` | Session handoff docs (AI-agent context resumption) |
@@ -59,7 +112,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftAssetWor
 2. **Archive** (`TWAD`) → parse entry table, decompress (zlib/LZMA2/raw), detect type
 3. **NIF probe** → parse Gamebryo block structure, extract `NiMesh` → `NiDataStream` bindings
 4. **Geometry decode** → decode positions/normals/UVs from float32 or uint16-packed streams
-5. **OBJ export** → experimental, behind `--experimental-position-source` flag
+5. **OBJ export** → behind `--experimental-position-source` (fallback) or `--export-obj` (attribute-set @264) flags
+
+### CI pipeline (`.github/workflows/ci.yml`)
+Two parallel jobs on `windows-latest`:
+- **.NET job:** `dotnet build`, `dotnet format --verify-no-changes`, `dotnet test` (pwsh shell)
+- **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
+- **Final job:** aggregates both results (Ubuntu)
+
+### Current project state (latest — Stage 13 verification)
+- **29 total OBJs, 23 faced, 6 position-only, 3,177 faces, 1,881 vertices across 13 mesh families**
+- All 4 proof guards PASSED on full inventory
+- Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
+- CI green: build 0 errors, tests 6/6, ruff 0 violations
 
 ## Conventions
 
@@ -69,11 +134,59 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftAssetWor
 - **Redaction:** CLI redacts `%USERPROFILE%` paths by default; use `--no-redact-paths` for debugging
 - **Records:** All data types are C# `record` types (immutable, positional) — never `class` for DTOs
 - **JSON output:** JSON Lines (`.jsonl`) for row data, single JSON (`.json`) for reports
-- **Geometry exports:** Blocked behind `--experimental-position-source` gate; never claim OBJ export without proof
+- **Geometry exports:** Behind `--experimental-position-source` (0-attribute-set fallback — normals+UVs+positions with fan faces) and `--export-obj` (attribute-set @264 indexed path — degenerate-bridge strip faces) gates; never claim OBJ export without proof
 - **LZMA2:** Only XZ-framed supported; raw LZMA2 is intentionally unhandled
 - **Name recovery:** Uses FNV1/FNV1a hashing with confidence scoring; recoveries need `--use-recovered-names`
 - **NIF block analysis:** 29-byte `NiDataStream` header invariant; roles classified as `*-ror1-lead`, `*-u16be-*`, etc.
 - **CI:** Runs both .NET (build, format, test) and Python (ruff, mypy, test) on push/PR
+- **Command naming:** Kebab-case for Python CLI (e.g., `mesh-bindings`), PascalCase for PS mode names (e.g., `MeshBindings`)
+- **OBJ face generation:** Uses degenerate-bridge triangle-strip walking with raw-zero-based (+1 OBJ) indexing for @264 indexed meshes; pairing-based for 0-attribute-set meshes with index streams
+
+## Key discoveries
+
+### NiDataStream header
+Every `NiDataStream` block in the copied set follows: `blockSize - firstUInt32 == 29` (31,777/31,777 blocks). The first uint32 is the declared payload byte count.
+
+### Stream endianness
+After the Stage 9 endian-analysis fix (line 9322: `ReadUInt16BigEndian` → `ReadUInt16LittleEndian`):
+- **5,551** big-endian u16 lead bodies
+- **24,272** mixed-u16 bodies
+- **1,800** ambiguous-small-u16 bodies
+- **154** little-endian u16 lead bodies
+
+### Top stream roles (full copied-set, 5,507 NiMesh blocks)
+| Role | Count |
+|---|---|
+| `uv-float2-ror1-lead` | 4,633 |
+| `normal-float3-ror1-lead` | 4,167 |
+| `index-u16be-strip-lead` | 2,101 |
+| `position-float3-ror1-lead` | 210 |
+| `index-u16be-list-lead` | 112 |
+
+### @264 explicit-index extra streams
+The strongest positive proof lead: 5 meshes at meshSize=297 with `@264/#15` extra streams, `index-u16be-strip-lead`, raw-zero-based mapping preferred (5/5), degenerate-bridge-stitch strip structure. All 5 exported to OBJ via `batch-export-264`.
+
+### meshSize=305 stream@188 residual-position dead end
+Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found magic 43606 (0xAA56) u16le pattern driving 0.9444 plausible rating — but float32 decode produces denormal garbage (10⁻²⁷ to 10⁻³⁹). **Not position data.** All 8 target rows failed strict classifier (below 0.95 threshold). Remains candidate-only ranking evidence; export blocked.
+
+### Position-source sibling families
+5 shared-source sibling groups confirmed:
+| Mesh size | Groups | Decision |
+|---|---|---:|---|
+| 329 | 23 | repeated source-binding family |
+| 305 | 15 | repeated source-binding family |
+| 321 | 11 | repeated source-binding family |
+| 325 | 1 | shifted sibling position-source clue |
+| 329 | 1 | shifted sibling position-source clue |
+
+### Compression truth
+| Scope | Count | Compression |
+|---|---|---:|---|
+| Copied TWAD entries | 40,203 | `0=203`, `1=40000`, `2=0` |
+| Full live TWAD entries | 263,957 | `0=22422`, `1=241535`, `2=0` |
+| Manifest Table 0 PAK rows | 2,076 | `0=736`, `2=1340` |
+
+LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads seen so far.
 
 ## Gotchas
 
@@ -86,3 +199,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftAssetWor
 - `ruff` ignores E501 (line length) since it's enforced by formatter; several naming conventions relaxed for PS→Py ports
 - Always use `--experimental-position-source` for meshes without direct attribute sets
 - The `@264/#15` extra-stream pattern is the strongest geometric index lead for mesh faces
+- The `Invoke-RiftWorkflow.ps1` wrapper translates legacy PS mode names to kebab-case Python commands
+- `dotnet build` is implicit for most workflow commands unless `--skip-build` is passed
+- The `generated_output_guard` runs at the start of every Python command — it checks that no generated/ignored files have been accidentally committed
+- `.agents/` directory defines Codebuff sub-agent types, their tool schemas, and invocation contracts — the agent-routing configuration for AI-assisted coding sessions
