@@ -1,6 +1,6 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-06-03
+Date: 2026-06-03 (updated 2026-05-22)
 
 ## 🐍 Python migration status (PS→Py phase 1)
 
@@ -146,6 +146,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Pairing validation (Stage 6) | 🔬 concluded | Investigated why pairings=0 for 0-attribute-set meshes; detailed stream analysis proved `index-u16be-lead` classification is a false positive (4 distinct values, 99% degenerate); strict `vertexCount > IndexMax` check is correct; no valid 0-attr+pairing meshes exist in the inventory. Reverted lenient-fallback attempt. |
 | False-positive `index-u16be-lead` classifier fix (Stage 7) | ✅ complete | Raised `BigEndianDistinctIndexCount` threshold 3→8; added degenerate-ratio gate (≤90%) in catch-all else branch; lowered confidence 70→60. Validated on both false-positive meshes — sentinel bodies now correctly classified as `strided-body`/`uv-float2-ror1-lead`/`normal-float3-ror1-lead`. Build 0 errors, tests 6/6, code review clean. |
 | Endian-analysis root-cause fix (Stage 9) | ✅ complete | Fixed pre-existing bug where `AnalyzeNifStreamEndian` read both `little` and `big` as big-endian (line 9322: `ReadUInt16BigEndian`→`ReadUInt16LittleEndian`), making the endian classifier unable to distinguish them and always returning `ambiguous-small-u16` for small-value streams. Added `ambiguous-small-u16` safety-net handler (≥8 distinct, triangle-aligned, ≤50% degenerate → `index-u16be-lead` c=55). Added guards to `little-endian-u16-lead` gate (≥8 distinct, triangle-aligned, ≤90% degenerate → `index-u16le-lead` c=45) to prevent sentinel misclassification. Updated proof guard baselines for new role/topology values. **PairCompatibleMeshes restored to 1,949** (from 0 post-Stage 7). Build 0 errors, tests 6/6, proof guard PASSED, code review clean. |
+| Full-scale OBJ export + guard validation (Stage 10) | ✅ complete | 13 OBJs across 11 unique assets decoded. **5 @264 faced** OBJs: 128v/318f (×2), 95v/118f, 80v/78f, 64v/82f. **1 breakthrough pairing face**: `084c1e91726a2aea` mesh#6 — first non-@264 mesh with working face generation (24v/22f) via `FindNifMeshProbePairings`; stream roles: position-float3-ror1 (#16, 24v), normal-float3-ror1 (#17, 24v), index-u16be-strip (#15, 6v u16be). **6 position-only** meshes with ExperimentalPositionSource: 168v, 93v (×2), 71v (×2), 48v, 30v. **All 4 proof guards PASSED**. CI: build 0 errors, tests 6/6, ruff 0 violations. |
 
 ## Approved operating mode 🚀
 
@@ -1436,6 +1437,38 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - **Files changed:** `Program.cs` — 2 lines modified (distinct threshold + else-branch gate).
 
 - **Build:** 0 errors, Tests: 6/6 pass, Code review: clean.
+
+**2026-05-22 — Stage 10: Full-scale OBJ export across 11 assets + proof guard suite validation (complete):**
+
+- **Scope:** Decode geometry from all accessible mesh families in the copied archive set — @264 indexed (attribute-set), experimental-position-source (0-attribute-set with pairings), and position-only fallback meshes. Run all 4 proof guards to validate baselines. CI gate: build + tests + ruff.
+
+- **@264 batch decode (5 assets, 5/5 success):**
+
+| Asset ID | Vertices | Faces | OBJ size | Lines |
+|---|---:|---:|---:|
+| `6fc01704d4a509d5` | 128 | 318 | 20,934 B | 711 |
+| `caa9a88e94ec8db0` | 128 | 318 | 20,934 B | 711 |
+| `3de9c1236fe20520` | 95 | 118 | 11,878 B | 412 |
+| `0603cce7cee15eb8` | 80 | 78 | 9,471 B | 327 |
+| `dfa4b4fccd826b59` | 64 | 82 | 8,193 B | 283 |
+
+- All 5 from `meshSize=297`, `@264/#15`, `index-u16be-strip-lead` family. Face format: `f v/vt/vn` with raw-zero-based indexing (+1 OBJ offset).
+
+- **KEY BREAKTHROUGH: `084c1e91726a2aea` mesh#6 (meshSize=276) — first non-@264 mesh with working face generation:** 24 positions + 24 normals, 22 faces via `FindNifMeshProbePairings`. Stream roles: position-float3-ror1 (#16, 24v), normal-float3-ror1 (#17, 24v), index-u16be-strip (#15, 6v u16be). OBJ: 2,356 B, 79 lines. Proves the Stage 5 pairing-based face path works on real data.
+
+- **Experimental-position-source position-only decodes (6 meshes):** `58eaafd0fd31fcaf` (168v/0f), `8e01613d7ce9e297` #6+#31 (93v/0f each), `e3de1077a37d0337` #6+#30 (71v/0f each), `87772c9630bd2d02` (48v/0f), `1601c1f75e0a6022` (30v/0f).
+
+- **Proof guard suite (all 4 PASSED):** attribute-extra (4 @264 groups, raw-zero-based 5/5, degenerate-bridge-stitch, parity 0/0), usage-access (5 roles, 0 pairing exceptions), position-source-sibling (guarded leads intact), residual-lead (meshSize=305: 119 residuals, 5 @188 candidates).
+
+- **meshSize=305 stream@188 probe confirmed negative:** Magic 43606 (0xAA56) u16le pattern drives 0.9444 plausible rating but float32 decode = denormal garbage (10^-27 to 10^-39). Not position data.
+
+- **CI gate:** Build 0 errors, Tests 6/6, Ruff 0 violations.
+
+- **Git:** `.gitignore` updated (`.pytest_cache/`, `*.lnk`). Commit `c432b85` pushed.
+
+- **Files changed:** `docs/current-status.md` (this entry), `.gitignore` (1 line). No source code changes — all work was decode/validation/analysis.
+
+- **Bottom line:** 11 unique assets decoded to OBJ, 5 @264 faced + 1 breakthrough pairing face. All proof guard baselines hold. Pairing-based face path proven functional. Next: open OBJs in 3D viewer; scale to more 0-attribute-set meshes with pairings.
 
 ## Current safest next direction 🛡️
 
