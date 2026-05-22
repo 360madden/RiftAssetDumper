@@ -1472,7 +1472,7 @@ def _run_command(args: argparse.Namespace) -> None:
 
         for entry_item in _KNOWN_264_IDS:
             asset_id: str = str(entry_item["id"])
-            vertex_count: int = int(entry_item["v"])  # type: ignore[arg-type]
+            vertex_count: int = int(entry_item["v"])
             label = f"export-obj {asset_id} (v={vertex_count})"
 
             dotnet_args: list[str] = [
@@ -1563,7 +1563,7 @@ def _run_command(args: argparse.Namespace) -> None:
         print("=" * 70)
         ok_count = sum(1 for r in results if r.get("status") == "OK")
         fail_count = sum(1 for r in results if r.get("status") != "OK")
-        total_bytes = sum(int(r.get("objBytes", 0)) for r in results)  # type: ignore[arg-type]
+        total_bytes = sum(int(r.get("objBytes", 0)) for r in results)
         print(f"  Passed: {ok_count}/{len(results)}")
         print(f"  Failed: {fail_count}/{len(results)}")
         print(f"  Total OBJ bytes: {total_bytes:,}")

@@ -1506,10 +1506,10 @@ def position_source_gap_report(report_path: str | Path) -> None:
             "role, pairing, attribute-set, or residual target data."
         )
 
-    top_pairings: list[dict[str, Any]] = top_pairings_raw  # type: ignore[assignment]
-    attribute_sets: list[dict[str, Any]] = attribute_sets_raw  # type: ignore[assignment]
-    residual_targets: list[dict[str, Any]] = residual_targets_raw  # type: ignore[assignment]
-    residual_streams: list[dict[str, Any]] = residual_streams_raw or []  # type: ignore[assignment]
+    top_pairings: list[dict[str, Any]] = top_pairings_raw
+    attribute_sets: list[dict[str, Any]] = attribute_sets_raw
+    residual_targets: list[dict[str, Any]] = residual_targets_raw
+    residual_streams: list[dict[str, Any]] = residual_streams_raw or []
 
     # --- Find position-float3-ror1-lead role group ---
 
@@ -1850,7 +1850,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             "ResidualPositionClassifierReport failed: TopResidualStreams "
             "is missing from mesh-binding inventory."
         )
-    streams: list[dict[str, Any]] = residual_streams_raw  # type: ignore[assignment]
+    streams: list[dict[str, Any]] = residual_streams_raw
 
     # --- Filter target leads (meshSize=305 stream@188 POSITION usage=1 access=19) ---
 
@@ -2016,7 +2016,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
         for r in rows
         if r["MaxPlausibleThresholdForSample"] is not None
         and r["Plausible"] is not None
-        and float(r["Plausible"]) >= 0.80  # type: ignore[arg-type]
+        and float(r["Plausible"]) >= 0.80
     ]
     if len(guard_rows) < 3:
         raise ValueError(
@@ -2026,12 +2026,12 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
         )
 
     min_plausible = min(
-        float(r["Plausible"])  # type: ignore[arg-type]
+        float(r["Plausible"])
         for r in guard_rows
         if r["Plausible"] is not None
     )
     max_plausible = max(
-        float(r["Plausible"])  # type: ignore[arg-type]
+        float(r["Plausible"])
         for r in guard_rows
         if r["Plausible"] is not None
     )
