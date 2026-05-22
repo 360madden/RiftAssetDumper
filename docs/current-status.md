@@ -8,11 +8,11 @@ Date: 2026-06-03
 |---|---|---|
 | `scripts/rift_workflow_utils.py` (49 unit tests) | ✅ complete | All utility functions ported and tested |
 | `scripts/rift_workflow.py` (orchestrator) | ✅ complete | Command dispatch, C# CLI integration, `generated_output_guard`, Python mode routing, `decode-geometry` with `--experimental-position-source`, `batch-export-264` batch OBJ exporter |
-| `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench` |
+| `scripts/rift_workflow_reports.py` (reports) | ✅ complete | `show_report_summary` (8 mode branches), `semantic_hint_cross_tab`, `discovery_workbench`, `position_source_sibling_family_report`, `position_source_gap_report`, `residual_position_classifier_report` |
 | `scripts/Invoke-RiftWorkflow.ps1` (thin wrapper) | ✅ updated | Translates legacy PS mode names → kebab-case Python commands |
-| `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` (dual-path: fitness/stream) + `attribute_extra_sibling_proof_guard` (dual-path: index-role/body-role) ported from PS. Fitness path now validates @264 aggregate edge/area/normal/parity/strip-structure regressions. |
-| Guard/report functions (remaining 11) | ⏳ deferred | `usage-access-correlation-guard`, `residual-lead-guard`, `residual-position-classifier-report`, `residual-position-cluster-probe-report`, `position-source-gap-report`, `position-source-sibling-lead-guard`, `position-source-sibling-family-report`, `position-source-sibling-probe-report`, `position-source-sibling-representative-probe-report`, `position-source-sibling-secondary-probe-report`, `position-source-sibling-extra-position-report` |
-| `scripts/Invoke-RiftAssetWorkflow.ps1` (legacy) | ⚠️ deprecated | Still available as fallback for unported complex modes |
+| `scripts/rift_workflow_guards.py` (proof guards) | ✅ complete | `attribute_extra_proof_guard` (dual-path: fitness/stream) + `attribute_extra_sibling_proof_guard` (dual-path: index-role/body-role) + `usage_access_correlation_guard` + `position_source_sibling_lead_guard` + `residual_lead_guard` ported from PS. Fitness path now validates @264 aggregate edge/area/normal/parity/strip-structure regressions. |
+| Guard/report functions (remaining 0) | ✅ all ported | All 12 guard/report functions fully ported from PowerShell to Python |
+| `scripts/Invoke-RiftAssetWorkflow.ps1` (legacy) | ✅ retired | All complex modes ported; `complex_modes` is now empty in `rift_workflow.py`. Legacy PS still available but no longer needed as fallback. |
 
 **Key commands (Python):**
 
@@ -28,6 +28,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftWorkflow.
 python scripts/rift_workflow.py mesh-bindings --full
 python scripts/rift_workflow.py semantic-hint-crosstab
 python scripts/rift_workflow.py discovery-workbench --privacy-scan
+python scripts/rift_workflow.py discovery-suite --skip-build
+python scripts/rift_workflow.py discovery-suite --quick --skip-build
 python scripts/rift_workflow.py attribute-extra-proof-guard --full --skip-build
 python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
 python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-block 6 --full
@@ -35,31 +37,81 @@ python scripts/rift_workflow.py decode-geometry --id 6fc01704d4a509d5 --mesh-blo
 python scripts/rift_workflow.py batch-export-264 --skip-build
 ```
 
-**Unported modes still use legacy PS:**
+**All 12 PS complex modes fully ported to Python — `complex_modes` is now empty.**
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-RiftAssetWorkflow.ps1 -Mode ResidualPositionClusterProbeReport
+# All 4 position-source-sibling probe commands are now ported to Python:
+python scripts/rift_workflow.py position-source-sibling-probe-report --skip-build
+python scripts/rift_workflow.py position-source-sibling-representative-probe-report --skip-build
+python scripts/rift_workflow.py position-source-sibling-secondary-probe-report --skip-build
+python scripts/rift_workflow.py position-source-sibling-extra-position-report --skip-build
 ```
 
-**2026-06-02 — Stage 2: Position-source fallback + triage + end-to-end validation (complete):**
-- Extended `ExperimentalPositionSource` fallback to decode **normals** and **UVs** from linked NiDataStream blocks, not just positions. Candidates filtered by `Role.StartsWith("normal-")` and `Role.StartsWith("uv-")` for safer matching.
-- Normals validated via `VectorLength` in console samples, identical to the attribute-set decode pattern.
-- OBJ writing now produces `vn` (normals) and `vt` (UVs) lines for all fallback-decoded meshes.
-- Summary line shows `"linked-stream fallback"` instead of `"0 attribute sets"` when the fallback path was used.
-- Added `--write-obj` flag to Python workflow orchestrator (`rift_workflow.py`) — wired through `COMMAND_MAP`, `_run_dotnet_and_summarize`, and `decode-geometry` handler.
-- **End-to-end validated on real 0-attribute-set meshes:**
-  - `084c1e91726a2aea` mesh#6: 24 positions + 24 normals decoded, OBJ written ✅
-  - `1601c1f75e0a6022` mesh#6: 30 positions + 30 UVs decoded, OBJ written ✅
-  - Both produce OBJ with `v` / `vn` / `vt` lines + trivial fan faces
-- Added `triage-fallback-candidates` Python command: reads fresh mesh-binding inventory and cross-references position/normal/UV float32 candidates across RoleGroups. Outputs classification (position-only vs position+normal+uv), top-16 sample listing, and ready-to-run test commands. Usage: `python scripts/rift_workflow.py triage-fallback-candidates --full`
-- Full inventory analysis: **5,507 NiMesh blocks, 5,455 (99%) have 0 attribute sets**, 210 position-float3 candidates, 0 with complete position+normal+UV triple (companion streams don't co-occur in the same mesh block).
-- Build: 0 errors, Tests: 6/6 pass, Code review: clean.
+**2026-06-03 — Stage 2 refresh: Position-source discovery sweep (complete):**
 
-**Known limitations:**
-- Faces are trivial triangle fan (vertex 0 to consecutive pairs) since no index stream is available in this fallback mode.
-- Only the first float32 candidate per role (position/normal/UV) is used; multiple candidates are skipped.
-- 5,455 meshes (99%) have 0 attribute sets — the fallback now handles these for meshes where linked streams contain float32 data.
-- Output path overlap: `--write-obj` writes OBJ to subdirectory under the probe-report JSON path; this is cosmetic and pre-existing.
+**Fresh baseline:**
+- Endian-analysis fix (Stage 9) confirmed stable: **1,949 pair-compatible meshes** across full inventory.
+- All guard/report functions fully ported from PowerShell to Python; `complex_modes` set is now empty.
+- All 12 PS complex modes runnable via `python scripts/rift_workflow.py`.
+
+**Position-source gap report:**
+- No position gaps in the five indexed target mesh sizes (297, 305, 321, 325, 329).
+- meshSize=297: topology-proof anchor (4+ attribute sets).
+- meshSize=305: residual-position-candidate-family (5+ position-like rows with plausible ≥ 0.80).
+- meshSize=321/329: topology-rich families; residual side-streams low-signal.
+- meshSize=325: topology-rich sparse-position singleton lead (300+ pairings, 0 residual streams).
+
+**Position-source sibling family report:**
+- Five known sibling groups with shared position sources confirmed.
+- | Mesh size | Mesh blocks | Stream offsets | Groups | Links | Decision |
+  |---:|---|---:---:|---|---|
+  | 329 | mesh#7, mesh#34 | stream@212 | 23 | 46 | repeated source-binding family |
+  | 305 | mesh#7, mesh#27 | stream@188 | 15 | 30 | repeated source-binding family |
+  | 321 | mesh#7, mesh#31 | stream@204 | 11 | 22 | repeated source-binding family |
+  | 325 | mesh#6, mesh#30 | stream@292/@296 | 1 | 2 | shifted sibling position-source clue |
+  | 329 | mesh#6, mesh#31 | stream@296 | 1 | 2 | shifted sibling position-source clue |
+- meshSize=329 is the strongest: 23 groups sharing stream@212, target block#28, 46 total links.
+- meshSize=305 is the second strongest: 15 groups sharing stream@188, target block#21, 30 links.
+
+**Residual position classifier report:**
+- Candidate-only dry-run on meshSize=305 stream@188 POSITION usage=1 access=19 residuals.
+- 8 target rows identified; **0 strict passes** (all below 0.95 PlausibleValueRatio).
+- 5 candidate guard rows with plausible ≥ 0.80 — held as ranking evidence only.
+- Plausible range: 0.8283 (payload 396) to **0.9444** (payload 288).
+- Payload 288 is the strongest candidate (0.9444 plausible, 24 vectors, extent=36.0).
+- All paired (mesh#7+mesh#27) rows share matching stream/body/prefix evidence — no divergent pairs.
+- All 3+ guard assertions pass: strict=0, paired rows ≥ 8, divergent = 0, candidate guard ≥ 3.
+
+**Residual position cluster probe report:**
+- Deep-dive on 5 payload variants (96, 180, 192, 288, 396) at meshSize=305 stream@188 block#21.
+- All payloads emit to mesh#7 and mesh#27 over the same stream block #21.
+- **Key structural finding — UInt16 triples analysis:**
+  - Payload 288 exhibits `magic-43606-u16-ternary-alternating` — magic constant 43606 (0xAA56) on even-C with alternating metadata layer. Typical of packed uint16 positions with vertex-type tag.
+  - Payload 96 has `u16-ternary-mixed-c` — alternating structure with varying even-C values. May indicate multi-attribute or interleaved data. **No magic 43606** (unique structure).
+  - Payloads 180, 192, 396 are `unstructured-u16` — present magic 43606 but no clear alternating pattern.
+- All payloads: **0 attribute sets, 0 pairings** — no complete geometry binding.
+- Byte-layout comparison against payload 288 baseline:
+  - Payload 96: 0 common prefix bytes, 59% diff ratio — structurally different.
+  - Payload 180: 1 common prefix byte, 34% diff ratio — closest to 288.
+  - Payload 192: 15 common prefix bytes, 44% diff ratio.
+  - Payload 396: 9 common prefix bytes, 43% diff ratio, length +108.
+- All mesh roles: `uint16-compatible-body`, confidence 25 (no index role assigned).
+- **Export/OBJ remains blocked for all rows** — `GeometryTruthPromoted=false` on every payload.
+
+**Bottom line:** The meshSize=305 stream@188 position-like data is persistently below the strict 0.95 classifier threshold. The magic-43606 pattern in payload 288 (0.9444 plausible) is the most promising lead for quantized/packed uint16 positions, but no index pairing or attribute sets exist to confirm geometry binding. This lane remains candidate-only ranking evidence.
+
+**2026-06-02 — Stage 2: Position-source fallback + triage + end-to-end validation (original, completed 2026-06-02):**
+- Extended `ExperimentalPositionSource` fallback to decode **normals** and **UVs** from linked NiDataStream blocks. Build/tests/code-review clean.
+- Full inventory: 5,507 NiMesh blocks, 5,455 (99%) have 0 attribute sets, 210 position-float3 candidates.
+- End-to-end validated on 0-attribute-set meshes.
+
+**Known limitations (unchanged from Stage 2):**
+- Faces are trivial triangle fan (vertex 0 to consecutive pairs) since no index stream is available in fallback mode.
+- Only the first float32 candidate per role is used; multiple candidates are skipped.
+- 5,455 meshes (99%) have 0 attribute sets — fallback handles these where linked streams contain float32 data.
+- Output path overlap: `--write-obj` writes OBJ to subdirectory under the probe-report JSON path.
+
+**2026-05-20 — C# gate fixes + fitness guard completion:**
 
 **2026-05-20 — C# gate fixes + fitness guard completion:**
 - Fixed two `StartsWith("index-")` gates in `Program.cs` (inventory loop L3949, probe loop L2602) → now use `IndexStats is not null`. This was the root cause preventing `TopAttributeExtraMappingFitness` from populating for `uint16-compatible-body` extra streams.
@@ -87,7 +139,8 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Mesh role decoding | ✅ new byte-order lead | Many coarse `uint16-compatible-body` streams now decode as rotate-right-1 `float3` normals and `float2` UVs. |
 | Attribute-set topology | ✅ structural lead | Complete position/normal/UV sets are now ranked by implicit topology candidates; strongest family is `v=16`, strip-or-quad, `7` copied-set hits. |
 | Attribute extra streams | ✅ split truth | Focused probing down-ranked low-variation `@272/#25` and `@296` side streams, while full mesh-binding inventory now finds four `@264/#15` explicit-index groups where segmented decoded-position, normal-delta, and triangle-area aggregate fitness favor raw-zero-based (`5/5` samples); UV deltas are neutral/no-worse, strip structure is consistently degenerate-bridge/stitch-like, first-segment proof samples include area/parity plus compact review flags, and the aggregate + focused sibling proof guards now fail if those proof signals silently flip. |
-| Position source fallback (Stage 2) | ✅ complete | `--experimental-position-source` decodes normals+UVs+positions; `--write-obj` wired; end-to-end validated on 2 real fallback meshes; `triage-fallback-candidates` command added. Build/test/code-review clean. |
+| Position source fallback (Stage 2) | ✅ complete | `--experimental-position-source` decodes normals+UVs+positions; `--write-obj` wired. **Position discovery sweep (2026-06-03):** gap report shows **no position gaps** in indexed families; sibling family confirms 5 shared-source groups (strongest: meshSize=329×23 groups); classifier finds 5 candidate rows at plausible 0.8283–0.9444 (below strict 0.95); cluster probe identifies magic-43606 pattern in payload 288 — promising but no complete geometry binding found. All rows remain candidate-only; export blocked. |
+| Discovery suite automation | ✅ complete | `discovery-suite` command orchestrates: build → inventory → position reports → guards → workbench → summary. Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs 7 unified pipeline stages. |
 | @264 batch OBJ export (Stage 4) | ✅ complete | `batch-export-264` command exports all 5 known `@264`-indexed meshes (v=128/128/95/80/64) via `--export-obj`; 5/5 passed, 71,435 bytes total. |
 | Position fallback faces (Stage 5) | ✅ complete | Experimental-position-source path now generates UInt16BE degenerate-bridge triangle-strip OBJ faces from index-stream pairings (`FindNifMeshProbePairings`); 4 `WriteObj`→`WriteObj||ExportObj` guard fixes ensure OBJ data populates under `--export-obj`; tested on 2 fallback meshes, build clean, 6/6 tests pass. |
 | Pairing validation (Stage 6) | 🔬 concluded | Investigated why pairings=0 for 0-attribute-set meshes; detailed stream analysis proved `index-u16be-lead` classification is a false positive (4 distinct values, 99% degenerate); strict `vertexCount > IndexMax` check is correct; no valid 0-attr+pairing meshes exist in the inventory. Reverted lenient-fallback attempt. |

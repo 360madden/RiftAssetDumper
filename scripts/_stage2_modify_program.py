@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Edit Program.cs to add ExperimentalPositionSource flag."""
 
-with open('src/RiftAssetDumper/Program.cs', 'r', encoding='utf-8') as f:
+with open('src/RiftAssetDumper/Program.cs', encoding='utf-8') as f:
     content = f.read()
 
 changes = 0
@@ -46,7 +46,7 @@ if idx >= 0:
     changes += 1
     print('OK: case parsing')
 else:
-    print(f'FAIL case parsing')
+    print('FAIL case parsing')
 
 # 4. Constructor call
 old4 = '          experimental,\n          writeObj);'

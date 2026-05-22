@@ -2,16 +2,16 @@
 
 Usage:
     python scripts/live_inventory.py [--re-extract]
-    
-Scans the live RIFT game archives for NIF files, runs the C# 
+
+Scans the live RIFT game archives for NIF files, runs the C#
 inventory pipeline, and reports @264-indexed mesh candidates.
 """
 
-import os
-import sys
 import json
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 LIVE_ROOT = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
@@ -23,7 +23,7 @@ def re_extract_with_original_names():
     """Re-extract NIFs but preserve original filenames for manifest lookup."""
     dst_root = Path(LIVE_NIFS) / "Assets"
     dst_root.mkdir(parents=True, exist_ok=True)
-    
+
     copied = 0
     for bundle_dir in sorted(os.listdir(EXTRACTED)):
         bundle_path = Path(EXTRACTED) / bundle_dir / "model"
@@ -62,14 +62,14 @@ def check_for_264():
     if not inv_path.exists():
         print("Inventory file not found!")
         return
-    
-    with open(inv_path, "r", encoding="utf-8-sig") as f:
+
+    with open(inv_path, encoding="utf-8-sig") as f:
         data = json.load(f)
-    
-    print(f"\n=== LIVE INVENTORY RESULTS ===")
+
+    print("\n=== LIVE INVENTORY RESULTS ===")
     print(f"NiMesh blocks: {data.get('MeshBlockCount', '?')}")
     print(f"Attribute sets: {len(data.get('TopAttributeSets', []))}")
-    
+
     # Check for @264
     fitness = data.get('TopAttributeExtraMappingFitness', [])
     found_264 = []
@@ -82,31 +82,31 @@ def check_for_264():
             ids = [s.get('IdPrefix', '?') for s in samples[:5]]
             print(f"\n  @264 FOUND: vc={vc} count={count} ids={ids}")
             found_264.append({"vc": vc, "count": count, "ids": ids})
-    
+
     if not found_264:
         print("\n  No @264-indexed meshes found in live-extracted set.")
-    
+
     return found_264
 
 
 def main():
     re_extract = "--re-extract" in sys.argv
-    
+
     if re_extract:
         print("=== Re-extracting NIFs with original filenames ===")
         count = re_extract_with_original_names()
         if count == 0:
             print("No NIFs found in extracted bundles!")
             sys.exit(1)
-        
+
         # Copy manifest files
         for mf in ["assets64.manifest", "manifest64.txt"]:
             shutil.copy2(f"Source/{mf}", f"{LIVE_NIFS}/{mf}")
         print("Copied manifest files")
-    
+
     print("\n=== Running C# mesh-binding inventory ===")
     success = run_inventory()
-    
+
     if success:
         print("\n=== Checking for @264 candidates ===")
         check_for_264()

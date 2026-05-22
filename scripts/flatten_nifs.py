@@ -1,4 +1,6 @@
-import os, shutil, sys
+import os
+import shutil
+import sys
 
 src_root = sys.argv[1] if len(sys.argv) > 1 else 'Exports/extracted-top260'
 dst_root = sys.argv[2] if len(sys.argv) > 2 else 'Exports/live-nifs'
@@ -6,7 +8,7 @@ dst_root = sys.argv[2] if len(sys.argv) > 2 else 'Exports/live-nifs'
 os.makedirs(dst_root, exist_ok=True)
 copied = 0
 
-for dirpath, dirnames, filenames in os.walk(src_root):
+for dirpath, _, filenames in os.walk(src_root):
     for f in filenames:
         if f.endswith('.nif'):
             src = os.path.join(dirpath, f)

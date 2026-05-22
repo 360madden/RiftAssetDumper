@@ -32,6 +32,7 @@ Commands (kebab-case):
     semantic-hint-crosstab       — Python cross-tabulation
     discovery-workbench          — Python workbench
     generated-output-guard       — guard only, no C#
+    discovery-suite              — unified pipeline: build → inventory → position reports → guards → summary (supports --quick)
     mesh-streams                 — inventory-nif-mesh-streams + summary
     index-candidates             — inventory-nif-index-candidates + summary
     stream-endianness            — inventory-nif-stream-endianness + summary
@@ -44,8 +45,10 @@ Commands (kebab-case):
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -70,15 +73,27 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
+    position_source_sibling_lead_guard,
+    residual_lead_guard,
+    usage_access_correlation_guard,
 )
 from scripts.rift_workflow_reports import (  # noqa: E402
     discovery_workbench,
+    position_source_gap_report,
+    position_source_sibling_extra_position_report,
+    position_source_sibling_family_report,
+    position_source_sibling_probe_report,
+    position_source_sibling_representative_probe_report,
+    position_source_sibling_secondary_probe_report,
+    residual_position_classifier_report,
+    residual_position_cluster_probe_report,
     semantic_hint_cross_tab,
     show_report_summary,
 )
 from scripts.rift_workflow_utils import (  # noqa: E402
     checked_run,
     generated_output_guard,
+    load_json_report,
 )
 
 # ============================================================================
@@ -114,6 +129,8 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "needs_mesh_block": True,
         "needs_extra_offset": True,
     },
+    # Guard commands below are routed manually in _run_command() (run C# + Python
+    # assertion), so their COMMAND_MAP entries are documentation-only.
     "attribute-extra-proof-guard": {
         "dotnet": "inventory-nif-mesh-bindings",
         "base": "nif-mesh-binding-inventory",
@@ -212,6 +229,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "discovery-suite": {
+        "dotnet": "",
+        "base": "",
+    },
 }
 
 
@@ -247,6 +268,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "StreamBodies": "stream-bodies",
     "DecodeGeometry": "decode-geometry",
     "BatchExport264": "batch-export-264",
+    "DiscoverySuite": "discovery-suite",
     "All": "all",
 }
 
@@ -393,8 +415,7 @@ def _run_command(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
-        import json
-        with open(inventory_path, 'r', encoding='utf-8-sig') as f:
+        with open(inventory_path, encoding='utf-8-sig') as f:
             data = json.load(f)
 
         # --- Gather metrics ---
@@ -435,7 +456,7 @@ def _run_command(args: argparse.Namespace) -> None:
         print(f"  Attribute-compatible:     {attr_compatible:>6}")
         print(f"  0-attribute-set meshes:  {zero_attr_count:>6}")
         print()
-        print(f"  --- Float32 candidates across ALL meshes ---")
+        print("  --- Float32 candidates across ALL meshes ---")
         print(f"  position-float3-ror1-lead: {pos_count:>5} (high confidence: {pos_high_conf})")
         print(f"  normal-float3-ror1-lead:   {normal_count:>5}")
         print(f"  uv-float2-ror1-lead:       {uv_count:>5}")
@@ -450,7 +471,7 @@ def _run_command(args: argparse.Namespace) -> None:
                 mesh_size = s.get('MeshSize', s.get('meshSize', '?'))
                 mesh_idx = s.get('MeshBlockIndex', s.get('meshBlockIndex', '?'))
                 # Check if this mesh has normal/UV too
-                pos_norm = '[ ]' 
+                pos_norm = '[ ]'
                 pos_uv = '[ ]'
                 # Match by ID to check companion streams
                 for ns in normal_samples:
@@ -515,11 +536,11 @@ def _run_command(args: argparse.Namespace) -> None:
         print(f"    Total position-candidate meshes: {pos_count:>4}")
         print()
         print(f"  Interpretation: {pos_both} meshes have full position+normal+UV float32 streams")
-        print(f"  and can be decoded with --experimental-position-source.")
+        print("  and can be decoded with --experimental-position-source.")
         print(f"  {pos_norm} more have position+normal (no UV), "
               f"{pos_uv} have position+UV (no normal).")
         print(f"  These are concentrated across {len(pos_samples)} unique sample entries")
-        print(f"  from the full mesh-binding inventory.")
+        print("  from the full mesh-binding inventory.")
         print()
         return
 
@@ -559,6 +580,37 @@ def _run_command(args: argparse.Namespace) -> None:
                 semantic_categories=args.semantic_category or [],
                 full=args.full,
             )
+        return
+
+    # --- UsageAccessCorrelationGuard: inventory + Python guard assertion ---
+
+    if command == "usage-access-correlation-guard":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("usage-access-correlation-guard (inventory)", dotnet_args)
+
+        # Run guard assertion
+        usage_access_correlation_guard(str(out_path))
         return
 
     # --- AttributeExtraProofGuard: inventory + Python guard assertion ---
@@ -634,23 +686,426 @@ def _run_command(args: argparse.Namespace) -> None:
         attribute_extra_sibling_proof_guard(str(out_path), asset_id)
         return
 
+    # --- PositionSourceSiblingLeadGuard: inventory + Python guard assertion ---
+
+    if command == "position-source-sibling-lead-guard":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("position-source-sibling-lead-guard (inventory)", dotnet_args)
+
+        # Run guard assertion
+        position_source_sibling_lead_guard(str(out_path))
+        return
+
+    # --- ResidualLeadGuard: inventory + Python guard assertion
+
+    if command == "residual-lead-guard":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("residual-lead-guard (inventory)", dotnet_args)
+
+        # Run guard assertion
+        residual_lead_guard(str(out_path))
+        return
+
+    # --- PositionSourceSiblingFamilyReport: inventory + Python report
+
+    if command == "position-source-sibling-family-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("position-source-sibling-family-report (inventory)", dotnet_args)
+
+        # Run report assertion
+        position_source_sibling_family_report(str(out_path))
+        return
+
+    # --- ResidualPositionClassifierReport: inventory + Python report ---
+
+    if command == "residual-position-classifier-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("residual-position-classifier-report (inventory)", dotnet_args)
+
+        # Run report
+        residual_position_classifier_report(str(out_path))
+        return
+
+    # --- PositionSourceGapReport: inventory + Python report ---
+
+    if command == "position-source-gap-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        # Run full mesh-binding inventory
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        dotnet_args: list[str] = [
+            "run", "--project", str(project), "--",
+            "inventory-nif-mesh-bindings",
+            "--root", str(root),
+            "--out", str(out_path),
+        ]
+        if args.full:
+            pass  # full scan
+        else:
+            dotnet_args += ["--limit", str(args.limit)]
+        checked_run("position-source-gap-report (inventory)", dotnet_args)
+
+        # Run report
+        position_source_gap_report(str(out_path))
+        return
+
+    # --- PositionSourceSiblingProbeReport: multi-probe orchestrator ---
+
+    if command == "position-source-sibling-probe-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        sibling_probe_specs = [
+            {"Pair": "e3de325329", "PairLabel": "meshSize 325/329 shifted-position sibling", "Id": "e3de1077a37d0337", "MeshBlock": 6},
+            {"Pair": "e3de325329", "PairLabel": "meshSize 325/329 shifted-position sibling", "Id": "e3de1077a37d0337", "MeshBlock": 30},
+            {"Pair": "8e016329", "PairLabel": "meshSize 329 repeated-position sibling", "Id": "8e01613d7ce9e297", "MeshBlock": 6},
+            {"Pair": "8e016329", "PairLabel": "meshSize 329 repeated-position sibling", "Id": "8e01613d7ce9e297", "MeshBlock": 31},
+        ]
+
+        representative_probe_specs = [
+            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 7},
+            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 27},
+            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 7},
+            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 31},
+            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
+            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+        ]
+
+        secondary_probe_specs = [
+            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
+            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 34, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 7, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 27, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
+            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 31, "ExpectedAttributeSetCount": 0},
+        ]
+
+        extra_position_probe_specs = [
+            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
+            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 7},
+            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 34},
+            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 7},
+            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 34},
+        ]
+
+        # Run all probes (16 total)
+        all_specs = sibling_probe_specs + representative_probe_specs + secondary_probe_specs + extra_position_probe_specs
+        seen = set()
+        for spec in all_specs:
+            asset_id = spec["Id"]
+            mesh_block = spec["MeshBlock"]
+            key = (asset_id, mesh_block)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
+            dotnet_args = [
+                "run", "--project", str(project), "--",
+                "probe-nif-mesh",
+                "--root", str(root),
+                "--id", asset_id,
+                "--mesh-block", str(mesh_block),
+                "--out", str(out_path),
+            ]
+            label = f"probe-nif-mesh {asset_id} mesh#{mesh_block}"
+            checked_run(label, dotnet_args)
+
+        # Add Path to each spec (report functions need it to load probe JSON)
+        for spec in all_specs:
+            spec["Path"] = str(out_dir / f"probe-nif-mesh-{spec['Id']}-mesh{spec['MeshBlock']}.json")
+
+        # Run all sub-reports via the orchestrator
+        position_source_sibling_probe_report(sibling_probe_specs)
+        position_source_sibling_representative_probe_report(representative_probe_specs)
+        position_source_sibling_secondary_probe_report(secondary_probe_specs)
+        position_source_sibling_extra_position_report(extra_position_probe_specs)
+        return
+
+    # --- PositionSourceSiblingRepresentativeProbeReport ---
+
+    if command == "position-source-sibling-representative-probe-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        representative_probe_specs = [
+            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 7},
+            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 27},
+            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 7},
+            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 31},
+            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
+            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+        ]
+
+        seen = set()
+        for spec in representative_probe_specs:
+            asset_id = spec["Id"]
+            mesh_block = spec["MeshBlock"]
+            key = (asset_id, mesh_block)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
+            dotnet_args = [
+                "run", "--project", str(project), "--",
+                "probe-nif-mesh",
+                "--root", str(root),
+                "--id", asset_id,
+                "--mesh-block", str(mesh_block),
+                "--out", str(out_path),
+            ]
+            checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
+
+        # Add Path to each spec
+        for spec in representative_probe_specs:
+            spec["Path"] = str(out_dir / f"probe-nif-mesh-{spec['Id']}-mesh{spec['MeshBlock']}.json")
+
+        position_source_sibling_representative_probe_report(representative_probe_specs)
+        return
+
+    # --- PositionSourceSiblingSecondaryProbeReport ---
+
+    if command == "position-source-sibling-secondary-probe-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        secondary_probe_specs = [
+            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
+            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 34, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 7, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 27, "ExpectedAttributeSetCount": 0},
+            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
+            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 31, "ExpectedAttributeSetCount": 0},
+        ]
+
+        seen = set()
+        for spec in secondary_probe_specs:
+            asset_id = spec["Id"]
+            mesh_block = spec["MeshBlock"]
+            key = (asset_id, mesh_block)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
+            dotnet_args = [
+                "run", "--project", str(project), "--",
+                "probe-nif-mesh",
+                "--root", str(root),
+                "--id", asset_id,
+                "--mesh-block", str(mesh_block),
+                "--out", str(out_path),
+            ]
+            checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
+
+        # Add Path to each spec
+        for spec in secondary_probe_specs:
+            spec["Path"] = str(out_dir / f"probe-nif-mesh-{spec['Id']}-mesh{spec['MeshBlock']}.json")
+
+        position_source_sibling_secondary_probe_report(secondary_probe_specs)
+        return
+
+    # --- PositionSourceSiblingExtraPositionReport ---
+
+    if command == "position-source-sibling-extra-position-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        extra_position_probe_specs = [
+            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
+            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 7},
+            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 34},
+            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 7},
+            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 34},
+        ]
+
+        seen = set()
+        for spec in extra_position_probe_specs:
+            asset_id = spec["Id"]
+            mesh_block = spec["MeshBlock"]
+            key = (asset_id, mesh_block)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
+            dotnet_args = [
+                "run", "--project", str(project), "--",
+                "probe-nif-mesh",
+                "--root", str(root),
+                "--id", asset_id,
+                "--mesh-block", str(mesh_block),
+                "--out", str(out_path),
+            ]
+            checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
+
+        # Add Path to each spec
+        for spec in extra_position_probe_specs:
+            spec["Path"] = str(out_dir / f"probe-nif-mesh-{spec['Id']}-mesh{spec['MeshBlock']}.json")
+
+        position_source_sibling_extra_position_report(extra_position_probe_specs)
+        return
+
+    # --- ResidualPositionClusterProbeReport: multi-probe orchestrator ---
+
+    if command == "residual-position-cluster-probe-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        cluster_probe_specs = [
+            {"Payload": 96, "Id": "75cea2f2254e8a76", "StreamBlock": 21, "MeshPayloadOffset": 188},
+            {"Payload": 180, "Id": "14924c7e9f7f03a9", "StreamBlock": 21, "MeshPayloadOffset": 188},
+            {"Payload": 192, "Id": "5a4f390f196037c6", "StreamBlock": 21, "MeshPayloadOffset": 188},
+            {"Payload": 288, "Id": "014e1ff60d8508f1", "StreamBlock": 21, "MeshPayloadOffset": 188},
+            {"Payload": 396, "Id": "b4de91a46cb7d4bc", "StreamBlock": 21, "MeshPayloadOffset": 188},
+        ]
+
+        # Run the cluster probe report (handles all C# probes internally)
+        residual_position_cluster_probe_report(
+            cluster_probe_specs,
+            out_dir,
+            project,
+            root,
+        )
+        return
+
     # --- Complex multi-step modes (ported incrementally) ---
 
     # These commands need their guard/report functions ported from PowerShell.
     # Until then, they fall through to a "not yet ported" message.
-    complex_modes = {
-        "usage-access-correlation-guard",
-        "residual-lead-guard",
-        "residual-position-classifier-report",
-        "residual-position-cluster-probe-report",
-        "position-source-gap-report",
-        "position-source-sibling-lead-guard",
-        "position-source-sibling-family-report",
-        "position-source-sibling-probe-report",
-        "position-source-sibling-representative-probe-report",
-        "position-source-sibling-secondary-probe-report",
-        "position-source-sibling-extra-position-report",
-    }
+    complex_modes: set[str] = set()
 
     if command in complex_modes:
         print(
@@ -666,6 +1121,276 @@ def _run_command(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # --- DiscoverySuite: unified pipeline orchestrator ---
+
+    if command == "discovery-suite":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        # Build (unless --skip-build)
+        if not args.skip_build and solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+
+        start_time = datetime.now()
+        print()
+        print("=" * 70)
+        print("  Discovery Suite — Unified Pipeline")
+        print("=" * 70)
+        print()
+
+        results: list[dict[str, str | int | float | bool]] = []
+
+        # --- Step 1: Mesh-binding inventory (or reuse if --quick) ---
+
+        if args.quick and inventory_path.exists():
+            print("  [--quick] Reusing existing mesh-binding inventory...")
+            try:
+                existing_data = load_json_report(str(inventory_path))
+                mesh_block_count = existing_data.get("MeshBlocks", existing_data.get("MeshBlockCount", 0))
+                attr_compatible = existing_data.get("AttributeCompatibleMeshes", 0)
+                zero_attr = mesh_block_count - attr_compatible
+                results.append({
+                    "step": "mesh-bindings",
+                    "status": "REUSED",
+                    "meshBlockCount": mesh_block_count,
+                    "attrCompatible": attr_compatible,
+                    "zeroAttrMeshes": zero_attr,
+                })
+                print(f"    Inventory: {mesh_block_count} meshes, {attr_compatible} attr-compatible")
+            except Exception as exc:
+                print(f"    [WARN] Could not load existing inventory: {exc}")
+                print("    Falling through to fresh run...")
+                args.quick = False
+
+        if not args.quick:
+            print("")
+            print("  -- Step 1/7: Mesh-Binding Inventory --")
+            dotnet_args = [
+                "run", "--project", str(project), "--",
+                "inventory-nif-mesh-bindings",
+                "--root", str(root),
+                "--out", str(inventory_path),
+            ]
+            if not args.full:
+                dotnet_args += ["--limit", str(args.limit)]
+            checked_run("discovery-suite (inventory)", dotnet_args)
+
+            try:
+                inv_data = load_json_report(str(inventory_path))
+                mesh_block_count = inv_data.get("MeshBlocks", inv_data.get("MeshBlockCount", 0))
+                attr_compatible = inv_data.get("AttributeCompatibleMeshes", 0)
+                zero_attr = mesh_block_count - attr_compatible
+                results.append({
+                    "step": "mesh-bindings",
+                    "status": "OK",
+                    "meshBlockCount": mesh_block_count,
+                    "attrCompatible": attr_compatible,
+                    "zeroAttrMeshes": zero_attr,
+                })
+            except Exception as exc:
+                print(f"  [WARN] Could not parse inventory: {exc}")
+                results.append({"step": "mesh-bindings", "status": "PARSE_ERROR"})
+
+        # --- Step 2: Position-source gap report ---
+
+        print()
+        print("  -- Step 2/7: Position-Source Gap Report --")
+        try:
+            position_source_gap_report(str(inventory_path))
+            gap_report_path = out_dir / "position-source-gap-report.json"
+            if gap_report_path.exists():
+                gap_data = load_json_report(str(gap_report_path))
+                gap_families = gap_data.get("TotalFamilies", gap_data.get("Families", []))
+                gap_count = len(gap_families) if isinstance(gap_families, list) else gap_families
+                results.append({"step": "position-source-gap-report", "status": "OK", "gapFamilies": gap_count})
+            else:
+                results.append({"step": "position-source-gap-report", "status": "OK"})
+        except Exception as exc:
+            print(f"  [WARN] Position-source gap report failed: {exc}")
+            results.append({"step": "position-source-gap-report", "status": "FAILED"})
+
+        # --- Step 3: Position-source sibling family report ---
+
+        print()
+        print("  -- Step 3/7: Position-Source Sibling Family Report --")
+        try:
+            position_source_sibling_family_report(str(inventory_path))
+            family_report_path = out_dir / "position-source-sibling-family-report.json"
+            if family_report_path.exists():
+                family_data = load_json_report(str(family_report_path))
+                sibling_families = family_data.get("Families", [])
+                total_groups = len(sibling_families) if isinstance(sibling_families, list) else 0
+                results.append({"step": "position-source-sibling-family-report", "status": "OK", "siblingGroups": total_groups})
+            else:
+                results.append({"step": "position-source-sibling-family-report", "status": "OK"})
+        except Exception as exc:
+            print(f"  [WARN] Sibling family report failed: {exc}")
+            results.append({"step": "position-source-sibling-family-report", "status": "FAILED"})
+
+        # --- Step 4: Residual position classifier report ---
+
+        print()
+        print("  -- Step 4/7: Residual Position Classifier Report --")
+        try:
+            residual_position_classifier_report(str(inventory_path))
+            classifier_report_path = out_dir / "residual-position-classifier-report.json"
+            if classifier_report_path.exists():
+                classifier_data = load_json_report(str(classifier_report_path))
+                target_rows = len(classifier_data.get("Rows", []))
+                strict_passes = sum(1 for r in classifier_data.get("Rows", []) if r.get("Strict"))
+                results.append({
+                    "step": "residual-position-classifier-report",
+                    "status": "OK",
+                    "targetRows": target_rows,
+                    "strictPasses": strict_passes,
+                })
+            else:
+                results.append({"step": "residual-position-classifier-report", "status": "OK"})
+        except Exception as exc:
+            print(f"  [WARN] Residual classifier report failed: {exc}")
+            results.append({"step": "residual-position-classifier-report", "status": "FAILED"})
+
+        # --- Step 5: Guards (usage-access-correlation, residual-lead, position-source-sibling-lead) ---
+
+        print()
+        print("  -- Step 5/7: Proof Guards --")
+
+        guard_results: list[dict[str, str | bool]] = []
+        guard_tasks = [
+            ("usage-access-correlation-guard", lambda: usage_access_correlation_guard(str(inventory_path))),
+            ("residual-lead-guard", lambda: residual_lead_guard(str(inventory_path))),
+            ("position-source-sibling-lead-guard", lambda: position_source_sibling_lead_guard(str(inventory_path))),
+        ]
+        for guard_name, guard_fn in guard_tasks:
+            try:
+                print(f"    Running {guard_name}...")
+                guard_fn()
+                guard_results.append({"guard": guard_name, "passed": True})
+                print(f"    {guard_name}: PASSED")
+            except AssertionError as exc:
+                print(f"    {guard_name}: FAILED - {exc}")
+                guard_results.append({"guard": guard_name, "passed": False, "detail": str(exc)})
+            except Exception as exc:
+                print(f"    {guard_name}: ERROR - {exc}")
+                guard_results.append({"guard": guard_name, "passed": False, "detail": str(exc)})
+
+        results.append({
+            "step": "proof-guards",
+            "status": "OK",
+            "guards": guard_results,
+            "allPassed": all(g.get("passed", False) for g in guard_results),
+        })
+
+        # --- Step 6: Discovery Workbench ---
+
+        print()
+        print("  -- Step 6/7: Discovery Workbench --")
+        try:
+            discovery_workbench(str(REPO_ROOT), str(out_dir), getattr(args, 'privacy_scan', False))
+            wb_scoreboard = out_dir / "discovery-workbench-scoreboard.json"
+            wb_queue = out_dir / "discovery-next-probe-queue.json"
+            wb_seen = wb_scoreboard.exists()
+            wb_queue_seen = wb_queue.exists()
+            wb_candidates = 0
+            wb_checks = 0
+            if wb_seen:
+                try:
+                    wb_data = load_json_report(str(wb_scoreboard))
+                    wb_candidates = len(wb_data.get("Candidates", []))
+                    wb_checks = len(wb_data.get("CrossChecks", []))
+                except Exception:
+                    pass
+            results.append({
+                "step": "discovery-workbench",
+                "status": "OK",
+                "candidateRows": wb_candidates,
+                "crossChecks": wb_checks,
+            })
+            print(f"    Scoreboard: {wb_candidates} candidates, {wb_checks} cross-checks")
+            if wb_queue_seen:
+                print(f"    Probe queue: {wb_queue}")
+        except Exception as exc:
+            print(f"  [WARN] Discovery workbench failed: {exc}")
+            results.append({"step": "discovery-workbench", "status": "FAILED"})
+
+        # --- Step 7: Summary report ---
+
+        print()
+        print("  -- Step 7/7: Discovery Suite Summary --")
+
+        elapsed = (datetime.now() - start_time).total_seconds()
+
+        print()
+        print("  +--------------------------------------------------------------+")
+        print("  |                 DISCOVERY SUITE SUMMARY                     |")
+        print("  +--------------------------------------------------------------+")
+        print()
+        print(f"  Duration: {elapsed:.1f}s")
+        print(f"  Quick mode: {'yes' if args.quick else 'no'}")
+        print(f"  Full scan: {'yes' if args.full else 'no'}")
+        print()
+
+        for r in results:
+            step_name = r.get("step", "?")
+            status = r.get("status", "?")
+            status_marker = "[OK]" if status == "OK" else "[!!]" if status in ("FAILED",) else "[..]"
+            summary_parts = []
+
+            if "meshBlockCount" in r:
+                summary_parts.append(f"{r['meshBlockCount']} meshes")
+            if "attrCompatible" in r:
+                summary_parts.append(f"{r['attrCompatible']} attr-compat")
+            if "gapFamilies" in r:
+                summary_parts.append(f"{r['gapFamilies']} gap families")
+            if "siblingGroups" in r:
+                summary_parts.append(f"{r['siblingGroups']} sibling groups")
+            if "targetRows" in r:
+                summary_parts.append(f"{r['targetRows']} targets")
+            if "strictPasses" in r:
+                summary_parts.append(f"{r['strictPasses']} strict passes")
+            if r.get("step") == "proof-guards":
+                guard_count = len(r.get("guards", []))
+                passed_count = sum(1 for g in r.get("guards", []) if g.get("passed"))
+                summary_parts.append(f"{passed_count}/{guard_count} guards passed")
+            if "candidateRows" in r:
+                summary_parts.append(f"{r['candidateRows']} candidates")
+            if "crossChecks" in r:
+                summary_parts.append(f"{r['crossChecks']} cross-checks")
+
+            summary_str = ", ".join(summary_parts) if summary_parts else ""
+            print(f"    {status_marker} {step_name}  {summary_str}")
+
+        print()
+        print(f"  Total steps: {len(results)}")
+        all_ok = all(r.get("status") in ("OK", "REUSED") for r in results)
+        if all_ok:
+            print("  Overall: [OK] ALL STEPS COMPLETED SUCCESSFULLY")
+        else:
+            failed_steps = [r.get("step", "?") for r in results if r.get("status") not in ("OK", "REUSED")]
+            print(f"  Overall: [WARN] {len(failed_steps)} step(s) had issues: {', '.join(failed_steps)}")
+        print()
+
+        # Write structured summary JSON
+        summary_data = {
+            "schema": "rift-discovery-suite/v1",
+            "timestamp": datetime.now().isoformat(),
+            "duration_seconds": elapsed,
+            "quick_mode": args.quick,
+            "full_scan": args.full,
+            "results": results,
+        }
+        summary_path = out_dir / "discovery-suite-summary.json"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(summary_data, f, indent=2)
+        print(f"  Structured summary: {summary_path}")
+        print()
+        return
 
     # --- Simple C# command + show_report_summary modes ---
 
@@ -998,6 +1723,11 @@ Examples:
         "--no-smoke",
         action="store_true",
         help="Skip smoke limiting (alias for --full)",
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Skip inventory re-run, reuse existing data (discovery-suite)",
     )
     parser.add_argument(
         "--skip-build",

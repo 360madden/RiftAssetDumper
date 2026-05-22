@@ -33,6 +33,8 @@ and TopAttributeExtraStreams (proof/inventory).
 
 from __future__ import annotations
 
+import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -42,6 +44,9 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.rift_workflow_utils import (  # noqa: E402
     assert_proof_guard,
+    assert_usage_access_guard,
+    format_markdown_cell,
+    json_double_or_none,
     json_value_or_dash,
     load_json_report,
     required_json_boolean,
@@ -49,6 +54,7 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     required_json_number,
     required_json_value,
     safe_int,
+    usage_access_guard_integer,
 )
 
 # ============================================================================
@@ -1022,3 +1028,878 @@ def attribute_extra_sibling_proof_guard(
     if is_index_role:
         result.update(fitness_summary)
     return result
+
+
+# ============================================================================
+# UsageAccessCorrelationGuard  (inventory-level)
+# ============================================================================
+
+
+def usage_access_correlation_guard(report_path: str | Path) -> None:
+    """Validate usage/access metadata correlation in the mesh-binding inventory.
+
+    Asserts:
+    1. TopUsageAccessRoles contains all 5 expected roles with correct
+       DataStreamUsage/DataStreamAccess values and minimum counts.
+    2. TopPairings has at least 5 index-to-vertex pairings.
+    3. All top index-to-vertex pairings have index usage=0 access=19
+       and vertex usage=1 access=19.
+
+    Mirrors: Invoke-UsageAccessCorrelationGuard
+    """
+    report = load_json_report(report_path)
+
+    # --- TopUsageAccessRoles ---
+    role_groups_raw = report.get("TopUsageAccessRoles")
+    assert_usage_access_guard(
+        role_groups_raw is not None and isinstance(role_groups_raw, list),
+        "TopUsageAccessRoles is missing from mesh-binding inventory.",
+    )
+    role_groups: list[dict[str, Any]] = role_groups_raw
+
+    expected_roles = [
+        {
+            "Role": "uv-float2-ror1-lead",
+            "Usage": "1",
+            "Access": "19",
+            "MinCount": 3000,
+            "Family": "vertex UV rotated-float lead",
+        },
+        {
+            "Role": "normal-float3-ror1-lead",
+            "Usage": "1",
+            "Access": "19",
+            "MinCount": 3000,
+            "Family": "vertex normal rotated-float lead",
+        },
+        {
+            "Role": "index-u16be-strip-lead",
+            "Usage": "0",
+            "Access": "19",
+            "MinCount": 1500,
+            "Family": "index strip lead",
+        },
+        {
+            "Role": "position-float3-ror1-lead",
+            "Usage": "1",
+            "Access": "19",
+            "MinCount": 100,
+            "Family": "position rotated-float lead",
+        },
+        {
+            "Role": "index-u16be-list-lead",
+            "Usage": "0",
+            "Access": "19",
+            "MinCount": 50,
+            "Family": "index list lead",
+        },
+    ]
+
+    results: list[dict[str, Any]] = []
+    for expected in expected_roles:
+        ctx = f"{expected['Role']} usage={expected['Usage']} access={expected['Access']}"
+        matches = [
+            g
+            for g in role_groups
+            if str(json_value_or_dash(g, "Role")) == expected["Role"]
+            and str(json_value_or_dash(g, "DataStreamUsage")) == expected["Usage"]
+            and str(json_value_or_dash(g, "DataStreamAccess")) == expected["Access"]
+        ]
+        assert_usage_access_guard(
+            len(matches) == 1,
+            f"{ctx} expected exactly one usage/access aggregate, found {len(matches)}.",
+        )
+        group = matches[0]
+        count = usage_access_guard_integer(group, "Count", ctx)
+        high_conf = usage_access_guard_integer(group, "HighConfidenceCount", ctx)
+        assert_usage_access_guard(
+            count >= expected["MinCount"],
+            f"{ctx} count {count} is below expected minimum {expected['MinCount']}.",
+        )
+        assert_usage_access_guard(
+            high_conf >= expected["MinCount"],
+            f"{ctx} high-confidence count {high_conf} is below expected minimum {expected['MinCount']}.",
+        )
+        results.append(
+            {
+                "Family": expected["Family"],
+                "Role": expected["Role"],
+                "Usage": expected["Usage"],
+                "Access": expected["Access"],
+                "Count": count,
+                "HighConfidence": high_conf,
+                "MinExpected": expected["MinCount"],
+            }
+        )
+
+    # --- TopPairings ---
+    top_pairings_raw = report.get("TopPairings")
+    assert_usage_access_guard(
+        top_pairings_raw is not None and isinstance(top_pairings_raw, list),
+        "TopPairings is missing from mesh-binding inventory.",
+    )
+    top_pairings: list[dict[str, Any]] = top_pairings_raw
+    assert_usage_access_guard(
+        len(top_pairings) >= 5,
+        f"expected at least 5 top pairings, found {len(top_pairings)}.",
+    )
+
+    index_vertex_pairings = [
+        p
+        for p in top_pairings
+        if str(json_value_or_dash(p, "IndexRole")).startswith("index-")
+        and re.match(r"^(position|normal|uv)-", str(json_value_or_dash(p, "VertexRole")))
+    ]
+    assert_usage_access_guard(
+        len(index_vertex_pairings) >= 5,
+        f"expected at least 5 index-to-vertex top pairings, found {len(index_vertex_pairings)}.",
+    )
+
+    pairing_exceptions = [
+        p
+        for p in index_vertex_pairings
+        if str(json_value_or_dash(p, "IndexDataStreamUsage")) != "0"
+        or str(json_value_or_dash(p, "IndexDataStreamAccess")) != "19"
+        or str(json_value_or_dash(p, "VertexDataStreamUsage")) != "1"
+        or str(json_value_or_dash(p, "VertexDataStreamAccess")) != "19"
+    ]
+    assert_usage_access_guard(
+        len(pairing_exceptions) == 0,
+        f"found {len(pairing_exceptions)} top pairing usage/access exception(s); "
+        f"expected index usage=0 access=19 -> vertex usage=1 access=19.",
+    )
+
+    # --- Report ---
+    print("\n--- UsageAccessCorrelationGuard NiDataStream usage/access correlation guard")
+    print(
+        f"{'Family':<34} {'Role':<30} "
+        f"{'Usage':<6} {'Access':<7} {'Count':>6} {'HighConf':>8} {'Min':>6}"
+    )
+    print("-" * 97)
+    for r in sorted(results, key=lambda x: -x["Count"]):
+        print(
+            f"{r['Family']:<34} {r['Role']:<30} "
+            f"{r['Usage']:<6} {r['Access']:<7} "
+            f"{r['Count']:>6} {r['HighConfidence']:>8} {r['MinExpected']:>6}"
+        )
+    print(
+        f"UsageAccessCorrelationGuard pairing check: {len(index_vertex_pairings)} "
+        f"top index-to-vertex pairings, exceptions=0."
+    )
+    print(
+        "UsageAccessCorrelationGuard passed: usage/access correlation remains "
+        "ranking evidence only; no geometry/export truth was promoted."
+    )
+
+
+# ============================================================================
+# PositionSourceSiblingLeadGuard  (inventory-level)
+# ============================================================================
+
+
+def position_source_sibling_lead_guard(report_path: str | Path) -> None:
+    """Validate known sibling position-source leads in the mesh-binding inventory.
+
+    Guards two hardcoded sibling groups from TopPositionSourceSiblings:
+    - e3de1077a37d0337 block#24 payload=852 (mesh blocks 6+30, offsets 292+296)
+    - 8e01613d7ce9e297 block#25 payload=1116 (mesh blocks 6+31, offset 296)
+
+    Verifies role=position-float3-ror1-lead, usage=1, access=19, and that
+    each group spans at least 2 distinct mesh blocks.
+
+    Generates position-source-sibling-lead-guard.json and .md reports.
+
+    Mirrors: Invoke-PositionSourceSiblingLeadGuard
+    """
+    report = load_json_report(report_path)
+
+    groups_raw = report.get("TopPositionSourceSiblings")
+    assert_proof_guard(
+        groups_raw is not None and isinstance(groups_raw, list) and len(groups_raw) > 0,
+        "TopPositionSourceSiblings is missing or empty in mesh-binding inventory.",
+    )
+    groups: list[dict[str, Any]] = groups_raw
+
+    # --- Helpers (nested, mirrors PowerShell inner functions) ---
+
+    def _find_group(
+        id_prefix: str,
+        target_block: int,
+        payload: int,
+    ) -> dict[str, Any] | None:
+        """Find exactly one group matching the key fields.
+
+        Mirrors: Find-PositionSourceSiblingGroup
+        """
+        matches = [
+            g
+            for g in groups
+            if isinstance(g, dict)
+            and str(json_value_or_dash(g, "IdPrefix")) == id_prefix
+            and safe_int(json_value_or_dash(g, "TargetBlockIndex")) == target_block
+            and safe_int(json_value_or_dash(g, "DeclaredPayloadBytes")) == payload
+        ]
+        return matches[0] if matches else None
+
+    def _assert_lead(
+        id_prefix: str,
+        target_block: int,
+        payload: int,
+        expected_mesh_blocks: list[int],
+        expected_offsets: list[int],
+    ) -> dict[str, Any]:
+        """Validate a sibling group and return it.
+
+        Mirrors: Assert-PositionSourceSiblingLead
+        """
+        ctx = f"{id_prefix} block#{target_block} payload={payload}"
+        match = _find_group(id_prefix, target_block, payload)
+        assert_proof_guard(
+            match is not None,
+            f"Expected one sibling group for {ctx}, found 0.",
+        )
+        group = match
+
+        distinct = safe_int(json_value_or_dash(group, "DistinctMeshBlocks"))
+        assert_proof_guard(
+            distinct >= 2,
+            f"{ctx} is no longer a sibling mesh-block group (distinct={distinct}).",
+        )
+
+        role = str(json_value_or_dash(group, "Role"))
+        assert_proof_guard(
+            role == "position-float3-ror1-lead",
+            f"{ctx} role changed from position-float3-ror1-lead to {role}.",
+        )
+
+        usage = str(json_value_or_dash(group, "DataStreamUsage"))
+        access = str(json_value_or_dash(group, "DataStreamAccess"))
+        assert_proof_guard(
+            usage == "1" and access == "19",
+            f"{ctx} usage/access changed from 1/19 to {usage}/{access}.",
+        )
+
+        mesh_blocks: list[int] = [
+            safe_int(mb) for mb in (group.get("MeshBlockIndices") or [])
+        ]
+        for expected in expected_mesh_blocks:
+            assert_proof_guard(
+                expected in mesh_blocks,
+                f"{ctx} missing mesh#{expected}.",
+            )
+
+        offsets: list[int] = [
+            safe_int(mo) for mo in (group.get("MeshPayloadOffsets") or [])
+        ]
+        for expected in expected_offsets:
+            assert_proof_guard(
+                expected in offsets,
+                f"{ctx} missing mesh payload offset {expected}.",
+            )
+
+        return group
+
+    # --- Guard the two known leads ---
+    _guard_groups = [
+        _assert_lead(
+            id_prefix="e3de1077a37d0337",
+            target_block=24,
+            payload=852,
+            expected_mesh_blocks=[6, 30],
+            expected_offsets=[292, 296],
+        ),
+        _assert_lead(
+            id_prefix="8e01613d7ce9e297",
+            target_block=25,
+            payload=1116,
+            expected_mesh_blocks=[6, 31],
+            expected_offsets=[296],
+        ),
+    ]
+
+    # --- Build top 20 rows for report ---
+    # Sort by Count desc, then IdPrefix, then TargetBlockIndex
+    sorted_groups = sorted(
+        groups,
+        key=lambda g: (
+            -safe_int(g.get("Count", 0) if isinstance(g, dict) else 0),
+            str(g.get("IdPrefix", "") if isinstance(g, dict) else ""),
+            safe_int(g.get("TargetBlockIndex", 0) if isinstance(g, dict) else 0),
+        ),
+    )[:20]
+
+    rows: list[dict[str, Any]] = []
+    for g in sorted_groups:
+        if not isinstance(g, dict):
+            continue
+        mesh_blocks = [
+            f"mesh#{safe_int(mb)}"
+            for mb in (g.get("MeshBlockIndices") or [])
+        ]
+        mesh_sizes_raw = g.get("MeshSizes") or []
+        mesh_sizes = [
+            f"{d.get('Size', '?') if isinstance(d, dict) else '?'}:{d.get('Count', '?') if isinstance(d, dict) else '?'}"
+            for d in mesh_sizes_raw
+        ]
+        mesh_offsets = [
+            f"stream@{safe_int(mo)}"
+            for mo in (g.get("MeshPayloadOffsets") or [])
+        ]
+        rows.append(
+            {
+                "IdPrefix": str(json_value_or_dash(g, "IdPrefix")),
+                "TargetBlock": safe_int(json_value_or_dash(g, "TargetBlockIndex")),
+                "Payload": safe_int(json_value_or_dash(g, "DeclaredPayloadBytes")),
+                "Count": safe_int(json_value_or_dash(g, "Count")),
+                "DistinctMeshBlocks": safe_int(json_value_or_dash(g, "DistinctMeshBlocks")),
+                "MeshBlocks": ", ".join(mesh_blocks),
+                "MeshSizes": ", ".join(mesh_sizes),
+                "MeshPayloadOffsets": ", ".join(mesh_offsets),
+                "UsageAccess": (
+                    f"{json_value_or_dash(g, 'DataStreamUsage')}/"
+                    f"{json_value_or_dash(g, 'DataStreamAccess')}"
+                ),
+                "Role": str(json_value_or_dash(g, "Role")),
+            }
+        )
+
+    # --- Write JSON + markdown reports ---
+    report_dir = Path(report_path).parent
+    json_path = report_dir / "position-source-sibling-lead-guard.json"
+    md_path = report_dir / "position-source-sibling-lead-guard.md"
+
+    summary: dict[str, Any] = {
+        "Schema": "position-source-sibling-lead-guard/v1",
+        "CandidateOnly": True,
+        "SourceReport": str(report_path),
+        "TopPositionSourceSiblingGroups": rows,
+        "GuardedGroups": [
+            {
+                "IdPrefix": "e3de1077a37d0337",
+                "TargetBlockIndex": 24,
+                "DeclaredPayloadBytes": 852,
+                "ExpectedMeshBlocks": [6, 30],
+                "ExpectedMeshPayloadOffsets": [292, 296],
+            },
+            {
+                "IdPrefix": "8e01613d7ce9e297",
+                "TargetBlockIndex": 25,
+                "DeclaredPayloadBytes": 1116,
+                "ExpectedMeshBlocks": [6, 31],
+                "ExpectedMeshPayloadOffsets": [296],
+            },
+        ],
+        "Interpretation": (
+            "Parser-derived sibling position-source aggregation for search "
+            "ranking only. It does not promote geometry truth, topology truth, "
+            "or export readiness."
+        ),
+    }
+    json_path.write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    md_lines: list[str] = [
+        "# Position Source Sibling Lead Guard",
+        "",
+        "Candidate-only guard over parser-derived `TopPositionSourceSiblings` from the mesh-binding inventory.",
+        "",
+        "Generated under ignored `Exports/`; do not stage generated discovery output.",
+        "",
+        "| ID | Target block | Payload | Count | Distinct meshes | Mesh blocks | Mesh sizes | Mesh offsets | Usage/access | Role |",
+        "|---|---:|---:|---:|---:|---|---|---|---|---|",
+    ]
+    for row in rows:
+        md_lines.append(
+            f"| {format_markdown_cell(row['IdPrefix'])} "
+            f"| {format_markdown_cell(row['TargetBlock'])} "
+            f"| {format_markdown_cell(row['Payload'])} "
+            f"| {format_markdown_cell(row['Count'])} "
+            f"| {format_markdown_cell(row['DistinctMeshBlocks'])} "
+            f"| {format_markdown_cell(row['MeshBlocks'])} "
+            f"| {format_markdown_cell(row['MeshSizes'])} "
+            f"| {format_markdown_cell(row['MeshPayloadOffsets'])} "
+            f"| {format_markdown_cell(row['UsageAccess'])} "
+            f"| {format_markdown_cell(row['Role'])} |"
+        )
+    md_lines += [
+        "",
+        "Guarded expected groups: `e3de1077a37d0337` block `#24` payload `852`, and `8e01613d7ce9e297` block `#25` payload `1116`.",
+        "",
+        "Interpretation: repeated position-source blocks across sibling meshes are a parser-search clue only. "
+        "Normal/UV pairing, topology proof, sane bounds, and proof guards still gate any future geometry/export promotion.",
+    ]
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    # --- Console output ---
+    print("\n--- PositionSourceSiblingLeadGuard parser-derived sibling source leads")
+    print(
+        f"{'IdPrefix':<18} {'Block':>6} {'Payload':>8} {'Count':>6} "
+        f"{'Distinct':>8} {'MeshBlocks':<24} {'Offsets':<24}"
+    )
+    print("-" * 100)
+    for row in rows:
+        print(
+            f"{row['IdPrefix']:<18} {row['TargetBlock']:>6} {row['Payload']:>8} "
+            f"{row['Count']:>6} {row['DistinctMeshBlocks']:>8} "
+            f"{row['MeshBlocks']:<24} {row['MeshPayloadOffsets']:<24}"
+        )
+    print(f"PositionSourceSiblingLeadGuard JSON: {json_path}")
+    print(f"PositionSourceSiblingLeadGuard markdown: {md_path}")
+    print(
+        "PositionSourceSiblingLeadGuard passed: known sibling position-source "
+        "leads remain candidate-only parser-search evidence."
+    )
+
+
+# ============================================================================
+# ResidualLeadGuard  (inventory-level)
+# ============================================================================
+
+
+def residual_lead_guard(report_path: str | Path) -> None:
+    """Validate residual stream leads for known target mesh sizes.
+
+    Guards mesh sizes 297, 305, 321, 325, 329 against the mesh-binding
+    inventory's ResidualTargetMeshSizes and TopResidualStreams sections.
+
+    Asserts:
+    - meshSize=305 has residual stream count >= 50, pattern count >= 20
+    - meshSize=325 is residual-empty (0 residual streams after known-role filtering)
+    - meshSize=305 offset@188 has >= 3 position-like ROR1 plausible leads
+    - meshSize=321 offset@204 stays a low-signal sentinel/noise profile
+    - meshSize=329 offset@212 stays a low-signal side-stream noise profile
+    - meshSize=329 COLOR repeated-pattern rows stay non-plausible
+    - meshSize=297 singleton rows stay non-promotable (no repeated or POSITION-labeled)
+
+    Generates residual-target-family-review.json and .md reports.
+
+    Mirrors: Invoke-ResidualLeadGuard
+    """
+    report = load_json_report(report_path)
+
+    # --- Validate sections exist ---
+    targets_raw = report.get("ResidualTargetMeshSizes")
+    assert_proof_guard(
+        targets_raw is not None and isinstance(targets_raw, list),
+        "ResidualTargetMeshSizes is missing from mesh-binding inventory.",
+    )
+    targets: list[dict[str, Any]] = targets_raw
+
+    streams_raw = report.get("TopResidualStreams")
+    assert_proof_guard(
+        streams_raw is not None and isinstance(streams_raw, list),
+        "TopResidualStreams is missing from mesh-binding inventory.",
+    )
+    streams: list[dict[str, Any]] = streams_raw
+
+    required_mesh_sizes = [297, 305, 321, 325, 329]
+
+    # --- Validate exactly one target entry per mesh size ---
+    for mesh_size in required_mesh_sizes:
+        matches = [t for t in targets if safe_int(t.get("MeshSize")) == mesh_size]
+        assert_proof_guard(
+            len(matches) == 1,
+            f"expected one ResidualTargetMeshSizes entry for meshSize={mesh_size}, "
+            f"found {len(matches)}.",
+        )
+
+    # --- Find specific targets ---
+    def _find_target(ms: int) -> dict[str, Any]:
+        for t in targets:
+            if safe_int(t.get("MeshSize")) == ms:
+                return t
+        raise ValueError(f"meshSize={ms} not found in targets")  # unreachable
+
+    mesh305 = _find_target(305)
+    mesh325 = _find_target(325)
+
+    # --- meshSize=305 guard ---
+    residual_count_305 = safe_int(mesh305.get("ResidualStreamCount"))
+    assert_proof_guard(
+        residual_count_305 >= 50,
+        f"meshSize=305 residual stream count dropped below 50 (actual {residual_count_305}).",
+    )
+    pattern_count_305 = safe_int(mesh305.get("ResidualPatternCount"))
+    assert_proof_guard(
+        pattern_count_305 >= 20,
+        f"meshSize=305 residual pattern count dropped below 20 (actual {pattern_count_305}).",
+    )
+
+    # --- meshSize=325 guard (must be residual-empty) ---
+    residual_count_325 = safe_int(mesh325.get("ResidualStreamCount"))
+    assert_proof_guard(
+        residual_count_325 == 0,
+        f"meshSize=325 is no longer residual-empty after known-role filtering "
+        f"(residualStreamCount={residual_count_325}).",
+    )
+
+    # --- meshSize=305 position-like leads (stream@188, POSITION, plausible >= 0.80) ---
+    position_like: list[dict[str, Any]] = [
+        s for s in streams
+        if safe_int(s.get("MeshSize")) == 305
+        and safe_int(s.get("MeshPayloadOffset")) == 188
+        and str(json_value_or_dash(s, "StringValue")) == "POSITION"
+        and str(json_value_or_dash(s, "DataStreamUsage")) == "1"
+        and str(json_value_or_dash(s, "DataStreamAccess")) == "19"
+        and (json_double_or_none(s, "RotatedFloat3PlausibleValueRatio") or 0.0) >= 0.80
+    ]
+    assert_proof_guard(
+        len(position_like) >= 3,
+        f"expected at least 3 meshSize=305 stream@188 POSITION residual leads "
+        f"with ROR1 plausible ratio >= 0.80, found {len(position_like)}.",
+    )
+
+    # --- meshSize=321 noise-row guard (stream@204, payload=40, POSITION, usage=1, access=19) ---
+    mesh321_noise_rows: list[dict[str, Any]] = [
+        s for s in streams
+        if safe_int(s.get("MeshSize")) == 321
+        and safe_int(s.get("MeshPayloadOffset")) == 204
+        and safe_int(s.get("DeclaredPayloadBytes")) == 40
+        and str(json_value_or_dash(s, "StringValue")) == "POSITION"
+        and str(json_value_or_dash(s, "DataStreamUsage")) == "1"
+        and str(json_value_or_dash(s, "DataStreamAccess")) == "19"
+    ]
+    assert_proof_guard(
+        len(mesh321_noise_rows) == 1,
+        f"expected exactly one meshSize=321 stream@204 POSITION residual "
+        f"noise-review row, found {len(mesh321_noise_rows)}.",
+    )
+
+    mesh321_noise = mesh321_noise_rows[0]
+    mesh321_plausible = json_double_or_none(mesh321_noise, "RotatedFloat3PlausibleValueRatio")
+    mesh321_nonzero = json_double_or_none(mesh321_noise, "RotatedFloat3NonZeroVectorRatio")
+    mesh321_extent = json_double_or_none(mesh321_noise, "RotatedFloat3MaxExtent")
+
+    assert_proof_guard(
+        safe_int(mesh321_noise.get("Count")) == 1
+        and str(json_value_or_dash(mesh321_noise, "Role")) == "strided-body"
+        and mesh321_plausible is not None and mesh321_plausible <= 0.30
+        and mesh321_nonzero is not None and mesh321_nonzero <= 0.34
+        and mesh321_extent is not None and abs(mesh321_extent) <= 0.000001
+        and str(json_value_or_dash(mesh321_noise, "BodyFirst16")).lower().startswith("ffff80ff"),
+        "meshSize=321 stream@204 no longer matches the low-signal sentinel/noise "
+        "profile; review before treating it as side-stream noise.",
+    )
+
+    # --- meshSize=329 POSITION noise-row guard (stream@212, POSITION, usage=1, access=19) ---
+    mesh329_position_rows: list[dict[str, Any]] = [
+        s for s in streams
+        if safe_int(s.get("MeshSize")) == 329
+        and safe_int(s.get("MeshPayloadOffset")) == 212
+        and str(json_value_or_dash(s, "StringValue")) == "POSITION"
+        and str(json_value_or_dash(s, "DataStreamUsage")) == "1"
+        and str(json_value_or_dash(s, "DataStreamAccess")) == "19"
+    ]
+    assert_proof_guard(
+        len(mesh329_position_rows) == 1,
+        f"expected exactly one meshSize=329 POSITION residual review row, "
+        f"found {len(mesh329_position_rows)}.",
+    )
+
+    mesh329_position = mesh329_position_rows[0]
+    mesh329_finite = json_double_or_none(mesh329_position, "RotatedFloat3FiniteVectorRatio")
+    mesh329_plausible = json_double_or_none(mesh329_position, "RotatedFloat3PlausibleValueRatio")
+    mesh329_nonzero = json_double_or_none(mesh329_position, "RotatedFloat3NonZeroVectorRatio")
+    mesh329_extent = json_double_or_none(mesh329_position, "RotatedFloat3MaxExtent")
+
+    noise_check_329 = (
+        safe_int(mesh329_position.get("Count")) >= 3
+        and str(json_value_or_dash(mesh329_position, "Role")) == "strided-body"
+        and mesh329_finite is not None and abs(mesh329_finite) <= 0.000001
+        and mesh329_plausible is not None and abs(mesh329_plausible) <= 0.000001
+        and mesh329_nonzero is not None and abs(mesh329_nonzero) <= 0.000001
+        and mesh329_extent is not None and abs(mesh329_extent) <= 0.000001
+    )
+    assert_proof_guard(
+        noise_check_329,
+        "meshSize=329 POSITION residual no longer matches the finite=0/plausible=0 "
+        "side-stream profile; review before treating it as noise.",
+    )
+
+    # --- meshSize=329 COLOR repeated-pattern rows ---
+    mesh329_color_pattern_rows: list[dict[str, Any]] = [
+        s for s in streams
+        if safe_int(s.get("MeshSize")) == 329
+        and str(json_value_or_dash(s, "StringValue")) == "COLOR"
+        and str(json_value_or_dash(s, "Role")) == "u32-repeated-pattern-body"
+    ]
+    assert_proof_guard(
+        len(mesh329_color_pattern_rows) >= 10,
+        f"expected at least 10 meshSize=329 COLOR repeated-pattern side-stream rows, "
+        f"found {len(mesh329_color_pattern_rows)}.",
+    )
+
+    mesh329_color_plausible_max = 0.0
+    for row in mesh329_color_pattern_rows:
+        plausible = json_double_or_none(row, "RotatedFloat3PlausibleValueRatio")
+        assert_proof_guard(
+            plausible is not None,
+            "meshSize=329 COLOR repeated-pattern row is missing "
+            "RotatedFloat3PlausibleValueRatio.",
+        )
+        mesh329_color_plausible_max = max(mesh329_color_plausible_max, plausible)
+
+    assert_proof_guard(
+        mesh329_color_plausible_max <= 0.000001,
+        f"meshSize=329 COLOR repeated-pattern rows now have plausible ratio "
+        f"max={mesh329_color_plausible_max}; review as a possible changed signal.",
+    )
+
+    # Unique payload sizes for COLOR rows
+    mesh329_color_payloads = sorted(set(
+        safe_int(row.get("DeclaredPayloadBytes"))
+        for row in mesh329_color_pattern_rows
+    ))
+
+    # --- meshSize=297 singleton position-like rows ---
+    # Filter: finite >= 0.95 AND plausible >= 0.80 AND extent > 0.0001
+    mesh297_position_like_singletons: list[dict[str, Any]] = [
+        s for s in streams
+        if safe_int(s.get("MeshSize")) == 297
+        and (json_double_or_none(s, "RotatedFloat3FiniteVectorRatio") or 0.0) >= 0.95
+        and (json_double_or_none(s, "RotatedFloat3PlausibleValueRatio") or 0.0) >= 0.80
+        and (json_double_or_none(s, "RotatedFloat3MaxExtent") or 0.0) > 0.0001
+    ]
+
+    # Promotable without review: Count > 1 OR label is POSITION
+    mesh297_promotable = [
+        s for s in mesh297_position_like_singletons
+        if safe_int(s.get("Count")) > 1
+        or str(json_value_or_dash(s, "StringValue")) == "POSITION"
+    ]
+    assert_proof_guard(
+        len(mesh297_promotable) == 0,
+        f"meshSize=297 now has {len(mesh297_promotable)} repeated or POSITION-labeled "
+        f"high-plausible residual row(s); review this as a new lead before treating "
+        f"it as a side stream.",
+    )
+
+    # --- Build review rows ---
+
+    # Candidate rows (position-like on meshSize=305)
+    candidate_review_rows: list[dict[str, object]] = [
+        {
+            "MeshSize": safe_int(s.get("MeshSize")),
+            "Stream": f"stream@{json_value_or_dash(s, 'MeshPayloadOffset')}",
+            "Payload": safe_int(s.get("DeclaredPayloadBytes")),
+            "Count": safe_int(s.get("Count")),
+            "Label": str(json_value_or_dash(s, "StringValue")),
+            "Decision": "candidate-only repeated family",
+            "Evidence": (
+                f"plausible={json_value_or_dash(s, 'RotatedFloat3PlausibleValueRatio')} "
+                f"extent={json_value_or_dash(s, 'RotatedFloat3MaxExtent')} "
+                f"first16={json_value_or_dash(s, 'BodyFirst16')}"
+            ),
+        }
+        for s in sorted(
+            position_like,
+            key=lambda s: safe_int(s.get("DeclaredPayloadBytes")),
+        )
+    ]
+
+    color_payload_str = (
+        f"{mesh329_color_payloads[0]}..{mesh329_color_payloads[-1]}"
+        if mesh329_color_payloads else "-"
+    )
+
+    # Residual (noise/side-stream) review rows
+    residual_review_rows: list[dict[str, object]] = [
+        {
+            "MeshSize": 321,
+            "Stream": "stream@204",
+            "Payload": safe_int(mesh321_noise.get("DeclaredPayloadBytes")),
+            "Count": safe_int(mesh321_noise.get("Count")),
+            "Label": "POSITION",
+            "Decision": "side-stream noise",
+            "Evidence": (
+                f"plausible={mesh321_plausible} nonzero={mesh321_nonzero} "
+                f"extent={mesh321_extent} "
+                f"first16={json_value_or_dash(mesh321_noise, 'BodyFirst16')}"
+            ),
+        },
+        {
+            "MeshSize": 329,
+            "Stream": "stream@212",
+            "Payload": safe_int(mesh329_position.get("DeclaredPayloadBytes")),
+            "Count": safe_int(mesh329_position.get("Count")),
+            "Label": "POSITION",
+            "Decision": "side-stream noise",
+            "Evidence": (
+                f"finite={mesh329_finite} plausible={mesh329_plausible} "
+                f"nonzero={mesh329_nonzero} extent={mesh329_extent}"
+            ),
+        },
+        {
+            "MeshSize": 329,
+            "Stream": "stream@296",
+            "Payload": color_payload_str,
+            "Count": len(mesh329_color_pattern_rows),
+            "Label": "COLOR",
+            "Decision": "repeated-pattern side stream",
+            "Evidence": (
+                f"rows={len(mesh329_color_pattern_rows)} "
+                f"plausibleMax={mesh329_color_plausible_max} first16=3a3aff3a..."
+            ),
+        },
+    ]
+
+    # Singleton follow-up rows (meshSize=297)
+    singleton_rows = [
+        {
+            "MeshSize": 297,
+            "Stream": f"stream@{json_value_or_dash(s, 'MeshPayloadOffset')}",
+            "Payload": safe_int(s.get("DeclaredPayloadBytes")),
+            "Count": safe_int(s.get("Count")),
+            "Label": str(json_value_or_dash(s, "StringValue")),
+            "Decision": "singleton follow-up only",
+            "Evidence": (
+                f"plausible={json_value_or_dash(s, 'RotatedFloat3PlausibleValueRatio')} "
+                f"extent={json_value_or_dash(s, 'RotatedFloat3MaxExtent')} "
+                f"first16={json_value_or_dash(s, 'BodyFirst16')}"
+            ),
+        }
+        for s in sorted(
+            mesh297_position_like_singletons,
+            key=lambda s: safe_int(s.get("DeclaredPayloadBytes")),
+        )
+    ]
+
+    residual_review_rows += singleton_rows
+
+    # Combined family review rows
+    family_review_rows = candidate_review_rows + residual_review_rows
+
+    # --- Write JSON + markdown reports ---
+    report_dir = Path(report_path).parent
+    json_path = report_dir / "residual-target-family-review.json"
+    md_path = report_dir / "residual-target-family-review.md"
+
+    summary: dict[str, Any] = {
+        "Schema": "residual-target-family-review/v1",
+        "CandidateOnly": True,
+        "SourceReport": str(report_path),
+        "TargetMeshSizes": required_mesh_sizes,
+        "Summary": {
+            "RepeatedMesh305CandidateRows": len(candidate_review_rows),
+            "Mesh297SingletonFollowUpRows": len(mesh297_position_like_singletons),
+            "Mesh321LowSignalRows": len(mesh321_noise_rows),
+            "Mesh329PositionLowSignalRows": len(mesh329_position_rows),
+            "Mesh329ColorRepeatedPatternRows": len(mesh329_color_pattern_rows),
+            "Mesh325ResidualStreamCount": residual_count_325,
+        },
+        "Rows": sorted(
+            family_review_rows,
+            key=lambda r: (int(r["MeshSize"]), str(r.get("Payload", 0))),
+        ),
+        "Interpretation": (
+            "Candidate-only residual-family routing. Repeated meshSize=305 rows are "
+            "ranking evidence; meshSize=321/329 POSITION rows remain low-signal side "
+            "streams; meshSize=329 COLOR rows are repeated-pattern side streams; "
+            "meshSize=297 rows are single-sample follow-up only."
+        ),
+    }
+    json_path.write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    md_lines: list[str] = [
+        "# Residual Target Family Review",
+        "",
+        "Candidate-only review for residual streams in target mesh sizes "
+        "`297`, `305`, `321`, `325`, and `329`.",
+        "",
+        "Generated under ignored `Exports/`; do not stage generated asset/discovery output.",
+        "",
+        (
+            f"Summary: meshSize=305 repeated candidates={len(candidate_review_rows)}; "
+            f"meshSize=297 singleton follow-ups={len(mesh297_position_like_singletons)}; "
+            f"meshSize=321 low-signal rows={len(mesh321_noise_rows)}; "
+            f"meshSize=329 POSITION low-signal rows={len(mesh329_position_rows)}; "
+            f"meshSize=329 COLOR repeated-pattern rows={len(mesh329_color_pattern_rows)}; "
+            f"meshSize=325 residual streams={residual_count_325}."
+        ),
+        "",
+        "| Mesh size | Stream | Payload | Count | Label | Decision | Evidence |",
+        "|---:|---|---:|---:|---|---|---|",
+    ]
+
+    sorted_rows = sorted(
+        family_review_rows,
+        key=lambda r: (int(r["MeshSize"]), str(r.get("Payload", 0))),
+    )
+    for row in sorted_rows:
+        md_lines.append(
+            f"| {format_markdown_cell(row['MeshSize'])} "
+            f"| {format_markdown_cell(row['Stream'])} "
+            f"| {format_markdown_cell(row['Payload'])} "
+            f"| {format_markdown_cell(row['Count'])} "
+            f"| {format_markdown_cell(row['Label'])} "
+            f"| {format_markdown_cell(row['Decision'])} "
+            f"| {format_markdown_cell(row['Evidence'])} |"
+        )
+
+    md_lines += [
+        "",
+        "Interpretation: keep these rows as search/ranking evidence only. "
+        "Do not promote parser role, topology, or export readiness from this report.",
+    ]
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    # --- Console output ---
+    print("\n--- ResidualLeadGuard candidate-only residual lead guard")
+
+    # Target mesh sizes table
+    print(f"{'MeshSize':<10} {'MeshBlockCount':>15} {'ResidualStream':>15} {'ResidualPattern':>15}")
+    print("-" * 60)
+    for t in sorted(targets, key=lambda t: safe_int(t.get("MeshSize"))):
+        print(
+            f"{safe_int(t.get('MeshSize')):<10} "
+            f"{safe_int(t.get('MeshBlockCount')):>15} "
+            f"{safe_int(t.get('ResidualStreamCount')):>15} "
+            f"{safe_int(t.get('ResidualPatternCount')):>15}"
+        )
+
+    # Position-like rows (candidates)
+    print(
+        f"\n{'MeshSize':<10} {'Offset':>8} {'Payload':>8} {'Count':>6} "
+        f"{'Label':<10} {'Role':<30} {'Vectors':>8} {'Plausible':>10} {'Extent':>12}"
+    )
+    print("-" * 110)
+    for s in sorted(position_like, key=lambda s: safe_int(s.get("DeclaredPayloadBytes"))):
+        print(
+            f"{safe_int(s.get('MeshSize')):<10} "
+            f"{safe_int(s.get('MeshPayloadOffset')):>8} "
+            f"{safe_int(s.get('DeclaredPayloadBytes')):>8} "
+            f"{safe_int(s.get('Count')):>6} "
+            f"{str(json_value_or_dash(s, 'StringValue')):<10} "
+            f"{str(json_value_or_dash(s, 'Role')):<30} "
+            f"{json_value_or_dash(s, 'RotatedFloat3VectorCount'):>8} "
+            f"{json_value_or_dash(s, 'RotatedFloat3PlausibleValueRatio'):>10} "
+            f"{json_value_or_dash(s, 'RotatedFloat3MaxExtent'):>12}"
+        )
+
+    # Residual side-stream review
+    print("\nResidual side-stream review:")
+    print(f"{'MeshSize':<10} {'Stream':<12} {'Payload':<18} {'Count':>6} {'Label':<10} {'Decision':<30} {'Evidence'}")
+    print("-" * 120)
+    for r_row in sorted(residual_review_rows, key=lambda r: (int(r["MeshSize"]), str(r.get("Payload", 0)))):
+        print(
+            f"{r_row['MeshSize']:<10} "
+            f"{r_row['Stream']:<12} "
+            f"{str(r_row['Payload']):<18} "
+            f"{r_row['Count']:>6} "
+            f"{r_row['Label']:<10} "
+            f"{r_row['Decision']:<30} "
+            f"{r_row['Evidence']}"
+        )
+
+    print(f"ResidualTargetFamilyReview JSON: {json_path}")
+    print(f"ResidualTargetFamilyReview markdown: {md_path}")
+    print(
+        "ResidualLeadGuard passed: residual leads remain candidate-only ranking "
+        "evidence; meshSize=321/329 side streams stayed low-signal and no role "
+        "or geometry truth was promoted."
+    )

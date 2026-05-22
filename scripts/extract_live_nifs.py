@@ -5,15 +5,13 @@ Usage:
     python scripts/extract_live_nifs.py --archive 53 --max 200 --out Exports/live-nifs-053
 """
 
-import os
-import sys
-import json
-import struct
-import lzma
-import zlib
-import hashlib
 import argparse
-from pathlib import Path
+import json
+import lzma
+import os
+import struct
+import sys
+import zlib
 
 LIVE_ROOT = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
 ARCHIVE_ENTRY_SIZE = 44
@@ -26,7 +24,7 @@ def read_archive_entry(data: bytes, offset: int, index: int) -> dict:
     id_bytes = entry_data[0:8]
     data_offset = struct.unpack_from("<I", entry_data, 8)[0]
     size = struct.unpack_from("<I", entry_data, 12)[0]
-    streamed_or_unknown = struct.unpack_from("<I", entry_data, 16)[0]
+    _streamed_or_unknown = struct.unpack_from("<I", entry_data, 16)[0]
     next_raw = struct.unpack_from("<H", entry_data, 20)[0]
     compression = struct.unpack_from("<H", entry_data, 22)[0]
     sha1 = entry_data[24:44].hex()
@@ -113,10 +111,10 @@ def read_archive(archive_path: str) -> list[dict]:
         print(f"  ERROR: invalid magic '{magic}'")
         return []
 
-    version = struct.unpack_from("<I", data, 4)[0]
+    _version = struct.unpack_from("<I", data, 4)[0]
     header_size = struct.unpack_from("<I", data, 8)[0]
     max_entries = struct.unpack_from("<I", data, 12)[0]
-    first_linked = struct.unpack_from("<I", data, 16)[0]
+    _first_linked = struct.unpack_from("<I", data, 16)[0]
 
     table_offset = header_size
     readable_entries = min(max_entries, (len(data) - table_offset) // ARCHIVE_ENTRY_SIZE)
@@ -143,7 +141,7 @@ def extract_nifs_from_archive(
 
     entries = read_archive_entry_table(data)
     if entries is None:
-        print(f"  ERROR: could not read entry table")
+        print("  ERROR: could not read entry table")
         return []
 
     nif_found = 0
