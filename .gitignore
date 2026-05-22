@@ -21,6 +21,9 @@ coverage/
 *.suo
 *.rsuser
 
+# local test cache
+.pytest_cache/
+
 # local logs/temp files
 *.log
 *.tmp
@@ -32,4 +35,8 @@ coverage/
 *.rar
 *.tar
 *.gz
+
+# Windows shortcuts
+*.lnk
+
 nul
