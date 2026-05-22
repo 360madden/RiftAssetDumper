@@ -2143,12 +2143,12 @@ internal static class Program
           {
             var pairings = FindNifMeshProbePairings(streamSummaries);
             var confidentPairings = pairings
-                .Where(static p => p.Confidence >= 80 && p.IndexMax < ushort.MaxValue)
+                .Where(static p => p.Confidence >= 60 && p.IndexMax < ushort.MaxValue)
                 .OrderByDescending(static p => p.Confidence)
                 .ThenByDescending(static p => p.IndexCoverageRatio)
                 .ToList();
 
-            Console.WriteLine($"    index-vertex pairings: {pairings.Count} total, {confidentPairings.Count} confident (minimum 80)");
+            Console.WriteLine($"    index-vertex pairings: {pairings.Count} total, {confidentPairings.Count} confident (minimum 60)");
 
             if (confidentPairings.Count > 0)
             {
@@ -3308,8 +3308,8 @@ internal static class Program
       if (body.Length < 12)
         continue;
 
-      // Float32 position candidate: body evenly divisible by 12, valid non-NaN float3s
-      if (body.Length % 12 == 0 && body.Length >= 36)
+      // Float32 position candidate: minimum 36 bytes (3 float3s), valid non-NaN float3s
+      if (body.Length >= 36)
       {
         var vertexCount = body.Length / 12;
         if (vertexCount >= 3 && vertexCount <= 65535)
