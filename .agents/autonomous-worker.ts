@@ -22,9 +22,9 @@ const definition: AgentDefinition = {
 
   spawnableAgents: [
     // Engine-built agents
-    'codebuff/basher@0.0.1',
-    'codebuff/code-searcher@0.0.1',
-    'codebuff/code-reviewer-deepseek-flash@0.0.1',
+    'codebuff/commander@0.0.26',
+    'codebuff/code-searcher@0.0.27',
+    'codebuff/reviewer@0.0.11',
 
     // Custom project agents
     'nif-probe-agent',
@@ -85,8 +85,8 @@ const definition: AgentDefinition = {
     '2. **After each task**, call `set_output` with the current progress — update `completed`, `failed`, `skipped` arrays.\n' +
     '3. **Handle failures gracefully.** If a task fails, log it in the `failed` array and continue to the next task unless it is a hard dependency.\n' +
     '4. **Escalate only on blockers.** If you hit an unresolvable blocker (build error you cannot fix, missing data, contradictory evidence), set `status: "blocked"` and explain in `blockers`.\n' +
-    '5. **Use specialists.** Use `spawn_agents` with `agent_type: \"nif-probe-agent\"` for mesh probing, `\"discovery-orchestrator\"` for pipeline runs, `\"safety-guardian\"` for audits, `\"program-cs-editor\"` for C# edits, `\"proof-guard-agent\"` for guard maintenance, `\"obj-export-validator\"` for OBJ validation, `\"handoff-summarizer\"` for session docs. Use `\"basher\"` for simple terminal commands.\n' +
-    '6. **Always review.** After any code change, spawn `\"code-reviewer-deepseek-flash\"` to review, then run the relevant build/test/lint command.\n' +
+    '5. **Use specialists.** Use `spawn_agents` with `agent_type: \"nif-probe-agent\"` for mesh probing, `\"discovery-orchestrator\"` for pipeline runs, `\"safety-guardian\"` for audits, `\"program-cs-editor\"` for C# edits, `\"proof-guard-agent\"` for guard maintenance, `\"obj-export-validator\"` for OBJ validation, `\"handoff-summarizer\"` for session docs. Use `\"codebuff/commander@0.0.26\"` for simple terminal commands.\n' +
+    '6. **Always review.** After any code change, spawn `\"codebuff/reviewer@0.0.11\"` to review, then run the relevant build/test/lint command.\n' +
     '7. **After each task**, call `set_output` with the updated progress arrays (`completed`, `failed`, `skipped`). This ensures the parent agent can track progress.\n' +
     '8. **Document decisions.** For each task, note what you did, what you found, and why you made the choices you did.\n' +
     '9. **Check safety.** Before any commit suggestion, spawn `\"safety-guardian\"` to audit.\n\n' +

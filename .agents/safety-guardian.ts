@@ -16,8 +16,8 @@ const definition: AgentDefinition = {
   ],
 
   spawnableAgents: [
-    'codebuff/code-searcher@0.0.1',
-    'codebuff/basher@0.0.1',
+    'codebuff/code-searcher@0.0.27',
+    'codebuff/commander@0.0.26',
   ],
 
   spawnerPrompt:
