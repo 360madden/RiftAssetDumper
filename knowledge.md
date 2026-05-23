@@ -16,13 +16,13 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 | `dotnet format RiftAssetDumper.slnx --verify-no-changes` | Check formatting |
 | `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- --help` | Run CLI |
 
-### PowerShell workflow helper (recommended runner — thin wrapper only)
+### PowerShell workflow helper (thin wrapper)
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftWorkflow.ps1" -Mode <Mode> [options]
 ```
 
-All complex modes have been ported to Python. The legacy `Invoke-RiftAssetWorkflow.ps1` still exists but is no longer needed as fallback.
+All complex modes have been ported to Python.
 
 ### Python (scripting/discovery orchestration — primary orchestrator)
 
@@ -44,6 +44,7 @@ All complex modes have been ported to Python. The legacy `Invoke-RiftAssetWorkfl
 
 | Command | Purpose |
 |---------|---------|
+| `python scripts/batch_sweep.py` | 4-phase OBJ integrity + candidate discovery + batch export + manifest |
 | `python scripts/rift_asset_discovery_matrix.py --skip-build` | Run discovery matrix jobs |
 | `python scripts/rift_position_gap_report.py <inventory.json>` | Generate position gap report |
 | `python scripts/extract_live_nifs.py` | Extract NIFs from live TWAD archives |
@@ -67,11 +68,12 @@ All complex modes have been ported to Python. The legacy `Invoke-RiftAssetWorkfl
 
 ### Python scripts (`scripts/`)
 - **Target:** Python 3.14 (ruff + mypy strict)
-- **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports
+- **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports, batch sweep
 - **Entry point:** `scripts/rift_workflow.py` — kebab-case command dispatch with 30+ commands
 - **Guards:** `scripts/rift_workflow_guards.py` — 4 proof guards (attribute-extra, usage-access-correlation, position-source-sibling-lead, residual-lead)
 - **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
 - **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
+- **Batch sweep:** `scripts/batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building
 - **Tests:** `scripts/test_rift_workflow_utils.py` (49 unit tests)
 - **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
 
@@ -120,11 +122,12 @@ Two parallel jobs on `windows-latest`:
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Stage 13 verification)
-- **29 total OBJs, 23 faced, 6 position-only, 3,177 faces, 1,881 vertices across 13 mesh families**
+### Current project state (latest — Stage 18)
+- **94 OBJs, 65 faced, 10,795 faces, 6,079 vertices across 18+ families. 0 structural issues. 0 unexported candidates remain.**
+- `batch_sweep.py` — 4-phase tool for OBJ integrity (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, manifest building
 - All 4 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
-- CI green: build 0 errors, tests 6/6, ruff 0 violations
+- CI green: build 0 errors, tests 6/6, ruff 0, mypy 0
 
 ## Conventions
 
@@ -202,4 +205,29 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - The `Invoke-RiftWorkflow.ps1` wrapper translates legacy PS mode names to kebab-case Python commands
 - `dotnet build` is implicit for most workflow commands unless `--skip-build` is passed
 - The `generated_output_guard` runs at the start of every Python command — it checks that no generated/ignored files have been accidentally committed
-- `.agents/` directory defines Codebuff sub-agent types, their tool schemas, and invocation contracts — the agent-routing configuration for AI-assisted coding sessions
+- `.agents/` directory contains Codebuff agent type definitions (`types/agent-definition.ts`, `types/tools.ts`, `util-types.ts`) — the schema types for building custom Codebuff agents
+- Agent definition files were rebuilt from scratch in `.agents/` (see `.agents.bak2/` for original reference)
+- `batch_sweep.py` is a standalone 4-phase script (not a workflow command) for OBJ integrity, candidate discovery, batch export, and manifest generation
+
+## Agent model strategy
+
+The `.agents/` directory contains 10 custom agent definitions with a tiered model strategy:
+
+| Agent | Model | Best for |
+|-------|-------|----------|
+| `nif-probe-agent` | DeepSeek V4 Flash (high) | NIF mesh analysis, stream role probing |
+| `discovery-orchestrator` | DeepSeek V4 Flash | Pipeline orchestration (build→inventory→guards) |
+| `program-cs-editor` | DeepSeek V4 Flash (high) | Routine C# edits, simple gate changes |
+| `proof-guard-agent` | DeepSeek V4 Flash (high) | Guard suite maintenance & validation |
+| `obj-export-validator` | DeepSeek V4 Flash | OBJ structural integrity checks |
+| `handoff-summarizer` | DeepSeek V4 Flash (high) | Session handoff document generation |
+| `safety-guardian` | DeepSeek V4 Flash (high) | Pre-commit safety audits |
+| `autonomous-worker` | DeepSeek V4 Flash | Task queue executor (delegates to all above) |
+| `cs-architect-gpt` | **OpenAI GPT-5.5** (high) | **Complex C# changes** needing deep reasoning (new decode paths, subtle bugs, algorithm design) |
+| `investigator-gpt` | **OpenAI GPT-5.1** (high) | **Stream data investigation** (half-float decode, magic-byte analysis, position source discovery) |
+
+**Strategy:**
+- Default to Flash agents for speed/cost on routine work
+- Deploy `cs-architect-gpt` when a C# change requires multi-step reasoning across the ~15K-line `Program.cs` (complex algorithm changes, subtle stream classification bugs, new geometry decode paths)
+- Deploy `investigator-gpt` for binary stream analysis requiring pattern recognition and experimental decode prototyping
+- DeepSeek V4 Pro is not yet available — once it is, upgrade `program-cs-editor` to Pro
