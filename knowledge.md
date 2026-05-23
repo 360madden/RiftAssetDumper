@@ -231,3 +231,60 @@ The `.agents/` directory contains 10 custom agent definitions with a tiered mode
 - Deploy `cs-architect-gpt` when a C# change requires multi-step reasoning across the ~15K-line `Program.cs` (complex algorithm changes, subtle stream classification bugs, new geometry decode paths)
 - Deploy `investigator-gpt` for binary stream analysis requiring pattern recognition and experimental decode prototyping
 - DeepSeek V4 Pro is not yet available — once it is, upgrade `program-cs-editor` to Pro
+
+## Third-party tools integration
+
+Tools are installed at the sibling `C:\RIFT MODDING\Tools\` directory (outside the git repo) and registered in `.tools.json` at the project root.
+
+### Config file (`.tools.json`)
+
+JSON registry mapping tool names to their paths (relative to project root), with `installed` status verified by actual file existence.
+
+```json
+{
+  "tools_root": "..\\Tools",
+  "tools": {
+    "x64dbg": { "path": "..\\Tools\\x64dbg\\...", "installed": true },
+    "ghidra": { "path": "..\\Tools\\Ghidra\\...", "installed": false },
+    ...
+  }
+}
+```
+
+### Loading tools in Python
+
+```python
+from scripts.rift_workflow_utils import load_tools_config, show_tools_status
+
+config = load_tools_config()
+show_tools_status(config)
+
+if config["tools"]["ghidra"]["installed"]:
+    ghidra_path = config["tools"]["ghidra"]["resolved_path"]
+    # use it...
+```
+
+### Registered tools
+
+| Tool | Category | Purpose |
+|------|----------|---------|
+| **x64dbg** | Debugger | Attach to RIFT client, observe archive read behavior at runtime |
+| **Ghidra** | Static analysis | Decompile RIFT DLLs to extract NiDataStream/TWAD parsing logic |
+| **Blender** | 3D viewer | Visually inspect OBJ exports for structural correctness |
+| **NifSkope** | NIF viewer | Inspect NiMesh block tree, NiDataStream bindings, raw bytes |
+| **ImHex** | Hex editor | Analyze binary stream bodies, identify magic constants |
+| **jq** | CLI | Slice/dice large JSON/JSONL inventories for pattern analysis |
+| **GIMP** | Image editor | Open DDS textures to verify texture→model bindings |
+| **HxD** | Hex editor | Inspect multi-GB TWAD archives, find magic bytes and compression boundaries |
+
+### Adding a new tool
+
+1. Install it in `C:\RIFT MODDING\Tools\ToolName\`
+2. Add an entry to `.tools.json` under `tools` with `path`, `description`, and `category`
+3. `load_tools_config()` automatically detects and sets `installed: true`
+
+### Commands
+
+| Purpose | Command |
+|---------|---------|
+| Show installed tools status | `python -c "from scripts.rift_workflow_utils import load_tools_config, show_tools_status; show_tools_status(load_tools_config())"` |

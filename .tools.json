@@ -1,0 +1,64 @@
+{
+  "schema": "rift-tools-config/v1",
+  "description": "Registry of third-party reverse-engineering and development tools installed at the sibling C:\\RIFT MODDING\\Tools\\ directory. All paths are relative to this project root (C:\\RIFT MODDING\\Assets\\).",
+  "tools_root": "..\\Tools",
+  "tools": {
+    "x64dbg": {
+      "path": "..\\Tools\\x64dbg\\release\\x64\\x64dbg.exe",
+      "description": "Windows debugger — attach to RIFT client to observe archive read behavior at runtime",
+      "installed": true,
+      "category": "debugger"
+    },
+    "jdk21": {
+      "path": "..\\Tools\\jdk-21.0.11+10\\bin\\java.exe",
+      "description": "Eclipse Temurin JDK 21 — required runtime for Ghidra 12.1+",
+      "installed": true,
+      "category": "runtime",
+      "home": "..\\Tools\\jdk-21.0.11+10"
+    },
+    "ghidra": {
+      "path": "..\\Tools\\ghidra_12.1_PUBLIC\\support\\analyzeHeadless.bat",
+      "description": "NSA binary static analysis — decompile RIFT DLLs to extract NiDataStream/TWAD parsing logic",
+      "installed": true,
+      "category": "static-analysis",
+      "home": "..\\Tools\\ghidra_12.1_PUBLIC",
+      "java_home_override": "..\\Tools\\jdk-21.0.11+10"
+    },
+    "blender": {
+      "path": "..\\Tools\\Blender\\blender.exe",
+      "description": "3D modeling suite — visually inspect OBJ exports for structural correctness",
+      "installed": false,
+      "category": "viewer"
+    },
+    "nifskope": {
+      "path": "..\\Tools\\NifSkope\\NifSkope.exe",
+      "description": "Gamebryo NIF viewer — inspect NiMesh block tree, NiDataStream bindings, and raw bytes",
+      "installed": false,
+      "category": "viewer"
+    },
+    "imhex": {
+      "path": "..\\Tools\\ImHex\\imhex.exe",
+      "description": "Pattern-based hex editor — analyze binary stream bodies, identify magic constants and struct layouts",
+      "installed": false,
+      "category": "hex-editor"
+    },
+    "jq": {
+      "path": "..\\Tools\\jq\\jq.exe",
+      "description": "JSON query CLI — slice/dice large JSON/JSONL inventories for pattern analysis",
+      "installed": false,
+      "category": "cli"
+    },
+    "gimp": {
+      "path": "..\\Tools\\GIMP\\bin\\gimp.exe",
+      "description": "Image editor — open DDS textures linked from NIF models to verify texture→model bindings",
+      "installed": false,
+      "category": "viewer"
+    },
+    "hxd": {
+      "path": "..\\Tools\\HxD\\HxD.exe",
+      "description": "Large-file hex editor — inspect multi-GB TWAD archives, find magic bytes and compression boundaries",
+      "installed": false,
+      "category": "hex-editor"
+    }
+  }
+}

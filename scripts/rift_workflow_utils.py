@@ -505,3 +505,121 @@ def load_json_report(path: str | Path) -> Any:
         return json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"Failed to parse JSON report: {path}") from exc
+
+
+# ============================================================================
+# Third-party tools registry (load_tools_config)
+# ============================================================================
+
+
+def _default_tools_config() -> dict[str, Any]:
+    """Return a placeholder config when .tools.json is missing.
+
+    Uses the sibling ..\\Tools\\ convention with all tools uninstalled.
+    """
+    return {
+        "schema": "rift-tools-config/v1",
+        "tools_root": "..\\Tools",
+        "tools": {
+            "x64dbg": {"path": "..\\Tools\\x64dbg\\release\\x64\\x64dbg.exe", "installed": False},
+            "ghidra": {"path": "..\\Tools\\Ghidra\\analyzeHeadless.bat", "installed": False},
+            "blender": {"path": "..\\Tools\\Blender\\blender.exe", "installed": False},
+            "nifskope": {"path": "..\\Tools\\NifSkope\\NifSkope.exe", "installed": False},
+            "imhex": {"path": "..\\Tools\\ImHex\\imhex.exe", "installed": False},
+            "jq": {"path": "..\\Tools\\jq\\jq.exe", "installed": False},
+            "gimp": {"path": "..\\Tools\\GIMP\\bin\\gimp.exe", "installed": False},
+            "hxd": {"path": "..\\Tools\\HxD\\HxD.exe", "installed": False},
+        },
+    }
+
+
+def load_tools_config(
+    config_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """Load the .tools.json registry from the project root.
+
+    Returns a dict with:
+      - tools_root: relative path from project root to Tools/ directory
+      - tools: dict of tool_name -> {path, description, installed, category}
+
+    Falls back to a sensible default if the file doesn't exist.
+    Each tool's 'installed' field is updated based on actual file existence.
+
+    Usage:
+        config = load_tools_config()
+        if config["tools"]["ghidra"]["installed"]:
+            ghidra_path = Path(REPO_ROOT) / config["tools"]["ghidra"]["path"]
+    """
+    if config_path is None:
+        config_path = REPO_ROOT / ".tools.json"
+
+    config_path = Path(config_path)
+
+    if not config_path.exists():
+        config = _default_tools_config()
+    else:
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            config = _default_tools_config()
+
+    # Validate/repair schema
+    if not isinstance(config, dict):
+        config = _default_tools_config()
+    if "tools" not in config:
+        config["tools"] = {}
+    if "tools_root" not in config:
+        config["tools_root"] = "..\\Tools"
+
+    # Resolve installed status by checking actual file existence
+    for _tool_name, tool_info in config["tools"].items():
+        if not isinstance(tool_info, dict):
+            continue
+        tool_path_str = tool_info.get("path", "")
+        if not tool_path_str:
+            tool_info["installed"] = False
+            continue
+        # Resolve relative to project root
+        resolved = (REPO_ROOT / tool_path_str).resolve()
+        tool_info["installed"] = resolved.exists()
+        # Store absolute path for convenience
+        tool_info["resolved_path"] = str(resolved)
+
+    return config
+
+
+def show_tools_status(
+    config: dict[str, Any] | None = None,
+) -> None:
+    """Print a formatted status table of all registered tools.
+
+    Args:
+        config: Result from load_tools_config(). If None, loads config.
+    """
+    if config is None:
+        config = load_tools_config()
+
+    tools = config.get("tools", {})
+    if not tools:
+        print("  No tools registered in .tools.json")
+        return
+
+    print()
+    print(f"  {'Tool':<22} {'Status':<10} {'Category':<18} Path")
+    print(f"  {'-'*22} {'-'*10} {'-'*18} {'-'*40}")
+
+    installed_count = 0
+    for name, info in sorted(tools.items()):
+        if not isinstance(info, dict):
+            continue
+        installed = info.get("installed", False)
+        category = info.get("category", "-")
+        tool_path = info.get("path", "-")
+        status = "[INSTALLED]" if installed else "[missing]"
+        if installed:
+            installed_count += 1
+        print(f"  {name:<22} {status:<10} {category:<18} {tool_path}")
+
+    print(f"\n  {installed_count}/{len(tools)} tools installed")
+    print(f"  Tools root: {config.get('tools_root', '-')}")
+    print()
