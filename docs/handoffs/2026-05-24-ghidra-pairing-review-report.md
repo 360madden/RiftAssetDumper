@@ -64,7 +64,7 @@ The Ghidra review data is now easier to consume in the normal workflow loop. The
 ## Remaining unwired pieces
 
 - No export, OBJ, or guard behavior consumes Ghidra pairing review output.
-- No single-sample C# probe mode yet compares decoded legacy-vs-Ghidra index/vector stats in detail.
+- `probe-nif-mesh` now emits focused per-mesh `GhidraPairings` side by side with legacy `Pairings`; no deeper decoded legacy-vs-Ghidra index/vector stats report exists yet.
 - No promotable whitelist exists for Ghidra semantic transitions.
 - Attribute-set logic still uses legacy/default roles.
 
@@ -76,3 +76,5 @@ Add a focused read-only C# probe enhancement for one review sample:
 - print/index JSON legacy vs Ghidra body first bytes, role stats, and confidence side by side,
 - keep the result candidate-only,
 - do not touch export behavior.
+
+Follow-up completed: `docs/handoffs/2026-05-24-ghidra-mesh-probe-sidecar-pairings.md`.

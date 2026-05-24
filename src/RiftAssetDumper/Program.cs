@@ -1902,6 +1902,7 @@ internal static class Program
       var meshPayload = SliceNifBlockPayload(payload, meshBlock);
       var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
       var pairings = FindNifMeshProbePairings(streamSummaries);
+      var ghidraPairings = FindNifMeshProbePairings(BuildNifGhidraRoleStreamSummaries(streamSummaries));
       var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
       var payloadWindows = FindNifMeshPayloadRoleWindows(
           meshPayload,
@@ -1921,6 +1922,7 @@ internal static class Program
           StringSamples: meshBlock.StringSamples,
           Streams: streamSummaries,
           Pairings: pairings,
+          GhidraPairings: ghidraPairings,
           AttributeSets: attributeSets,
           PayloadWindows: payloadWindows));
     }
@@ -1939,6 +1941,7 @@ internal static class Program
         MeshesEmitted: meshes.Count,
         CandidateLinks: meshes.Sum(static m => m.Streams.Count),
         Pairings: meshes.Sum(static m => m.Pairings.Count),
+        GhidraPairings: meshes.Sum(static m => m.GhidraPairings.Count),
         AttributeSets: meshes.Sum(static m => m.AttributeSets.Count),
         HeaderWarnings: header.Warnings,
         Meshes: meshes);
@@ -1947,13 +1950,18 @@ internal static class Program
     Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
     File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
-    Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} attributeSets={report.AttributeSets:N0}");
+    Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} ghidraPairings={report.GhidraPairings:N0} attributeSets={report.AttributeSets:N0}");
     foreach (var mesh in meshes.Take(8))
     {
       Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
       foreach (var pairing in mesh.Pairings.Take(5))
       {
         Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
+      }
+
+      foreach (var pairing in mesh.GhidraPairings.Take(5))
+      {
+        Console.WriteLine($"  ghidra-pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
       }
 
       foreach (var attributeSet in mesh.AttributeSets.Take(3))
@@ -14428,6 +14436,7 @@ internal sealed record NifMeshProbeReport(
     int MeshesEmitted,
     int CandidateLinks,
     int Pairings,
+    int GhidraPairings,
     int AttributeSets,
     List<string> HeaderWarnings,
     List<NifMeshProbe> Meshes);
@@ -14443,6 +14452,7 @@ internal sealed record NifMeshProbe(
     List<string> StringSamples,
     List<NifMeshBoundStreamSummary> Streams,
     List<NifMeshProbePairing> Pairings,
+    List<NifMeshProbePairing> GhidraPairings,
     List<NifMeshAttributeSetSample> AttributeSets,
     List<NifMeshPayloadRoleWindow> PayloadWindows);
 

@@ -181,6 +181,52 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra review report finding", json.dumps(review_report), "abc123abc123abcd")
     check_contains("ghidra review markdown", review_md.read_text(encoding="utf-8"), "vertex-semantic-change")
 
+print("=== MeshProbe Ghidra pairing summary ===")
+with TemporaryDirectory() as temp_dir:
+    report_path = Path(temp_dir) / "mesh-probe.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "NifVersion": "20.6.0.0",
+                "MeshBlockCount": 1,
+                "MeshesEmitted": 1,
+                "CandidateLinks": 2,
+                "Pairings": 0,
+                "GhidraPairings": 1,
+                "AttributeSets": 0,
+                "Meshes": [
+                    {
+                        "MeshBlockIndex": 6,
+                        "MeshSize": 301,
+                        "Streams": [],
+                        "Pairings": [],
+                        "GhidraPairings": [
+                            {
+                                "IndexMeshPayloadOffset": 292,
+                                "IndexBlockIndex": 24,
+                                "IndexRole": "index-u16le-lead",
+                                "IndexMax": 47,
+                                "VertexMeshPayloadOffset": 188,
+                                "VertexBlockIndex": 21,
+                                "VertexRole": "position-float3-lead",
+                                "VertexCount": 48,
+                            }
+                        ],
+                        "AttributeSets": [],
+                        "PayloadWindows": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        show_report_summary("MeshProbe", str(report_path))
+    text = buffer.getvalue()
+    check_contains("mesh probe ghidra count", text, "ghidraPairings=1")
+    check_contains("mesh probe ghidra row", text, "index@292/#24 index-u16le-lead max=47")
+
 print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")

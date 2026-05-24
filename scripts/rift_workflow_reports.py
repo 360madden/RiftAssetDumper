@@ -560,6 +560,7 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
         f"emitted={json_value_or_dash(report, 'MeshesEmitted')} "
         f"links={json_value_or_dash(report, 'CandidateLinks')} "
         f"pairings={json_value_or_dash(report, 'Pairings')} "
+        f"ghidraPairings={json_value_or_dash(report, 'GhidraPairings')} "
         f"attributeSets={json_value_or_dash(report, 'AttributeSets')}"
     )
 
@@ -571,6 +572,7 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
                 f"size={json_value_or_dash(mesh, 'MeshSize')} "
                 f"streams={len(mesh.get('Streams') or [])} "
                 f"pairings={len(mesh.get('Pairings') or [])} "
+                f"ghidraPairings={len(mesh.get('GhidraPairings') or [])} "
                 f"attributeSets={len(mesh.get('AttributeSets') or [])} "
                 f"payloadWindows={len(mesh.get('PayloadWindows') or [])}"
             )
@@ -604,6 +606,26 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
                             f"max={json_value_or_dash(p, 'IndexMax')} -> "
                             f"stream@{json_value_or_dash(p, 'VertexMeshPayloadOffset')}/"
                             f"#{json_value_or_dash(p, 'VertexBlockIndex')} "
+                            f"v={json_value_or_dash(p, 'VertexCount')}"
+                        ),
+                        5,
+                    )
+                )
+
+            ghidra_pairings = mesh.get("GhidraPairings")
+            if ghidra_pairings and isinstance(ghidra_pairings, list):
+                print(
+                    "  ghidra pairings: "
+                    + top_text(
+                        ghidra_pairings,
+                        lambda p: (
+                            f"index@{json_value_or_dash(p, 'IndexMeshPayloadOffset')}/"
+                            f"#{json_value_or_dash(p, 'IndexBlockIndex')} "
+                            f"{json_value_or_dash(p, 'IndexRole')} "
+                            f"max={json_value_or_dash(p, 'IndexMax')} -> "
+                            f"stream@{json_value_or_dash(p, 'VertexMeshPayloadOffset')}/"
+                            f"#{json_value_or_dash(p, 'VertexBlockIndex')} "
+                            f"{json_value_or_dash(p, 'VertexRole')} "
                             f"v={json_value_or_dash(p, 'VertexCount')}"
                         ),
                         5,
