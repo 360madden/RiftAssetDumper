@@ -7,9 +7,11 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
+from unittest.mock import patch
 
 sys.path.insert(0, ".")
 
+from scripts import rift_workflow
 from scripts.rift_workflow_guards import (
     ghidra_attribute_candidate_guard,
     ghidra_pairing_non_export_guard,
@@ -83,6 +85,32 @@ def minimal_program(extra_decode_line: str = "") -> str:
     )
 
 
+def baseline_attribute_report() -> dict[str, Any]:
+    return {
+        "SchemaVersion": "ghidra-attribute-candidate-report/v1",
+        "CandidateOnly": True,
+        "Summary": {
+            "GhidraOnlyGroups": 14,
+            "GhidraOnlyPairingsCovered": 64,
+            "GroupedSampleMeshes": 8,
+            "CompletePositionNormalUvCandidateGroups": 0,
+            "ProbeBackedRanks": 14,
+            "PositionReviewPassGroups": 4,
+            "NormalReviewPassGroups": 3,
+            "UvReviewPassGroups": 3,
+            "UvReviewFailGroups": 2,
+            "RejectedNoiseGroups": 2,
+        },
+        "Groups": [
+            {
+                "SampleIdPrefix": "25f30ec90608eab7",
+                "SampleMeshBlockIndex": 7,
+                "CompletePositionNormalUvCandidate": False,
+            }
+        ],
+    }
+
+
 print("=== Ghidra pairing non-export guard ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -109,29 +137,7 @@ print("=== Ghidra attribute candidate guard ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     report_path = temp_path / "ghidra-attribute-candidate-report.json"
-    baseline = {
-        "SchemaVersion": "ghidra-attribute-candidate-report/v1",
-        "CandidateOnly": True,
-        "Summary": {
-            "GhidraOnlyGroups": 14,
-            "GhidraOnlyPairingsCovered": 64,
-            "GroupedSampleMeshes": 8,
-            "CompletePositionNormalUvCandidateGroups": 0,
-            "ProbeBackedRanks": 14,
-            "PositionReviewPassGroups": 4,
-            "NormalReviewPassGroups": 3,
-            "UvReviewPassGroups": 3,
-            "UvReviewFailGroups": 2,
-            "RejectedNoiseGroups": 2,
-        },
-        "Groups": [
-            {
-                "SampleIdPrefix": "25f30ec90608eab7",
-                "SampleMeshBlockIndex": 7,
-                "CompletePositionNormalUvCandidate": False,
-            }
-        ],
-    }
+    baseline = baseline_attribute_report()
     report_path.write_text(json.dumps(baseline), encoding="utf-8")
     ghidra_attribute_candidate_guard(report_path)
     print("  PASS: baseline attribute candidate report")
@@ -142,6 +148,33 @@ with TemporaryDirectory() as temp_dir:
     promoted["Groups"][0]["CompletePositionNormalUvCandidate"] = True
     promoted_path.write_text(json.dumps(promoted), encoding="utf-8")
     check_raises("complete Ghidra group fails closed", lambda: ghidra_attribute_candidate_guard(promoted_path))
+
+print("=== Ghidra workflow guard suite ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    (temp_path / "ghidra-attribute-candidate-report.json").write_text(
+        json.dumps(baseline_attribute_report()),
+        encoding="utf-8",
+    )
+    suite_calls: dict[str, bool] = {}
+
+    def fake_non_export_guard() -> None:
+        suite_calls["non_export"] = True
+
+    suite_argv = [
+        "rift_workflow.py",
+        "ghidra-workflow-guard-suite",
+        "--out",
+        str(temp_path),
+    ]
+    with (
+        patch.object(sys, "argv", suite_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.rift_workflow.ghidra_pairing_non_export_guard", side_effect=fake_non_export_guard),
+    ):
+        rift_workflow.main()
+
+    check("workflow suite ran non-export guard", suite_calls.get("non_export"), True)
 
 print(f"\n{'=' * 50}")
 if failed:

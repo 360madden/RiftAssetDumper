@@ -10,6 +10,7 @@ python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
 python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build
 python scripts/rift_workflow.py ghidra-attribute-candidate-report
 python scripts/rift_workflow.py ghidra-attribute-candidate-guard
+python scripts/rift_workflow.py ghidra-workflow-guard-suite
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
 ```
 
@@ -25,7 +26,7 @@ docs/schemas/ghidra-attribute-candidate-v1.schema.json
 | Gate | Requirement |
 |---|---|
 | Candidate-only marker | Every Ghidra sidecar path remains `CandidateOnly=true` until promotion. |
-| Export isolation | `python scripts/rift_workflow.py ghidra-pairing-non-export-guard` passes. |
+| Export isolation | `python scripts/rift_workflow.py ghidra-workflow-guard-suite` passes, including `ghidra-pairing-non-export-guard`. |
 | Generated-output safety | `python scripts/rift_workflow.py generated-output-guard` passes before commit. |
 | Review queue | `TopGhidraPairingReviewFindings` remains the primary queue; do not cherry-pick one row into export behavior without checking its family. |
 | Focused probe | Each candidate family has at least one `mesh-probe --review-rank N --skip-build` JSON/console review; use `ghidra-review-rank-probes --limit 14 --skip-build` to refresh the current Ghidra-only set. |

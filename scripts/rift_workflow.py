@@ -23,6 +23,7 @@ Commands (kebab-case):
     ghidra-attribute-candidate-report — group Ghidra-only review rows by sample mesh
     ghidra-attribute-candidate-guard — grouped Ghidra candidate baseline guard
     ghidra-review-rank-probes — batch mesh-probe focused Ghidra review ranks
+    ghidra-workflow-guard-suite — run Ghidra non-export + attribute baseline guards
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
     PositionSourceGapReport     — inventory + gap report
@@ -187,6 +188,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-workflow-guard-suite": {
+        "dotnet": "",
+        "base": "",
+    },
     "residual-position-cluster-probe-report": {
         "dotnet": "",  # multi-step; handled separately
         "base": "",
@@ -311,6 +316,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraAttributeCandidateReport": "ghidra-attribute-candidate-report",
     "GhidraAttributeCandidateGuard": "ghidra-attribute-candidate-guard",
     "GhidraReviewRankProbes": "ghidra-review-rank-probes",
+    "GhidraWorkflowGuardSuite": "ghidra-workflow-guard-suite",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
     "position-gap-report": "position-gap-report",
@@ -573,6 +579,17 @@ def _ensure_ghidra_pairing_review_report(out_dir: Path, limit: int) -> Path:
     return review_path
 
 
+def _ensure_ghidra_attribute_candidate_report(out_dir: Path, limit: int) -> Path:
+    """Return a grouped Ghidra attribute candidate report, rebuilding it if needed."""
+    report_path = out_dir / "ghidra-attribute-candidate-report.json"
+    if report_path.exists():
+        return report_path
+
+    review_path = _ensure_ghidra_pairing_review_report(out_dir, limit)
+    ghidra_attribute_candidate_report(review_path, out_dir)
+    return report_path
+
+
 def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     """Batch-refresh ignored mesh-probe JSON for ranked Ghidra review findings."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
@@ -644,6 +661,16 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     print("GhidraReviewRankProbes passed: focused probe outputs remain under ignored Exports/.")
 
 
+def _run_ghidra_workflow_guard_suite(args: argparse.Namespace) -> None:
+    """Run Ghidra workflow promotion brakes together."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    print("--- GhidraWorkflowGuardSuite")
+    ghidra_pairing_non_export_guard()
+    report_path = _ensure_ghidra_attribute_candidate_report(out_dir, args.limit)
+    ghidra_attribute_candidate_guard(report_path)
+    print("GhidraWorkflowGuardSuite passed: Ghidra evidence remains candidate-only/report-only.")
+
+
 def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
     """Print bounded Ghidra output and fail closed on script/runtime errors."""
     from scripts.ghidra_runner import _has_ghidra_script_error
@@ -704,27 +731,20 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "ghidra-attribute-candidate-guard":
         out_dir = Path(args.out) if args.out else DEFAULT_OUT
-        report_path = out_dir / "ghidra-attribute-candidate-report.json"
-        if not report_path.exists():
-            review_path = out_dir / "ghidra-pairing-review-report.json"
-            if not review_path.exists():
-                inventory_path = out_dir / "nif-mesh-binding-inventory.json"
-                if not inventory_path.exists():
-                    print(
-                        "ERROR: ghidra-attribute-candidate-guard requires an existing "
-                        "ghidra-attribute-candidate-report.json, ghidra-pairing-review-report.json, "
-                        "or nif-mesh-binding-inventory.json.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-                ghidra_pairing_review_report(str(inventory_path), out_dir, take=args.limit)
-                review_path = out_dir / "ghidra-pairing-review-report.json"
-            ghidra_attribute_candidate_report(review_path, out_dir)
+        try:
+            report_path = _ensure_ghidra_attribute_candidate_report(out_dir, args.limit)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
         ghidra_attribute_candidate_guard(report_path)
         return
 
     if command == "ghidra-review-rank-probes":
         _run_ghidra_review_rank_probes(args)
+        return
+
+    if command == "ghidra-workflow-guard-suite":
+        _run_ghidra_workflow_guard_suite(args)
         return
 
     if command == "tools-status":
@@ -2102,6 +2122,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
   python scripts/rift_workflow.py ghidra-attribute-candidate-guard
+  python scripts/rift_workflow.py ghidra-workflow-guard-suite
   python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
         """,
     )
