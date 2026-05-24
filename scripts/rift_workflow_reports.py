@@ -234,6 +234,26 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
             )
         )
 
+    ghidra_role_deltas = report.get("TopGhidraRoleDeltas")
+    if ghidra_role_deltas and isinstance(ghidra_role_deltas, list):
+        print(
+            "Top Ghidra role deltas: "
+            + top_text(
+                ghidra_role_deltas,
+                lambda g: (
+                    f"meshSize={json_value_or_dash(g, 'MeshSize')} "
+                    f"payload={json_value_or_dash(g, 'DeclaredPayloadBytes')} "
+                    f"{format_nif_usage_access(g)} "
+                    f"{json_value_or_dash(g, 'LegacyRole')}->"
+                    f"{json_value_or_dash(g, 'GhidraRole')}="
+                    f"{json_value_or_dash(g, 'Count')} "
+                    f"c={json_value_or_dash(g, 'AverageLegacyConfidence')}->"
+                    f"{json_value_or_dash(g, 'AverageGhidraConfidence')}"
+                ),
+                8,
+            )
+        )
+
     position_siblings = report.get("TopPositionSourceSiblings")
     if position_siblings and isinstance(position_siblings, list):
         print(

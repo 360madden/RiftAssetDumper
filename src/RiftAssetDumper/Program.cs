@@ -4092,6 +4092,7 @@ internal static class Program
     var filter = BuildExtractionFilter(options, lookup);
     var roleGroups = new Dictionary<string, NifMeshBindingRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
     var usageAccessRoleGroups = new Dictionary<string, NifMeshBindingUsageAccessRoleAccumulator>(StringComparer.OrdinalIgnoreCase);
+    var ghidraRoleDeltaGroups = new Dictionary<string, NifMeshBindingGhidraRoleDeltaAccumulator>(StringComparer.OrdinalIgnoreCase);
     var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
     var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
     var positionSourceSiblingGroups = new Dictionary<string, NifPositionSourceSiblingAccumulator>(StringComparer.OrdinalIgnoreCase);
@@ -4259,6 +4260,53 @@ internal static class Program
                   GhidraRoleStats: ghidraRoleStats);
               streamSummaries.Add(summary);
 
+              var usageAccessKey = FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess);
+              if (summary.GhidraRoleStats is not null &&
+                  !string.Equals(summary.RoleStats.PrimaryRole, summary.GhidraRoleStats.PrimaryRole, StringComparison.OrdinalIgnoreCase))
+              {
+                var declaredPayloadKey = summary.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-";
+                var ghidraDeltaKey = $"meshSize={meshBlock.Size}|payload={declaredPayloadKey}|{usageAccessKey}|legacy={summary.RoleStats.PrimaryRole}|ghidra={summary.GhidraRoleStats.PrimaryRole}";
+                if (!ghidraRoleDeltaGroups.TryGetValue(ghidraDeltaKey, out var ghidraDeltaGroup))
+                {
+                  ghidraDeltaGroup = new NifMeshBindingGhidraRoleDeltaAccumulator(
+                      ghidraDeltaKey,
+                      summary.RoleStats.PrimaryRole,
+                      summary.GhidraRoleStats.PrimaryRole,
+                      summary.DeclaredPayloadBytes,
+                      summary.DataStreamUsage,
+                      summary.DataStreamAccess,
+                      meshBlock.Size);
+                  ghidraRoleDeltaGroups.Add(ghidraDeltaKey, ghidraDeltaGroup);
+                }
+
+                ghidraDeltaGroup.Count++;
+                ghidraDeltaGroup.NifIds.Add(entry.IdPrefix);
+                ghidraDeltaGroup.LegacyConfidenceTotal += summary.RoleStats.Confidence;
+                ghidraDeltaGroup.GhidraConfidenceTotal += summary.GhidraRoleStats.Confidence;
+                ghidraDeltaGroup.MeshPayloadOffsetCounts[summary.MeshPayloadOffset] = ghidraDeltaGroup.MeshPayloadOffsetCounts.GetValueOrDefault(summary.MeshPayloadOffset) + 1;
+                if (!string.IsNullOrWhiteSpace(summary.BodyFirst16))
+                {
+                  ghidraDeltaGroup.LegacyBodyFirst16Counts[summary.BodyFirst16] = ghidraDeltaGroup.LegacyBodyFirst16Counts.GetValueOrDefault(summary.BodyFirst16) + 1;
+                }
+
+                if (!string.IsNullOrWhiteSpace(summary.GhidraBodyFirst16))
+                {
+                  ghidraDeltaGroup.GhidraBodyFirst16Counts[summary.GhidraBodyFirst16] = ghidraDeltaGroup.GhidraBodyFirst16Counts.GetValueOrDefault(summary.GhidraBodyFirst16) + 1;
+                }
+
+                if (ghidraDeltaGroup.Samples.Count < 16)
+                {
+                  ghidraDeltaGroup.Samples.Add(new NifMeshBindingStreamSample(
+                      ArchiveName: archiveName,
+                      EntryIndex: entry.Index,
+                      IdPrefix: entry.IdPrefix,
+                      ManifestEntryIndex: manifestEntry?.Index,
+                      MeshBlockIndex: meshBlock.Index,
+                      MeshSize: meshBlock.Size,
+                      Stream: summary));
+                }
+              }
+
               if (!roleGroups.TryGetValue(roleStats.PrimaryRole, out var roleGroup))
               {
                 roleGroup = new NifMeshBindingRoleAccumulator(roleStats.PrimaryRole);
@@ -4266,7 +4314,6 @@ internal static class Program
               }
 
               roleGroup.Count++;
-              var usageAccessKey = FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess);
               roleGroup.UsageAccessCounts[usageAccessKey] = roleGroup.UsageAccessCounts.GetValueOrDefault(usageAccessKey) + 1;
               if (roleStats.Confidence >= 70)
               {
@@ -4686,6 +4733,15 @@ internal static class Program
           .ToList();
     }
 
+    static List<NifIntCount> topIntCounts(Dictionary<int, int> counts)
+    {
+      return counts
+          .OrderByDescending(static kvp => kvp.Value)
+          .ThenBy(static kvp => kvp.Key)
+          .Select(static kvp => new NifIntCount(kvp.Key, kvp.Value))
+          .ToList();
+    }
+
     static NifMeshBindingRoleGroup toRoleRecord(NifMeshBindingRoleAccumulator group)
     {
       return new NifMeshBindingRoleGroup(
@@ -4708,6 +4764,26 @@ internal static class Program
           HighConfidenceCount: group.HighConfidenceCount,
           MeshSizes: topSizeCounts(group.MeshSizeCounts),
           DeclaredPayloadSizes: topSizeCounts(group.DeclaredPayloadSizeCounts),
+          Samples: group.Samples);
+    }
+
+    static NifMeshBindingGhidraRoleDeltaGroup toGhidraRoleDeltaRecord(NifMeshBindingGhidraRoleDeltaAccumulator group)
+    {
+      return new NifMeshBindingGhidraRoleDeltaGroup(
+          Pattern: group.Pattern,
+          LegacyRole: group.LegacyRole,
+          GhidraRole: group.GhidraRole,
+          DeclaredPayloadBytes: group.DeclaredPayloadBytes,
+          DataStreamUsage: group.DataStreamUsage,
+          DataStreamAccess: group.DataStreamAccess,
+          MeshSize: group.MeshSize,
+          Count: group.Count,
+          NifPayloads: group.NifIds.Count,
+          AverageLegacyConfidence: group.Count == 0 ? 0 : Math.Round(group.LegacyConfidenceTotal / group.Count, 2),
+          AverageGhidraConfidence: group.Count == 0 ? 0 : Math.Round(group.GhidraConfidenceTotal / group.Count, 2),
+          MeshPayloadOffsets: topIntCounts(group.MeshPayloadOffsetCounts),
+          LegacyBodyFirst16Counts: topStringCounts(group.LegacyBodyFirst16Counts),
+          GhidraBodyFirst16Counts: topStringCounts(group.GhidraBodyFirst16Counts),
           Samples: group.Samples);
     }
 
@@ -4967,6 +5043,17 @@ internal static class Program
             .ThenBy(static g => g.Role, StringComparer.OrdinalIgnoreCase)
             .Take(options.Limit > 0 ? options.Limit : 100)
             .ToList(),
+        TopGhidraRoleDeltas: ghidraRoleDeltaGroups.Values
+            .Select(toGhidraRoleDeltaRecord)
+            .OrderByDescending(static g => g.Count)
+            .ThenBy(static g => g.MeshSize)
+            .ThenBy(static g => g.DeclaredPayloadBytes)
+            .ThenBy(static g => g.DataStreamUsage, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static g => g.DataStreamAccess, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static g => g.LegacyRole, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static g => g.GhidraRole, StringComparer.OrdinalIgnoreCase)
+            .Take(options.Limit > 0 ? options.Limit : 100)
+            .ToList(),
         TopPositionSourceSiblings: positionSourceSiblingGroups.Values
             .Where(static g => g.MeshBlockIndices.Count >= 2)
             .Select(toPositionSourceSiblingRecord)
@@ -5060,6 +5147,7 @@ internal static class Program
     Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
     Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
     Console.WriteLine($"Top usage/access roles: {string.Join(" | ", report.TopUsageAccessRoles.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role}={g.Count:N0}"))}");
+    Console.WriteLine($"Top Ghidra role deltas: {string.Join(" | ", report.TopGhidraRoleDeltas.Take(8).Select(static g => $"meshSize={g.MeshSize} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.LegacyRole}->{g.GhidraRole}={g.Count:N0} c={g.AverageLegacyConfidence.ToString("g6", CultureInfo.InvariantCulture)}->{g.AverageGhidraConfidence.ToString("g6", CultureInfo.InvariantCulture)}"))}");
     Console.WriteLine($"Top position source sibling groups: {string.Join(" | ", report.TopPositionSourceSiblings.Take(5).Select(static g => $"{g.IdPrefix} block#{g.TargetBlockIndex} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} count={g.Count:N0} meshes={string.Join(",", g.MeshBlockIndices.Take(4).Select(static i => $"#{i}"))} offsets={string.Join(",", g.MeshPayloadOffsets.Take(4))}"))}");
     Console.WriteLine($"Residual target mesh sizes: {string.Join(" | ", report.ResidualTargetMeshSizes.Select(static g => $"meshSize={g.MeshSize} meshes={g.MeshBlockCount:N0} residuals={g.ResidualStreamCount:N0} patterns={g.ResidualPatternCount:N0}"))}");
     Console.WriteLine($"Top residual streams (target mesh sizes, known geometry/sentinel roles removed): {string.Join(" | ", report.TopResidualStreams.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} stream@{g.MeshPayloadOffset} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role} c={g.RoleConfidence} string={g.StringValue ?? "-"} ror3=v{g.RotatedFloat3VectorCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} finite={g.RotatedFloat3FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} plausible={g.RotatedFloat3PlausibleValueRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={g.RotatedFloat3MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} first16={g.BodyFirst16}"))}");
@@ -14566,6 +14654,32 @@ internal sealed class NifMeshBindingUsageAccessRoleAccumulator(string role, stri
   public List<NifMeshBindingStreamSample> Samples { get; } = [];
 }
 
+internal sealed class NifMeshBindingGhidraRoleDeltaAccumulator(
+    string pattern,
+    string legacyRole,
+    string ghidraRole,
+    uint? declaredPayloadBytes,
+    string? dataStreamUsage,
+    string? dataStreamAccess,
+    uint meshSize)
+{
+  public string Pattern { get; } = pattern;
+  public string LegacyRole { get; } = legacyRole;
+  public string GhidraRole { get; } = ghidraRole;
+  public uint? DeclaredPayloadBytes { get; } = declaredPayloadBytes;
+  public string? DataStreamUsage { get; } = dataStreamUsage;
+  public string? DataStreamAccess { get; } = dataStreamAccess;
+  public uint MeshSize { get; } = meshSize;
+  public int Count { get; set; }
+  public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+  public double LegacyConfidenceTotal { get; set; }
+  public double GhidraConfidenceTotal { get; set; }
+  public Dictionary<int, int> MeshPayloadOffsetCounts { get; } = [];
+  public Dictionary<string, int> LegacyBodyFirst16Counts { get; } = new(StringComparer.OrdinalIgnoreCase);
+  public Dictionary<string, int> GhidraBodyFirst16Counts { get; } = new(StringComparer.OrdinalIgnoreCase);
+  public List<NifMeshBindingStreamSample> Samples { get; } = [];
+}
+
 internal sealed class NifPositionSourceSiblingAccumulator(
     string pattern,
     string idPrefix,
@@ -14967,6 +15081,7 @@ internal sealed record NifMeshBindingInventoryReport(
     int AttributeCompatibleSets,
     List<NifMeshBindingRoleGroup> RoleGroups,
     List<NifMeshBindingUsageAccessRoleGroup> TopUsageAccessRoles,
+    List<NifMeshBindingGhidraRoleDeltaGroup> TopGhidraRoleDeltas,
     List<NifPositionSourceSiblingGroup> TopPositionSourceSiblings,
     List<NifMeshResidualTargetGroup> ResidualTargetMeshSizes,
     List<NifMeshResidualStreamGroup> TopResidualStreams,
@@ -14994,6 +15109,23 @@ internal sealed record NifMeshBindingUsageAccessRoleGroup(
     int HighConfidenceCount,
     List<NifSizeCount> MeshSizes,
     List<NifSizeCount> DeclaredPayloadSizes,
+    List<NifMeshBindingStreamSample> Samples);
+
+internal sealed record NifMeshBindingGhidraRoleDeltaGroup(
+    string Pattern,
+    string LegacyRole,
+    string GhidraRole,
+    uint? DeclaredPayloadBytes,
+    string? DataStreamUsage,
+    string? DataStreamAccess,
+    uint MeshSize,
+    int Count,
+    int NifPayloads,
+    double AverageLegacyConfidence,
+    double AverageGhidraConfidence,
+    List<NifIntCount> MeshPayloadOffsets,
+    List<NifStringCount> LegacyBodyFirst16Counts,
+    List<NifStringCount> GhidraBodyFirst16Counts,
     List<NifMeshBindingStreamSample> Samples);
 
 internal sealed record NifPositionSourceSiblingGroup(
