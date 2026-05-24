@@ -47,6 +47,8 @@ The comparison is now wired, but it proves the Ghidra-aligned role path is **not
 
 The leading role deltas still look useful, but current Ghidra-aligned pairing produces zero compatible pairs. That suggests at least one required role-stat field is still not equivalent to the legacy path. A likely next target is little-endian index statistics for `index-u16le-lead`, because the current role classifier still carries the older big-endian index stats shape.
 
+Update: `docs/handoffs/2026-05-24-ghidra-little-endian-index-stats.md` implements that follow-up. Candidate-only Ghidra pairings now produce nonzero pair counts after `index-u16le-*` roles use separate little-endian index bounds.
+
 ## Remaining unwired pieces
 
 - No Ghidra pairing field is used by export, OBJ, or guards.

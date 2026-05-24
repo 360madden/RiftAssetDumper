@@ -9877,11 +9877,94 @@ internal static class Program
         FirstBigEndianTriples: firstTriples);
   }
 
-  private static NifMeshStreamRoleStats AnalyzeNifMeshBoundStreamRole(ReadOnlySpan<byte> body)
+  private static NifUInt16LeIndexStats AnalyzeNifUInt16LeIndex(ReadOnlySpan<byte> body)
+  {
+    var pairCount = body.Length / 2;
+    var triangleAligned = body.Length > 0 && body.Length % 6 == 0;
+    var triangleCount = body.Length / 6;
+    var values = new ushort[pairCount];
+    var distinct = new HashSet<ushort>();
+    ushort maxIndex = 0;
+    ushort minIndex = ushort.MaxValue;
+    var firstIndices = new List<ushort>(Math.Min(pairCount, 32));
+    var firstTriples = new List<NifUInt16Triple>(Math.Min(triangleCount, 16));
+    var degenerateTriangles = 0;
+
+    for (var i = 0; i < pairCount; i++)
+    {
+      var value = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(i * 2, 2));
+      values[i] = value;
+      distinct.Add(value);
+      maxIndex = Math.Max(maxIndex, value);
+      minIndex = Math.Min(minIndex, value);
+      if (firstIndices.Count < 32)
+      {
+        firstIndices.Add(value);
+      }
+    }
+
+    for (var i = 0; i < triangleCount; i++)
+    {
+      var offset = i * 6;
+      var a = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(offset, 2));
+      var b = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(offset + 2, 2));
+      var c = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(offset + 4, 2));
+      if (firstTriples.Count < 16)
+      {
+        firstTriples.Add(new NifUInt16Triple(i, a, b, c));
+      }
+
+      if (a == b || b == c || a == c)
+      {
+        degenerateTriangles++;
+      }
+    }
+
+    var triangleStripWindowCount = Math.Max(0, pairCount - 2);
+    var triangleStripDegenerateWindows = 0;
+    for (var i = 0; i < triangleStripWindowCount; i++)
+    {
+      var a = values[i];
+      var b = values[i + 1];
+      var c = values[i + 2];
+      if (a == b || b == c || a == c)
+      {
+        triangleStripDegenerateWindows++;
+      }
+    }
+
+    if (pairCount == 0)
+    {
+      minIndex = 0;
+    }
+
+    var degenerateTriangleRatio = triangleCount == 0 ? 0 : Math.Round(degenerateTriangles / (double)triangleCount, 4);
+    var triangleStripDegenerateRatio = triangleStripWindowCount == 0 ? 0 : Math.Round(triangleStripDegenerateWindows / (double)triangleStripWindowCount, 4);
+
+    return new NifUInt16LeIndexStats(
+        PairCount: pairCount,
+        TriangleAligned: triangleAligned,
+        TriangleCount: triangleCount,
+        LittleEndianMinIndex: minIndex,
+        LittleEndianMaxIndex: maxIndex,
+        LittleEndianDistinctIndexCount: distinct.Count,
+        DegenerateTriangles: degenerateTriangles,
+        DegenerateTriangleRatio: degenerateTriangleRatio,
+        TriangleStripWindowCount: triangleStripWindowCount,
+        TriangleStripNonDegenerateWindowCount: triangleStripWindowCount - triangleStripDegenerateWindows,
+        TriangleStripDegenerateWindows: triangleStripDegenerateWindows,
+        TriangleStripDegenerateRatio: triangleStripDegenerateRatio,
+        TriangleStripLessDegenerateThanTriples: triangleCount > 0 && triangleStripWindowCount > 0 && triangleStripDegenerateRatio < degenerateTriangleRatio,
+        FirstLittleEndianIndices: firstIndices,
+        FirstLittleEndianTriples: firstTriples);
+  }
+
+  internal static NifMeshStreamRoleStats AnalyzeNifMeshBoundStreamRole(ReadOnlySpan<byte> body)
   {
     var bodyStats = AnalyzeNifStreamBody(body);
     var endianStats = body.Length % 2 == 0 ? AnalyzeNifStreamEndian(body) : null;
     var indexStats = body.Length % 2 == 0 ? AnalyzeNifUInt16BeIndex(body) : null;
+    var littleEndianIndexStats = body.Length % 2 == 0 ? AnalyzeNifUInt16LeIndex(body) : null;
     var float2Stats = AnalyzeNifFloatVectors(body, components: 2, NifFloatByteTransform.LittleEndian);
     var float3Stats = AnalyzeNifFloatVectors(body, components: 3, NifFloatByteTransform.LittleEndian);
     var rotatedFloat2Stats = AnalyzeNifFloatVectors(body, components: 2, NifFloatByteTransform.RotateRight1);
@@ -9897,6 +9980,7 @@ internal static class Program
     var primaryRole = "unknown-stream";
     var confidence = 0;
     ushort? indexMax = null;
+    int? indexPairCount = indexStats?.PairCount;
 
     if (bodyStats.AllZero)
     {
@@ -9911,6 +9995,7 @@ internal static class Program
           BodyStats: bodyStats,
           EndianStats: endianStats,
           IndexStats: indexStats,
+          LittleEndianIndexStats: littleEndianIndexStats,
           Float2Stats: float2Stats,
           Float3Stats: float3Stats,
           RotatedFloat2Stats: rotatedFloat2Stats,
@@ -9930,6 +10015,7 @@ internal static class Program
           BodyStats: bodyStats,
           EndianStats: endianStats,
           IndexStats: indexStats,
+          LittleEndianIndexStats: littleEndianIndexStats,
           Float2Stats: float2Stats,
           Float3Stats: float3Stats,
           RotatedFloat2Stats: rotatedFloat2Stats,
@@ -9939,6 +10025,7 @@ internal static class Program
     if (endianStats?.Classification == "big-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8)
     {
       indexMax = indexStats.BigEndianMaxIndex;
+      indexPairCount = indexStats.PairCount;
       evidence.Add($"big-endian uint16 lead, maxIndex={indexStats.BigEndianMaxIndex}, distinct={indexStats.BigEndianDistinctIndexCount}");
       if (indexStats.TriangleStripLessDegenerateThanTriples)
       {
@@ -9966,6 +10053,7 @@ internal static class Program
     if (endianStats?.Classification == "ambiguous-small-u16" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8 && indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.50)
     {
       indexMax = indexStats.BigEndianMaxIndex;
+      indexPairCount = indexStats.PairCount;
       evidence.Add($"ambiguous-small-u16 lead, maxIndex={indexStats.BigEndianMaxIndex}, distinct={indexStats.BigEndianDistinctIndexCount}");
       primaryRole = "index-u16be-lead";
       confidence = 55;
@@ -9973,14 +10061,20 @@ internal static class Program
       evidence.Add($"ambiguous endianness uint16 stream, triangle-aligned low-degenerate ({indexStats.DegenerateTriangleRatio:0.####})");
     }
 
-    if (endianStats?.Classification == "little-endian-u16-lead" && indexStats is not null && indexStats.BigEndianDistinctIndexCount >= 8 && indexStats.TriangleAligned && indexStats.DegenerateTriangleRatio <= 0.90 && primaryRole == "unknown-stream")
+    if (endianStats?.Classification == "little-endian-u16-lead" &&
+        littleEndianIndexStats is not null &&
+        littleEndianIndexStats.LittleEndianDistinctIndexCount >= 8 &&
+        littleEndianIndexStats.TriangleAligned &&
+        littleEndianIndexStats.DegenerateTriangleRatio <= 0.90 &&
+        primaryRole == "unknown-stream")
     {
-      indexMax = indexStats.BigEndianMaxIndex;
-      evidence.Add($"little-endian u16 lead, be-maxIndex={indexStats.BigEndianMaxIndex}, be-distinct={indexStats.BigEndianDistinctIndexCount}");
+      indexMax = littleEndianIndexStats.LittleEndianMaxIndex;
+      indexPairCount = littleEndianIndexStats.PairCount;
+      evidence.Add($"little-endian u16 lead, maxIndex={littleEndianIndexStats.LittleEndianMaxIndex}, distinct={littleEndianIndexStats.LittleEndianDistinctIndexCount}");
       primaryRole = "index-u16le-lead";
       confidence = 45;
       roleCandidates.Add(primaryRole);
-      evidence.Add($"little-endian uint16 lead with guards; low confidence ({indexStats.DegenerateTriangleRatio:0.####})");
+      evidence.Add($"little-endian uint16 lead with guards; low confidence ({littleEndianIndexStats.DegenerateTriangleRatio:0.####})");
     }
 
     if (float3Stats.VectorCount >= 3 && float3Stats.FiniteVectorRatio >= 0.95 && float3Stats.PlausibleValueRatio >= 0.95)
@@ -10077,10 +10171,11 @@ internal static class Program
         Evidence: evidence,
         VertexCountCandidates: vertexCountCandidates,
         IndexMax: indexMax,
-        IndexPairCount: indexStats?.PairCount,
+        IndexPairCount: indexPairCount,
         BodyStats: bodyStats,
         EndianStats: endianStats,
         IndexStats: indexStats,
+        LittleEndianIndexStats: littleEndianIndexStats,
         Float2Stats: float2Stats,
         Float3Stats: float3Stats,
         RotatedFloat2Stats: rotatedFloat2Stats,
@@ -15595,6 +15690,7 @@ internal sealed record NifMeshStreamRoleStats(
     NifStreamBodyStats? BodyStats,
     NifStreamEndianStats? EndianStats,
     NifUInt16BeIndexStats? IndexStats,
+    NifUInt16LeIndexStats? LittleEndianIndexStats,
     NifFloatVectorStats? Float2Stats,
     NifFloatVectorStats? Float3Stats,
     NifFloatVectorStats? RotatedFloat2Stats,
@@ -15611,6 +15707,7 @@ internal sealed record NifMeshStreamRoleStats(
       BodyStats: null,
       EndianStats: null,
       IndexStats: null,
+      LittleEndianIndexStats: null,
       Float2Stats: null,
       Float3Stats: null,
       RotatedFloat2Stats: null,
@@ -16046,6 +16143,23 @@ internal sealed record NifUInt16BeIndexStats(
     bool TriangleStripLessDegenerateThanTriples,
     List<ushort> FirstBigEndianIndices,
     List<NifUInt16Triple> FirstBigEndianTriples);
+
+internal sealed record NifUInt16LeIndexStats(
+    int PairCount,
+    bool TriangleAligned,
+    int TriangleCount,
+    ushort LittleEndianMinIndex,
+    ushort LittleEndianMaxIndex,
+    int LittleEndianDistinctIndexCount,
+    int DegenerateTriangles,
+    double DegenerateTriangleRatio,
+    int TriangleStripWindowCount,
+    int TriangleStripNonDegenerateWindowCount,
+    int TriangleStripDegenerateWindows,
+    double TriangleStripDegenerateRatio,
+    bool TriangleStripLessDegenerateThanTriples,
+    List<ushort> FirstLittleEndianIndices,
+    List<NifUInt16Triple> FirstLittleEndianTriples);
 
 internal sealed record NifReferenceSample(
     string ArchiveName,

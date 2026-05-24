@@ -210,6 +210,25 @@ public class BasicTests
   }
 
   [Fact]
+  public void NifMeshBoundStreamRole_UsesLittleEndianIndexMaxForLittleEndianLead()
+  {
+    var body = new byte[24 * 2];
+    for (var i = 0; i < 24; i++)
+    {
+      BinaryPrimitives.WriteUInt16LittleEndian(body.AsSpan(i * 2, 2), (ushort)i);
+    }
+
+    var stats = Program.AnalyzeNifMeshBoundStreamRole(body);
+
+    Assert.Equal("index-u16le-lead", stats.PrimaryRole);
+    Assert.Equal((ushort)23, stats.IndexMax);
+    Assert.Equal(24, stats.IndexPairCount);
+    Assert.NotNull(stats.LittleEndianIndexStats);
+    Assert.Equal((ushort)23, stats.LittleEndianIndexStats.LittleEndianMaxIndex);
+    Assert.True(stats.IndexStats?.BigEndianMaxIndex > stats.IndexMax);
+  }
+
+  [Fact]
   public void TwadArchiveHeader_MatchesClientGhidraProof()
   {
     var bytes = new byte[20 + 44];
