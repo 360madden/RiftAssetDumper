@@ -8,7 +8,7 @@ Milestones 1, 2, and 4 are complete:
 - Byte-level archive/header cross-check completed against copied and live archive headers.
 - Parser-facing test `TwadArchiveHeader_MatchesClientGhidraProof` added without changing production parser behavior.
 
-Milestone 3 is partially complete through the generic `ghidra-run` workflow command and tracked `scripts/ghidra/TwadSiteSurvey.java` template. A report summarizer remains optional future workflow hardening.
+Milestone 3 is partially complete through the generic `ghidra-run` workflow command and tracked `scripts/ghidra/FunctionSiteSurvey.java` template. A report summarizer remains optional future workflow hardening.
 
 ## Recommended goal
 

@@ -100,7 +100,7 @@ print("=== rift_workflow ghidra-run routing ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     project_dir = temp_path / "projects"
-    script_file = temp_path / "scripts" / "TwadSiteSurvey.java"
+    script_file = temp_path / "scripts" / "FunctionSiteSurvey.java"
     report_file = temp_path / "reports" / "twad.json"
     script_file.parent.mkdir()
     report_file.parent.mkdir()

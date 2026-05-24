@@ -1,4 +1,4 @@
-// Reusable Ghidra script. Writes static evidence for a TWAD compare site.
+// Reusable Ghidra script. Writes static evidence for a target function site.
 
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileResults;
@@ -20,12 +20,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TwadSiteSurvey extends GhidraScript {
+public class FunctionSiteSurvey extends GhidraScript {
     @Override
     protected void run() throws Exception {
         String[] args = getScriptArgs();
         if (args.length < 2) {
-            printerr("Usage: TwadSiteSurvey.java <target-address> <output-json>");
+            printerr("Usage: FunctionSiteSurvey.java <target-address> <output-json>");
             return;
         }
 
@@ -61,7 +61,7 @@ public class TwadSiteSurvey extends GhidraScript {
         } finally {
             writer.close();
         }
-        println("TwadSiteSurvey wrote: " + outFile.getAbsolutePath());
+        println("FunctionSiteSurvey wrote: " + outFile.getAbsolutePath());
     }
 
     private Map<String, Object> describeFunction(Function function) {

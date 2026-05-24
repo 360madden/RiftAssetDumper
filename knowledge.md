@@ -291,5 +291,5 @@ if config["tools"]["ghidra"]["installed"]:
 | Show installed tools status | `python scripts/rift_workflow.py tools-status` |
 | Verify Ghidra/JDK wiring without launching analysis | `python scripts/rift_workflow.py ghidra-dry-run` |
 | Dry-run a retained-project script rerun | `python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project` |
-| Run a retained-project Ghidra script | `python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/TwadSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json` |
+| Run a retained-project Ghidra script | `python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/FunctionSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json` |
 | First-pass full Ghidra import/analysis | Use `ghidra-run` with `--ghidra-import <binary>` and `--ghidra-timeout 14400`; keep projects under ignored `Exports/ghidra-projects/`. |
