@@ -49,3 +49,7 @@ git diff --check
 ## Remaining
 
 - Add future Ghidra promotion guards to this suite instead of relying on manual command lists.
+
+## Follow-up note
+
+- The shared review-report helper now reports the calling workflow in missing-input errors, so `ghidra-attribute-candidate-guard` and the guard suite no longer inherit the batch-probe command name in their error text.

@@ -176,6 +176,14 @@ with TemporaryDirectory() as temp_dir:
 
     check("workflow suite ran non-export guard", suite_calls.get("non_export"), True)
 
+with TemporaryDirectory() as temp_dir:
+    try:
+        rift_workflow._ensure_ghidra_attribute_candidate_report(Path(temp_dir), 100)
+        print("  FAIL: missing attribute report error context (no exception)")
+        failed += 1
+    except ValueError as exc:
+        check("missing attribute report error context", "Ghidra attribute candidate workflow" in str(exc), True)
+
 print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")

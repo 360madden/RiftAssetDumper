@@ -558,7 +558,11 @@ def _apply_mesh_probe_review_rank(args: argparse.Namespace) -> None:
     )
 
 
-def _ensure_ghidra_pairing_review_report(out_dir: Path, limit: int) -> Path:
+def _ensure_ghidra_pairing_review_report(
+    out_dir: Path,
+    limit: int,
+    consumer: str = "Ghidra pairing review workflow",
+) -> Path:
     """Return a Ghidra pairing review report, rebuilding it from inventory if needed."""
     review_path = out_dir / "ghidra-pairing-review-report.json"
     if review_path.exists():
@@ -567,7 +571,7 @@ def _ensure_ghidra_pairing_review_report(out_dir: Path, limit: int) -> Path:
     inventory_path = out_dir / "nif-mesh-binding-inventory.json"
     if not inventory_path.exists():
         raise ValueError(
-            "ghidra-review-rank-probes requires an existing "
+            f"{consumer} requires an existing "
             "ghidra-pairing-review-report.json or nif-mesh-binding-inventory.json.\n"
             f"  Expected report: {review_path}\n"
             f"  Expected inventory: {inventory_path}\n"
@@ -579,13 +583,17 @@ def _ensure_ghidra_pairing_review_report(out_dir: Path, limit: int) -> Path:
     return review_path
 
 
-def _ensure_ghidra_attribute_candidate_report(out_dir: Path, limit: int) -> Path:
+def _ensure_ghidra_attribute_candidate_report(
+    out_dir: Path,
+    limit: int,
+    consumer: str = "Ghidra attribute candidate workflow",
+) -> Path:
     """Return a grouped Ghidra attribute candidate report, rebuilding it if needed."""
     report_path = out_dir / "ghidra-attribute-candidate-report.json"
     if report_path.exists():
         return report_path
 
-    review_path = _ensure_ghidra_pairing_review_report(out_dir, limit)
+    review_path = _ensure_ghidra_pairing_review_report(out_dir, limit, consumer)
     ghidra_attribute_candidate_report(review_path, out_dir)
     return report_path
 
@@ -593,7 +601,7 @@ def _ensure_ghidra_attribute_candidate_report(out_dir: Path, limit: int) -> Path
 def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     """Batch-refresh ignored mesh-probe JSON for ranked Ghidra review findings."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
-    review_path = _ensure_ghidra_pairing_review_report(out_dir, args.limit)
+    review_path = _ensure_ghidra_pairing_review_report(out_dir, args.limit, "ghidra-review-rank-probes")
     report = load_json_report(str(review_path))
     findings = report.get("Findings")
     if not isinstance(findings, list):
