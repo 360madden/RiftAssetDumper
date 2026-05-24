@@ -9,6 +9,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+import jsonschema
+
 sys.path.insert(0, ".")
 
 from scripts import rift_workflow
@@ -135,6 +137,9 @@ with TemporaryDirectory() as temp_dir:
     check("missing report rebuilt from inventory", captured["mesh_block"], 25)
 
 print("=== ghidra-review-rank-probes ===")
+manifest_schema = json.loads(
+    Path("docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json").read_text(encoding="utf-8")
+)
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     out_dir = temp_path / "batch-exports"
@@ -199,6 +204,8 @@ with TemporaryDirectory() as temp_dir:
     check("batch manifest schema", manifest["SchemaVersion"], "ghidra-review-rank-probes-manifest/v1")
     check("batch manifest selected count", manifest["SelectedCount"], 2)
     check("batch manifest kind", manifest["ReviewKindFilter"], "ghidra-only")
+    jsonschema.validate(manifest, manifest_schema)
+    print("  PASS: batch manifest schema validation")
 
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -265,6 +272,8 @@ with TemporaryDirectory() as temp_dir:
     )
     check("vertex manifest kind", vertex_manifest["ReviewKindFilter"], "vertex-semantic-change")
     check("vertex manifest report limit", vertex_manifest["ReviewReportLimit"], 100)
+    jsonschema.validate(vertex_manifest, manifest_schema)
+    print("  PASS: vertex manifest schema validation")
 
 print(f"\n{'=' * 50}")
 if failed:

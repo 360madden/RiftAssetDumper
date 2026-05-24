@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-review-rank-probes-manifest-v1.schema.json",
+  "title": "Ghidra review-rank probe manifest v1",
+  "description": "Candidate-only manifest emitted by `python scripts/rift_workflow.py ghidra-review-rank-probes`. The manifest summarizes ignored focused probe outputs under Exports/ and must not be consumed by decoder/export behavior until separately promoted through proof guards.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "GeneratedAt",
+    "SourceReviewReport",
+    "ProbeRoot",
+    "ReviewKindFilter",
+    "SelectedCount",
+    "ReviewReportLimit",
+    "Results"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-review-rank-probes-manifest/v1" },
+    "CandidateOnly": { "const": true },
+    "GeneratedAt": {
+      "type": "string",
+      "description": "Local generation timestamp from the workflow runner."
+    },
+    "SourceReviewReport": {
+      "type": "string",
+      "description": "Path to the Ghidra pairing review report used as the batch source."
+    },
+    "ProbeRoot": {
+      "type": "string",
+      "description": "Ignored output root containing per-rank probe folders."
+    },
+    "ReviewKindFilter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "SelectedCount": { "$ref": "#/$defs/nonNegativeInteger" },
+    "ReviewReportLimit": { "$ref": "#/$defs/nonNegativeInteger" },
+    "Results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sampleIdPrefix": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "result": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "ReviewKind",
+        "SampleIdPrefix",
+        "SampleMeshBlockIndex",
+        "GhidraRoles",
+        "OutputJson"
+      ],
+      "properties": {
+        "Rank": { "$ref": "#/$defs/positiveInteger" },
+        "ReviewKind": { "type": "string" },
+        "SampleIdPrefix": { "$ref": "#/$defs/sampleIdPrefix" },
+        "SampleMeshBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "GhidraRoles": { "type": "string" },
+        "OutputJson": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

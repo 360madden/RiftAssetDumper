@@ -38,6 +38,7 @@ Exports/ghidra-review-rank-probes/
 
 - Probe manifests are generated evidence only.
 - Per-kind manifests use names such as `manifest-ghidra-only.json` and `manifest-vertex-semantic-change.json`; `manifest.json` remains the latest run pointer.
+- Manifest shape is locked by `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`.
 - They are ignored local output and must not be staged.
 - This does not change parser, decode, or export behavior.
 
