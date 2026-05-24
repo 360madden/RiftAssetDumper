@@ -49,6 +49,7 @@ $PSModeToKebab = @{
     'ToolsStatus' = 'tools-status'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'
+    'GhidraFunctionSiteSurvey' = 'ghidra-function-site-survey'
     'GhidraSummarize' = 'ghidra-summarize'
     'GhidraPairingNonExportGuard' = 'ghidra-pairing-non-export-guard'
     'GhidraPairingReviewReport' = 'ghidra-pairing-review-report'

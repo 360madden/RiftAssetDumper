@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import io
+import json
 import os
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -23,6 +26,15 @@ def check(desc: str, actual: Any, expected: Any) -> None:
         print(f"  PASS: {desc}")
     else:
         print(f"  FAIL: {desc}  expected={expected!r}  actual={actual!r}")
+        failed += 1
+
+
+def check_contains(desc: str, text: str, expected: str) -> None:
+    global failed
+    if expected in text:
+        print(f"  PASS: {desc}")
+    else:
+        print(f"  FAIL: {desc}  missing={expected!r}")
         failed += 1
 
 
@@ -148,6 +160,90 @@ with TemporaryDirectory() as temp_dir:
     check("workflow no-analysis forwarded", captured["analyze"], False)
     check("workflow keep-project forwarded", captured["delete_project"], False)
     check("workflow timeout forwarded", captured["timeout_seconds"], 14400)
+
+print("=== rift_workflow ghidra-function-site-survey routing ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    script_file = temp_path / "FunctionSiteSurvey.java"
+    report_file = temp_path / "reports" / "target.json"
+    summary_file = temp_path / "reports" / "target.md"
+    targets_file = temp_path / "targets.json"
+    script_file.write_text("// test\n", encoding="utf-8")
+    targets_file.write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-function-site-targets/v1",
+                "CandidateOnly": True,
+                "DefaultProjectName": "RiftAnchorSurvey",
+                "DefaultProcess": "rift_x64.exe",
+                "DefaultScript": str(script_file),
+                "DefaultNoAnalysis": True,
+                "DefaultKeepProject": True,
+                "DefaultTimeoutSeconds": 900,
+                "Targets": [
+                    {
+                        "Key": "test-target",
+                        "Address": "0x141186980",
+                        "ReportPath": str(report_file),
+                        "SummaryPath": str(summary_file),
+                        "SummaryTerms": ["NiDataStream", "LoadBinary"],
+                        "Description": "test target",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    dry_run_argv = [
+        "rift_workflow.py",
+        "ghidra-function-site-survey",
+        "--ghidra-targets-file",
+        str(targets_file),
+        "--ghidra-target",
+        "test-target",
+    ]
+    dry_run_output = io.StringIO()
+    with (
+        patch.object(sys, "argv", dry_run_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(dry_run_output),
+    ):
+        rift_workflow.main()
+    dry_run_text = dry_run_output.getvalue()
+    check_contains("function survey dry-run target", dry_run_text, "GhidraFunctionSiteSurvey target: test-target")
+    check_contains("function survey dry-run run command", dry_run_text, "ghidra-run")
+    check_contains("function survey dry-run summary command", dry_run_text, "ghidra-summarize")
+
+    captured_run: dict[str, Any] = {}
+    captured_summary: dict[str, Any] = {}
+
+    def fake_function_site_run(**kwargs: Any) -> subprocess.CompletedProcess[str]:
+        captured_run.update(kwargs)
+        return subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+
+    def fake_summarize_file(input_path: str, **kwargs: Any) -> str:
+        captured_summary["input_path"] = input_path
+        captured_summary.update(kwargs)
+        return "# summary\n"
+
+    execute_argv = dry_run_argv + ["--ghidra-execute"]
+    with (
+        patch.object(sys, "argv", execute_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.ghidra_runner.run_ghidra_headless", side_effect=fake_function_site_run),
+        patch("scripts.ghidra_report_summary.summarize_file", side_effect=fake_summarize_file),
+    ):
+        rift_workflow.main()
+
+    check("function survey process forwarded", captured_run["process_path"], "rift_x64.exe")
+    check("function survey script forwarded", captured_run["script"], str(script_file))
+    check("function survey args forwarded", captured_run["script_args"], ["0x141186980", str(report_file)])
+    check("function survey default no-analysis", captured_run["analyze"], False)
+    check("function survey default keep-project", captured_run["delete_project"], False)
+    check("function survey summary input", captured_summary["input_path"], str(report_file))
+    check("function survey summary output", captured_summary["output_path"], str(summary_file))
+    check("function survey terms", captured_summary["terms"], ["NiDataStream", "LoadBinary"])
 
 print(f"\n{'=' * 50}")
 if failed:

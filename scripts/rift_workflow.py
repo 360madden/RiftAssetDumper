@@ -49,6 +49,7 @@ Commands (kebab-case):
     tools-status                 — show configured third-party reverse-engineering tools
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
+    ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-layout          — read-only NiDataStream layout report/validator
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
@@ -287,6 +288,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-function-site-survey": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-summarize": {
         "dotnet": "",
         "base": "",
@@ -344,6 +349,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ToolsStatus": "tools-status",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
+    "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
@@ -895,6 +901,149 @@ def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
     print("\nGhidra headless completed successfully.")
 
 
+def _as_string_list(value: Any) -> list[str]:
+    """Return a JSON value as a string list."""
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _load_ghidra_function_site_targets(path: Path) -> dict[str, Any]:
+    """Load the tracked FunctionSiteSurvey target registry."""
+    if not path.exists():
+        print(f"ERROR: Ghidra FunctionSiteSurvey target registry not found: {path}", file=sys.stderr)
+        sys.exit(1)
+    data = load_json_report(str(path))
+    targets = data.get("Targets")
+    if not isinstance(targets, list):
+        print(f"ERROR: Ghidra FunctionSiteSurvey target registry has no Targets array: {path}", file=sys.stderr)
+        sys.exit(1)
+    return data
+
+
+def _print_ghidra_function_site_targets(registry: dict[str, Any]) -> None:
+    """Print available FunctionSiteSurvey targets."""
+    print("Available Ghidra FunctionSiteSurvey targets:")
+    for target in registry.get("Targets", []):
+        if not isinstance(target, dict):
+            continue
+        print(f"  {target.get('Key', '-'):32} {target.get('Address', '-'):14} {target.get('Description', '-')}")
+
+
+def _run_ghidra_function_site_survey(args: argparse.Namespace) -> None:
+    """Run or print a serialized Ghidra FunctionSiteSurvey target from the registry."""
+    registry_path = Path(args.ghidra_targets_file) if args.ghidra_targets_file else REPO_ROOT / "docs" / "ghidra-function-site-targets.json"
+    registry = _load_ghidra_function_site_targets(registry_path)
+    target_key = str(args.ghidra_target or "")
+    if not target_key:
+        _print_ghidra_function_site_targets(registry)
+        print("\nUse --ghidra-target <key> to print commands, or add --ghidra-execute to run one serialized target.")
+        return
+
+    targets = [target for target in registry["Targets"] if isinstance(target, dict)]
+    target = next((item for item in targets if str(item.get("Key", "")) == target_key), None)
+    if target is None:
+        print(f"ERROR: unknown Ghidra FunctionSiteSurvey target: {target_key}", file=sys.stderr)
+        _print_ghidra_function_site_targets(registry)
+        sys.exit(1)
+
+    project_name = (
+        args.ghidra_project_name
+        if args.ghidra_project_name != "TempProject"
+        else str(registry.get("DefaultProjectName", args.ghidra_project_name))
+    )
+    process_path = args.ghidra_process or str(registry.get("DefaultProcess", "rift_x64.exe"))
+    script = args.ghidra_script or str(registry.get("DefaultScript", "scripts/ghidra/FunctionSiteSurvey.java"))
+    timeout_seconds = args.ghidra_timeout or int(registry.get("DefaultTimeoutSeconds", 900))
+    analyze = not (args.ghidra_no_analysis or bool(registry.get("DefaultNoAnalysis", False)))
+    keep_project = args.ghidra_keep_project or bool(registry.get("DefaultKeepProject", False))
+    project_dir = _ghidra_project_dir_arg(args)
+    address = str(target.get("Address", ""))
+    report_path = str(target.get("ReportPath", ""))
+    summary_path = str(target.get("SummaryPath", ""))
+    terms = _as_string_list(target.get("SummaryTerms"))
+    if not address or not report_path:
+        print(f"ERROR: target {target_key} must define Address and ReportPath.", file=sys.stderr)
+        sys.exit(1)
+
+    run_command = [
+        "python",
+        "scripts/rift_workflow.py",
+        "ghidra-run",
+        "--ghidra-project-name",
+        project_name,
+        "--ghidra-process",
+        process_path,
+        "--ghidra-timeout",
+        str(timeout_seconds),
+        "--ghidra-script",
+        script,
+        "--ghidra-script-arg",
+        address,
+        "--ghidra-script-arg",
+        report_path,
+    ]
+    if not analyze:
+        run_command.append("--ghidra-no-analysis")
+    if keep_project:
+        run_command.append("--ghidra-keep-project")
+
+    summarize_command = [
+        "python",
+        "scripts/rift_workflow.py",
+        "ghidra-summarize",
+        "--ghidra-report",
+        report_path,
+    ]
+    if summary_path:
+        summarize_command += ["--ghidra-summary-out", summary_path]
+    for term in terms:
+        summarize_command += ["--ghidra-summary-term", term]
+
+    print(f"GhidraFunctionSiteSurvey target: {target_key}")
+    print(f"Description: {target.get('Description', '-')}")
+    print(f"Address: {address}")
+    print(f"Report: {report_path}")
+    if summary_path:
+        print(f"Summary: {summary_path}")
+    print("\nRun command:")
+    print(" ".join(run_command))
+    print("\nSummary command:")
+    print(" ".join(summarize_command))
+
+    if not args.ghidra_execute:
+        print("\nDry-run only. Add --ghidra-execute to run this serialized target.")
+        return
+
+    from scripts.ghidra_report_summary import summarize_file
+    from scripts.ghidra_runner import run_ghidra_headless
+
+    report_file = Path(report_path)
+    report_file.parent.mkdir(parents=True, exist_ok=True)
+    if summary_path:
+        Path(summary_path).parent.mkdir(parents=True, exist_ok=True)
+    result = run_ghidra_headless(
+        project_dir=project_dir,
+        project_name=project_name,
+        process_path=process_path,
+        script=script,
+        script_args=[address, report_path],
+        analyze=analyze,
+        delete_project=not keep_project,
+        timeout_seconds=timeout_seconds,
+    )
+    _print_ghidra_result(result)
+    summarize_file(
+        report_path,
+        output_path=summary_path or None,
+        terms=terms,
+        max_items=args.ghidra_summary_max_items,
+        max_matches=args.ghidra_summary_max_matches,
+    )
+    if summary_path:
+        print(f"Wrote Ghidra summary: {summary_path}")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -990,6 +1139,10 @@ def _run_command(args: argparse.Namespace) -> None:
             timeout_seconds=args.ghidra_timeout,
         )
         _print_ghidra_result(result)
+        return
+
+    if command == "ghidra-function-site-survey":
+        _run_ghidra_function_site_survey(args)
         return
 
     if command == "ghidra-summarize":
@@ -2324,6 +2477,7 @@ Examples:
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
+  python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
@@ -2515,6 +2669,21 @@ Examples:
         type=int,
         default=900,
         help="Max seconds to wait for Ghidra (default: 900; use 14400 for full first-pass analysis)",
+    )
+    parser.add_argument(
+        "--ghidra-target",
+        default="",
+        help="Named FunctionSiteSurvey target from docs/ghidra-function-site-targets.json",
+    )
+    parser.add_argument(
+        "--ghidra-targets-file",
+        default="",
+        help="Optional FunctionSiteSurvey target registry override",
+    )
+    parser.add_argument(
+        "--ghidra-execute",
+        action="store_true",
+        help="Run a named ghidra-function-site-survey target; without this flag the command prints a dry-run plan",
     )
     parser.add_argument(
         "--ghidra-report",

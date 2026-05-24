@@ -65,6 +65,7 @@ python scripts/rift_workflow.py tools-status
 python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
 python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/FunctionSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -87,7 +88,7 @@ Current durable Ghidra truth:
 
 Keep Ghidra projects, reports, and one-off scripts under ignored `Exports/ghidra-*`. Prefer Java Ghidra scripts for this lane unless a future validation proves Python/Jython scripts work in the current headless launch mode.
 
-`scripts/ghidra/FunctionSiteSurvey.java` emits the current reusable function-site JSON shape; `docs/schemas/ghidra-function-site-survey-v1.schema.json` documents that generated report contract. Use `ghidra-summarize` for reviewable Markdown summaries instead of committing raw `Exports/ghidra-reports/*.json`.
+`scripts/ghidra/FunctionSiteSurvey.java` emits the current reusable function-site JSON shape; `docs/schemas/ghidra-function-site-survey-v1.schema.json` documents that generated report contract. Reusable target definitions live in `docs/ghidra-function-site-targets.json`; use `ghidra-function-site-survey --ghidra-target <key>` to print serialized rerun/summarize commands, and add `--ghidra-execute` only when intentionally running one target against the retained project. Use `ghidra-summarize` for reviewable Markdown summaries instead of committing raw `Exports/ghidra-reports/*.json`.
 
 Use `nidatastream-layout` as the read-only bridge between Ghidra's `NiDataStream::LoadBinary()` evidence and copied/extracted NIF samples. It checks descriptor prefix bytes, declared payload bytes, and trailing flag bytes without changing decoder/export behavior.
 

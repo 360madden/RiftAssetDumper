@@ -86,6 +86,7 @@ python scripts/rift_workflow.py tools-status
 python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
 python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/FunctionSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -104,7 +105,7 @@ Prefer Java Ghidra scripts in this lane. Ghidra 12.1 headless did not run `.py` 
 
 Run retained-project Ghidra jobs serially. Parallel `ghidra-run` calls against the same project can fail on the Ghidra project lock.
 
-For `FunctionSiteSurvey.java` reports, use `ghidra-summarize` to produce a small Markdown review. The generated JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
+For `FunctionSiteSurvey.java` reports, use `ghidra-function-site-survey --ghidra-target <key>` with targets from `docs/ghidra-function-site-targets.json` to print serialized rerun/summarize commands. Add `--ghidra-execute` only when intentionally running one target against the retained project. Use `ghidra-summarize` to produce a small Markdown review. The generated JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
 
@@ -137,6 +138,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra review-rank probe manifest schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-manifest-schema.md`
 - Ghidra review-rank probe summary wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary.md`
 - Ghidra review-rank probe summary schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary-schema.md`
+- Ghidra FunctionSiteSurvey target registry wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-registry.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
