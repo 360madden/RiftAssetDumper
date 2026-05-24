@@ -229,6 +229,16 @@ public class BasicTests
   }
 
   [Fact]
+  public void NifMeshRoleSemanticClass_GroupsReviewRoles()
+  {
+    Assert.Equal("position", Program.GetNifMeshRoleSemanticClass("position-float3-lead"));
+    Assert.Equal("normal", Program.GetNifMeshRoleSemanticClass("normal-float3-ror1-lead"));
+    Assert.Equal("uv", Program.GetNifMeshRoleSemanticClass("uv-float2-ror1-lead"));
+    Assert.Equal("index", Program.GetNifMeshRoleSemanticClass("index-u16le-lead"));
+    Assert.Equal("missing", Program.GetNifMeshRoleSemanticClass(null));
+  }
+
+  [Fact]
   public void TwadArchiveHeader_MatchesClientGhidraProof()
   {
     var bytes = new byte[20 + 44];

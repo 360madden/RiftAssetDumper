@@ -88,6 +88,23 @@ with TemporaryDirectory() as temp_dir:
                         "AverageGhidraConfidence": 45,
                     }
                 ],
+                "TopGhidraPairingReviewFindings": [
+                    {
+                        "ReviewKind": "vertex-semantic-change",
+                        "Priority": 2,
+                        "MeshSize": 301,
+                        "Count": 7,
+                        "LegacyIndexRole": "index-u16be-strip-lead",
+                        "LegacyVertexRole": "uv-float2-ror1-lead",
+                        "LegacyVertexSemanticClass": "uv",
+                        "GhidraIndexRole": "index-u16le-lead",
+                        "GhidraVertexRole": "position-float3-lead",
+                        "GhidraVertexSemanticClass": "position",
+                        "AverageLegacyConfidence": 89.75,
+                        "AverageGhidraConfidence": 54.75,
+                        "AverageConfidenceDelta": -35,
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -106,6 +123,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra pairing roles", text, "index-u16le-lead->vertex[usage=1 access=19] normal-float3-lead")
     check_contains("ghidra comparison heading", text, "Top Ghidra pairing comparisons")
     check_contains("ghidra comparison roles", text, "shared meshSize=325 count=2 legacy=index-u16be-strip-lead->normal-float3-ror1-lead ghidra=index-u16le-lead->normal-float3-lead")
+    check_contains("ghidra review heading", text, "Top Ghidra pairing review findings")
+    check_contains("ghidra review roles", text, "vertex-semantic-change p=2 meshSize=301 count=7 legacy=index-u16be-strip-lead->uv-float2-ror1-lead(uv) ghidra=index-u16le-lead->position-float3-lead(position)")
 
     no_delta_path = Path(temp_dir) / "mesh-bindings-no-deltas.json"
     no_delta_path.write_text(

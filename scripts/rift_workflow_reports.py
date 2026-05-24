@@ -434,6 +434,32 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
             )
         )
 
+    top_ghidra_pairing_review_findings = report.get("TopGhidraPairingReviewFindings")
+    if top_ghidra_pairing_review_findings and isinstance(
+        top_ghidra_pairing_review_findings, list
+    ):
+        print(
+            "Top Ghidra pairing review findings: "
+            + top_text(
+                top_ghidra_pairing_review_findings,
+                lambda g: (
+                    f"{json_value_or_dash(g, 'ReviewKind')} "
+                    f"p={json_value_or_dash(g, 'Priority')} "
+                    f"meshSize={json_value_or_dash(g, 'MeshSize')} "
+                    f"count={json_value_or_dash(g, 'Count')} "
+                    f"legacy={json_value_or_dash(g, 'LegacyIndexRole')}->"
+                    f"{json_value_or_dash(g, 'LegacyVertexRole')}"
+                    f"({json_value_or_dash(g, 'LegacyVertexSemanticClass')}) "
+                    f"ghidra={json_value_or_dash(g, 'GhidraIndexRole')}->"
+                    f"{json_value_or_dash(g, 'GhidraVertexRole')}"
+                    f"({json_value_or_dash(g, 'GhidraVertexSemanticClass')}) "
+                    f"c={json_value_or_dash(g, 'AverageLegacyConfidence')}->"
+                    f"{json_value_or_dash(g, 'AverageGhidraConfidence')} "
+                    f"delta={json_value_or_dash(g, 'AverageConfidenceDelta')}"
+                ),
+            )
+        )
+
     top_attr_sets = report.get("TopAttributeSets")
     if top_attr_sets and isinstance(top_attr_sets, list):
         print(

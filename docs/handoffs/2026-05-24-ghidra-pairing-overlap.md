@@ -76,7 +76,7 @@ The Ghidra-only delta is small (`64` links), but it is not automatically promota
 
 - No export, OBJ, or guard behavior consumes Ghidra pairings.
 - No promotable whitelist exists for Ghidra role transitions.
-- No focused sample-probe command yet ranks the `64` Ghidra-only links.
+- Focused ranking for the `64` Ghidra-only links is now wired in `TopGhidraPairingReviewFindings`; no focused single-sample probe command exists yet.
 - Attribute-set logic still uses legacy/default roles.
 
 ## Recommended next milestone
@@ -87,3 +87,5 @@ Add a candidate-only review report for Ghidra-only pairings and suspicious share
 - rank shared rows where vertex semantic class changes,
 - include samples with stream offsets, first bytes, usage/access, and confidence deltas,
 - keep output under ignored `Exports/` and do not modify export behavior.
+
+Completed in follow-up: `docs/handoffs/2026-05-24-ghidra-pairing-review.md`.
