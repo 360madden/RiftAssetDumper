@@ -82,6 +82,8 @@ Current durable Ghidra truth:
 
 - `docs/handoffs/2026-05-24-ghidra-anchor-survey.md` — retained `rift_x64.exe` anchor survey and NIF/NiDataStream/NiMesh leads.
 - `docs/handoffs/2026-05-24-twad-ghidra-proof.md` — `TWAD` proven as archive file/header magic; no parser behavior change recommended.
+- `docs/ghidra-function-site-targets.json` — serialized retained-project `FunctionSiteSurvey` targets for rerunnable Ghidra evidence.
+- `docs/ghidra-nidatastream-parser-field-comparison.md` — current NiDataStream parser-field comparison; keeps Ghidra-aligned layout evidence report-only.
 - `docs/ai-driven-workflow.md` — validation gate, generated-output hygiene, and Ghidra lane rules.
 - `.github/workflows/ci.yml` — CI runs all offline `scripts/test_*.py` workflow smoke tests, including Ghidra command wiring.
 - `.tools.json` — local Ghidra/JDK registry; installed tools live outside the repo.
