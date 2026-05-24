@@ -42,6 +42,8 @@ Commands (kebab-case):
     tools-status                 — show configured third-party reverse-engineering tools
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
+    ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
+    nidatastream-layout          — read-only NiDataStream layout report/validator
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
 
@@ -246,6 +248,14 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-summarize": {
+        "dotnet": "",
+        "base": "",
+    },
+    "nidatastream-layout": {
+        "dotnet": "",
+        "base": "nidatastream-layout-report",
+    },
     "discovery-suite": {
         "dotnet": "",
         "base": "",
@@ -288,6 +298,8 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ToolsStatus": "tools-status",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
+    "GhidraSummarize": "ghidra-summarize",
+    "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
     "All": "all",
 }
@@ -478,6 +490,46 @@ def _run_command(args: argparse.Namespace) -> None:
             timeout_seconds=args.ghidra_timeout,
         )
         _print_ghidra_result(result)
+        return
+
+    if command == "ghidra-summarize":
+        if not args.ghidra_report:
+            print("ERROR: ghidra-summarize requires --ghidra-report <FunctionSiteSurvey.json>", file=sys.stderr)
+            sys.exit(1)
+
+        from scripts.ghidra_report_summary import summarize_file
+
+        markdown = summarize_file(
+            args.ghidra_report,
+            output_path=args.ghidra_summary_out or None,
+            terms=args.ghidra_summary_term,
+            max_items=args.ghidra_summary_max_items,
+            max_matches=args.ghidra_summary_max_matches,
+        )
+        if args.ghidra_summary_out:
+            print(f"Wrote Ghidra summary: {args.ghidra_summary_out}")
+        else:
+            print(markdown, end="")
+        return
+
+    if command == "nidatastream-layout":
+        from scripts.nidatastream_layout_report import build_report, write_report
+
+        scan_root = Path(args.root) if args.root else REPO_ROOT / "Extracted"
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        max_files = None if args.full else args.limit
+        report = build_report(scan_root, max_files=max_files, sample_limit=50)
+        json_path, markdown_path = write_report(report, out_dir)
+        print(
+            "NiDataStreamLayout: "
+            f"files={report['FilesScanned']} parsed={report['FilesParsed']} "
+            f"blocks={report['NiDataStreamBlocks']} "
+            f"ghidraStyleValid={report['GhidraStyleLayoutValidBlocks']} "
+            f"legacyOffsetShifted={report['LegacyOffsetShiftedBlocks']}"
+        )
+        print(f"NiDataStreamLayout JSON: {json_path}")
+        print(f"NiDataStreamLayout markdown: {markdown_path}")
+        print("NiDataStreamLayout passed: report is candidate-only/read-only; decoder behavior was not changed.")
         return
 
     if command == "position-gap-report":
@@ -1726,6 +1778,8 @@ Examples:
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
+  python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+  python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
         """,
     )
     parser.add_argument(
@@ -1890,6 +1944,34 @@ Examples:
         type=int,
         default=900,
         help="Max seconds to wait for Ghidra (default: 900; use 14400 for full first-pass analysis)",
+    )
+    parser.add_argument(
+        "--ghidra-report",
+        default="",
+        help="FunctionSiteSurvey JSON report for ghidra-summarize",
+    )
+    parser.add_argument(
+        "--ghidra-summary-out",
+        default="",
+        help="Optional Markdown output path for ghidra-summarize",
+    )
+    parser.add_argument(
+        "--ghidra-summary-term",
+        action="append",
+        default=[],
+        help="Decompile term to show in ghidra-summarize; repeat for multiple terms",
+    )
+    parser.add_argument(
+        "--ghidra-summary-max-items",
+        type=int,
+        default=8,
+        help="Max rows per ghidra-summarize reference table (default: 8)",
+    )
+    parser.add_argument(
+        "--ghidra-summary-max-matches",
+        type=int,
+        default=12,
+        help="Max decompile matches for ghidra-summarize (default: 12)",
     )
 
     args = parser.parse_args()

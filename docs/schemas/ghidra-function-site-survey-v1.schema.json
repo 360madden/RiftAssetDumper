@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/ghidra-function-site-survey-v1.schema.json",
+  "title": "Ghidra FunctionSiteSurvey report",
+  "description": "Schema for reports produced by scripts/ghidra/FunctionSiteSurvey.java. These reports are static-analysis evidence only and are expected to be generated under ignored Exports/ paths.",
+  "type": "object",
+  "required": [
+    "targetAddress",
+    "programName",
+    "imageBase"
+  ],
+  "properties": {
+    "targetAddress": {
+      "type": "string"
+    },
+    "programName": {
+      "type": "string"
+    },
+    "imageBase": {
+      "type": "string"
+    },
+    "function": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "name",
+            "entry",
+            "signature",
+            "bodyMin",
+            "bodyMax",
+            "bodyNumAddresses",
+            "parameterCount",
+            "returnType"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "entry": {
+              "type": "string"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "bodyMin": {
+              "type": "string"
+            },
+            "bodyMax": {
+              "type": "string"
+            },
+            "bodyNumAddresses": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parameterCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "returnType": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "instructionsNearTarget": {
+      "$ref": "#/$defs/instructionList"
+    },
+    "functionInstructions": {
+      "$ref": "#/$defs/instructionList"
+    },
+    "callers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/callerRef"
+      }
+    },
+    "callsFromFunction": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/callRef"
+      }
+    },
+    "dataRefsFromFunction": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataRef"
+      }
+    },
+    "decompile": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        },
+        "errorMessage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "c": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "instructionList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/instruction"
+      }
+    },
+    "instruction": {
+      "type": "object",
+      "required": [
+        "address",
+        "target",
+        "mnemonic",
+        "opStr",
+        "bytes",
+        "refsFrom"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "target": {
+          "type": "boolean"
+        },
+        "mnemonic": {
+          "type": "string"
+        },
+        "opStr": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "string"
+        },
+        "refsFrom": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dataRef"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "callerRef": {
+      "type": "object",
+      "required": [
+        "from",
+        "type"
+      ],
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "caller": {
+          "type": "string"
+        },
+        "callerEntry": {
+          "type": "string"
+        },
+        "callerSignature": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "callRef": {
+      "type": "object",
+      "required": [
+        "from",
+        "type"
+      ],
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": "string"
+        },
+        "callee": {
+          "type": "string"
+        },
+        "calleeEntry": {
+          "type": "string"
+        },
+        "calleeSignature": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "dataRef": {
+      "type": "object",
+      "required": [
+        "from",
+        "type"
+      ],
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": "string"
+        },
+        "toFunction": {
+          "type": "string"
+        },
+        "toFunctionEntry": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

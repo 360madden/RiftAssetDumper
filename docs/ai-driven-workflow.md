@@ -84,6 +84,8 @@ Use the repo workflow surface first:
 python scripts/rift_workflow.py tools-status
 python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
 python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/FunctionSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
+python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 ```
 
 Use `--ghidra-timeout 14400` for a first-pass full import/auto-analysis of `rift_x64.exe`; use shorter script-only reruns against a retained project when possible. Call `scripts/ghidra_runner.py` directly only when debugging the lower-level wrapper itself.
@@ -92,13 +94,18 @@ Prefer Java Ghidra scripts in this lane. Ghidra 12.1 headless did not run `.py` 
 
 Run retained-project Ghidra jobs serially. Parallel `ghidra-run` calls against the same project can fail on the Ghidra project lock.
 
+For `FunctionSiteSurvey.java` reports, use `ghidra-summarize` to produce a small Markdown review. The generated JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
+
+For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
+
 ## Current Ghidra lane state
 
 - Anchor survey complete: `docs/handoffs/2026-05-24-ghidra-anchor-survey.md`
 - TWAD proof complete: `docs/handoffs/2026-05-24-twad-ghidra-proof.md`
 - NiDataStream/NiMesh proof started: `docs/handoffs/2026-05-24-nidatastream-ghidra-proof.md`
+- NiDataStream layout mismatch documented: `docs/handoffs/2026-05-24-nidatastream-layout-mismatch.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
-- Parser behavior should remain unchanged unless a separate small warning/test gap is identified.
+- Parser behavior should remain unchanged until the `PayloadPrefixBytes=28`, declared payload, and trailing-flag evidence is converted into a small guarded decoder patch with report/test migration.
 - Next safe Ghidra target: either a tiny unsupported-TWAD-version warning/test review or the `NiDataStream` / `NiMesh` leads from the anchor survey.

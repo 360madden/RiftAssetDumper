@@ -46,6 +46,11 @@ $PSModeToKebab = @{
     'IndexCandidates' = 'index-candidates'
     'StreamEndianness' = 'stream-endianness'
     'StreamBodies' = 'stream-bodies'
+    'ToolsStatus' = 'tools-status'
+    'GhidraDryRun' = 'ghidra-dry-run'
+    'GhidraRun' = 'ghidra-run'
+    'GhidraSummarize' = 'ghidra-summarize'
+    'NiDataStreamLayout' = 'nidatastream-layout'
     'All' = 'all'
 }
 
