@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-attribute-candidate-v1.schema.json",
+  "title": "Ghidra attribute candidate report v1",
+  "description": "Candidate-only grouped triage report emitted by `python scripts/rift_workflow.py ghidra-attribute-candidate-report`. The report is generated under ignored Exports/ paths and must not be consumed by decoder/export behavior until separately promoted through proof guards.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "SourceReviewReport",
+    "RankProbeRoot",
+    "Summary",
+    "Groups",
+    "EvidenceRows"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-attribute-candidate-report/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReviewReport": {
+      "type": "string",
+      "description": "Path to the Ghidra pairing review report used as the source. Generated reports should remain ignored/local."
+    },
+    "RankProbeRoot": {
+      "type": "string",
+      "description": "Path to ignored focused mesh-probe outputs used to enrich review rows."
+    },
+    "Summary": { "$ref": "#/$defs/summary" },
+    "Groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateGroup" }
+    },
+    "EvidenceRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceRow" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sampleIdPrefix": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "dashOrBoolean": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "const": "-" }
+      ]
+    },
+    "dashOrNumber": {
+      "oneOf": [
+        { "type": "number" },
+        { "const": "-" }
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "GhidraOnlyGroups",
+        "GhidraOnlyPairingsCovered",
+        "GroupedSampleMeshes",
+        "CompletePositionNormalUvCandidateGroups",
+        "ProbeBackedRanks",
+        "PositionReviewPassGroups",
+        "NormalReviewPassGroups",
+        "UvReviewPassGroups",
+        "UvReviewFailGroups",
+        "RejectedNoiseGroups"
+      ],
+      "properties": {
+        "GhidraOnlyGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "GhidraOnlyPairingsCovered": { "$ref": "#/$defs/nonNegativeInteger" },
+        "GroupedSampleMeshes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "CompletePositionNormalUvCandidateGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ProbeBackedRanks": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionReviewPassGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "NormalReviewPassGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "UvReviewPassGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "UvReviewFailGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "RejectedNoiseGroups": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRow": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "Count",
+        "SampleIdPrefix",
+        "SampleMeshBlockIndex",
+        "GhidraRoles",
+        "GhidraVertexSemanticClass",
+        "ProbeBacked",
+        "ReviewPresent",
+        "PassesBasicReview",
+        "MetricName",
+        "MetricValue",
+        "MissReasons"
+      ],
+      "properties": {
+        "Rank": { "$ref": "#/$defs/positiveInteger" },
+        "Count": { "$ref": "#/$defs/nonNegativeInteger" },
+        "SampleIdPrefix": { "$ref": "#/$defs/sampleIdPrefix" },
+        "SampleMeshBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "GhidraRoles": { "type": "string" },
+        "GhidraVertexSemanticClass": { "type": "string" },
+        "ProbeBacked": { "type": "boolean" },
+        "ReviewPresent": { "type": "boolean" },
+        "PassesBasicReview": { "$ref": "#/$defs/dashOrBoolean" },
+        "MetricName": { "type": "string" },
+        "MetricValue": { "$ref": "#/$defs/dashOrNumber" },
+        "MissReasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidateGroup": {
+      "type": "object",
+      "required": [
+        "SampleIdPrefix",
+        "SampleMeshBlockIndex",
+        "Ranks",
+        "TotalCount",
+        "Semantics",
+        "Evidence",
+        "HasPosition",
+        "HasNormal",
+        "HasUv",
+        "HasRejectedNoise",
+        "CompletePositionNormalUvCandidate",
+        "InitialDecision"
+      ],
+      "properties": {
+        "SampleIdPrefix": { "$ref": "#/$defs/sampleIdPrefix" },
+        "SampleMeshBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Ranks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/positiveInteger" }
+        },
+        "TotalCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Semantics": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "Evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRow" }
+        },
+        "HasPosition": { "type": "boolean" },
+        "HasNormal": { "type": "boolean" },
+        "HasUv": { "type": "boolean" },
+        "HasRejectedNoise": { "type": "boolean" },
+        "CompletePositionNormalUvCandidate": { "type": "boolean" },
+        "InitialDecision": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

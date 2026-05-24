@@ -272,6 +272,14 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra attribute report candidate-only", str(attr_report.get("CandidateOnly")), "True")
     check_contains("ghidra attribute report complete group", json.dumps(attr_report), "CompletePositionNormalUvCandidate")
     check_contains("ghidra attribute markdown", attr_md.read_text(encoding="utf-8"), "Complete position/normal/UV")
+    attr_schema = json.loads(Path("docs/schemas/ghidra-attribute-candidate-v1.schema.json").read_text(encoding="utf-8"))
+    check_contains(
+        "ghidra attribute schema version",
+        str(attr_schema["properties"]["SchemaVersion"]["const"]),
+        str(attr_report["SchemaVersion"]),
+    )
+    check_contains("ghidra attribute schema groups", json.dumps(attr_schema.get("required", [])), "Groups")
+    check_contains("ghidra attribute schema completion marker", json.dumps(attr_schema), "CompletePositionNormalUvCandidate")
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:
