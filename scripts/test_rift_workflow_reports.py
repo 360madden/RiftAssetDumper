@@ -11,7 +11,11 @@ from tempfile import TemporaryDirectory
 
 sys.path.insert(0, ".")
 
-from scripts.rift_workflow_reports import ghidra_pairing_review_report, show_report_summary
+from scripts.rift_workflow_reports import (
+    ghidra_attribute_candidate_report,
+    ghidra_pairing_review_report,
+    show_report_summary,
+)
 
 failed = 0
 
@@ -186,6 +190,88 @@ with TemporaryDirectory() as temp_dir:
         str(schema["properties"]["SchemaVersion"]["const"]),
         str(review_report["SchemaVersion"]),
     )
+
+    print("=== Ghidra attribute candidate report ===")
+    attr_review_path = Path(temp_dir) / "ghidra-pairing-review-report.json"
+    attr_id = "def456def456abcd"
+    attr_findings = [
+        {
+            "Rank": 1,
+            "CandidateOnly": True,
+            "ReviewKind": "ghidra-only",
+            "Count": 2,
+            "SampleIdPrefix": attr_id,
+            "SampleMeshBlockIndex": 6,
+            "SampleIndexOffset": 24,
+            "SampleVertexOffset": 188,
+            "GhidraRoles": "index-u16le-lead->position-float3-lead",
+            "GhidraVertexSemanticClass": "position",
+        },
+        {
+            "Rank": 2,
+            "CandidateOnly": True,
+            "ReviewKind": "ghidra-only",
+            "Count": 2,
+            "SampleIdPrefix": attr_id,
+            "SampleMeshBlockIndex": 6,
+            "SampleIndexOffset": 24,
+            "SampleVertexOffset": 196,
+            "GhidraRoles": "index-u16le-lead->normal-float3-lead",
+            "GhidraVertexSemanticClass": "normal",
+        },
+        {
+            "Rank": 3,
+            "CandidateOnly": True,
+            "ReviewKind": "ghidra-only",
+            "Count": 2,
+            "SampleIdPrefix": attr_id,
+            "SampleMeshBlockIndex": 6,
+            "SampleIndexOffset": 24,
+            "SampleVertexOffset": 204,
+            "GhidraRoles": "index-u16le-lead->uv-float2-lead",
+            "GhidraVertexSemanticClass": "uv",
+        },
+    ]
+    attr_review_path.write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-pairing-review/v1",
+                "CandidateOnly": True,
+                "Findings": attr_findings,
+            }
+        ),
+        encoding="utf-8",
+    )
+    for finding in attr_findings:
+        rank_dir = Path(temp_dir) / "ghidra-review-rank-probes" / f"rank{finding['Rank']:02d}"
+        rank_dir.mkdir(parents=True, exist_ok=True)
+        role = str(finding["GhidraRoles"]).split("->", 1)[1]
+        probe_pairing = {
+            "IndexMeshPayloadOffset": 24,
+            "VertexMeshPayloadOffset": finding["SampleVertexOffset"],
+            "VertexRole": role,
+        }
+        if role.startswith("position-"):
+            probe_pairing["VertexPositionBoundsReview"] = {"PassesBasicReview": True, "MaxExtent": 10.0}
+        elif role.startswith("normal-"):
+            probe_pairing["VertexNormalVectorReview"] = {"PassesBasicReview": True, "NearUnitVectorRatio": 1.0}
+        elif role.startswith("uv-"):
+            probe_pairing["VertexUvRangeReview"] = {"PassesBasicReview": True, "UvRangeRatio": 1.0}
+        (rank_dir / f"probe-nif-mesh-{attr_id}.json").write_text(
+            json.dumps({"Meshes": [{"GhidraPairings": [probe_pairing]}]}),
+            encoding="utf-8",
+        )
+
+    attr_buffer = io.StringIO()
+    with redirect_stdout(attr_buffer):
+        ghidra_attribute_candidate_report(attr_review_path, temp_dir)
+    attr_json = Path(temp_dir) / "ghidra-attribute-candidate-report.json"
+    attr_md = Path(temp_dir) / "ghidra-attribute-candidate-report.md"
+    attr_report = json.loads(attr_json.read_text(encoding="utf-8"))
+    check_contains("ghidra attribute report console", attr_buffer.getvalue(), "GhidraAttributeCandidateReport passed")
+    check_contains("ghidra attribute report candidate-only", str(attr_report.get("CandidateOnly")), "True")
+    check_contains("ghidra attribute report complete group", json.dumps(attr_report), "CompletePositionNormalUvCandidate")
+    check_contains("ghidra attribute markdown", attr_md.read_text(encoding="utf-8"), "Complete position/normal/UV")
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:

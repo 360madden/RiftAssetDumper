@@ -1371,6 +1371,260 @@ def ghidra_pairing_review_report(
 
 
 # ============================================================================
+# GhidraAttributeCandidateReport
+# ============================================================================
+
+
+def ghidra_attribute_candidate_report(
+    review_report_path: str | Path,
+    out_dir: str | Path | None = None,
+) -> None:
+    """Group Ghidra-only review ranks into candidate attribute families."""
+    review_path = Path(review_report_path)
+    report = load_json_report(review_path)
+    findings_raw = report.get("Findings")
+    if not isinstance(findings_raw, list) or not findings_raw:
+        raise ValueError("GhidraAttributeCandidateReport failed: Findings is missing or empty.")
+
+    output_dir = Path(out_dir) if out_dir is not None else review_path.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rank_probe_root = output_dir / "ghidra-review-rank-probes"
+
+    def _desired_vertex_role(finding: dict[str, Any]) -> str:
+        roles = str(finding.get("GhidraRoles", ""))
+        return roles.split("->", 1)[1] if "->" in roles else roles
+
+    def _semantic(finding: dict[str, Any]) -> str:
+        semantic = str(finding.get("GhidraVertexSemanticClass", "-"))
+        if semantic not in ("-", "missing"):
+            return semantic
+        role = _desired_vertex_role(finding)
+        if role.startswith("position-"):
+            return "position"
+        if role.startswith("normal-"):
+            return "normal"
+        if role.startswith("uv-"):
+            return "uv"
+        if "repeated-pattern" in role:
+            return "noise"
+        return "other"
+
+    def _load_probe_pairing(finding: dict[str, Any]) -> dict[str, Any]:
+        rank = safe_int(finding.get("Rank"))
+        asset_id = str(finding.get("SampleIdPrefix", ""))
+        probe_path = rank_probe_root / f"rank{rank:02d}" / f"probe-nif-mesh-{asset_id}.json"
+        if not probe_path.exists():
+            return {}
+        probe = load_json_report(probe_path)
+        meshes = probe.get("Meshes")
+        if not isinstance(meshes, list) or not meshes:
+            return {}
+        pairings = meshes[0].get("GhidraPairings")
+        if not isinstance(pairings, list):
+            return {}
+        desired_role = _desired_vertex_role(finding)
+        desired_vertex_offset = safe_int(finding.get("SampleVertexOffset"))
+        desired_index_offset = safe_int(finding.get("SampleIndexOffset"))
+        for pairing in pairings:
+            if (
+                isinstance(pairing, dict)
+                and str(pairing.get("VertexRole", "")) == desired_role
+                and safe_int(pairing.get("VertexMeshPayloadOffset")) == desired_vertex_offset
+                and safe_int(pairing.get("IndexMeshPayloadOffset")) == desired_index_offset
+            ):
+                return pairing
+        for pairing in pairings:
+            if isinstance(pairing, dict) and str(pairing.get("VertexRole", "")) == desired_role:
+                return pairing
+        return {}
+
+    def _review_summary(semantic: str, pairing: dict[str, Any]) -> dict[str, Any]:
+        if semantic == "position":
+            review = pairing.get("VertexPositionBoundsReview")
+            metric_name = "MaxExtent"
+        elif semantic == "normal":
+            review = pairing.get("VertexNormalVectorReview")
+            metric_name = "NearUnitVectorRatio"
+        elif semantic == "uv":
+            review = pairing.get("VertexUvRangeReview")
+            metric_name = "UvRangeRatio"
+        else:
+            review = None
+            metric_name = "-"
+        if not isinstance(review, dict):
+            return {
+                "ProbeBacked": bool(pairing),
+                "ReviewPresent": False,
+                "PassesBasicReview": "-",
+                "MetricName": metric_name,
+                "MetricValue": "-",
+                "MissReasons": [],
+            }
+        miss_reasons = review.get("MissReasons")
+        return {
+            "ProbeBacked": True,
+            "ReviewPresent": True,
+            "PassesBasicReview": json_value_or_dash(review, "PassesBasicReview"),
+            "MetricName": metric_name,
+            "MetricValue": json_value_or_dash(review, metric_name),
+            "MissReasons": miss_reasons if isinstance(miss_reasons, list) else [],
+        }
+
+    evidence_rows: list[dict[str, Any]] = []
+    groups: dict[str, dict[str, Any]] = {}
+    for raw in findings_raw:
+        if not isinstance(raw, dict) or str(raw.get("ReviewKind", "")) != "ghidra-only":
+            continue
+        asset_id = str(raw.get("SampleIdPrefix", ""))
+        mesh_block = safe_int(raw.get("SampleMeshBlockIndex"))
+        semantic = _semantic(raw)
+        pairing = _load_probe_pairing(raw)
+        review = _review_summary(semantic, pairing)
+        row = {
+            "Rank": safe_int(raw.get("Rank")),
+            "Count": safe_int(raw.get("Count")),
+            "SampleIdPrefix": asset_id,
+            "SampleMeshBlockIndex": mesh_block,
+            "GhidraRoles": raw.get("GhidraRoles", "-"),
+            "GhidraVertexSemanticClass": semantic,
+            **review,
+        }
+        evidence_rows.append(row)
+        key = f"{asset_id}|mesh#{mesh_block}"
+        group = groups.setdefault(
+            key,
+            {
+                "SampleIdPrefix": asset_id,
+                "SampleMeshBlockIndex": mesh_block,
+                "Ranks": [],
+                "TotalCount": 0,
+                "Semantics": [],
+                "Evidence": [],
+            },
+        )
+        group["Ranks"].append(row["Rank"])
+        group["TotalCount"] += row["Count"]
+        if semantic not in group["Semantics"]:
+            group["Semantics"].append(semantic)
+        group["Evidence"].append(row)
+
+    if not evidence_rows:
+        raise ValueError("GhidraAttributeCandidateReport failed: no ghidra-only findings were found.")
+
+    for group in groups.values():
+        semantics = set(group["Semantics"])
+        group["HasPosition"] = "position" in semantics
+        group["HasNormal"] = "normal" in semantics
+        group["HasUv"] = "uv" in semantics
+        group["HasRejectedNoise"] = bool(semantics & {"noise", "other"})
+        group["CompletePositionNormalUvCandidate"] = (
+            group["HasPosition"] and group["HasNormal"] and group["HasUv"]
+        )
+        if group["HasPosition"] and group["HasNormal"]:
+            decision = "position-normal partial; needs UV/group proof"
+        elif group["HasPosition"] and group["HasUv"]:
+            decision = "position-UV partial; needs normal/group proof"
+        elif group["HasPosition"]:
+            decision = "position-only candidate; needs companions"
+        elif group["HasNormal"]:
+            decision = "normal-only candidate; needs companions"
+        elif group["HasUv"]:
+            decision = "UV-only candidate; needs companions"
+        else:
+            decision = "noise/other only; keep rejected"
+        group["InitialDecision"] = decision
+        group["Ranks"] = sorted(group["Ranks"])
+        group["Semantics"] = sorted(group["Semantics"])
+
+    summary = {
+        "GhidraOnlyGroups": len(evidence_rows),
+        "GhidraOnlyPairingsCovered": sum(row["Count"] for row in evidence_rows),
+        "GroupedSampleMeshes": len(groups),
+        "CompletePositionNormalUvCandidateGroups": sum(
+            1 for group in groups.values() if group["CompletePositionNormalUvCandidate"]
+        ),
+        "ProbeBackedRanks": sum(1 for row in evidence_rows if row["ProbeBacked"]),
+        "PositionReviewPassGroups": sum(
+            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "position" and row["PassesBasicReview"] is True
+        ),
+        "NormalReviewPassGroups": sum(
+            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "normal" and row["PassesBasicReview"] is True
+        ),
+        "UvReviewPassGroups": sum(
+            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "uv" and row["PassesBasicReview"] is True
+        ),
+        "UvReviewFailGroups": sum(
+            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "uv" and row["PassesBasicReview"] is False
+        ),
+        "RejectedNoiseGroups": sum(
+            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] in ("noise", "other")
+        ),
+    }
+
+    groups_output: list[dict[str, Any]] = sorted(
+        groups.values(),
+        key=lambda group: (
+            not group["HasPosition"],
+            not group["HasNormal"],
+            not group["HasUv"],
+            str(group["SampleIdPrefix"]),
+            safe_int(group["SampleMeshBlockIndex"]),
+        ),
+    )
+
+    output = {
+        "SchemaVersion": "ghidra-attribute-candidate-report/v1",
+        "CandidateOnly": True,
+        "SourceReviewReport": str(review_path),
+        "RankProbeRoot": str(rank_probe_root),
+        "Summary": summary,
+        "Groups": groups_output,
+        "EvidenceRows": sorted(evidence_rows, key=lambda row: row["Rank"]),
+    }
+
+    json_path = output_dir / "ghidra-attribute-candidate-report.json"
+    md_path = output_dir / "ghidra-attribute-candidate-report.md"
+    json_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
+
+    md_lines = [
+        "# Ghidra attribute candidate report",
+        "",
+        "Candidate-only: yes. This grouped triage report does not promote parser/export behavior.",
+        "",
+        f"- Ghidra-only groups: {summary['GhidraOnlyGroups']}",
+        f"- Ghidra-only pairings covered: {summary['GhidraOnlyPairingsCovered']}",
+        f"- Grouped sample meshes: {summary['GroupedSampleMeshes']}",
+        f"- Complete position/normal/UV candidate groups: {summary['CompletePositionNormalUvCandidateGroups']}",
+        f"- Probe-backed ranks: {summary['ProbeBackedRanks']}",
+        f"- Position/normal/UV pass groups: {summary['PositionReviewPassGroups']}/{summary['NormalReviewPassGroups']}/{summary['UvReviewPassGroups']}",
+        f"- UV review fail groups: {summary['UvReviewFailGroups']}",
+        "",
+        "| Sample | Ranks | Count | Semantics | Decision |",
+        "|---|---:|---:|---|---|",
+    ]
+    for group in groups_output:
+        sample = f"{group['SampleIdPrefix']} mesh#{group['SampleMeshBlockIndex']}"
+        ranks = ",".join(str(rank) for rank in group["Ranks"])
+        semantics = ",".join(group["Semantics"])
+        md_lines.append(
+            f"| {format_markdown_cell(sample)} "
+            f"| {format_markdown_cell(ranks)} "
+            f"| {group['TotalCount']} "
+            f"| {format_markdown_cell(semantics)} "
+            f"| {format_markdown_cell(group['InitialDecision'])} |"
+        )
+    md_lines += [
+        "",
+        "Promotion note: keep `ghidra-pairing-non-export-guard` passing; this report is not an exporter input.",
+    ]
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    print(f"GhidraAttributeCandidateReport JSON: {json_path}")
+    print(f"GhidraAttributeCandidateReport markdown: {md_path}")
+    print("GhidraAttributeCandidateReport passed: grouped candidate evidence remains report-only.")
+
+
+# ============================================================================
 # PositionSourceSiblingFamilyReport  (inventory-level)
 # ============================================================================
 
