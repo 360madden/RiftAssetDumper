@@ -41,6 +41,9 @@ with TemporaryDirectory() as temp_dir:
                 "PairCompatibleLinks": 0,
                 "GhidraPairCompatibleMeshes": 1,
                 "GhidraPairCompatibleLinks": 2,
+                "GhidraSharedPairings": 1,
+                "LegacyOnlyPairings": 0,
+                "GhidraOnlyPairings": 1,
                 "TopGhidraRoleDeltas": [
                     {
                         "MeshSize": 325,
@@ -72,6 +75,19 @@ with TemporaryDirectory() as temp_dir:
                         "MaxIndexCoverageRatio": 1,
                     }
                 ],
+                "TopGhidraPairingComparisons": [
+                    {
+                        "Status": "shared",
+                        "MeshSize": 325,
+                        "Count": 2,
+                        "LegacyIndexRole": "index-u16be-strip-lead",
+                        "LegacyVertexRole": "normal-float3-ror1-lead",
+                        "GhidraIndexRole": "index-u16le-lead",
+                        "GhidraVertexRole": "normal-float3-lead",
+                        "AverageLegacyConfidence": 85,
+                        "AverageGhidraConfidence": 45,
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -82,11 +98,14 @@ with TemporaryDirectory() as temp_dir:
     text = buffer.getvalue()
     check_contains("summary counts", text, "roleDeltas=1")
     check_contains("ghidra pairing counts", text, "ghidraPairMeshes=1 ghidraPairLinks=2")
+    check_contains("pairing overlap counts", text, "sharedPairs=1 legacyOnlyPairs=0 ghidraOnlyPairs=1")
     check_contains("delta heading", text, "Top Ghidra role deltas")
     check_contains("delta role arrow", text, "unknown-binary->position-float3-ror1-lead=7")
     check_contains("delta grouping fields", text, "meshSize=325 payload=96 usage=1 access=19")
     check_contains("ghidra pairing heading", text, "Top Ghidra pairings")
     check_contains("ghidra pairing roles", text, "index-u16le-lead->vertex[usage=1 access=19] normal-float3-lead")
+    check_contains("ghidra comparison heading", text, "Top Ghidra pairing comparisons")
+    check_contains("ghidra comparison roles", text, "shared meshSize=325 count=2 legacy=index-u16be-strip-lead->normal-float3-ror1-lead ghidra=index-u16le-lead->normal-float3-lead")
 
     no_delta_path = Path(temp_dir) / "mesh-bindings-no-deltas.json"
     no_delta_path.write_text(

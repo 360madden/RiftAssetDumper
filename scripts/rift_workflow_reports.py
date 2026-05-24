@@ -208,7 +208,10 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
         f"pairMeshes={json_value_or_dash(report, 'PairCompatibleMeshes')} "
         f"pairLinks={json_value_or_dash(report, 'PairCompatibleLinks')} "
         f"ghidraPairMeshes={json_value_or_dash(report, 'GhidraPairCompatibleMeshes')} "
-        f"ghidraPairLinks={json_value_or_dash(report, 'GhidraPairCompatibleLinks')}"
+        f"ghidraPairLinks={json_value_or_dash(report, 'GhidraPairCompatibleLinks')} "
+        f"sharedPairs={json_value_or_dash(report, 'GhidraSharedPairings')} "
+        f"legacyOnlyPairs={json_value_or_dash(report, 'LegacyOnlyPairings')} "
+        f"ghidraOnlyPairs={json_value_or_dash(report, 'GhidraOnlyPairings')}"
     )
 
     role_groups = report.get("RoleGroups")
@@ -407,6 +410,26 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
                     f"list={json_value_or_dash(g, 'TriangleListTriangleCount')} "
                     f"strip={json_value_or_dash(g, 'TriangleStripWindowCount')} "
                     f"cov={json_value_or_dash(g, 'MaxIndexCoverageRatio')}"
+                ),
+            )
+        )
+
+    top_ghidra_pairing_comparisons = report.get("TopGhidraPairingComparisons")
+    if top_ghidra_pairing_comparisons and isinstance(top_ghidra_pairing_comparisons, list):
+        print(
+            "Top Ghidra pairing comparisons: "
+            + top_text(
+                top_ghidra_pairing_comparisons,
+                lambda g: (
+                    f"{json_value_or_dash(g, 'Status')} "
+                    f"meshSize={json_value_or_dash(g, 'MeshSize')} "
+                    f"count={json_value_or_dash(g, 'Count')} "
+                    f"legacy={json_value_or_dash(g, 'LegacyIndexRole')}->"
+                    f"{json_value_or_dash(g, 'LegacyVertexRole')} "
+                    f"ghidra={json_value_or_dash(g, 'GhidraIndexRole')}->"
+                    f"{json_value_or_dash(g, 'GhidraVertexRole')} "
+                    f"c={json_value_or_dash(g, 'AverageLegacyConfidence')}->"
+                    f"{json_value_or_dash(g, 'AverageGhidraConfidence')}"
                 ),
             )
         )

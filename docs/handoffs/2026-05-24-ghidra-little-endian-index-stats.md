@@ -70,7 +70,7 @@ The Ghidra candidate path now has slightly more compatible mesh/link counts than
 - Ghidra pairings remain report-only.
 - Export, OBJ, pairing guards, and attribute-set promotion still consume legacy/default fields.
 - No confidence/role whitelist exists yet for deciding which Ghidra pairings are promotable.
-- No diff report exists yet for legacy-pairing versus Ghidra-pairing overlap/gaps.
+- Legacy-pairing versus Ghidra-pairing overlap/gaps are now summarized in `docs/handoffs/2026-05-24-ghidra-pairing-overlap.md`.
 
 ## Recommended next milestone
 
