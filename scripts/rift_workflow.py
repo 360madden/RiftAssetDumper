@@ -601,7 +601,8 @@ def _ensure_ghidra_attribute_candidate_report(
 def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     """Batch-refresh ignored mesh-probe JSON for ranked Ghidra review findings."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
-    review_path = _ensure_ghidra_pairing_review_report(out_dir, args.limit, "ghidra-review-rank-probes")
+    review_report_limit = args.review_report_limit if args.review_report_limit > 0 else args.limit
+    review_path = _ensure_ghidra_pairing_review_report(out_dir, review_report_limit, "ghidra-review-rank-probes")
     report = load_json_report(str(review_path))
     findings = report.get("Findings")
     if not isinstance(findings, list):
@@ -641,6 +642,7 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
         f"ghidra-review-rank-probes: probing {len(selected)} finding(s) "
         f"from {review_path} into {probe_root}"
     )
+    results: list[dict[str, object]] = []
     for finding in selected:
         rank = _json_int_or_none(finding.get("Rank"))
         asset_id = str(finding.get("SampleIdPrefix"))
@@ -648,6 +650,7 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
         if rank is None or mesh_block is None:
             continue
         rank_dir = probe_root / f"rank{rank:02d}"
+        output_path = rank_dir / f"probe-nif-mesh-{asset_id}.json"
         print(
             f"\n--- rank {rank}: id={asset_id} meshBlock={mesh_block} "
             f"kind={finding.get('ReviewKind', '-')}"
@@ -666,6 +669,64 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
             semantic_categories=[],
             full=args.full,
         )
+        results.append(
+            {
+                "Rank": rank,
+                "ReviewKind": str(finding.get("ReviewKind", "-")),
+                "SampleIdPrefix": asset_id,
+                "SampleMeshBlockIndex": mesh_block,
+                "GhidraRoles": str(finding.get("GhidraRoles", "-")),
+                "OutputJson": str(output_path),
+            }
+        )
+
+    manifest = {
+        "SchemaVersion": "ghidra-review-rank-probes-manifest/v1",
+        "CandidateOnly": True,
+        "GeneratedAt": datetime.now().isoformat(),
+        "SourceReviewReport": str(review_path),
+        "ProbeRoot": str(probe_root),
+        "ReviewKindFilter": review_kind,
+        "SelectedCount": len(results),
+        "ReviewReportLimit": review_report_limit,
+        "Results": results,
+    }
+    manifest_slug = "-".join(part for part in "".join(
+        char.lower() if char.isalnum() else "-" for char in review_kind
+    ).split("-") if part) or "all"
+    manifest_json = probe_root / f"manifest-{manifest_slug}.json"
+    manifest_json.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    latest_manifest_json = probe_root / "manifest.json"
+    latest_manifest_json.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    md_lines = [
+        "# Ghidra review-rank probe manifest",
+        "",
+        "Candidate-only: yes. These probe outputs are ignored workflow evidence, not parser/export inputs.",
+        "",
+        f"- Source review report: `{review_path}`",
+        f"- Review kind filter: `{review_kind}`",
+        f"- Selected ranks: `{len(results)}`",
+        "",
+        "| Rank | Kind | Sample | Mesh | Roles | Output |",
+        "|---:|---|---|---:|---|---|",
+    ]
+    for result in results:
+        md_lines.append(
+            f"| {result['Rank']} "
+            f"| {result['ReviewKind']} "
+            f"| `{result['SampleIdPrefix']}` "
+            f"| {result['SampleMeshBlockIndex']} "
+            f"| `{result['GhidraRoles']}` "
+            f"| `{Path(str(result['OutputJson'])).name}` |"
+        )
+    manifest_md = probe_root / f"manifest-{manifest_slug}.md"
+    manifest_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    latest_manifest_md = probe_root / "manifest.md"
+    latest_manifest_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    print(f"GhidraReviewRankProbes manifest JSON: {manifest_json}")
+    print(f"GhidraReviewRankProbes manifest markdown: {manifest_md}")
     print("GhidraReviewRankProbes passed: focused probe outputs remain under ignored Exports/.")
 
 
@@ -2192,6 +2253,12 @@ Examples:
         "--review-kind",
         default="ghidra-only",
         help="ReviewKind filter for ghidra-review-rank-probes (default: ghidra-only; use all for every kind)",
+    )
+    parser.add_argument(
+        "--review-report-limit",
+        type=int,
+        default=100,
+        help="Finding limit when rebuilding ghidra-pairing-review-report for review-rank workflows (default: 100)",
     )
     parser.add_argument(
         "--extra-offset",

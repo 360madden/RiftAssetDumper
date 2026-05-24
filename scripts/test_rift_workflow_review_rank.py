@@ -195,6 +195,76 @@ with TemporaryDirectory() as temp_dir:
     check("batch first rank dir", captured_calls[0]["out_dir"].name, "rank01")
     check("batch skips shared finding", captured_calls[1]["asset_id"], "3333333333333333")
     check("batch second rank dir", captured_calls[1]["out_dir"].name, "rank03")
+    manifest = json.loads((out_dir / "ghidra-review-rank-probes" / "manifest-ghidra-only.json").read_text(encoding="utf-8"))
+    check("batch manifest schema", manifest["SchemaVersion"], "ghidra-review-rank-probes-manifest/v1")
+    check("batch manifest selected count", manifest["SelectedCount"], 2)
+    check("batch manifest kind", manifest["ReviewKindFilter"], "ghidra-only")
+
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "vertex-rebuild"
+    out_dir.mkdir()
+    (out_dir / "nif-mesh-binding-inventory.json").write_text("{}", encoding="utf-8")
+    captured_calls = []
+
+    def fake_vertex_review_report(_inventory_path: str, output_dir: Path, take: int = 100) -> None:
+        check("vertex rebuild uses review report limit", take, 100)
+        (output_dir / "ghidra-pairing-review-report.json").write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "ghidra-pairing-review/v1",
+                    "CandidateOnly": True,
+                    "Findings": [
+                        {
+                            "Rank": 1,
+                            "ReviewKind": "ghidra-only",
+                            "SampleIdPrefix": "1111111111111111",
+                            "SampleMeshBlockIndex": 7,
+                        },
+                        {
+                            "Rank": 15,
+                            "ReviewKind": "vertex-semantic-change",
+                            "SampleIdPrefix": "aaaaaaaaaaaaaaaa",
+                            "SampleMeshBlockIndex": 11,
+                        },
+                        {
+                            "Rank": 16,
+                            "ReviewKind": "vertex-semantic-change",
+                            "SampleIdPrefix": "bbbbbbbbbbbbbbbb",
+                            "SampleMeshBlockIndex": 12,
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    vertex_argv = [
+        "rift_workflow.py",
+        "ghidra-review-rank-probes",
+        "--out",
+        str(out_dir),
+        "--limit",
+        "1",
+        "--review-kind",
+        "vertex-semantic-change",
+        "--skip-build",
+    ]
+    with (
+        patch.object(sys, "argv", vertex_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.rift_workflow.ghidra_pairing_review_report", side_effect=fake_vertex_review_report),
+        patch("scripts.rift_workflow._run_dotnet_and_summarize", side_effect=fake_batch_dotnet_run),
+    ):
+        rift_workflow.main()
+
+    check("vertex batch selected count", len(captured_calls), 1)
+    check("vertex batch first asset", captured_calls[0]["asset_id"], "aaaaaaaaaaaaaaaa")
+    vertex_manifest = json.loads(
+        (out_dir / "ghidra-review-rank-probes" / "manifest-vertex-semantic-change.json").read_text(encoding="utf-8")
+    )
+    check("vertex manifest kind", vertex_manifest["ReviewKindFilter"], "vertex-semantic-change")
+    check("vertex manifest report limit", vertex_manifest["ReviewReportLimit"], 100)
 
 print(f"\n{'=' * 50}")
 if failed:

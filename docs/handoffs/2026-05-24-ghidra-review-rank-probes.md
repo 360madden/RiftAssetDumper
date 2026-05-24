@@ -16,8 +16,15 @@ Default behavior:
 - rebuilds it from `Exports/nif-mesh-binding-inventory.json` if needed
 - filters `ReviewKind == ghidra-only`
 - writes focused probe JSON under ignored `Exports/ghidra-review-rank-probes/rankNN/`
+- writes ignored per-kind `manifest-*.json` / `manifest-*.md` files under `Exports/ghidra-review-rank-probes/`
 
 Use `--review-kind all` to include non-`ghidra-only` review rows.
+
+Use this for the remaining shared semantic-change review rows:
+
+```powershell
+python scripts/rift_workflow.py ghidra-review-rank-probes --review-kind vertex-semantic-change --limit 11 --skip-build
+```
 
 ## Files changed
 

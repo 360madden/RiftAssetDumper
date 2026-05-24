@@ -91,6 +91,7 @@ python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
 python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
 python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build
+python scripts/rift_workflow.py ghidra-review-rank-probes --review-kind vertex-semantic-change --limit 11 --skip-build
 python scripts/rift_workflow.py ghidra-attribute-candidate-report
 python scripts/rift_workflow.py ghidra-attribute-candidate-guard
 python scripts/rift_workflow.py ghidra-workflow-guard-suite
@@ -106,7 +107,7 @@ For `FunctionSiteSurvey.java` reports, use `ghidra-summarize` to produce a small
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
 
-For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json` and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
+For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json` and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
 
 ## Current Ghidra lane state
 
@@ -131,6 +132,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Batch Ghidra review-rank probe refresh wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes.md`
 - Ghidra promotion checklist refreshed for batch probes and grouped candidate guard: `docs/handoffs/2026-05-24-ghidra-promotion-checklist-refresh.md`
 - Ghidra workflow guard suite wired: `docs/handoffs/2026-05-24-ghidra-workflow-guard-suite.md`
+- Ghidra review-rank probe manifest and vertex semantic-change batch docs wired: `docs/handoffs/2026-05-24-ghidra-review-rank-manifest.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
