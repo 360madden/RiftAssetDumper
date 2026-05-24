@@ -13,6 +13,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+import jsonschema
+
 sys.path.insert(0, ".")
 
 from scripts import ghidra_runner, rift_workflow
@@ -162,6 +164,10 @@ with TemporaryDirectory() as temp_dir:
     check("workflow timeout forwarded", captured["timeout_seconds"], 14400)
 
 print("=== rift_workflow ghidra-function-site-survey routing ===")
+target_schema = json.loads(Path("docs/schemas/ghidra-function-site-targets-v1.schema.json").read_text(encoding="utf-8"))
+target_registry = json.loads(Path("docs/ghidra-function-site-targets.json").read_text(encoding="utf-8"))
+jsonschema.validate(target_registry, target_schema)
+check("function survey target registry schema", target_registry["SchemaVersion"], "ghidra-function-site-targets/v1")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     script_file = temp_path / "FunctionSiteSurvey.java"

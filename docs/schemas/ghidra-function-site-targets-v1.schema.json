@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-function-site-targets-v1.schema.json",
+  "title": "Ghidra FunctionSiteSurvey targets v1",
+  "description": "Tracked registry of reusable FunctionSiteSurvey targets for `python scripts/rift_workflow.py ghidra-function-site-survey`. Targets describe ignored Ghidra report and summary outputs and must remain static-analysis evidence only.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "DefaultProjectName",
+    "DefaultProcess",
+    "DefaultScript",
+    "DefaultNoAnalysis",
+    "DefaultKeepProject",
+    "DefaultTimeoutSeconds",
+    "Targets"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-function-site-targets/v1" },
+    "CandidateOnly": { "const": true },
+    "DefaultProjectName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "DefaultProcess": {
+      "type": "string",
+      "minLength": 1
+    },
+    "DefaultScript": {
+      "type": "string",
+      "minLength": 1
+    },
+    "DefaultNoAnalysis": { "type": "boolean" },
+    "DefaultKeepProject": { "type": "boolean" },
+    "DefaultTimeoutSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "Targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/target" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "targetKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "hexAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]+$"
+    },
+    "ignoredOutputPath": {
+      "type": "string",
+      "pattern": "^Exports/ghidra-reports/[^\\\\]+$"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "Key",
+        "Address",
+        "ReportPath",
+        "SummaryPath",
+        "SummaryTerms",
+        "Description"
+      ],
+      "properties": {
+        "Key": { "$ref": "#/$defs/targetKey" },
+        "Address": { "$ref": "#/$defs/hexAddress" },
+        "ReportPath": { "$ref": "#/$defs/ignoredOutputPath" },
+        "SummaryPath": { "$ref": "#/$defs/ignoredOutputPath" },
+        "SummaryTerms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "Description": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

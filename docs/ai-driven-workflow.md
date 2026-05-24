@@ -105,7 +105,7 @@ Prefer Java Ghidra scripts in this lane. Ghidra 12.1 headless did not run `.py` 
 
 Run retained-project Ghidra jobs serially. Parallel `ghidra-run` calls against the same project can fail on the Ghidra project lock.
 
-For `FunctionSiteSurvey.java` reports, use `ghidra-function-site-survey --ghidra-target <key>` with targets from `docs/ghidra-function-site-targets.json` to print serialized rerun/summarize commands. Add `--ghidra-execute` only when intentionally running one target against the retained project. Use `ghidra-summarize` to produce a small Markdown review. The generated JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
+For `FunctionSiteSurvey.java` reports, use `ghidra-function-site-survey --ghidra-target <key>` with targets from `docs/ghidra-function-site-targets.json` to print serialized rerun/summarize commands; the target registry schema is `docs/schemas/ghidra-function-site-targets-v1.schema.json`. Add `--ghidra-execute` only when intentionally running one target against the retained project. Use `ghidra-summarize` to produce a small Markdown review. The generated report JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
 
@@ -139,6 +139,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra review-rank probe summary wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary.md`
 - Ghidra review-rank probe summary schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary-schema.md`
 - Ghidra FunctionSiteSurvey target registry wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-registry.md`
+- Ghidra FunctionSiteSurvey target registry schema wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-schema.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.

@@ -68,4 +68,4 @@ Result: passed as a dry-run plan and printed the retained-project `ghidra-run` p
 
 ## Remaining
 
-- Add a JSON schema for `docs/ghidra-function-site-targets.json` before adding many more targets.
+- Target registry schema is now tracked by `docs/schemas/ghidra-function-site-targets-v1.schema.json`; update it with any future target field changes.
