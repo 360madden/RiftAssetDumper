@@ -7,6 +7,9 @@ Status: **candidate-only**. Ghidra pairing evidence is useful for triage, but it
 ```powershell
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 25
 python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
+python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build
+python scripts/rift_workflow.py ghidra-attribute-candidate-report
+python scripts/rift_workflow.py ghidra-attribute-candidate-guard
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
 ```
 
@@ -25,7 +28,8 @@ docs/schemas/ghidra-attribute-candidate-v1.schema.json
 | Export isolation | `python scripts/rift_workflow.py ghidra-pairing-non-export-guard` passes. |
 | Generated-output safety | `python scripts/rift_workflow.py generated-output-guard` passes before commit. |
 | Review queue | `TopGhidraPairingReviewFindings` remains the primary queue; do not cherry-pick one row into export behavior without checking its family. |
-| Focused probe | Each candidate family has at least one `mesh-probe --review-rank N --skip-build` JSON/console review. |
+| Focused probe | Each candidate family has at least one `mesh-probe --review-rank N --skip-build` JSON/console review; use `ghidra-review-rank-probes --limit 14 --skip-build` to refresh the current Ghidra-only set. |
+| Grouped candidate proof | `ghidra-attribute-candidate-report` plus `ghidra-attribute-candidate-guard` must still report zero complete position+normal+UV groups before any parser/export promotion. |
 | Index proof | Index stream stats show sane max/distinct/degenerate behavior and `IndexMax < VertexCount`. |
 | Vector proof | Position candidates pass finite/plausible/nonzero/extent checks and include sample vectors. |
 | Semantic proof | Position, normal, and UV roles agree with body bytes and usage/access metadata across multiple samples. |
@@ -34,11 +38,12 @@ docs/schemas/ghidra-attribute-candidate-v1.schema.json
 
 ## Promotion sequence
 
-1. **Triage only**: use `ghidra-pairing-review-report` and `mesh-probe --review-rank N`.
+1. **Triage only**: use `ghidra-pairing-review-report`, `mesh-probe --review-rank N`, and `ghidra-review-rank-probes` for batch probe refresh.
 2. **Evidence patch**: add read-only JSON/console evidence; keep export behavior unchanged.
 3. **Proof guard patch**: add or update guards so bad Ghidra promotion fails closed.
-4. **Parser patch**: only after guards exist, change parser role logic in the smallest possible place.
-5. **Exporter patch**: only after parser truth is proven and export-specific guards pass.
+4. **Grouped candidate patch**: update `ghidra-attribute-candidate-report`/guard evidence; require a deliberate review if a complete position+normal+UV group appears.
+5. **Parser patch**: only after guards exist, change parser role logic in the smallest possible place.
+6. **Exporter patch**: only after parser truth is proven and export-specific guards pass.
 
 ## Current top review queue
 
@@ -49,7 +54,7 @@ As of the latest local report on 2026-05-24, the inventory reports:
 - Ghidra-only pairings: `64`
 - `ghidra-only` review groups: `14`, covering all `64` Ghidra-only pairings
 
-Full Ghidra-only probe coverage is documented in `docs/handoffs/2026-05-24-ghidra-only-rank-1-14-probes.md`.
+Full Ghidra-only probe coverage is documented in `docs/handoffs/2026-05-24-ghidra-only-rank-1-14-probes.md`; the durable batch refresh command is documented in `docs/handoffs/2026-05-24-ghidra-review-rank-probes.md`.
 
 Top emitted review ranks:
 

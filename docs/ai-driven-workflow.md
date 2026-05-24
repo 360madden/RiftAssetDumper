@@ -128,6 +128,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Grouped Ghidra attribute candidate guard wired: `docs/handoffs/2026-05-24-ghidra-attribute-candidate-guard.md`
 - Grouped Ghidra attribute candidate schema wired: `docs/handoffs/2026-05-24-ghidra-attribute-schema.md`
 - Batch Ghidra review-rank probe refresh wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes.md`
+- Ghidra promotion checklist refreshed for batch probes and grouped candidate guard: `docs/handoffs/2026-05-24-ghidra-promotion-checklist-refresh.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
