@@ -66,6 +66,12 @@ def _build_ghidra_env(java_path: str, java_home: str) -> dict[str, str]:
     return env
 
 
+def _has_ghidra_script_error(result: subprocess.CompletedProcess[str]) -> bool:
+    """Return True when Ghidra reports script failure despite exit code 0."""
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    return "REPORT SCRIPT ERROR" in output
+
+
 def run_ghidra_headless(
     project_dir: str | Path,
     project_name: str = "TempProject",
@@ -303,9 +309,13 @@ def main() -> None:
             print("--- stderr ---")
             print(result.stderr[:5000])
 
-        if result.returncode != 0:
+        script_error = _has_ghidra_script_error(result)
+
+        if result.returncode != 0 or script_error:
+            if script_error and result.returncode == 0:
+                print("\nGhidra reported a script error despite exit code 0", file=sys.stderr)
             print(f"\nGhidra exited with code {result.returncode}", file=sys.stderr)
-            sys.exit(result.returncode)
+            sys.exit(result.returncode or 1)
 
         print("\nGhidra headless completed successfully.")
 

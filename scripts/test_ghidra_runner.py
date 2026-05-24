@@ -88,6 +88,14 @@ with TemporaryDirectory() as temp_dir:
     check("scriptPath inferred", "-scriptPath" in cmd and str(temp_path / "scripts") in cmd, True)
     check("script uses discoverable name", "RiftAnchorSurvey.java" in cmd, True)
 
+print("=== Ghidra script errors ===")
+ok_result = subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+script_error_result = subprocess.CompletedProcess(["ghidra"], 0, "REPORT SCRIPT ERROR: bad script", "")
+stderr_script_error_result = subprocess.CompletedProcess(["ghidra"], 0, "", "REPORT SCRIPT ERROR: bad script")
+check("normal output has no script error", ghidra_runner._has_ghidra_script_error(ok_result), False)
+check("stdout script error detected", ghidra_runner._has_ghidra_script_error(script_error_result), True)
+check("stderr script error detected", ghidra_runner._has_ghidra_script_error(stderr_script_error_result), True)
+
 print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")
