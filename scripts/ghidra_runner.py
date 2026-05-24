@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -50,12 +51,30 @@ def _resolve_tool(config: dict[str, Any], name: str) -> tuple[str, str]:
     return resolved, home
 
 
+def _build_ghidra_env(java_path: str, java_home: str) -> dict[str, str]:
+    """Build an environment where Ghidra can find the configured JDK."""
+    env = os.environ.copy()
+    if java_home:
+        env["JAVA_HOME"] = java_home
+
+    java_bin = str(Path(java_path).resolve().parent) if java_path else ""
+    if java_bin:
+        path_key = "Path" if "Path" in env else "PATH"
+        current_path = env.get(path_key, "")
+        env[path_key] = os.pathsep.join([java_bin, current_path]) if current_path else java_bin
+
+    return env
+
+
 def run_ghidra_headless(
     project_dir: str | Path,
     project_name: str = "TempProject",
     import_path: str | None = None,
+    process_path: str | None = None,
     script: str | Path | None = None,
     script_args: list[str] | None = None,
+    script_path: str | Path | None = None,
+    analyze: bool = True,
     delete_project: bool = True,
     timeout_seconds: int = 300,
 ) -> subprocess.CompletedProcess:
@@ -65,8 +84,11 @@ def run_ghidra_headless(
         project_dir: Directory to create/open the Ghidra project in.
         project_name: Name for the Ghidra project.
         import_path: Optional path to a binary/DLL to import.
+        process_path: Optional existing project file to process.
         script: Optional Python script to run post-import.
         script_args: Optional list of args to pass to the script.
+        script_path: Optional additional Ghidra script search path.
+        analyze: If False, pass -noanalysis.
         delete_project: If True, pass -deleteProject to clean up.
         timeout_seconds: Max seconds to wait for Ghidra.
 
@@ -80,15 +102,33 @@ def run_ghidra_headless(
     config = load_tools_config()
     ghidra_path, ghidra_home = _resolve_tool(config, "ghidra")
     java_path, java_home = _resolve_tool(config, "jdk21")
+    env = _build_ghidra_env(java_path, java_home)
+    Path(project_dir).mkdir(parents=True, exist_ok=True)
 
     # Build the command
     cmd = [ghidra_path, str(project_dir), project_name]
 
+    if import_path and process_path:
+        raise ValueError("Use either import_path or process_path, not both.")
+
     if import_path:
         cmd += ["-import", str(import_path)]
+    elif process_path:
+        cmd += ["-process", str(process_path)]
+
+    if not analyze:
+        cmd.append("-noanalysis")
 
     if script:
-        cmd += ["-postScript", str(script)]
+        script_arg = str(script)
+        if script_path:
+            cmd += ["-scriptPath", str(script_path)]
+        else:
+            script_file = Path(script)
+            if script_file.exists():
+                cmd += ["-scriptPath", str(script_file.parent)]
+                script_arg = script_file.name
+        cmd += ["-postScript", script_arg]
         if script_args:
             cmd += script_args
 
@@ -107,6 +147,7 @@ def run_ghidra_headless(
         encoding="utf-8",
         errors="replace",
         timeout=timeout_seconds,
+        env=env,
     )
 
     return result
@@ -116,8 +157,11 @@ def dry_run_ghidra_headless(
     project_dir: str | Path | None = None,
     project_name: str = "TempProject",
     import_path: str | None = None,
+    process_path: str | None = None,
     script: str | None = None,
     script_args: list[str] | None = None,
+    script_path: str | None = None,
+    analyze: bool = True,
     keep_project: bool = False,
     timeout_seconds: int = 300,
 ) -> None:
@@ -136,8 +180,14 @@ def dry_run_ghidra_headless(
     print(f"Project:    {project_dir}/{project_name}")
     if import_path:
         print(f"Import:     {import_path}")
+    if process_path:
+        print(f"Process:    {process_path}")
     if script:
         print(f"Script:     {script} {script_args or []}")
+    if script_path:
+        print(f"Script path: {script_path}")
+    if not analyze:
+        print("Analysis:   disabled (-noanalysis)")
     if keep_project:
         print("Keep project: yes")
     print(f"Timeout:    {timeout_seconds}s")
@@ -167,9 +217,20 @@ def main() -> None:
         help="Binary/DLL to import into Ghidra",
     )
     parser.add_argument(
+        "--process",
+        dest="process_path",
+        default=None,
+        help="Existing project file to process",
+    )
+    parser.add_argument(
         "--script",
         default=None,
         help="Python/Jython script to run post-import",
+    )
+    parser.add_argument(
+        "--script-path",
+        default=None,
+        help="Additional Ghidra script search path",
     )
     parser.add_argument(
         "--script-args",
@@ -181,6 +242,11 @@ def main() -> None:
         "--keep-project",
         action="store_true",
         help="Don't delete the Ghidra project after analysis",
+    )
+    parser.add_argument(
+        "--no-analysis",
+        action="store_true",
+        help="Pass -noanalysis to skip auto-analysis",
     )
     parser.add_argument(
         "--timeout",
@@ -202,8 +268,11 @@ def main() -> None:
                 project_dir=args.project_dir,
                 project_name=args.project_name,
                 import_path=args.import_path,
+                process_path=args.process_path,
                 script=args.script,
                 script_args=args.script_args,
+                script_path=args.script_path,
+                analyze=not args.no_analysis,
                 keep_project=args.keep_project,
                 timeout_seconds=args.timeout,
             )
@@ -217,8 +286,11 @@ def main() -> None:
             project_dir=args.project_dir,
             project_name=args.project_name,
             import_path=args.import_path,
+            process_path=args.process_path,
             script=args.script,
             script_args=args.script_args if args.script_args else None,
+            script_path=args.script_path,
+            analyze=not args.no_analysis,
             delete_project=not args.keep_project,
             timeout_seconds=args.timeout,
         )
