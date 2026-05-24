@@ -104,8 +104,9 @@ For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before cha
 - TWAD proof complete: `docs/handoffs/2026-05-24-twad-ghidra-proof.md`
 - NiDataStream/NiMesh proof started: `docs/handoffs/2026-05-24-nidatastream-ghidra-proof.md`
 - NiDataStream layout mismatch documented: `docs/handoffs/2026-05-24-nidatastream-layout-mismatch.md`
+- NiDataStream C# layout sidecar comparison wired: `docs/handoffs/2026-05-24-nidatastream-layout-helper-migration.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
-- Parser behavior should remain unchanged until the `PayloadPrefixBytes=28`, declared payload, and trailing-flag evidence is converted into a small guarded decoder patch with report/test migration.
+- Parser/export behavior should remain unchanged until the sidecar Ghidra-aligned role/body fields are reviewed and promoted through a small guarded decoder patch.
 - Next safe Ghidra target: either a tiny unsupported-TWAD-version warning/test review or the `NiDataStream` / `NiMesh` leads from the anchor survey.

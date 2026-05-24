@@ -156,6 +156,60 @@ public class BasicTests
   }
 
   [Fact]
+  public void NifDataStreamLayout_DetectsGhidraPayloadPrefixAndTrailingFlag()
+  {
+    var declaredPayload = new byte[] { 0xfe, 0xff, 0x3f, 0xc1, 0xbc, 0x82, 0x7c, 0x3e };
+    var blockPayload = new byte[4 + 4 + 4 + 8 + 4 + 4 + declaredPayload.Length + 1];
+    var offset = 0;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), (uint)declaredPayload.Length);
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 123);
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 1); // descriptor-pair count
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 4);
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 5);
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 1); // element descriptor count
+    offset += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(offset, 4), 0xaa);
+    offset += 4;
+    declaredPayload.CopyTo(blockPayload.AsSpan(offset));
+    offset += declaredPayload.Length;
+    blockPayload[offset] = 1;
+
+    var layout = Program.AnalyzeNifDataStreamLayout(blockPayload);
+
+    Assert.True(layout.ValidDeclaredPayload);
+    Assert.True(layout.GhidraStyleLayoutValid);
+    Assert.Equal((uint)declaredPayload.Length, layout.DeclaredPayloadBytes);
+    Assert.Equal(123u, layout.SecondUInt32);
+    Assert.Equal(1u, layout.DescriptorPairCount);
+    Assert.Equal(1u, layout.ElementDescriptorCount);
+    Assert.Equal(29, layout.LegacyPayloadOffset);
+    Assert.Equal(28, layout.PayloadPrefixBytes);
+    Assert.Equal(1, layout.PayloadTrailerBytes);
+    Assert.Equal((byte)1, layout.TrailingFlag);
+    Assert.Equal(1, layout.LegacyOffsetMinusPayloadPrefixBytes);
+    Assert.Null(layout.Warning);
+  }
+
+  [Fact]
+  public void NifDataStreamLayout_RejectsDeclaredPayloadPastBlock()
+  {
+    var blockPayload = new byte[8];
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(0, 4), 999);
+
+    var layout = Program.AnalyzeNifDataStreamLayout(blockPayload);
+
+    Assert.False(layout.ValidDeclaredPayload);
+    Assert.False(layout.GhidraStyleLayoutValid);
+    Assert.Equal(999u, layout.DeclaredPayloadBytes);
+    Assert.Equal("declared-payload-past-block", layout.Warning);
+  }
+
+  [Fact]
   public void TwadArchiveHeader_MatchesClientGhidraProof()
   {
     var bytes = new byte[20 + 44];

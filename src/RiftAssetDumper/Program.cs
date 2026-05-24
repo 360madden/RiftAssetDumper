@@ -3420,18 +3420,21 @@ internal static class Program
       }
 
       var blockPayload = SliceNifBlockPayload(payload, block);
-      uint? declaredPayloadBytes = null;
-      int? headerBytes = null;
+      var layout = AnalyzeNifDataStreamLayout(blockPayload);
+      var declaredPayloadBytes = layout.DeclaredPayloadBytes;
+      var headerBytes = layout.LegacyPayloadOffset;
       ReadOnlySpan<byte> body = ReadOnlySpan<byte>.Empty;
+      ReadOnlySpan<byte> ghidraBody = ReadOnlySpan<byte>.Empty;
       NifStreamBodyStats? stats = null;
-      if (blockPayload.Length >= 4)
+      NifStreamBodyStats? ghidraStats = null;
+      if (layout.ValidDeclaredPayload)
       {
-        declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
-        if (declaredPayloadBytes.Value <= blockPayload.Length)
+        body = SliceNifDataStreamLegacyBody(blockPayload, layout);
+        stats = AnalyzeNifStreamBody(body);
+        if (layout.GhidraStyleLayoutValid)
         {
-          headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes.Value);
-          body = blockPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
-          stats = AnalyzeNifStreamBody(body);
+          ghidraBody = SliceNifDataStreamGhidraBody(blockPayload, layout);
+          ghidraStats = AnalyzeNifStreamBody(ghidraBody);
         }
       }
 
@@ -3444,9 +3447,17 @@ internal static class Program
           BlockFirst64: ToHex(blockPayload[..Math.Min(64, blockPayload.Length)]),
           DeclaredPayloadBytes: declaredPayloadBytes,
           HeaderBytes: headerBytes,
+          LegacyPayloadOffset: layout.LegacyPayloadOffset,
+          PayloadPrefixBytes: layout.PayloadPrefixBytes,
+          PayloadTrailerBytes: layout.PayloadTrailerBytes,
+          TrailingFlag: layout.TrailingFlag,
+          GhidraStyleLayoutValid: layout.GhidraStyleLayoutValid,
+          LegacyOffsetMinusPayloadPrefixBytes: layout.LegacyOffsetMinusPayloadPrefixBytes,
           BodyOffset: headerBytes,
           BodyFirst128: ToHex(body[..Math.Min(128, body.Length)]),
           Stats: stats,
+          GhidraBodyFirst128: ToHex(ghidraBody[..Math.Min(128, ghidraBody.Length)]),
+          GhidraStats: ghidraStats,
           UInt16Prefix: ReadUInt16Prefix(body, maxValues: 32),
           UInt16BigEndianPrefix: ReadUInt16BigEndianPrefix(body, maxValues: 32),
           UInt32Prefix: ReadUInt32Prefix(body, maxValues: 24),
@@ -3489,7 +3500,7 @@ internal static class Program
       var strideText = stream.PreferredStrideCandidates.Count == 0
           ? "none"
           : FormatPreferredStrideSummary(stream.PreferredStrideCandidates, max: 6);
-      Console.WriteLine($"Stream #{stream.BlockIndex} size={stream.BlockSize:N0} payload={stream.DeclaredPayloadBytes} header={stream.HeaderBytes} class={stream.Stats?.Classification ?? "invalid"} strides={strideText}");
+      Console.WriteLine($"Stream #{stream.BlockIndex} size={stream.BlockSize:N0} payload={stream.DeclaredPayloadBytes} header={stream.HeaderBytes} prefix={stream.PayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} trailer={stream.PayloadTrailerBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} flag={stream.TrailingFlag?.ToString(CultureInfo.InvariantCulture) ?? "-"} shifted={stream.LegacyOffsetMinusPayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} class={stream.Stats?.Classification ?? "invalid"} ghidraClass={stream.GhidraStats?.Classification ?? "-"} strides={strideText}");
       Console.WriteLine($"  body first16={stream.BodyFirst128[..Math.Min(32, stream.BodyFirst128.Length)]}");
       Console.WriteLine($"  u16le={string.Join(",", stream.UInt16Prefix.Take(12))}");
       Console.WriteLine($"  u16be={string.Join(",", stream.UInt16BigEndianPrefix.Take(12))}");
@@ -4098,6 +4109,9 @@ internal static class Program
     var candidateLinkCount = 0;
     var validDeclaredStreamBodies = 0;
     var invalidDeclaredStreamBodies = 0;
+    var ghidraStyleLayoutValidStreamBodies = 0;
+    var legacyOffsetShiftedStreamBodies = 0;
+    var ghidraRoleDeltaStreamBodies = 0;
     var pairCompatibleMeshes = 0;
     var pairCompatibleLinks = 0;
     var attributeCompatibleMeshes = 0;
@@ -4186,27 +4200,38 @@ internal static class Program
               uint? declaredPayloadBytes = null;
               int? headerBytes = null;
               var bodyFirst16 = string.Empty;
+              var ghidraBodyFirst16 = string.Empty;
               NifMeshStreamRoleStats roleStats;
-              if (targetPayload.Length >= 4)
+              NifMeshStreamRoleStats? ghidraRoleStats = null;
+              var layout = AnalyzeNifDataStreamLayout(targetPayload);
+              declaredPayloadBytes = layout.DeclaredPayloadBytes;
+              headerBytes = layout.LegacyPayloadOffset;
+              if (layout.ValidDeclaredPayload)
               {
-                declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(targetPayload[..4]);
-                if (declaredPayloadBytes.Value <= targetPayload.Length)
+                var body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+                bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
+                roleStats = AnalyzeNifMeshBoundStreamRole(body);
+                validDeclaredStreamBodies++;
+                if (layout.GhidraStyleLayoutValid)
                 {
-                  headerBytes = targetPayload.Length - checked((int)declaredPayloadBytes.Value);
-                  var body = targetPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
-                  bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
-                  roleStats = AnalyzeNifMeshBoundStreamRole(body);
-                  validDeclaredStreamBodies++;
+                  ghidraStyleLayoutValidStreamBodies++;
+                  var ghidraBody = SliceNifDataStreamGhidraBody(targetPayload, layout);
+                  ghidraBodyFirst16 = ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]);
+                  ghidraRoleStats = AnalyzeNifMeshBoundStreamRole(ghidraBody);
+                  if (!string.Equals(roleStats.PrimaryRole, ghidraRoleStats.PrimaryRole, StringComparison.OrdinalIgnoreCase))
+                  {
+                    ghidraRoleDeltaStreamBodies++;
+                  }
                 }
-                else
+
+                if (layout.LegacyOffsetMinusPayloadPrefixBytes is not null and not 0)
                 {
-                  roleStats = NifMeshStreamRoleStats.Invalid("declared-payload-past-block");
-                  invalidDeclaredStreamBodies++;
+                  legacyOffsetShiftedStreamBodies++;
                 }
               }
               else
               {
-                roleStats = NifMeshStreamRoleStats.Invalid("stream-block-too-small");
+                roleStats = NifMeshStreamRoleStats.Invalid(layout.Warning ?? "invalid-stream-layout");
                 invalidDeclaredStreamBodies++;
               }
 
@@ -4220,10 +4245,18 @@ internal static class Program
                   TargetFirst16: candidate.TargetFirst16,
                   DeclaredPayloadBytes: declaredPayloadBytes,
                   HeaderBytes: headerBytes,
+                  LegacyPayloadOffset: layout.LegacyPayloadOffset,
+                  PayloadPrefixBytes: layout.PayloadPrefixBytes,
+                  PayloadTrailerBytes: layout.PayloadTrailerBytes,
+                  TrailingFlag: layout.TrailingFlag,
+                  GhidraStyleLayoutValid: layout.GhidraStyleLayoutValid,
+                  LegacyOffsetMinusPayloadPrefixBytes: layout.LegacyOffsetMinusPayloadPrefixBytes,
                   BodyFirst16: bodyFirst16,
+                  GhidraBodyFirst16: ghidraBodyFirst16,
                   MaybeStringIndex: candidate.MaybeStringIndex,
                   StringValue: candidate.StringValue,
-                  RoleStats: roleStats);
+                  RoleStats: roleStats,
+                  GhidraRoleStats: ghidraRoleStats);
               streamSummaries.Add(summary);
 
               if (!roleGroups.TryGetValue(roleStats.PrimaryRole, out var roleGroup))
@@ -4913,6 +4946,9 @@ internal static class Program
         CandidateLinks: candidateLinkCount,
         ValidDeclaredStreamBodies: validDeclaredStreamBodies,
         InvalidDeclaredStreamBodies: invalidDeclaredStreamBodies,
+        GhidraStyleLayoutValidStreamBodies: ghidraStyleLayoutValidStreamBodies,
+        LegacyOffsetShiftedStreamBodies: legacyOffsetShiftedStreamBodies,
+        GhidraRoleDeltaStreamBodies: ghidraRoleDeltaStreamBodies,
         PairCompatibleMeshes: pairCompatibleMeshes,
         PairCompatibleLinks: pairCompatibleLinks,
         AttributeCompatibleMeshes: attributeCompatibleMeshes,
@@ -5015,6 +5051,9 @@ internal static class Program
     Console.WriteLine($"Candidate stream links: {candidateLinkCount:N0}");
     Console.WriteLine($"Valid declared stream bodies: {validDeclaredStreamBodies:N0}");
     Console.WriteLine($"Invalid declared stream bodies: {invalidDeclaredStreamBodies:N0}");
+    Console.WriteLine($"Ghidra-style layout valid stream bodies: {ghidraStyleLayoutValidStreamBodies:N0}");
+    Console.WriteLine($"Legacy offset shifted stream bodies: {legacyOffsetShiftedStreamBodies:N0}");
+    Console.WriteLine($"Ghidra role deltas: {ghidraRoleDeltaStreamBodies:N0}");
     Console.WriteLine($"Pair-compatible meshes: {pairCompatibleMeshes:N0}");
     Console.WriteLine($"Pair-compatible links: {pairCompatibleLinks:N0}");
     Console.WriteLine($"Attribute-compatible meshes: {attributeCompatibleMeshes:N0}");
@@ -5328,6 +5367,9 @@ internal static class Program
     var dataStreamBlocks = 0;
     var validStreamBodies = 0;
     var invalidStreamBodies = 0;
+    var ghidraStyleLayoutValidStreamBodies = 0;
+    var legacyOffsetShiftedStreamBodies = 0;
+    var ghidraClassificationDeltaStreamBodies = 0;
 
     foreach (var archivePath in Directory.EnumerateFiles(assetsDirectory, "assets.*", SearchOption.TopDirectoryOnly).OrderBy(static p => p))
     {
@@ -5384,16 +5426,35 @@ internal static class Program
               continue;
             }
 
-            var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
-            if (declaredPayloadBytes > blockPayload.Length)
+            var layout = AnalyzeNifDataStreamLayout(blockPayload);
+            if (!layout.ValidDeclaredPayload || layout.DeclaredPayloadBytes is null)
             {
               invalidStreamBodies++;
               continue;
             }
 
-            var bodyOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
-            var body = blockPayload.Slice(bodyOffset, checked((int)declaredPayloadBytes));
+            var declaredPayloadBytes = layout.DeclaredPayloadBytes.Value;
+            var bodyOffset = layout.LegacyPayloadOffset!.Value;
+            var body = SliceNifDataStreamLegacyBody(blockPayload, layout);
             var stats = AnalyzeNifStreamBody(body);
+            ReadOnlySpan<byte> ghidraBody = ReadOnlySpan<byte>.Empty;
+            NifStreamBodyStats? ghidraStats = null;
+            if (layout.GhidraStyleLayoutValid)
+            {
+              ghidraStyleLayoutValidStreamBodies++;
+              ghidraBody = SliceNifDataStreamGhidraBody(blockPayload, layout);
+              ghidraStats = AnalyzeNifStreamBody(ghidraBody);
+              if (!string.Equals(stats.Classification, ghidraStats.Classification, StringComparison.OrdinalIgnoreCase))
+              {
+                ghidraClassificationDeltaStreamBodies++;
+              }
+            }
+
+            if (layout.LegacyOffsetMinusPayloadPrefixBytes is not null and not 0)
+            {
+              legacyOffsetShiftedStreamBodies++;
+            }
+
             var usageAccessKey = FormatNifDataStreamUsageAccessKey(block.DataStreamUsage, block.DataStreamAccess);
             validStreamBodies++;
 
@@ -5408,8 +5469,16 @@ internal static class Program
                 DataStreamAccess: block.DataStreamAccess,
                 BlockSize: block.Size,
                 HeaderBytes: bodyOffset,
+                LegacyPayloadOffset: layout.LegacyPayloadOffset,
+                PayloadPrefixBytes: layout.PayloadPrefixBytes,
+                PayloadTrailerBytes: layout.PayloadTrailerBytes,
+                TrailingFlag: layout.TrailingFlag,
+                GhidraStyleLayoutValid: layout.GhidraStyleLayoutValid,
+                LegacyOffsetMinusPayloadPrefixBytes: layout.LegacyOffsetMinusPayloadPrefixBytes,
                 DeclaredPayloadBytes: declaredPayloadBytes,
                 PayloadFirst16: stats.First16,
+                GhidraPayloadFirst16: ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]),
+                GhidraStats: ghidraStats,
                 Stats: stats);
 
             if (!sizeGroups.TryGetValue(declaredPayloadBytes, out var sizeGroup))
@@ -5538,6 +5607,9 @@ internal static class Program
         DataStreamBlocks: dataStreamBlocks,
         ValidStreamBodies: validStreamBodies,
         InvalidStreamBodies: invalidStreamBodies,
+        GhidraStyleLayoutValidStreamBodies: ghidraStyleLayoutValidStreamBodies,
+        LegacyOffsetShiftedStreamBodies: legacyOffsetShiftedStreamBodies,
+        GhidraClassificationDeltaStreamBodies: ghidraClassificationDeltaStreamBodies,
         UsageAccessGroups: usageAccessGroups.Values
             .Select(static g => new NifDataStreamUsageAccessGroup(g.DataStreamUsage, g.DataStreamAccess, g.Count))
             .OrderByDescending(static g => g.Count)
@@ -5567,6 +5639,9 @@ internal static class Program
     Console.WriteLine($"NiDataStream blocks: {dataStreamBlocks:N0}");
     Console.WriteLine($"Valid stream bodies: {validStreamBodies:N0}");
     Console.WriteLine($"Invalid stream bodies: {invalidStreamBodies:N0}");
+    Console.WriteLine($"Ghidra-style layout valid stream bodies: {ghidraStyleLayoutValidStreamBodies:N0}");
+    Console.WriteLine($"Legacy offset shifted stream bodies: {legacyOffsetShiftedStreamBodies:N0}");
+    Console.WriteLine($"Ghidra classification deltas: {ghidraClassificationDeltaStreamBodies:N0}");
     Console.WriteLine($"Top usage/access: {string.Join(", ", report.UsageAccessGroups.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)}={g.Count:N0}"))}");
     Console.WriteLine($"Top payload sizes: {string.Join(", ", report.PayloadSizeGroups.Take(8).Select(static g => $"{g.DeclaredPayloadBytes}={g.Count:N0}"))}");
     Console.WriteLine($"Top body signatures: {string.Join(" | ", report.TopBodySignatures.Take(5).Select(static g => $"payload={g.DeclaredPayloadBytes}{FormatNifDataStreamUsageAccessInline(g.DataStreamUsage, g.DataStreamAccess)} first16={g.PayloadFirst16} count={g.Count:N0}"))}");
@@ -9168,6 +9243,148 @@ internal static class Program
     return payload.AsSpan(block.DataOffset, safeSize);
   }
 
+  internal static NifDataStreamLayout AnalyzeNifDataStreamLayout(byte[] blockPayload)
+  {
+    return AnalyzeNifDataStreamLayout(blockPayload.AsSpan());
+  }
+
+  private static NifDataStreamLayout AnalyzeNifDataStreamLayout(ReadOnlySpan<byte> blockPayload)
+  {
+    if (blockPayload.Length < 4)
+    {
+      return new NifDataStreamLayout(
+          DeclaredPayloadBytes: null,
+          ValidDeclaredPayload: false,
+          SecondUInt32: null,
+          DescriptorPairCount: null,
+          ElementDescriptorCount: null,
+          LegacyPayloadOffset: null,
+          PayloadPrefixBytes: null,
+          PayloadTrailerBytes: null,
+          TrailingFlag: null,
+          GhidraStyleLayoutValid: false,
+          LegacyOffsetMinusPayloadPrefixBytes: null,
+          Warning: "stream-block-too-small");
+    }
+
+    var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
+    if (declaredPayloadBytes > blockPayload.Length)
+    {
+      return new NifDataStreamLayout(
+          DeclaredPayloadBytes: declaredPayloadBytes,
+          ValidDeclaredPayload: false,
+          SecondUInt32: null,
+          DescriptorPairCount: null,
+          ElementDescriptorCount: null,
+          LegacyPayloadOffset: null,
+          PayloadPrefixBytes: null,
+          PayloadTrailerBytes: null,
+          TrailingFlag: null,
+          GhidraStyleLayoutValid: false,
+          LegacyOffsetMinusPayloadPrefixBytes: null,
+          Warning: "declared-payload-past-block");
+    }
+
+    var legacyPayloadOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
+    uint? secondUInt32 = null;
+    uint? descriptorPairCount = null;
+    uint? elementDescriptorCount = null;
+    int? payloadPrefixBytes = null;
+    int? payloadTrailerBytes = null;
+    byte? trailingFlag = null;
+    string? warning = null;
+
+    try
+    {
+      var offset = 4;
+      if (offset + 4 > blockPayload.Length)
+      {
+        throw new InvalidDataException("stream-block-ended-before-second-u32");
+      }
+
+      secondUInt32 = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload.Slice(offset, 4));
+      offset += 4;
+      if (offset + 4 > blockPayload.Length)
+      {
+        throw new InvalidDataException("stream-block-ended-before-descriptor-pair-count");
+      }
+
+      descriptorPairCount = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload.Slice(offset, 4));
+      offset += 4;
+      var pairBytes = checked((ulong)descriptorPairCount.Value * 8UL);
+      if (pairBytes > (ulong)(blockPayload.Length - offset))
+      {
+        throw new InvalidDataException("descriptor-pair-table-past-block");
+      }
+
+      offset += checked((int)pairBytes);
+      if (offset + 4 > blockPayload.Length)
+      {
+        throw new InvalidDataException("stream-block-ended-before-element-descriptor-count");
+      }
+
+      elementDescriptorCount = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload.Slice(offset, 4));
+      offset += 4;
+      var descriptorBytes = checked((ulong)elementDescriptorCount.Value * 4UL);
+      if (descriptorBytes > (ulong)(blockPayload.Length - offset))
+      {
+        throw new InvalidDataException("element-descriptor-table-past-block");
+      }
+
+      offset += checked((int)descriptorBytes);
+      payloadPrefixBytes = offset;
+      var payloadEnd = checked(payloadPrefixBytes.Value + (int)declaredPayloadBytes);
+      if (payloadEnd > blockPayload.Length)
+      {
+        throw new InvalidDataException("descriptor-prefix-plus-payload-past-block");
+      }
+
+      payloadTrailerBytes = blockPayload.Length - payloadEnd;
+      trailingFlag = payloadTrailerBytes.Value > 0 ? blockPayload[payloadEnd] : null;
+    }
+    catch (Exception ex) when (ex is OverflowException or InvalidDataException)
+    {
+      warning = ex.Message;
+    }
+
+    var ghidraStyleLayoutValid = payloadPrefixBytes is not null &&
+        payloadTrailerBytes == 1 &&
+        trailingFlag is 0 or 1;
+    return new NifDataStreamLayout(
+        DeclaredPayloadBytes: declaredPayloadBytes,
+        ValidDeclaredPayload: true,
+        SecondUInt32: secondUInt32,
+        DescriptorPairCount: descriptorPairCount,
+        ElementDescriptorCount: elementDescriptorCount,
+        LegacyPayloadOffset: legacyPayloadOffset,
+        PayloadPrefixBytes: payloadPrefixBytes,
+        PayloadTrailerBytes: payloadTrailerBytes,
+        TrailingFlag: trailingFlag,
+        GhidraStyleLayoutValid: ghidraStyleLayoutValid,
+        LegacyOffsetMinusPayloadPrefixBytes: payloadPrefixBytes is null ? null : legacyPayloadOffset - payloadPrefixBytes.Value,
+        Warning: warning);
+  }
+
+  private static ReadOnlySpan<byte> SliceNifDataStreamLegacyBody(ReadOnlySpan<byte> blockPayload, NifDataStreamLayout layout)
+  {
+    if (!layout.ValidDeclaredPayload || layout.DeclaredPayloadBytes is null || layout.LegacyPayloadOffset is null)
+    {
+      return ReadOnlySpan<byte>.Empty;
+    }
+
+    return blockPayload.Slice(layout.LegacyPayloadOffset.Value, checked((int)layout.DeclaredPayloadBytes.Value));
+  }
+
+  private static ReadOnlySpan<byte> SliceNifDataStreamGhidraBody(ReadOnlySpan<byte> blockPayload, NifDataStreamLayout layout)
+  {
+    if (!layout.GhidraStyleLayoutValid || layout.DeclaredPayloadBytes is null || layout.PayloadPrefixBytes is null)
+    {
+      return ReadOnlySpan<byte>.Empty;
+    }
+
+    return blockPayload.Slice(layout.PayloadPrefixBytes.Value, checked((int)layout.DeclaredPayloadBytes.Value));
+  }
+
   private static List<StrideCandidate> FindWholeBlockStrideCandidates(int length)
   {
     var candidates = new List<StrideCandidate>();
@@ -10008,25 +10225,27 @@ internal static class Program
       uint? declaredPayloadBytes = null;
       int? headerBytes = null;
       var bodyFirst16 = string.Empty;
+      var ghidraBodyFirst16 = string.Empty;
       NifMeshStreamRoleStats roleStats;
-      if (targetPayload.Length >= 4)
+      NifMeshStreamRoleStats? ghidraRoleStats = null;
+      var layout = AnalyzeNifDataStreamLayout(targetPayload);
+      declaredPayloadBytes = layout.DeclaredPayloadBytes;
+      headerBytes = layout.LegacyPayloadOffset;
+      if (layout.ValidDeclaredPayload)
       {
-        declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(targetPayload[..4]);
-        if (declaredPayloadBytes.Value <= targetPayload.Length)
+        var body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+        bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
+        roleStats = AnalyzeNifMeshBoundStreamRole(body);
+        if (layout.GhidraStyleLayoutValid)
         {
-          headerBytes = targetPayload.Length - checked((int)declaredPayloadBytes.Value);
-          var body = targetPayload.Slice(headerBytes.Value, checked((int)declaredPayloadBytes.Value));
-          bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
-          roleStats = AnalyzeNifMeshBoundStreamRole(body);
-        }
-        else
-        {
-          roleStats = NifMeshStreamRoleStats.Invalid("declared-payload-past-block");
+          var ghidraBody = SliceNifDataStreamGhidraBody(targetPayload, layout);
+          ghidraBodyFirst16 = ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]);
+          ghidraRoleStats = AnalyzeNifMeshBoundStreamRole(ghidraBody);
         }
       }
       else
       {
-        roleStats = NifMeshStreamRoleStats.Invalid("stream-block-too-small");
+        roleStats = NifMeshStreamRoleStats.Invalid(layout.Warning ?? "invalid-stream-layout");
       }
 
       streamSummaries.Add(new NifMeshBoundStreamSummary(
@@ -10039,10 +10258,18 @@ internal static class Program
           TargetFirst16: candidate.TargetFirst16,
           DeclaredPayloadBytes: declaredPayloadBytes,
           HeaderBytes: headerBytes,
+          LegacyPayloadOffset: layout.LegacyPayloadOffset,
+          PayloadPrefixBytes: layout.PayloadPrefixBytes,
+          PayloadTrailerBytes: layout.PayloadTrailerBytes,
+          TrailingFlag: layout.TrailingFlag,
+          GhidraStyleLayoutValid: layout.GhidraStyleLayoutValid,
+          LegacyOffsetMinusPayloadPrefixBytes: layout.LegacyOffsetMinusPayloadPrefixBytes,
           BodyFirst16: bodyFirst16,
+          GhidraBodyFirst16: ghidraBodyFirst16,
           MaybeStringIndex: candidate.MaybeStringIndex,
           StringValue: candidate.StringValue,
-          RoleStats: roleStats));
+          RoleStats: roleStats,
+          GhidraRoleStats: ghidraRoleStats));
     }
 
     return streamSummaries;
@@ -13994,6 +14221,20 @@ internal sealed record NifStreamBodyProbeReport(
     List<string> HeaderWarnings,
     List<NifStreamBodyProbe> StreamBodies);
 
+internal sealed record NifDataStreamLayout(
+    uint? DeclaredPayloadBytes,
+    bool ValidDeclaredPayload,
+    uint? SecondUInt32,
+    uint? DescriptorPairCount,
+    uint? ElementDescriptorCount,
+    int? LegacyPayloadOffset,
+    int? PayloadPrefixBytes,
+    int? PayloadTrailerBytes,
+    byte? TrailingFlag,
+    bool GhidraStyleLayoutValid,
+    int? LegacyOffsetMinusPayloadPrefixBytes,
+    string? Warning);
+
 internal sealed record NifStreamBodyProbe(
     int BlockIndex,
     string TypeName,
@@ -14002,9 +14243,17 @@ internal sealed record NifStreamBodyProbe(
     string BlockFirst64,
     uint? DeclaredPayloadBytes,
     int? HeaderBytes,
+    int? LegacyPayloadOffset,
+    int? PayloadPrefixBytes,
+    int? PayloadTrailerBytes,
+    byte? TrailingFlag,
+    bool GhidraStyleLayoutValid,
+    int? LegacyOffsetMinusPayloadPrefixBytes,
     int? BodyOffset,
     string BodyFirst128,
     NifStreamBodyStats? Stats,
+    string GhidraBodyFirst128,
+    NifStreamBodyStats? GhidraStats,
     List<ushort> UInt16Prefix,
     List<ushort> UInt16BigEndianPrefix,
     List<uint> UInt32Prefix,
@@ -14709,6 +14958,9 @@ internal sealed record NifMeshBindingInventoryReport(
     int CandidateLinks,
     int ValidDeclaredStreamBodies,
     int InvalidDeclaredStreamBodies,
+    int GhidraStyleLayoutValidStreamBodies,
+    int LegacyOffsetShiftedStreamBodies,
+    int GhidraRoleDeltaStreamBodies,
     int PairCompatibleMeshes,
     int PairCompatibleLinks,
     int AttributeCompatibleMeshes,
@@ -15048,10 +15300,18 @@ internal sealed record NifMeshBoundStreamSummary(
     string TargetFirst16,
     uint? DeclaredPayloadBytes,
     int? HeaderBytes,
+    int? LegacyPayloadOffset,
+    int? PayloadPrefixBytes,
+    int? PayloadTrailerBytes,
+    byte? TrailingFlag,
+    bool GhidraStyleLayoutValid,
+    int? LegacyOffsetMinusPayloadPrefixBytes,
     string BodyFirst16,
+    string GhidraBodyFirst16,
     bool MaybeStringIndex,
     string? StringValue,
-    NifMeshStreamRoleStats RoleStats);
+    NifMeshStreamRoleStats RoleStats,
+    NifMeshStreamRoleStats? GhidraRoleStats);
 
 internal sealed record NifMeshBindingPairingSample(
     string ArchiveName,
@@ -15330,6 +15590,9 @@ internal sealed record NifStreamBodyInventoryReport(
     int DataStreamBlocks,
     int ValidStreamBodies,
     int InvalidStreamBodies,
+    int GhidraStyleLayoutValidStreamBodies,
+    int LegacyOffsetShiftedStreamBodies,
+    int GhidraClassificationDeltaStreamBodies,
     List<NifDataStreamUsageAccessGroup> UsageAccessGroups,
     List<NifStreamBodySizeGroup> PayloadSizeGroups,
     List<NifStreamBodySignatureGroup> TopBodySignatures);
@@ -15367,8 +15630,16 @@ internal sealed record NifStreamBodySample(
     string? DataStreamAccess,
     uint BlockSize,
     int HeaderBytes,
+    int? LegacyPayloadOffset,
+    int? PayloadPrefixBytes,
+    int? PayloadTrailerBytes,
+    byte? TrailingFlag,
+    bool GhidraStyleLayoutValid,
+    int? LegacyOffsetMinusPayloadPrefixBytes,
     uint DeclaredPayloadBytes,
     string PayloadFirst16,
+    string GhidraPayloadFirst16,
+    NifStreamBodyStats? GhidraStats,
     NifStreamBodyStats Stats);
 
 internal sealed record NifStreamBodyStats(

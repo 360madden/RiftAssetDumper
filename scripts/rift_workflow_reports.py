@@ -202,6 +202,9 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
         f"NIF payloads={json_value_or_dash(report, 'NifPayloads')} "
         f"meshBlocks={json_value_or_dash(report, 'MeshBlocks')} "
         f"links={json_value_or_dash(report, 'CandidateLinks')} "
+        f"ghidraLayout={json_value_or_dash(report, 'GhidraStyleLayoutValidStreamBodies')} "
+        f"shifted={json_value_or_dash(report, 'LegacyOffsetShiftedStreamBodies')} "
+        f"roleDeltas={json_value_or_dash(report, 'GhidraRoleDeltaStreamBodies')} "
         f"pairMeshes={json_value_or_dash(report, 'PairCompatibleMeshes')} "
         f"pairLinks={json_value_or_dash(report, 'PairCompatibleLinks')}"
     )
@@ -804,9 +807,12 @@ def _show_simple_inventory(report: dict[str, Any], mode: str) -> None:
         print(
             f"NIF payloads={json_value_or_dash(report, 'NifPayloads')} "
             f"validBodies={json_value_or_dash(report, 'ValidStreamBodies')} "
-            f"invalid={json_value_or_dash(report, 'InvalidStreamBodies')}"
+            f"invalid={json_value_or_dash(report, 'InvalidStreamBodies')} "
+            f"ghidraLayout={json_value_or_dash(report, 'GhidraStyleLayoutValidStreamBodies')} "
+            f"shifted={json_value_or_dash(report, 'LegacyOffsetShiftedStreamBodies')} "
+            f"classDeltas={json_value_or_dash(report, 'GhidraClassificationDeltaStreamBodies')}"
         )
-        sizes = report.get("SizeGroups")
+        sizes = report.get("PayloadSizeGroups")
         if sizes and isinstance(sizes, list):
             print(
                 "Top sizes: "
@@ -815,7 +821,7 @@ def _show_simple_inventory(report: dict[str, Any], mode: str) -> None:
                     lambda g: f"payload={json_value_or_dash(g, 'DeclaredPayloadBytes')} count={json_value_or_dash(g, 'Count')}",
                 )
             )
-        sigs = report.get("TopSignatures")
+        sigs = report.get("TopBodySignatures")
         if sigs and isinstance(sigs, list):
             print(
                 "Top signatures: "

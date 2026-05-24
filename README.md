@@ -81,6 +81,8 @@ Keep Ghidra projects, reports, and one-off scripts under ignored `Exports/ghidra
 
 Use `nidatastream-layout` as the read-only bridge between Ghidra's `NiDataStream::LoadBinary()` evidence and copied/extracted NIF samples. It checks descriptor prefix bytes, declared payload bytes, and trailing flag bytes without changing decoder/export behavior.
 
+C# stream reports now expose the same layout comparison side-by-side: legacy `HeaderBytes` / `RoleStats` remain unchanged, while `PayloadPrefixBytes`, `PayloadTrailerBytes`, `TrailingFlag`, and `Ghidra*` sidecar fields show the Ghidra-aligned interpretation for review.
+
 ## Privacy and path redaction
 
 The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports. Paths under the current user's profile are emitted with an environment-variable placeholder:
