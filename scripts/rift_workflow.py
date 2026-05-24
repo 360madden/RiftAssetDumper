@@ -23,6 +23,7 @@ Commands (kebab-case):
     ghidra-attribute-candidate-report — group Ghidra-only review rows by sample mesh
     ghidra-attribute-candidate-guard — grouped Ghidra candidate baseline guard
     ghidra-review-rank-probes — batch mesh-probe focused Ghidra review ranks
+    ghidra-review-rank-probes-summary — summarize ignored Ghidra review-rank probe manifests
     ghidra-workflow-guard-suite — run Ghidra non-export + attribute baseline guards
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
@@ -188,6 +189,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-review-rank-probes-summary": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-workflow-guard-suite": {
         "dotnet": "",
         "base": "",
@@ -316,6 +321,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraAttributeCandidateReport": "ghidra-attribute-candidate-report",
     "GhidraAttributeCandidateGuard": "ghidra-attribute-candidate-guard",
     "GhidraReviewRankProbes": "ghidra-review-rank-probes",
+    "GhidraReviewRankProbesSummary": "ghidra-review-rank-probes-summary",
     "GhidraWorkflowGuardSuite": "ghidra-workflow-guard-suite",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
@@ -598,6 +604,13 @@ def _ensure_ghidra_attribute_candidate_report(
     return report_path
 
 
+def _slugify_review_kind(review_kind: str) -> str:
+    """Return a filesystem-safe slug for review-kind specific generated files."""
+    return "-".join(part for part in "".join(
+        char.lower() if char.isalnum() else "-" for char in review_kind
+    ).split("-") if part) or "all"
+
+
 def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     """Batch-refresh ignored mesh-probe JSON for ranked Ghidra review findings."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
@@ -691,9 +704,7 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
         "ReviewReportLimit": review_report_limit,
         "Results": results,
     }
-    manifest_slug = "-".join(part for part in "".join(
-        char.lower() if char.isalnum() else "-" for char in review_kind
-    ).split("-") if part) or "all"
+    manifest_slug = _slugify_review_kind(review_kind)
     manifest_json = probe_root / f"manifest-{manifest_slug}.json"
     manifest_json.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     latest_manifest_json = probe_root / "manifest.json"
@@ -728,6 +739,128 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     print(f"GhidraReviewRankProbes manifest JSON: {manifest_json}")
     print(f"GhidraReviewRankProbes manifest markdown: {manifest_md}")
     print("GhidraReviewRankProbes passed: focused probe outputs remain under ignored Exports/.")
+
+
+def _run_ghidra_review_rank_probes_summary(args: argparse.Namespace) -> None:
+    """Summarize ignored per-kind Ghidra review-rank probe manifests."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    probe_root = out_dir / "ghidra-review-rank-probes"
+    kind_filter = str(args.review_kind or "all").lower()
+    if not probe_root.exists():
+        print(
+            "ERROR: ghidra-review-rank-probes-summary requires existing ignored probe manifests.\n"
+            f"  Expected probe root: {probe_root}\n"
+            "  Run: python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    manifest_paths = sorted(path for path in probe_root.glob("manifest-*.json") if path.name != "manifest.json")
+    if not manifest_paths and (probe_root / "manifest.json").exists():
+        manifest_paths = [probe_root / "manifest.json"]
+    if not manifest_paths:
+        print(
+            "ERROR: ghidra-review-rank-probes-summary found no manifest JSON files.\n"
+            f"  Expected files like: {probe_root / 'manifest-ghidra-only.json'}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    review_kind_summaries: list[dict[str, object]] = []
+    total_selected = 0
+    for manifest_path in manifest_paths:
+        manifest = load_json_report(str(manifest_path))
+        review_kind = str(manifest.get("ReviewKindFilter", "-"))
+        if kind_filter != "all" and review_kind.lower() != kind_filter:
+            continue
+        results = manifest.get("Results")
+        if not isinstance(results, list):
+            print(f"ERROR: manifest {manifest_path} is missing a Results array.", file=sys.stderr)
+            sys.exit(1)
+
+        role_counts: dict[str, int] = {}
+        ranks: list[int] = []
+        sample_meshes: list[str] = []
+        for result in results:
+            if not isinstance(result, dict):
+                continue
+            rank = _json_int_or_none(result.get("Rank"))
+            mesh_block = _json_int_or_none(result.get("SampleMeshBlockIndex"))
+            sample_id = str(result.get("SampleIdPrefix", "-"))
+            role = str(result.get("GhidraRoles", "-"))
+            role_counts[role] = role_counts.get(role, 0) + 1
+            if rank is not None:
+                ranks.append(rank)
+            if sample_id != "-" and mesh_block is not None:
+                sample_meshes.append(f"{sample_id}#mesh{mesh_block}")
+
+        selected_count = len(results)
+        total_selected += selected_count
+        review_kind_summaries.append(
+            {
+                "ReviewKind": review_kind,
+                "ManifestPath": str(manifest_path),
+                "SelectedCount": selected_count,
+                "Ranks": sorted(ranks),
+                "SampleMeshes": sorted(set(sample_meshes)),
+                "GhidraRoleCounts": dict(sorted(role_counts.items())),
+            }
+        )
+
+    if not review_kind_summaries:
+        print(
+            f"ERROR: no ghidra-review-rank-probes manifests matched --review-kind {kind_filter}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    summary = {
+        "SchemaVersion": "ghidra-review-rank-probes-summary/v1",
+        "CandidateOnly": True,
+        "GeneratedAt": datetime.now().isoformat(),
+        "ProbeRoot": str(probe_root),
+        "ReviewKindFilter": kind_filter,
+        "ManifestCount": len(review_kind_summaries),
+        "SelectedCountTotal": total_selected,
+        "ReviewKinds": review_kind_summaries,
+    }
+    summary_slug = _slugify_review_kind(kind_filter)
+    summary_json = probe_root / f"summary-{summary_slug}.json"
+    summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (probe_root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    md_lines = [
+        "# Ghidra review-rank probe summary",
+        "",
+        "Candidate-only: yes. This summarizes ignored probe manifests and does not feed parser/export behavior.",
+        "",
+        f"- Probe root: `{probe_root}`",
+        f"- Review kind filter: `{kind_filter}`",
+        f"- Manifests summarized: `{len(review_kind_summaries)}`",
+        f"- Selected rows total: `{total_selected}`",
+        "",
+        "| Kind | Rows | Ranks | Top roles |",
+        "|---|---:|---|---|",
+    ]
+    for item in review_kind_summaries:
+        role_counts_obj = item.get("GhidraRoleCounts", {})
+        top_roles = ""
+        if isinstance(role_counts_obj, dict):
+            top_roles = ", ".join(f"{role}={count}" for role, count in list(role_counts_obj.items())[:5])
+        ranks_obj = item.get("Ranks", [])
+        ranks_text = ""
+        if isinstance(ranks_obj, list):
+            ranks_text = ",".join(str(rank) for rank in ranks_obj)
+        md_lines.append(
+            f"| {item['ReviewKind']} | {item['SelectedCount']} | `{ranks_text}` | `{top_roles}` |"
+        )
+    summary_md = probe_root / f"summary-{summary_slug}.md"
+    summary_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    (probe_root / "summary.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    print(f"GhidraReviewRankProbesSummary JSON: {summary_json}")
+    print(f"GhidraReviewRankProbesSummary markdown: {summary_md}")
+    print("GhidraReviewRankProbesSummary passed: summary output remains under ignored Exports/.")
 
 
 def _run_ghidra_workflow_guard_suite(args: argparse.Namespace) -> None:
@@ -810,6 +943,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "ghidra-review-rank-probes":
         _run_ghidra_review_rank_probes(args)
+        return
+
+    if command == "ghidra-review-rank-probes-summary":
+        _run_ghidra_review_rank_probes_summary(args)
         return
 
     if command == "ghidra-workflow-guard-suite":
@@ -2177,6 +2314,7 @@ Examples:
   python scripts/rift_workflow.py mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
   python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
   python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build
+  python scripts/rift_workflow.py ghidra-review-rank-probes-summary --review-kind all
   python scripts/rift_workflow.py asset-signatures --smoke-max-total 500
   python scripts/rift_workflow.py semantic-hint-crosstab
   python scripts/rift_workflow.py all --full
@@ -2251,8 +2389,11 @@ Examples:
     )
     parser.add_argument(
         "--review-kind",
-        default="ghidra-only",
-        help="ReviewKind filter for ghidra-review-rank-probes (default: ghidra-only; use all for every kind)",
+        default=None,
+        help=(
+            "ReviewKind filter for Ghidra review-rank workflows "
+            "(probes default: ghidra-only; summary default: all)"
+        ),
     )
     parser.add_argument(
         "--review-report-limit",

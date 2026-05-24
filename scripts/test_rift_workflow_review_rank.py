@@ -275,6 +275,106 @@ with TemporaryDirectory() as temp_dir:
     jsonschema.validate(vertex_manifest, manifest_schema)
     print("  PASS: vertex manifest schema validation")
 
+print("=== ghidra-review-rank-probes-summary ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "summary-exports"
+    probe_root = out_dir / "ghidra-review-rank-probes"
+    probe_root.mkdir(parents=True)
+    (probe_root / "manifest-ghidra-only.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-review-rank-probes-manifest/v1",
+                "CandidateOnly": True,
+                "GeneratedAt": "2026-05-24T00:00:00",
+                "SourceReviewReport": "Exports/ghidra-pairing-review-report.json",
+                "ProbeRoot": str(probe_root),
+                "ReviewKindFilter": "ghidra-only",
+                "SelectedCount": 2,
+                "ReviewReportLimit": 100,
+                "Results": [
+                    {
+                        "Rank": 1,
+                        "ReviewKind": "ghidra-only",
+                        "SampleIdPrefix": "1111111111111111",
+                        "SampleMeshBlockIndex": 7,
+                        "GhidraRoles": "index-u16le-lead->normal-float3-lead",
+                        "OutputJson": "Exports/ghidra-review-rank-probes/rank01/probe-nif-mesh-1111111111111111.json",
+                    },
+                    {
+                        "Rank": 3,
+                        "ReviewKind": "ghidra-only",
+                        "SampleIdPrefix": "3333333333333333",
+                        "SampleMeshBlockIndex": 9,
+                        "GhidraRoles": "index-u16le-lead->u32-repeated-pattern-body",
+                        "OutputJson": "Exports/ghidra-review-rank-probes/rank03/probe-nif-mesh-3333333333333333.json",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (probe_root / "manifest-vertex-semantic-change.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-review-rank-probes-manifest/v1",
+                "CandidateOnly": True,
+                "GeneratedAt": "2026-05-24T00:00:00",
+                "SourceReviewReport": "Exports/ghidra-pairing-review-report.json",
+                "ProbeRoot": str(probe_root),
+                "ReviewKindFilter": "vertex-semantic-change",
+                "SelectedCount": 1,
+                "ReviewReportLimit": 100,
+                "Results": [
+                    {
+                        "Rank": 15,
+                        "ReviewKind": "vertex-semantic-change",
+                        "SampleIdPrefix": "aaaaaaaaaaaaaaaa",
+                        "SampleMeshBlockIndex": 11,
+                        "GhidraRoles": "index-u16le-lead->position-float3-lead",
+                        "OutputJson": "Exports/ghidra-review-rank-probes/rank15/probe-nif-mesh-aaaaaaaaaaaaaaaa.json",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary_argv = [
+        "rift_workflow.py",
+        "ghidra-review-rank-probes-summary",
+        "--out",
+        str(out_dir),
+    ]
+    with (
+        patch.object(sys, "argv", summary_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+    ):
+        rift_workflow.main()
+
+    summary = json.loads((probe_root / "summary-all.json").read_text(encoding="utf-8"))
+    check("summary default filter", summary["ReviewKindFilter"], "all")
+    check("summary manifest count", summary["ManifestCount"], 2)
+    check("summary selected total", summary["SelectedCountTotal"], 3)
+
+    filtered_argv = [
+        "rift_workflow.py",
+        "ghidra-review-rank-probes-summary",
+        "--out",
+        str(out_dir),
+        "--review-kind",
+        "vertex-semantic-change",
+    ]
+    with (
+        patch.object(sys, "argv", filtered_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+    ):
+        rift_workflow.main()
+
+    filtered_summary = json.loads((probe_root / "summary-vertex-semantic-change.json").read_text(encoding="utf-8"))
+    check("filtered summary manifest count", filtered_summary["ManifestCount"], 1)
+    check("filtered summary selected total", filtered_summary["SelectedCountTotal"], 1)
+
 print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")

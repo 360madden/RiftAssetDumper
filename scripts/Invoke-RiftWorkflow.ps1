@@ -55,6 +55,7 @@ $PSModeToKebab = @{
     'GhidraAttributeCandidateReport' = 'ghidra-attribute-candidate-report'
     'GhidraAttributeCandidateGuard' = 'ghidra-attribute-candidate-guard'
     'GhidraReviewRankProbes' = 'ghidra-review-rank-probes'
+    'GhidraReviewRankProbesSummary' = 'ghidra-review-rank-probes-summary'
     'GhidraWorkflowGuardSuite' = 'ghidra-workflow-guard-suite'
     'NiDataStreamLayout' = 'nidatastream-layout'
     'All' = 'all'
