@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-pairing-review-v1.schema.json",
+  "title": "Ghidra pairing review report v1",
+  "description": "Candidate-only triage report emitted by `python scripts/rift_workflow.py ghidra-pairing-review-report`. The report is generated under ignored Exports/ paths and must not be consumed by decoder/export behavior until separately promoted through proof guards.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "SourceReport",
+    "TotalReviewFindingsInSource",
+    "EmittedFindings",
+    "KindCounts",
+    "PairingCounts",
+    "Findings"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-pairing-review/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReport": {
+      "type": "string",
+      "description": "Path to the mesh-binding inventory used as the report source. Generated reports should remain ignored/local."
+    },
+    "TotalReviewFindingsInSource": { "type": "integer", "minimum": 0 },
+    "EmittedFindings": { "type": "integer", "minimum": 0 },
+    "KindCounts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "PairingCounts": {
+      "type": "object",
+      "required": ["Shared", "LegacyOnly", "GhidraOnly"],
+      "properties": {
+        "Shared": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "LegacyOnly": { "$ref": "#/$defs/nullableNonNegativeInteger" },
+        "GhidraOnly": { "$ref": "#/$defs/nullableNonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "Findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nullableNonNegativeInteger": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "dashOrInteger": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "const": "-" }
+      ]
+    },
+    "dashOrNumber": {
+      "oneOf": [
+        { "type": "number" },
+        { "const": "-" }
+      ]
+    },
+    "dashOrHex16": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{32}$"
+        },
+        { "const": "-" }
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "CandidateOnly",
+        "ReviewKind",
+        "Priority",
+        "MeshSize",
+        "Count",
+        "LegacyRoles",
+        "GhidraRoles",
+        "LegacyVertexSemanticClass",
+        "GhidraVertexSemanticClass",
+        "AverageLegacyConfidence",
+        "AverageGhidraConfidence",
+        "AverageConfidenceDelta",
+        "SampleIdPrefix",
+        "SampleMeshBlockIndex",
+        "SampleIndexOffset",
+        "SampleIndexBlock",
+        "SampleVertexOffset",
+        "SampleVertexBlock",
+        "LegacyIndexBodyFirst16",
+        "LegacyVertexBodyFirst16",
+        "GhidraIndexBodyFirst16",
+        "GhidraVertexBodyFirst16",
+        "ProbeCommand"
+      ],
+      "properties": {
+        "Rank": { "type": "integer", "minimum": 1 },
+        "CandidateOnly": { "const": true },
+        "ReviewKind": { "type": "string" },
+        "Priority": { "$ref": "#/$defs/dashOrInteger" },
+        "MeshSize": { "$ref": "#/$defs/dashOrInteger" },
+        "Count": { "$ref": "#/$defs/dashOrInteger" },
+        "LegacyRoles": { "type": "string" },
+        "GhidraRoles": { "type": "string" },
+        "LegacyVertexSemanticClass": { "type": "string" },
+        "GhidraVertexSemanticClass": { "type": "string" },
+        "AverageLegacyConfidence": { "$ref": "#/$defs/dashOrNumber" },
+        "AverageGhidraConfidence": { "$ref": "#/$defs/dashOrNumber" },
+        "AverageConfidenceDelta": { "$ref": "#/$defs/dashOrNumber" },
+        "SampleIdPrefix": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{16}$"
+        },
+        "SampleMeshBlockIndex": { "$ref": "#/$defs/dashOrInteger" },
+        "SampleIndexOffset": { "$ref": "#/$defs/dashOrInteger" },
+        "SampleIndexBlock": { "$ref": "#/$defs/dashOrInteger" },
+        "SampleVertexOffset": { "$ref": "#/$defs/dashOrInteger" },
+        "SampleVertexBlock": { "$ref": "#/$defs/dashOrInteger" },
+        "LegacyIndexBodyFirst16": { "$ref": "#/$defs/dashOrHex16" },
+        "LegacyVertexBodyFirst16": { "$ref": "#/$defs/dashOrHex16" },
+        "GhidraIndexBodyFirst16": { "$ref": "#/$defs/dashOrHex16" },
+        "GhidraVertexBodyFirst16": { "$ref": "#/$defs/dashOrHex16" },
+        "ProbeCommand": {
+          "type": "string",
+          "pattern": "^python scripts/rift_workflow\\.py mesh-probe --id [0-9a-fA-F]{16} --mesh-block [0-9]+ --skip-build$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -180,6 +180,12 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra review report candidate-only", str(review_report.get("CandidateOnly")), "True")
     check_contains("ghidra review report finding", json.dumps(review_report), "abc123abc123abcd")
     check_contains("ghidra review markdown", review_md.read_text(encoding="utf-8"), "vertex-semantic-change")
+    schema = json.loads(Path("docs/schemas/ghidra-pairing-review-v1.schema.json").read_text(encoding="utf-8"))
+    check_contains(
+        "ghidra review schema version",
+        str(schema["properties"]["SchemaVersion"]["const"]),
+        str(review_report["SchemaVersion"]),
+    )
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:

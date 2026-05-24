@@ -87,6 +87,8 @@ python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurve
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
+python scripts/rift_workflow.py ghidra-pairing-non-export-guard
+python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
 ```
 
 Use `--ghidra-timeout 14400` for a first-pass full import/auto-analysis of `rift_x64.exe`; use shorter script-only reruns against a retained project when possible. Call `scripts/ghidra_runner.py` directly only when debugging the lower-level wrapper itself.
@@ -98,6 +100,8 @@ Run retained-project Ghidra jobs serially. Parallel `ghidra-run` calls against t
 For `FunctionSiteSurvey.java` reports, use `ghidra-summarize` to produce a small Markdown review. The generated JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
+
+For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for focused probes, and `ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. The report schema is `docs/schemas/ghidra-pairing-review-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
 
 ## Current Ghidra lane state
 
@@ -113,8 +117,9 @@ For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before cha
 - Candidate-only Ghidra pairing review findings wired: `docs/handoffs/2026-05-24-ghidra-pairing-review.md`
 - Workflow-level Ghidra pairing review report wired: `docs/handoffs/2026-05-24-ghidra-pairing-review-report.md`
 - Focused mesh-probe Ghidra sidecar pairings wired: `docs/handoffs/2026-05-24-ghidra-mesh-probe-sidecar-pairings.md`
+- Ghidra non-export guard, `mesh-probe --review-rank`, schema, and promotion checklist wired: `docs/handoffs/2026-05-24-ghidra-workflow-guard-review-rank-schema.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
-- Parser/export behavior should remain unchanged until the sidecar Ghidra-aligned role/body fields, `TopGhidraRoleDeltas`, little-endian index stats, candidate-only `TopGhidraPairings`, pairing overlap/gap evidence, `TopGhidraPairingReviewFindings`, ignored `ghidra-pairing-review-report` outputs, and focused `probe-nif-mesh` `GhidraPairings` are reviewed and promoted through a small guarded decoder patch.
+- Parser/export behavior should remain unchanged until the sidecar Ghidra-aligned role/body fields, `TopGhidraRoleDeltas`, little-endian index stats, candidate-only `TopGhidraPairings`, pairing overlap/gap evidence, `TopGhidraPairingReviewFindings`, ignored `ghidra-pairing-review-report` outputs, focused `probe-nif-mesh` `GhidraPairings`, and `mesh-probe --review-rank` evidence are reviewed and promoted through a small guarded decoder patch. `ghidra-pairing-non-export-guard` should keep failing closed on any premature export wiring.
 - Next safe Ghidra target: either a tiny unsupported-TWAD-version warning/test review or the `NiDataStream` / `NiMesh` leads from the anchor survey.
