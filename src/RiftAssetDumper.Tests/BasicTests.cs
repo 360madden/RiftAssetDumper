@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Reflection;
 using System.Text;
 using Xunit;
 
@@ -151,5 +153,39 @@ public class BasicTests
     Assert.Equal(15, candidate.BlockIndex);
     Assert.Equal(75, candidate.VertexCount);
     Assert.Equal("NiDataStream", candidate.BlockTypeName);
+  }
+
+  [Fact]
+  public void TwadArchiveHeader_MatchesClientGhidraProof()
+  {
+    var bytes = new byte[20 + 44];
+    Encoding.ASCII.GetBytes("TWAD").CopyTo(bytes, 0);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 1);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 20);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 1);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), 0);
+
+    var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.assets");
+    File.WriteAllBytes(path, bytes);
+    try
+    {
+      var readArchive = typeof(Program).GetMethod("ReadArchive", BindingFlags.NonPublic | BindingFlags.Static);
+      Assert.NotNull(readArchive);
+
+      var probe = Assert.IsType<ArchiveProbe>(readArchive.Invoke(null, [path]));
+
+      Assert.True(probe.HeaderValid);
+      Assert.Equal("TWAD", probe.Header.Magic);
+      Assert.Equal(1u, probe.Header.Version);
+      Assert.Equal(20u, probe.Header.HeaderSize);
+      Assert.Equal(1u, probe.Header.MaxEntryCount);
+      Assert.Equal(0u, probe.Header.FirstLinkedEntryRaw);
+      Assert.Equal(0, probe.NonNullEntryCount);
+      Assert.Empty(probe.Warnings);
+    }
+    finally
+    {
+      File.Delete(path);
+    }
   }
 }
