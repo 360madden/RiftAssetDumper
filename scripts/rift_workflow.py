@@ -18,6 +18,7 @@ Commands (kebab-case):
     attribute-extra-sibling-proof-guard — sibling probes + guard
     usage-access-correlation-guard — inventory + guard
     residual-lead-guard          — inventory + residual guard
+    ghidra-pairing-review-report — inventory + Ghidra pairing review report
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
     PositionSourceGapReport     — inventory + gap report
@@ -84,6 +85,7 @@ from scripts.rift_workflow_guards import (  # noqa: E402
 )
 from scripts.rift_workflow_reports import (  # noqa: E402
     discovery_workbench,
+    ghidra_pairing_review_report,
     position_source_gap_report,
     position_source_sibling_extra_position_report,
     position_source_sibling_family_report,
@@ -155,6 +157,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "base": "nif-mesh-binding-inventory",
     },
     "residual-position-classifier-report": {
+        "dotnet": "inventory-nif-mesh-bindings",
+        "base": "nif-mesh-binding-inventory",
+    },
+    "ghidra-pairing-review-report": {
         "dotnet": "inventory-nif-mesh-bindings",
         "base": "nif-mesh-binding-inventory",
     },
@@ -277,6 +283,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "AttributeExtraSiblingProofGuard": "attribute-extra-sibling-proof-guard",
     "UsageAccessCorrelationGuard": "usage-access-correlation-guard",
     "ResidualLeadGuard": "residual-lead-guard",
+    "GhidraPairingReviewReport": "ghidra-pairing-review-report",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
     "position-gap-report": "position-gap-report",
@@ -952,6 +959,45 @@ def _run_command(args: argparse.Namespace) -> None:
 
         # Run report
         residual_position_classifier_report(str(out_path))
+        return
+
+    # --- GhidraPairingReviewReport: inventory + Python report ---
+
+    if command == "ghidra-pairing-review-report":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        project = Path(args.project) if args.project else DEFAULT_PROJECT
+        root = Path(args.root) if args.root else DEFAULT_ROOT
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "nif-mesh-binding-inventory.json"
+        if args.quick:
+            if not out_path.exists():
+                print(
+                    "ERROR: ghidra-pairing-review-report --quick requires an "
+                    "existing mesh-binding inventory.\n"
+                    f"  Run 'python scripts/rift_workflow.py mesh-bindings --full' first.\n"
+                    f"  Expected: {out_path}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            if not args.skip_build and solution.exists():
+                checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+            dotnet_args: list[str] = [
+                "run", "--project", str(project), "--",
+                "inventory-nif-mesh-bindings",
+                "--root", str(root),
+                "--out", str(out_path),
+            ]
+            if args.full:
+                pass  # full scan
+            else:
+                dotnet_args += ["--limit", str(args.limit)]
+            checked_run("ghidra-pairing-review-report (inventory)", dotnet_args)
+
+        ghidra_pairing_review_report(str(out_path), out_dir, take=args.limit)
         return
 
     # --- PositionSourceGapReport: inventory + Python report ---
@@ -1779,6 +1825,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+  python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
         """,
     )

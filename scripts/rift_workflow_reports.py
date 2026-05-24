@@ -1157,6 +1157,191 @@ def semantic_hint_cross_tab(out_dir: str) -> None:
 
 
 # ============================================================================
+# GhidraPairingReviewReport
+# ============================================================================
+
+
+def ghidra_pairing_review_report(
+    report_path: str | Path,
+    out_dir: str | Path | None = None,
+    take: int = 25,
+) -> None:
+    """Write a compact candidate-only report for Ghidra pairing review findings."""
+    report = load_json_report(report_path)
+
+    groups_raw = report.get("TopGhidraPairingReviewFindings")
+    if not groups_raw or not isinstance(groups_raw, list):
+        raise ValueError(
+            "GhidraPairingReviewReport failed: TopGhidraPairingReviewFindings "
+            "is missing or empty in mesh-binding inventory."
+        )
+
+    output_dir = Path(out_dir) if out_dir is not None else Path(report_path).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _first_sample(group: dict[str, Any]) -> dict[str, Any]:
+        samples = group.get("Samples")
+        if isinstance(samples, list) and samples and isinstance(samples[0], dict):
+            return samples[0]
+        return {}
+
+    def _pairing(sample: dict[str, Any], key: str) -> dict[str, Any]:
+        pairing = sample.get(key)
+        return pairing if isinstance(pairing, dict) else {}
+
+    def _role_pair(pairing: dict[str, Any]) -> str:
+        index_role = json_value_or_dash(pairing, "IndexRole")
+        vertex_role = json_value_or_dash(pairing, "VertexRole")
+        return f"{index_role}->{vertex_role}"
+
+    findings: list[dict[str, Any]] = []
+    for ordinal, group_obj in enumerate(groups_raw[:take], start=1):
+        if not isinstance(group_obj, dict):
+            continue
+        sample = _first_sample(group_obj)
+        legacy_pairing = _pairing(sample, "LegacyPairing")
+        ghidra_pairing = _pairing(sample, "GhidraPairing")
+        chosen_pairing = ghidra_pairing or legacy_pairing
+        finding = {
+            "Rank": ordinal,
+            "CandidateOnly": True,
+            "ReviewKind": json_value_or_dash(group_obj, "ReviewKind"),
+            "Priority": json_value_or_dash(group_obj, "Priority"),
+            "MeshSize": json_value_or_dash(group_obj, "MeshSize"),
+            "Count": json_value_or_dash(group_obj, "Count"),
+            "LegacyRoles": _role_pair(legacy_pairing) if legacy_pairing else "-",
+            "GhidraRoles": _role_pair(ghidra_pairing) if ghidra_pairing else "-",
+            "LegacyVertexSemanticClass": json_value_or_dash(
+                group_obj, "LegacyVertexSemanticClass"
+            ),
+            "GhidraVertexSemanticClass": json_value_or_dash(
+                group_obj, "GhidraVertexSemanticClass"
+            ),
+            "AverageLegacyConfidence": json_value_or_dash(
+                group_obj, "AverageLegacyConfidence"
+            ),
+            "AverageGhidraConfidence": json_value_or_dash(
+                group_obj, "AverageGhidraConfidence"
+            ),
+            "AverageConfidenceDelta": json_value_or_dash(
+                group_obj, "AverageConfidenceDelta"
+            ),
+            "SampleIdPrefix": json_value_or_dash(sample, "IdPrefix"),
+            "SampleMeshBlockIndex": json_value_or_dash(sample, "MeshBlockIndex"),
+            "SampleIndexOffset": json_value_or_dash(
+                chosen_pairing, "IndexMeshPayloadOffset"
+            ),
+            "SampleIndexBlock": json_value_or_dash(chosen_pairing, "IndexBlockIndex"),
+            "SampleVertexOffset": json_value_or_dash(
+                chosen_pairing, "VertexMeshPayloadOffset"
+            ),
+            "SampleVertexBlock": json_value_or_dash(chosen_pairing, "VertexBlockIndex"),
+            "LegacyIndexBodyFirst16": json_value_or_dash(
+                legacy_pairing, "IndexBodyFirst16"
+            ),
+            "LegacyVertexBodyFirst16": json_value_or_dash(
+                legacy_pairing, "VertexBodyFirst16"
+            ),
+            "GhidraIndexBodyFirst16": json_value_or_dash(
+                ghidra_pairing, "IndexBodyFirst16"
+            ),
+            "GhidraVertexBodyFirst16": json_value_or_dash(
+                ghidra_pairing, "VertexBodyFirst16"
+            ),
+        }
+        finding["ProbeCommand"] = (
+            "python scripts/rift_workflow.py mesh-probe "
+            f"--id {finding['SampleIdPrefix']} "
+            f"--mesh-block {finding['SampleMeshBlockIndex']} "
+            "--skip-build"
+        )
+        findings.append(finding)
+
+    if not findings:
+        raise ValueError(
+            "GhidraPairingReviewReport failed: no valid review findings were found."
+        )
+
+    kind_counts: dict[str, int] = {}
+    for finding in findings:
+        kind = str(finding["ReviewKind"])
+        kind_counts[kind] = kind_counts.get(kind, 0) + 1
+
+    output = {
+        "SchemaVersion": "ghidra-pairing-review/v1",
+        "CandidateOnly": True,
+        "SourceReport": str(report_path),
+        "TotalReviewFindingsInSource": len(groups_raw),
+        "EmittedFindings": len(findings),
+        "KindCounts": kind_counts,
+        "PairingCounts": {
+            "Shared": report.get("GhidraSharedPairings"),
+            "LegacyOnly": report.get("LegacyOnlyPairings"),
+            "GhidraOnly": report.get("GhidraOnlyPairings"),
+        },
+        "Findings": findings,
+    }
+
+    json_path = output_dir / "ghidra-pairing-review-report.json"
+    md_path = output_dir / "ghidra-pairing-review-report.md"
+    json_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
+
+    md_lines = [
+        "# Ghidra pairing review report",
+        "",
+        "Candidate-only: yes. This report ranks review targets and does not promote "
+        "parser/export behavior.",
+        "",
+        f"- Source report: `{format_markdown_cell(report_path)}`",
+        f"- Emitted findings: {len(findings)}",
+        f"- Kind counts: {', '.join(f'{k}={v}' for k, v in sorted(kind_counts.items()))}",
+        f"- Pairing overlap: shared={json_value_or_dash(output['PairingCounts'], 'Shared')} "
+        f"legacyOnly={json_value_or_dash(output['PairingCounts'], 'LegacyOnly')} "
+        f"ghidraOnly={json_value_or_dash(output['PairingCounts'], 'GhidraOnly')}",
+        "",
+        "| Rank | Kind | Mesh size | Count | Legacy roles | Ghidra roles | Classes | Sample | First bytes |",
+        "|---:|---|---:|---:|---|---|---|---|---|",
+    ]
+    for finding in findings:
+        classes = (
+            f"{finding['LegacyVertexSemanticClass']}->{finding['GhidraVertexSemanticClass']}"
+        )
+        sample = (
+            f"{finding['SampleIdPrefix']} mesh#{finding['SampleMeshBlockIndex']} "
+            f"index@{finding['SampleIndexOffset']}/#{finding['SampleIndexBlock']} "
+            f"vertex@{finding['SampleVertexOffset']}/#{finding['SampleVertexBlock']}"
+        )
+        first_bytes = (
+            f"L[{finding['LegacyIndexBodyFirst16']}|{finding['LegacyVertexBodyFirst16']}] "
+            f"G[{finding['GhidraIndexBodyFirst16']}|{finding['GhidraVertexBodyFirst16']}]"
+        )
+        md_lines.append(
+            f"| {finding['Rank']} "
+            f"| {format_markdown_cell(finding['ReviewKind'])} "
+            f"| {format_markdown_cell(finding['MeshSize'])} "
+            f"| {format_markdown_cell(finding['Count'])} "
+            f"| {format_markdown_cell(finding['LegacyRoles'])} "
+            f"| {format_markdown_cell(finding['GhidraRoles'])} "
+            f"| {format_markdown_cell(classes)} "
+            f"| {format_markdown_cell(sample)} "
+            f"| {format_markdown_cell(first_bytes)} |"
+        )
+    md_lines += [
+        "",
+        "Next use: run the probe command from the JSON row for a selected sample, "
+        "then compare its legacy and Ghidra body bytes before changing any decoder behavior.",
+    ]
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    print(f"GhidraPairingReviewReport JSON: {json_path}")
+    print(f"GhidraPairingReviewReport markdown: {md_path}")
+    print(
+        "GhidraPairingReviewReport passed: review findings remain candidate-only "
+        "and export behavior was not changed."
+    )
+
+
+# ============================================================================
 # PositionSourceSiblingFamilyReport  (inventory-level)
 # ============================================================================
 

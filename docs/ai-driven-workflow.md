@@ -86,6 +86,7 @@ python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorS
 python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/FunctionSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
+python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 ```
 
 Use `--ghidra-timeout 14400` for a first-pass full import/auto-analysis of `rift_x64.exe`; use shorter script-only reruns against a retained project when possible. Call `scripts/ghidra_runner.py` directly only when debugging the lower-level wrapper itself.
@@ -110,8 +111,9 @@ For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before cha
 - Little-endian index stats for Ghidra pairings wired: `docs/handoffs/2026-05-24-ghidra-little-endian-index-stats.md`
 - Legacy/Ghidra pairing overlap review wired: `docs/handoffs/2026-05-24-ghidra-pairing-overlap.md`
 - Candidate-only Ghidra pairing review findings wired: `docs/handoffs/2026-05-24-ghidra-pairing-review.md`
+- Workflow-level Ghidra pairing review report wired: `docs/handoffs/2026-05-24-ghidra-pairing-review-report.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.
-- Parser/export behavior should remain unchanged until the sidecar Ghidra-aligned role/body fields, `TopGhidraRoleDeltas`, little-endian index stats, candidate-only `TopGhidraPairings`, pairing overlap/gap evidence, and `TopGhidraPairingReviewFindings` are reviewed and promoted through a small guarded decoder patch.
+- Parser/export behavior should remain unchanged until the sidecar Ghidra-aligned role/body fields, `TopGhidraRoleDeltas`, little-endian index stats, candidate-only `TopGhidraPairings`, pairing overlap/gap evidence, `TopGhidraPairingReviewFindings`, and ignored `ghidra-pairing-review-report` outputs are reviewed and promoted through a small guarded decoder patch.
 - Next safe Ghidra target: either a tiny unsupported-TWAD-version warning/test review or the `NiDataStream` / `NiMesh` leads from the anchor survey.

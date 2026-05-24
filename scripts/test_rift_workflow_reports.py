@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 
 sys.path.insert(0, ".")
 
-from scripts.rift_workflow_reports import show_report_summary
+from scripts.rift_workflow_reports import ghidra_pairing_review_report, show_report_summary
 
 failed = 0
 
@@ -28,85 +28,110 @@ def check_contains(desc: str, text: str, expected: str) -> None:
 print("=== MeshBindings summary ===")
 with TemporaryDirectory() as temp_dir:
     report_path = Path(temp_dir) / "mesh-bindings.json"
-    report_path.write_text(
-        json.dumps(
+    mesh_bindings_fixture = {
+        "NifPayloads": 2,
+        "MeshBlocks": 3,
+        "CandidateLinks": 4,
+        "GhidraStyleLayoutValidStreamBodies": 4,
+        "LegacyOffsetShiftedStreamBodies": 4,
+        "GhidraRoleDeltaStreamBodies": 1,
+        "PairCompatibleMeshes": 0,
+        "PairCompatibleLinks": 0,
+        "GhidraPairCompatibleMeshes": 1,
+        "GhidraPairCompatibleLinks": 2,
+        "GhidraSharedPairings": 1,
+        "LegacyOnlyPairings": 0,
+        "GhidraOnlyPairings": 1,
+        "TopGhidraRoleDeltas": [
             {
-                "NifPayloads": 2,
-                "MeshBlocks": 3,
-                "CandidateLinks": 4,
-                "GhidraStyleLayoutValidStreamBodies": 4,
-                "LegacyOffsetShiftedStreamBodies": 4,
-                "GhidraRoleDeltaStreamBodies": 1,
-                "PairCompatibleMeshes": 0,
-                "PairCompatibleLinks": 0,
-                "GhidraPairCompatibleMeshes": 1,
-                "GhidraPairCompatibleLinks": 2,
-                "GhidraSharedPairings": 1,
-                "LegacyOnlyPairings": 0,
-                "GhidraOnlyPairings": 1,
-                "TopGhidraRoleDeltas": [
+                "MeshSize": 325,
+                "DeclaredPayloadBytes": 96,
+                "DataStreamUsage": 1,
+                "DataStreamAccess": 19,
+                "LegacyRole": "unknown-binary",
+                "GhidraRole": "position-float3-ror1-lead",
+                "Count": 7,
+                "AverageLegacyConfidence": 10,
+                "AverageGhidraConfidence": 85,
+            }
+        ],
+        "TopGhidraPairings": [
+            {
+                "MeshSize": 325,
+                "Count": 2,
+                "IndexDataStreamUsage": 0,
+                "IndexDataStreamAccess": 19,
+                "IndexRole": "index-u16le-lead",
+                "VertexDataStreamUsage": 1,
+                "VertexDataStreamAccess": 19,
+                "VertexRole": "normal-float3-lead",
+                "VertexCount": 24,
+                "MaxIndexObserved": 23,
+                "IndexPairCount": 36,
+                "TriangleListTriangleCount": 12,
+                "TriangleStripWindowCount": 34,
+                "MaxIndexCoverageRatio": 1,
+            }
+        ],
+        "TopGhidraPairingComparisons": [
+            {
+                "Status": "shared",
+                "MeshSize": 325,
+                "Count": 2,
+                "LegacyIndexRole": "index-u16be-strip-lead",
+                "LegacyVertexRole": "normal-float3-ror1-lead",
+                "GhidraIndexRole": "index-u16le-lead",
+                "GhidraVertexRole": "normal-float3-lead",
+                "AverageLegacyConfidence": 85,
+                "AverageGhidraConfidence": 45,
+            }
+        ],
+        "TopGhidraPairingReviewFindings": [
+            {
+                "ReviewKind": "vertex-semantic-change",
+                "Priority": 2,
+                "MeshSize": 301,
+                "Count": 7,
+                "LegacyIndexRole": "index-u16be-strip-lead",
+                "LegacyVertexRole": "uv-float2-ror1-lead",
+                "LegacyVertexSemanticClass": "uv",
+                "GhidraIndexRole": "index-u16le-lead",
+                "GhidraVertexRole": "position-float3-lead",
+                "GhidraVertexSemanticClass": "position",
+                "AverageLegacyConfidence": 89.75,
+                "AverageGhidraConfidence": 54.75,
+                "AverageConfidenceDelta": -35,
+                "Samples": [
                     {
-                        "MeshSize": 325,
-                        "DeclaredPayloadBytes": 96,
-                        "DataStreamUsage": 1,
-                        "DataStreamAccess": 19,
-                        "LegacyRole": "unknown-binary",
-                        "GhidraRole": "position-float3-ror1-lead",
-                        "Count": 7,
-                        "AverageLegacyConfidence": 10,
-                        "AverageGhidraConfidence": 85,
-                    }
-                ],
-                "TopGhidraPairings": [
-                    {
-                        "MeshSize": 325,
-                        "Count": 2,
-                        "IndexDataStreamUsage": 0,
-                        "IndexDataStreamAccess": 19,
-                        "IndexRole": "index-u16le-lead",
-                        "VertexDataStreamUsage": 1,
-                        "VertexDataStreamAccess": 19,
-                        "VertexRole": "normal-float3-lead",
-                        "VertexCount": 24,
-                        "MaxIndexObserved": 23,
-                        "IndexPairCount": 36,
-                        "TriangleListTriangleCount": 12,
-                        "TriangleStripWindowCount": 34,
-                        "MaxIndexCoverageRatio": 1,
-                    }
-                ],
-                "TopGhidraPairingComparisons": [
-                    {
-                        "Status": "shared",
-                        "MeshSize": 325,
-                        "Count": 2,
-                        "LegacyIndexRole": "index-u16be-strip-lead",
-                        "LegacyVertexRole": "normal-float3-ror1-lead",
-                        "GhidraIndexRole": "index-u16le-lead",
-                        "GhidraVertexRole": "normal-float3-lead",
-                        "AverageLegacyConfidence": 85,
-                        "AverageGhidraConfidence": 45,
-                    }
-                ],
-                "TopGhidraPairingReviewFindings": [
-                    {
-                        "ReviewKind": "vertex-semantic-change",
-                        "Priority": 2,
-                        "MeshSize": 301,
-                        "Count": 7,
-                        "LegacyIndexRole": "index-u16be-strip-lead",
-                        "LegacyVertexRole": "uv-float2-ror1-lead",
-                        "LegacyVertexSemanticClass": "uv",
-                        "GhidraIndexRole": "index-u16le-lead",
-                        "GhidraVertexRole": "position-float3-lead",
-                        "GhidraVertexSemanticClass": "position",
-                        "AverageLegacyConfidence": 89.75,
-                        "AverageGhidraConfidence": 54.75,
-                        "AverageConfidenceDelta": -35,
+                        "IdPrefix": "abc123abc123abcd",
+                        "MeshBlockIndex": 6,
+                        "GhidraPairing": {
+                            "IndexRole": "index-u16le-lead",
+                            "VertexRole": "position-float3-lead",
+                            "IndexMeshPayloadOffset": 292,
+                            "IndexBlockIndex": 24,
+                            "VertexMeshPayloadOffset": 188,
+                            "VertexBlockIndex": 21,
+                            "IndexBodyFirst16": "0000010002000300",
+                            "VertexBodyFirst16": "0000803f00000000",
+                        },
+                        "LegacyPairing": {
+                            "IndexRole": "index-u16be-strip-lead",
+                            "VertexRole": "uv-float2-ror1-lead",
+                            "IndexMeshPayloadOffset": 292,
+                            "IndexBlockIndex": 24,
+                            "VertexMeshPayloadOffset": 188,
+                            "VertexBlockIndex": 21,
+                            "IndexBodyFirst16": "0001000200030004",
+                            "VertexBodyFirst16": "000000000000803f",
+                        },
                     }
                 ],
             }
-        ),
+        ],
+    }
+    report_path.write_text(
+        json.dumps(mesh_bindings_fixture),
         encoding="utf-8",
     )
     buffer = io.StringIO()
@@ -122,9 +147,17 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra pairing heading", text, "Top Ghidra pairings")
     check_contains("ghidra pairing roles", text, "index-u16le-lead->vertex[usage=1 access=19] normal-float3-lead")
     check_contains("ghidra comparison heading", text, "Top Ghidra pairing comparisons")
-    check_contains("ghidra comparison roles", text, "shared meshSize=325 count=2 legacy=index-u16be-strip-lead->normal-float3-ror1-lead ghidra=index-u16le-lead->normal-float3-lead")
+    check_contains(
+        "ghidra comparison roles",
+        text,
+        "shared meshSize=325 count=2 legacy=index-u16be-strip-lead->normal-float3-ror1-lead ghidra=index-u16le-lead->normal-float3-lead",
+    )
     check_contains("ghidra review heading", text, "Top Ghidra pairing review findings")
-    check_contains("ghidra review roles", text, "vertex-semantic-change p=2 meshSize=301 count=7 legacy=index-u16be-strip-lead->uv-float2-ror1-lead(uv) ghidra=index-u16le-lead->position-float3-lead(position)")
+    check_contains(
+        "ghidra review roles",
+        text,
+        "vertex-semantic-change p=2 meshSize=301 count=7 legacy=index-u16be-strip-lead->uv-float2-ror1-lead(uv) ghidra=index-u16le-lead->position-float3-lead(position)",
+    )
 
     no_delta_path = Path(temp_dir) / "mesh-bindings-no-deltas.json"
     no_delta_path.write_text(
@@ -135,6 +168,18 @@ with TemporaryDirectory() as temp_dir:
     with redirect_stdout(no_delta_buffer):
         show_report_summary("MeshBindings", str(no_delta_path))
     check_contains("missing deltas does not crash", no_delta_buffer.getvalue(), "NIF payloads=1")
+
+    print("=== Ghidra pairing review report ===")
+    review_buffer = io.StringIO()
+    with redirect_stdout(review_buffer):
+        ghidra_pairing_review_report(report_path, temp_dir, take=5)
+    review_json = Path(temp_dir) / "ghidra-pairing-review-report.json"
+    review_md = Path(temp_dir) / "ghidra-pairing-review-report.md"
+    review_report = json.loads(review_json.read_text(encoding="utf-8"))
+    check_contains("ghidra review report console", review_buffer.getvalue(), "GhidraPairingReviewReport passed")
+    check_contains("ghidra review report candidate-only", str(review_report.get("CandidateOnly")), "True")
+    check_contains("ghidra review report finding", json.dumps(review_report), "abc123abc123abcd")
+    check_contains("ghidra review markdown", review_md.read_text(encoding="utf-8"), "vertex-semantic-change")
 
 print(f"\n{'=' * 50}")
 if failed:

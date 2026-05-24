@@ -76,7 +76,7 @@ Because the Ghidra-only groups include position, normal, UV, and `other` vertex 
 
 - No export, OBJ, or guard behavior consumes `TopGhidraPairingReviewFindings`.
 - Attribute-set logic still uses legacy/default roles.
-- No command yet expands one review finding into a focused byte/float/vector probe report.
+- Workflow-level `ghidra-pairing-review-report` now expands review findings into ignored JSON/Markdown triage output; no deeper byte/float/vector focused probe exists yet.
 - No promotable whitelist exists for Ghidra semantic transitions.
 
 ## Recommended next milestone
@@ -88,3 +88,5 @@ Add a small candidate-only focused probe command for one review finding/sample:
 - include decoded float/vector/index summaries where applicable,
 - keep generated output under ignored `Exports/`,
 - do not modify export behavior.
+
+Follow-up started: `docs/handoffs/2026-05-24-ghidra-pairing-review-report.md`.
