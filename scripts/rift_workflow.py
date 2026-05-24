@@ -435,6 +435,103 @@ def _ghidra_script_args_arg(args: argparse.Namespace) -> list[str] | None:
     return script_args if script_args else None
 
 
+def _json_int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _apply_mesh_probe_review_rank(args: argparse.Namespace) -> None:
+    """Resolve mesh-probe --review-rank N through the Ghidra review report."""
+    if args.review_rank <= 0:
+        return
+
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    review_path = out_dir / "ghidra-pairing-review-report.json"
+    if not review_path.exists():
+        inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+        if not inventory_path.exists():
+            print(
+                "ERROR: mesh-probe --review-rank requires an existing "
+                "ghidra-pairing-review-report.json or nif-mesh-binding-inventory.json.\n"
+                f"  Expected report: {review_path}\n"
+                f"  Expected inventory: {inventory_path}\n"
+                "  Run: python scripts/rift_workflow.py ghidra-pairing-review-report --quick",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"mesh-probe --review-rank: building review report from existing inventory {inventory_path}")
+        ghidra_pairing_review_report(str(inventory_path), out_dir, take=args.limit)
+
+    report = load_json_report(str(review_path))
+    findings = report.get("Findings")
+    if not isinstance(findings, list):
+        print(f"ERROR: review report has no Findings array: {review_path}", file=sys.stderr)
+        sys.exit(1)
+
+    selected = next(
+        (
+            finding
+            for finding in findings
+            if isinstance(finding, dict) and _json_int_or_none(finding.get("Rank")) == args.review_rank
+        ),
+        None,
+    )
+    if selected is None:
+        available = [
+            str(rank)
+            for finding in findings
+            if isinstance(finding, dict)
+            for rank in [_json_int_or_none(finding.get("Rank"))]
+            if rank is not None
+        ]
+        print(
+            f"ERROR: review rank {args.review_rank} not found in {review_path}. "
+            f"Available ranks: {', '.join(available) if available else 'none'}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    asset_id_raw = selected.get("SampleIdPrefix")
+    mesh_block = _json_int_or_none(selected.get("SampleMeshBlockIndex"))
+    asset_id = asset_id_raw if isinstance(asset_id_raw, str) else ""
+    if not asset_id or mesh_block is None:
+        print(
+            f"ERROR: review rank {args.review_rank} is missing SampleIdPrefix/SampleMeshBlockIndex.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if args.id and args.id.lower() != asset_id.lower():
+        print(
+            f"ERROR: --id {args.id} conflicts with review rank {args.review_rank} sample {asset_id}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if args.mesh_block >= 0 and args.mesh_block != mesh_block:
+        print(
+            f"ERROR: --mesh-block {args.mesh_block} conflicts with review rank "
+            f"{args.review_rank} sample mesh block {mesh_block}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    args.id = asset_id
+    args.mesh_block = mesh_block
+    print(
+        f"mesh-probe --review-rank {args.review_rank}: "
+        f"id={asset_id} meshBlock={mesh_block} "
+        f"kind={selected.get('ReviewKind', '-')}"
+    )
+
+
 def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
     """Print bounded Ghidra output and fail closed on script/runtime errors."""
     from scripts.ghidra_runner import _has_ghidra_script_error
@@ -460,6 +557,9 @@ def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
+    if args.review_rank > 0 and command != "mesh-probe":
+        print("ERROR: --review-rank is only supported with mesh-probe.", file=sys.stderr)
+        sys.exit(1)
 
     # --- Pure-Python modes (no C# at all) ---
 
@@ -1602,6 +1702,9 @@ def _run_command(args: argparse.Namespace) -> None:
         print(f"Available: {', '.join(sorted(COMMAND_MAP))}", file=sys.stderr)
         sys.exit(1)
 
+    if command == "mesh-probe":
+        _apply_mesh_probe_review_rank(args)
+
     # --- decode-geometry: needs --id and --mesh-block; passes --experimental-position-source ---
 
     if command == "decode-geometry":
@@ -1827,6 +1930,7 @@ Examples:
   python scripts/rift_workflow.py mesh-bindings
   python scripts/rift_workflow.py mesh-bindings --full
   python scripts/rift_workflow.py mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
+  python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
   python scripts/rift_workflow.py asset-signatures --smoke-max-total 500
   python scripts/rift_workflow.py semantic-hint-crosstab
   python scripts/rift_workflow.py all --full
@@ -1889,6 +1993,12 @@ Examples:
         type=int,
         default=-1,
         help="Mesh block index for probe commands",
+    )
+    parser.add_argument(
+        "--review-rank",
+        type=int,
+        default=0,
+        help="For mesh-probe, resolve --id/--mesh-block from ghidra-pairing-review-report rank",
     )
     parser.add_argument(
         "--extra-offset",
