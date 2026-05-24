@@ -134,6 +134,68 @@ with TemporaryDirectory() as temp_dir:
 
     check("missing report rebuilt from inventory", captured["mesh_block"], 25)
 
+print("=== ghidra-review-rank-probes ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "batch-exports"
+    out_dir.mkdir()
+    (out_dir / "ghidra-pairing-review-report.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-pairing-review/v1",
+                "CandidateOnly": True,
+                "Findings": [
+                    {
+                        "Rank": 1,
+                        "ReviewKind": "ghidra-only",
+                        "SampleIdPrefix": "1111111111111111",
+                        "SampleMeshBlockIndex": 7,
+                    },
+                    {
+                        "Rank": 2,
+                        "ReviewKind": "shared",
+                        "SampleIdPrefix": "2222222222222222",
+                        "SampleMeshBlockIndex": 8,
+                    },
+                    {
+                        "Rank": 3,
+                        "ReviewKind": "ghidra-only",
+                        "SampleIdPrefix": "3333333333333333",
+                        "SampleMeshBlockIndex": 9,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured_calls: list[dict[str, Any]] = []
+
+    def fake_batch_dotnet_run(**kwargs: Any) -> None:
+        captured_calls.append(kwargs)
+
+    batch_argv = [
+        "rift_workflow.py",
+        "ghidra-review-rank-probes",
+        "--out",
+        str(out_dir),
+        "--limit",
+        "2",
+        "--skip-build",
+    ]
+    with (
+        patch.object(sys, "argv", batch_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.rift_workflow._run_dotnet_and_summarize", side_effect=fake_batch_dotnet_run),
+    ):
+        rift_workflow.main()
+
+    check("batch probes ghidra-only count", len(captured_calls), 2)
+    check("batch first asset", captured_calls[0]["asset_id"], "1111111111111111")
+    check("batch first rank dir", captured_calls[0]["out_dir"].name, "rank01")
+    check("batch skips shared finding", captured_calls[1]["asset_id"], "3333333333333333")
+    check("batch second rank dir", captured_calls[1]["out_dir"].name, "rank03")
+
 print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")

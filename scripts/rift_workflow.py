@@ -22,6 +22,7 @@ Commands (kebab-case):
     ghidra-pairing-review-report — inventory + Ghidra pairing review report
     ghidra-attribute-candidate-report — group Ghidra-only review rows by sample mesh
     ghidra-attribute-candidate-guard — grouped Ghidra candidate baseline guard
+    ghidra-review-rank-probes — batch mesh-probe focused Ghidra review ranks
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
     PositionSourceGapReport     — inventory + gap report
@@ -182,6 +183,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-review-rank-probes": {
+        "dotnet": "",
+        "base": "",
+    },
     "residual-position-cluster-probe-report": {
         "dotnet": "",  # multi-step; handled separately
         "base": "",
@@ -305,6 +310,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraPairingReviewReport": "ghidra-pairing-review-report",
     "GhidraAttributeCandidateReport": "ghidra-attribute-candidate-report",
     "GhidraAttributeCandidateGuard": "ghidra-attribute-candidate-guard",
+    "GhidraReviewRankProbes": "ghidra-review-rank-probes",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
     "position-gap-report": "position-gap-report",
@@ -546,6 +552,98 @@ def _apply_mesh_probe_review_rank(args: argparse.Namespace) -> None:
     )
 
 
+def _ensure_ghidra_pairing_review_report(out_dir: Path, limit: int) -> Path:
+    """Return a Ghidra pairing review report, rebuilding it from inventory if needed."""
+    review_path = out_dir / "ghidra-pairing-review-report.json"
+    if review_path.exists():
+        return review_path
+
+    inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+    if not inventory_path.exists():
+        raise ValueError(
+            "ghidra-review-rank-probes requires an existing "
+            "ghidra-pairing-review-report.json or nif-mesh-binding-inventory.json.\n"
+            f"  Expected report: {review_path}\n"
+            f"  Expected inventory: {inventory_path}\n"
+            "  Run: python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 25"
+        )
+
+    print(f"ghidra-review-rank-probes: building review report from existing inventory {inventory_path}")
+    ghidra_pairing_review_report(str(inventory_path), out_dir, take=limit)
+    return review_path
+
+
+def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
+    """Batch-refresh ignored mesh-probe JSON for ranked Ghidra review findings."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    review_path = _ensure_ghidra_pairing_review_report(out_dir, args.limit)
+    report = load_json_report(str(review_path))
+    findings = report.get("Findings")
+    if not isinstance(findings, list):
+        raise ValueError(f"Ghidra review report has no Findings array: {review_path}")
+
+    review_kind = str(args.review_kind or "ghidra-only")
+    selected: list[dict[str, Any]] = []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        if review_kind.lower() != "all" and str(finding.get("ReviewKind", "")) != review_kind:
+            continue
+        rank = _json_int_or_none(finding.get("Rank"))
+        asset_id = finding.get("SampleIdPrefix")
+        mesh_block = _json_int_or_none(finding.get("SampleMeshBlockIndex"))
+        if rank is None or not isinstance(asset_id, str) or mesh_block is None:
+            continue
+        selected.append(finding)
+
+    selected.sort(key=lambda finding: _json_int_or_none(finding.get("Rank")) or 0)
+    if args.limit > 0:
+        selected = selected[: args.limit]
+    if not selected:
+        raise ValueError(f"No review findings matched ReviewKind={review_kind!r} in {review_path}.")
+
+    if not args.skip_build:
+        solution = Path(args.solution) if args.solution else DEFAULT_SOLUTION
+        if solution.exists():
+            checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
+
+    probe_root = out_dir / "ghidra-review-rank-probes"
+    probe_root.mkdir(parents=True, exist_ok=True)
+    project = Path(args.project) if args.project else DEFAULT_PROJECT
+    root = Path(args.root) if args.root else DEFAULT_ROOT
+
+    print(
+        f"ghidra-review-rank-probes: probing {len(selected)} finding(s) "
+        f"from {review_path} into {probe_root}"
+    )
+    for finding in selected:
+        rank = _json_int_or_none(finding.get("Rank"))
+        asset_id = str(finding.get("SampleIdPrefix"))
+        mesh_block = _json_int_or_none(finding.get("SampleMeshBlockIndex"))
+        if rank is None or mesh_block is None:
+            continue
+        rank_dir = probe_root / f"rank{rank:02d}"
+        print(
+            f"\n--- rank {rank}: id={asset_id} meshBlock={mesh_block} "
+            f"kind={finding.get('ReviewKind', '-')}"
+        )
+        _run_dotnet_and_summarize(
+            command="mesh-probe",
+            out_dir=rank_dir,
+            project=project,
+            root=root,
+            smoke_max_total=args.smoke_max_total,
+            limit=args.limit,
+            asset_id=asset_id,
+            mesh_block=mesh_block,
+            extra_offset=-1,
+            asset_type="",
+            semantic_categories=[],
+            full=args.full,
+        )
+    print("GhidraReviewRankProbes passed: focused probe outputs remain under ignored Exports/.")
+
+
 def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
     """Print bounded Ghidra output and fail closed on script/runtime errors."""
     from scripts.ghidra_runner import _has_ghidra_script_error
@@ -623,6 +721,10 @@ def _run_command(args: argparse.Namespace) -> None:
                 review_path = out_dir / "ghidra-pairing-review-report.json"
             ghidra_attribute_candidate_report(review_path, out_dir)
         ghidra_attribute_candidate_guard(report_path)
+        return
+
+    if command == "ghidra-review-rank-probes":
+        _run_ghidra_review_rank_probes(args)
         return
 
     if command == "tools-status":
@@ -1985,6 +2087,7 @@ Examples:
   python scripts/rift_workflow.py mesh-bindings --full
   python scripts/rift_workflow.py mesh-probe --id c841eb9a0ed1c95e --mesh-block 6
   python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build
+  python scripts/rift_workflow.py ghidra-review-rank-probes --limit 14 --skip-build
   python scripts/rift_workflow.py asset-signatures --smoke-max-total 500
   python scripts/rift_workflow.py semantic-hint-crosstab
   python scripts/rift_workflow.py all --full
@@ -2055,6 +2158,11 @@ Examples:
         type=int,
         default=0,
         help="For mesh-probe, resolve --id/--mesh-block from ghidra-pairing-review-report rank",
+    )
+    parser.add_argument(
+        "--review-kind",
+        default="ghidra-only",
+        help="ReviewKind filter for ghidra-review-rank-probes (default: ghidra-only; use all for every kind)",
     )
     parser.add_argument(
         "--extra-offset",

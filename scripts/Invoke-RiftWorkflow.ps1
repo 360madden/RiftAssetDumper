@@ -54,6 +54,7 @@ $PSModeToKebab = @{
     'GhidraPairingReviewReport' = 'ghidra-pairing-review-report'
     'GhidraAttributeCandidateReport' = 'ghidra-attribute-candidate-report'
     'GhidraAttributeCandidateGuard' = 'ghidra-attribute-candidate-guard'
+    'GhidraReviewRankProbes' = 'ghidra-review-rank-probes'
     'NiDataStreamLayout' = 'nidatastream-layout'
     'All' = 'all'
 }
