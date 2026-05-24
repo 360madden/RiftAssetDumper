@@ -37,6 +37,7 @@ For tool-registry or Ghidra workflow changes, also run:
 ```powershell
 python scripts/rift_workflow.py tools-status
 python scripts/rift_workflow.py ghidra-dry-run
+python scripts/test_ghidra_runner.py
 ```
 
 Stage only the intended tracked files. Do not use broad staging such as `git add .` in this repo.
@@ -80,6 +81,18 @@ Ghidra is an explicit offline static-analysis support tool, not part of the defa
 
 Use it first for target-bound questions such as TWAD, NIF, or `NiDataStream` parser anchors. Keep generated projects under ignored `Exports/ghidra-projects/`. Treat findings as hypotheses until parser output and proof guards validate them.
 
+Use the repo workflow surface first:
+
+```powershell
+python scripts/rift_workflow.py tools-status
+python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
+python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/TwadSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
+```
+
+Use `--ghidra-timeout 14400` for a first-pass full import/auto-analysis of `rift_x64.exe`; use shorter script-only reruns against a retained project when possible. Call `scripts/ghidra_runner.py` directly only when debugging the lower-level wrapper itself.
+
+Prefer Java Ghidra scripts in this lane. Ghidra 12.1 headless did not run `.py` scripts in the validated `rift_x64.exe` launch mode; treat Python/Jython Ghidra scripts as unproven until a future validation shows otherwise.
+
 ### Aider
 
 Aider is optional secondary tooling and must stay in its own lane until stabilized. Use diagnostics with `--no-gitignore`, `--no-check-update`, `--no-analytics`, and `--no-auto-commits` so it does not mutate repo policy or create commit noise.
@@ -92,6 +105,11 @@ aider --exit --no-git --no-gitignore --no-check-update --no-analytics --no-auto-
 
 Do not commit Aider history, logs, environment files, or provider config.
 
-## Current recommended next milestone
+## Current Ghidra lane state
 
-After the Ghidra workflow checks are committed, the next technical milestone is a no-broad-analysis Ghidra plan for `rift_x64.exe` that identifies static TWAD/NIF/`NiDataStream` parser anchors before any deeper decompilation or parser changes.
+- Anchor survey complete: `docs/handoffs/2026-05-24-ghidra-anchor-survey.md`
+- TWAD proof complete: `docs/handoffs/2026-05-24-twad-ghidra-proof.md`
+- Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
+- `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
+- Parser behavior should remain unchanged unless a separate small warning/test gap is identified.
+- Next safe Ghidra target: either a tiny unsupported-TWAD-version warning/test review or the `NiDataStream` / `NiMesh` leads from the anchor survey.

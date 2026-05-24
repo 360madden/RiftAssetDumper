@@ -41,6 +41,7 @@ Commands (kebab-case):
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
     tools-status                 — show configured third-party reverse-engineering tools
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
+    ghidra-run                   — run Ghidra headless through the repo workflow guard
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
 
@@ -241,6 +242,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-run": {
+        "dotnet": "",
+        "base": "",
+    },
     "discovery-suite": {
         "dotnet": "",
         "base": "",
@@ -282,6 +287,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "BatchExport264": "batch-export-264",
     "ToolsStatus": "tools-status",
     "GhidraDryRun": "ghidra-dry-run",
+    "GhidraRun": "ghidra-run",
     "DiscoverySuite": "discovery-suite",
     "All": "all",
 }
@@ -392,6 +398,39 @@ def _run_dotnet_and_summarize(
     show_report_summary(mode_name, str(out_path))
 
 
+def _ghidra_project_dir_arg(args: argparse.Namespace) -> Path:
+    """Return the Ghidra project directory, defaulting to ignored Exports/."""
+    return Path(args.ghidra_project_dir) if args.ghidra_project_dir else DEFAULT_OUT / "ghidra-projects"
+
+
+def _ghidra_script_args_arg(args: argparse.Namespace) -> list[str] | None:
+    """Return repeated Ghidra post-script args, normalized for ghidra_runner."""
+    script_args = args.ghidra_script_arg or []
+    return script_args if script_args else None
+
+
+def _print_ghidra_result(result: subprocess.CompletedProcess[str]) -> None:
+    """Print bounded Ghidra output and fail closed on script/runtime errors."""
+    from scripts.ghidra_runner import _has_ghidra_script_error
+
+    print(f"Exit code: {result.returncode}")
+    if result.stdout:
+        print("--- stdout ---")
+        print(result.stdout[:5000])
+    if result.stderr:
+        print("--- stderr ---")
+        print(result.stderr[:5000])
+
+    script_error = _has_ghidra_script_error(result)
+    if result.returncode != 0 or script_error:
+        if script_error and result.returncode == 0:
+            print("\nGhidra reported a script error despite exit code 0", file=sys.stderr)
+        print(f"\nGhidra exited with code {result.returncode}", file=sys.stderr)
+        sys.exit(result.returncode or 1)
+
+    print("\nGhidra headless completed successfully.")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -409,7 +448,36 @@ def _run_command(args: argparse.Namespace) -> None:
     if command == "ghidra-dry-run":
         from scripts.ghidra_runner import dry_run_ghidra_headless
 
-        dry_run_ghidra_headless()
+        dry_run_ghidra_headless(
+            project_dir=_ghidra_project_dir_arg(args),
+            project_name=args.ghidra_project_name,
+            import_path=args.ghidra_import or None,
+            process_path=args.ghidra_process or None,
+            script=args.ghidra_script or None,
+            script_args=_ghidra_script_args_arg(args),
+            script_path=args.ghidra_script_path or None,
+            analyze=not args.ghidra_no_analysis,
+            keep_project=args.ghidra_keep_project,
+            timeout_seconds=args.ghidra_timeout,
+        )
+        return
+
+    if command == "ghidra-run":
+        from scripts.ghidra_runner import run_ghidra_headless
+
+        result = run_ghidra_headless(
+            project_dir=_ghidra_project_dir_arg(args),
+            project_name=args.ghidra_project_name,
+            import_path=args.ghidra_import or None,
+            process_path=args.ghidra_process or None,
+            script=args.ghidra_script or None,
+            script_args=_ghidra_script_args_arg(args),
+            script_path=args.ghidra_script_path or None,
+            analyze=not args.ghidra_no_analysis,
+            delete_project=not args.ghidra_keep_project,
+            timeout_seconds=args.ghidra_timeout,
+        )
+        _print_ghidra_result(result)
         return
 
     if command == "position-gap-report":
@@ -1657,6 +1725,7 @@ Examples:
   python scripts/rift_workflow.py triage-fallback-candidates --full
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py ghidra-dry-run
+  python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
         """,
     )
     parser.add_argument(
@@ -1769,6 +1838,58 @@ Examples:
         "--verbose",
         action="store_true",
         help="Show full dotnet output for batch commands",
+    )
+    parser.add_argument(
+        "--ghidra-project-dir",
+        default="",
+        help=f"Ghidra project directory (default: {DEFAULT_OUT / 'ghidra-projects'})",
+    )
+    parser.add_argument(
+        "--ghidra-project-name",
+        default="TempProject",
+        help="Ghidra project name (default: TempProject)",
+    )
+    parser.add_argument(
+        "--ghidra-import",
+        default="",
+        help="Binary/DLL to import into Ghidra for ghidra-run/ghidra-dry-run",
+    )
+    parser.add_argument(
+        "--ghidra-process",
+        default="",
+        help="Existing program name/path in the Ghidra project for ghidra-run/ghidra-dry-run",
+    )
+    parser.add_argument(
+        "--ghidra-script",
+        default="",
+        help="Ghidra post-script path/name for ghidra-run/ghidra-dry-run",
+    )
+    parser.add_argument(
+        "--ghidra-script-path",
+        default="",
+        help="Additional Ghidra script search path for ghidra-run/ghidra-dry-run",
+    )
+    parser.add_argument(
+        "--ghidra-script-arg",
+        action="append",
+        default=[],
+        help="Argument passed to the Ghidra post-script; repeat for multiple args",
+    )
+    parser.add_argument(
+        "--ghidra-no-analysis",
+        action="store_true",
+        help="Pass -noanalysis for Ghidra script-only reruns",
+    )
+    parser.add_argument(
+        "--ghidra-keep-project",
+        action="store_true",
+        help="Keep the Ghidra project after ghidra-run",
+    )
+    parser.add_argument(
+        "--ghidra-timeout",
+        type=int,
+        default=900,
+        help="Max seconds to wait for Ghidra (default: 900; use 14400 for full first-pass analysis)",
     )
 
     args = parser.parse_args()

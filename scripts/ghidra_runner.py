@@ -7,7 +7,7 @@ can invoke Ghidra without manually specifying paths.
 Usage:
     python scripts/ghidra_runner.py --help
     python scripts/ghidra_runner.py --project /tmp/ghidra_proj --import some.dll
-    python scripts/ghidra_runner.py --script my_script.py
+    python scripts/ghidra_runner.py --script my_script.java
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.rift_workflow_utils import load_tools_config  # noqa: E402
+
+DEFAULT_TIMEOUT_SECONDS = 900
 
 
 def _resolve_tool(config: dict[str, Any], name: str) -> tuple[str, str]:
@@ -82,7 +84,7 @@ def run_ghidra_headless(
     script_path: str | Path | None = None,
     analyze: bool = True,
     delete_project: bool = True,
-    timeout_seconds: int = 300,
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess:
     """Run Ghidra in headless mode with automatic JDK resolution.
 
@@ -169,7 +171,7 @@ def dry_run_ghidra_headless(
     script_path: str | None = None,
     analyze: bool = True,
     keep_project: bool = False,
-    timeout_seconds: int = 300,
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
     """Print resolved Ghidra/JDK settings without launching Ghidra."""
     if project_dir is None:
@@ -231,7 +233,7 @@ def main() -> None:
     parser.add_argument(
         "--script",
         default=None,
-        help="Python/Jython script to run post-import",
+        help="Ghidra post-script to run post-import; Java scripts are the proven path for this repo",
     )
     parser.add_argument(
         "--script-path",
@@ -242,7 +244,7 @@ def main() -> None:
         "--script-args",
         nargs=argparse.REMAINDER,
         default=[],
-        help="Additional args passed to the script",
+        help="Additional args passed to the script; must be the final runner option",
     )
     parser.add_argument(
         "--keep-project",
@@ -257,8 +259,8 @@ def main() -> None:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=300,
-        help="Max seconds to wait for Ghidra (default: 300)",
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=f"Max seconds to wait for Ghidra (default: {DEFAULT_TIMEOUT_SECONDS})",
     )
     parser.add_argument(
         "--dry-run",

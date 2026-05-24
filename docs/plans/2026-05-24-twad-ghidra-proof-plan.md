@@ -1,5 +1,15 @@
 # TWAD Ghidra proof plan — 2026-05-24
 
+## Execution status
+
+Milestones 1, 2, and 4 are complete:
+
+- `TWAD` compare site inspected in the retained Ghidra project.
+- Byte-level archive/header cross-check completed against copied and live archive headers.
+- Parser-facing test `TwadArchiveHeader_MatchesClientGhidraProof` added without changing production parser behavior.
+
+Milestone 3 is partially complete through the generic `ghidra-run` workflow command and tracked `scripts/ghidra/TwadSiteSurvey.java` template. A report summarizer remains optional future workflow hardening.
+
 ## Recommended goal
 
 Prove the TWAD Ghidra lead without changing parser behavior: reuse the retained Ghidra project, inspect the compare at `0x1406e905e`, identify the owning function and caller/input path, cross-check against local asset/package bytes, write a hypothesis/proof handoff, add only minimal durable workflow support if needed, run validation and generated-output guard, and commit/push tracked artifacts only.

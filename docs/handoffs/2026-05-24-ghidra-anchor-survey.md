@@ -1,5 +1,7 @@
 # Ghidra anchor survey handoff — 2026-05-24
 
+> Status note: the TWAD-specific next step in this historical handoff is superseded by `docs/handoffs/2026-05-24-twad-ghidra-proof.md`. Keep this file as the anchor-survey evidence packet for the broader NIF, NiDataStream, NiMesh, and decompression leads.
+
 ## Status
 
 Completed a narrow offline Ghidra survey against `rift_x64.exe` for asset/parser anchors. Treat every address and function name below as a static-analysis hypothesis only.

@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, ".")
 
-from scripts import ghidra_runner
+from scripts import ghidra_runner, rift_workflow
 
 failed = 0
 
@@ -95,6 +95,59 @@ stderr_script_error_result = subprocess.CompletedProcess(["ghidra"], 0, "", "REP
 check("normal output has no script error", ghidra_runner._has_ghidra_script_error(ok_result), False)
 check("stdout script error detected", ghidra_runner._has_ghidra_script_error(script_error_result), True)
 check("stderr script error detected", ghidra_runner._has_ghidra_script_error(stderr_script_error_result), True)
+
+print("=== rift_workflow ghidra-run routing ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    project_dir = temp_path / "projects"
+    script_file = temp_path / "scripts" / "TwadSiteSurvey.java"
+    report_file = temp_path / "reports" / "twad.json"
+    script_file.parent.mkdir()
+    report_file.parent.mkdir()
+    script_file.write_text("// test\n", encoding="utf-8")
+
+    captured: dict[str, Any] = {}
+
+    def fake_ghidra_run(**kwargs: Any) -> subprocess.CompletedProcess[str]:
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+
+    workflow_argv = [
+        "rift_workflow.py",
+        "ghidra-run",
+        "--ghidra-project-dir",
+        str(project_dir),
+        "--ghidra-project-name",
+        "RiftAnchorSurvey",
+        "--ghidra-process",
+        "rift_x64.exe",
+        "--ghidra-script",
+        str(script_file),
+        "--ghidra-script-arg",
+        "0x1406e905f",
+        "--ghidra-script-arg",
+        str(report_file),
+        "--ghidra-no-analysis",
+        "--ghidra-keep-project",
+        "--ghidra-timeout",
+        "14400",
+    ]
+
+    with (
+        patch.object(sys, "argv", workflow_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.ghidra_runner.run_ghidra_headless", side_effect=fake_ghidra_run),
+    ):
+        rift_workflow.main()
+
+    check("workflow project dir forwarded", captured["project_dir"], project_dir)
+    check("workflow project name forwarded", captured["project_name"], "RiftAnchorSurvey")
+    check("workflow process forwarded", captured["process_path"], "rift_x64.exe")
+    check("workflow script forwarded", captured["script"], str(script_file))
+    check("workflow script args forwarded", captured["script_args"], ["0x1406e905f", str(report_file)])
+    check("workflow no-analysis forwarded", captured["analyze"], False)
+    check("workflow keep-project forwarded", captured["delete_project"], False)
+    check("workflow timeout forwarded", captured["timeout_seconds"], 14400)
 
 print(f"\n{'=' * 50}")
 if failed:

@@ -130,6 +130,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | Lane | Status | Current truth |
 |---|---:|---|
 | Compression / LZMA2 | ✅ clarified | Full live `TWAD` archive entries still use only compression `0` and `1`; compression `2` remains a manifest Table 0 logical PAK-layer problem. |
+| Ghidra / TWAD static proof | ✅ complete | Retained `rift_x64.exe` Ghidra anchor survey proved `TWAD` as archive file/header magic and `TWAM` as manifest-layer magic. Parser behavior remains unchanged; `TwadArchiveHeader_MatchesClientGhidraProof` covers the proven header layout. Next safe static targets are unsupported-version warning/test review or the `NiDataStream` / `NiMesh` leads. |
 | Model format | ✅ major lead | Repeated Gamebryo payloads are now detected/extracted as `.nif` and parsed for NIF header/block/string-table evidence. |
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
 | Asset signature/semantic index | ✅ new scaffold | `inventory-asset-signatures` now groups all copied payload signatures, and `build-asset-semantic-index` emits generated `asset-semantic-index/v1` packets under ignored `Exports/` with IDs, detected types, signatures, bounded references/snippets, `hint:*` semantic categories, category filters, XML tag/attribute name counts, and XML parse status/boundary metadata with no values/text/raw parse messages. |

@@ -54,6 +54,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 
 Prefer adding options/modes to this helper before creating new one-off helper apps.
 
+## Ghidra static-analysis lane
+
+Ghidra is integrated as an offline static-analysis support tool for bounded parser/format proof work. It is not part of the default discovery suite and should not replace parser tests or byte-level proof.
+
+Preferred guarded workflow:
+
+```powershell
+python scripts/rift_workflow.py tools-status
+python scripts/rift_workflow.py ghidra-dry-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
+python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurvey --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project --ghidra-timeout 900 --ghidra-script scripts/ghidra/TwadSiteSurvey.java --ghidra-script-arg 0x1406e905f --ghidra-script-arg Exports/ghidra-reports/twad_site_survey.json
+```
+
+Current durable Ghidra truth:
+
+- `docs/handoffs/2026-05-24-ghidra-anchor-survey.md` — retained `rift_x64.exe` anchor survey and NIF/NiDataStream/NiMesh leads.
+- `docs/handoffs/2026-05-24-twad-ghidra-proof.md` — `TWAD` proven as archive file/header magic; no parser behavior change recommended.
+- `docs/ai-driven-workflow.md` — validation gate, generated-output hygiene, and Ghidra lane rules.
+- `.tools.json` — local Ghidra/JDK registry; installed tools live outside the repo.
+
+Keep Ghidra projects, reports, and one-off scripts under ignored `Exports/ghidra-*`. Prefer Java Ghidra scripts for this lane unless a future validation proves Python/Jython scripts work in the current headless launch mode.
+
 ## Privacy and path redaction
 
 The CLI redacts Windows user-profile path segments by default in console output and JSON/JSONL reports. Paths under the current user's profile are emitted with an environment-variable placeholder:
