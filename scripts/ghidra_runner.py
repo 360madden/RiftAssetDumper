@@ -7,7 +7,7 @@ can invoke Ghidra without manually specifying paths.
 Usage:
     python scripts/ghidra_runner.py --help
     python scripts/ghidra_runner.py --project /tmp/ghidra_proj --import some.dll
-    python scripts/ghidra_runner.py --headless --script my_script.py
+    python scripts/ghidra_runner.py --script my_script.py
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _resolve_tool(config: dict[str, Any], name: str) -> tuple[str, str]:
     if not tool or not isinstance(tool, dict):
         raise RuntimeError(
             f"Tool '{name}' not found in .tools.json. "
-            f"Run 'python scripts/rift_workflow.py ghidra-install' first."
+            "Run 'python scripts/rift_workflow.py tools-status' to inspect configured tools."
         )
     if not tool.get("installed"):
         resolved_path = tool.get("resolved_path", "")
@@ -112,6 +112,39 @@ def run_ghidra_headless(
     return result
 
 
+def dry_run_ghidra_headless(
+    project_dir: str | Path | None = None,
+    project_name: str = "TempProject",
+    import_path: str | None = None,
+    script: str | None = None,
+    script_args: list[str] | None = None,
+    keep_project: bool = False,
+    timeout_seconds: int = 300,
+) -> None:
+    """Print resolved Ghidra/JDK settings without launching Ghidra."""
+    if project_dir is None:
+        project_dir = REPO_ROOT / "Exports" / "ghidra-projects"
+
+    config = load_tools_config()
+    ghidra_path, ghidra_home = _resolve_tool(config, "ghidra")
+    java_path, java_home = _resolve_tool(config, "jdk21")
+
+    print(f"Ghidra:     {ghidra_path}")
+    print(f"Ghidra home: {ghidra_home}")
+    print(f"JDK:        {java_path}")
+    print(f"JDK home:   {java_home}")
+    print(f"Project:    {project_dir}/{project_name}")
+    if import_path:
+        print(f"Import:     {import_path}")
+    if script:
+        print(f"Script:     {script} {script_args or []}")
+    if keep_project:
+        print("Keep project: yes")
+    print(f"Timeout:    {timeout_seconds}s")
+    print()
+    print("Dry-run: use the command above to run manually.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run Ghidra headless with automatic JDK resolution",
@@ -164,28 +197,19 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.dry_run:
-        config = load_tools_config()
         try:
-            ghidra_path, ghidra_home = _resolve_tool(config, "ghidra")
-            java_path, java_home = _resolve_tool(config, "jdk21")
+            dry_run_ghidra_headless(
+                project_dir=args.project_dir,
+                project_name=args.project_name,
+                import_path=args.import_path,
+                script=args.script,
+                script_args=args.script_args,
+                keep_project=args.keep_project,
+                timeout_seconds=args.timeout,
+            )
         except RuntimeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             sys.exit(1)
-
-        print(f"Ghidra:     {ghidra_path}")
-        print(f"Ghidra home: {ghidra_home}")
-        print(f"JDK:        {java_path}")
-        print(f"JDK home:   {java_home}")
-        print(f"Project:    {args.project_dir}/{args.project_name}")
-        if args.import_path:
-            print(f"Import:     {args.import_path}")
-        if args.script:
-            print(f"Script:     {args.script} {args.script_args}")
-        if args.keep_project:
-            print("Keep project: yes")
-        print(f"Timeout:    {args.timeout}s")
-        print()
-        print("Dry-run: use the command above to run manually.")
         return
 
     try:

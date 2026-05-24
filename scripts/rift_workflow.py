@@ -39,6 +39,8 @@ Commands (kebab-case):
     stream-bodies                — inventory-nif-stream-bodies + summary
     decode-geometry              — decode-nif-geometry + summary (needs --id --mesh-block; supports --experimental-position-source)
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
+    tools-status                 — show configured third-party reverse-engineering tools
+    ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
 
@@ -94,6 +96,8 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     checked_run,
     generated_output_guard,
     load_json_report,
+    load_tools_config,
+    show_tools_status,
 )
 
 # ============================================================================
@@ -229,6 +233,14 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "tools-status": {
+        "dotnet": "",
+        "base": "",
+    },
+    "ghidra-dry-run": {
+        "dotnet": "",
+        "base": "",
+    },
     "discovery-suite": {
         "dotnet": "",
         "base": "",
@@ -268,6 +280,8 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "StreamBodies": "stream-bodies",
     "DecodeGeometry": "decode-geometry",
     "BatchExport264": "batch-export-264",
+    "ToolsStatus": "tools-status",
+    "GhidraDryRun": "ghidra-dry-run",
     "DiscoverySuite": "discovery-suite",
     "All": "all",
 }
@@ -386,6 +400,16 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "generated-output-guard":
         generated_output_guard()
+        return
+
+    if command == "tools-status":
+        show_tools_status(load_tools_config())
+        return
+
+    if command == "ghidra-dry-run":
+        from scripts.ghidra_runner import dry_run_ghidra_headless
+
+        dry_run_ghidra_headless()
         return
 
     if command == "position-gap-report":
@@ -1631,6 +1655,8 @@ Examples:
   python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6
   python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6 --experimental-position-source --full
   python scripts/rift_workflow.py triage-fallback-candidates --full
+  python scripts/rift_workflow.py tools-status
+  python scripts/rift_workflow.py ghidra-dry-run
         """,
     )
     parser.add_argument(

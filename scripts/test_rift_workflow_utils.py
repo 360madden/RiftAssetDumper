@@ -1,6 +1,11 @@
 """Smoke test for rift_workflow_utils.py ported functions."""
+import io
+import json
 import sys
 from collections.abc import Callable
+from contextlib import redirect_stdout
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 sys.path.insert(0, ".")
@@ -17,6 +22,7 @@ from scripts.rift_workflow_utils import (
     json_double_or_none,
     json_value_or_dash,
     json_value_or_none,
+    load_tools_config,
     measure_sum_or_zero,
     required_json_boolean,
     required_json_integer,
@@ -24,6 +30,7 @@ from scripts.rift_workflow_utils import (
     required_json_value,
     semantic_hint_bucket,
     semantic_hint_primary_model,
+    show_tools_status,
     top_text,
     usage_access_guard_integer,
 )
@@ -102,6 +109,47 @@ check(".pyc", is_generated_output_path("module.cpython-39.pyc"), True)
 check("src/", is_generated_output_path("src/RiftAssetDumper/Program.cs"), False)
 check("scripts/", is_generated_output_path("scripts/Invoke-RiftAssetWorkflow.ps1"), False)
 check("empty", is_generated_output_path(""), False)
+
+print("=== Tools registry ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    fake_ghidra = temp_path / "analyzeHeadless.bat"
+    fake_ghidra.write_text("@echo off\n", encoding="utf-8")
+    missing_tool = temp_path / "missing.exe"
+    config_path = temp_path / ".tools.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "schema": "rift-tools-config/v1",
+                "tools_root": str(temp_path),
+                "tools": {
+                    "fake-ghidra": {
+                        "path": str(fake_ghidra),
+                        "category": "static-analysis",
+                    },
+                    "missing-tool": {
+                        "path": str(missing_tool),
+                        "category": "viewer",
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tools_config = load_tools_config(config_path)
+    fake_info = tools_config["tools"]["fake-ghidra"]
+    missing_info = tools_config["tools"]["missing-tool"]
+    check("tool installed detected", fake_info["installed"], True)
+    check("tool missing detected", missing_info["installed"], False)
+    check("tool resolved path", fake_info["resolved_path"], str(fake_ghidra.resolve()))
+
+    status_buffer = io.StringIO()
+    with redirect_stdout(status_buffer):
+        show_tools_status(tools_config)
+    status_text = status_buffer.getvalue()
+    check("tools status includes installed", "fake-ghidra" in status_text and "[INSTALLED]" in status_text, True)
+    check("tools status includes missing", "missing-tool" in status_text and "[missing]" in status_text, True)
 
 print("=== Formatting ===")
 check("markdown cell pipe", format_markdown_cell("hello|world"), "hello\\|world")
