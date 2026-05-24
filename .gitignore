@@ -24,12 +24,8 @@ coverage/
 # local test cache
 .pytest_cache/
 
-# local Aider secrets/history
+# local environment/secrets
 .env
-.aider.input.history
-.aider.chat.history.md
-.aider.llm.history
-.aider*.log
 
 # local logs/temp files
 *.log

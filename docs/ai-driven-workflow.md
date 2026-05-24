@@ -51,10 +51,7 @@ Never stage or commit:
 - `Exports/`
 - `bin/`, `obj/`, `__pycache__/`, `*.pyc`
 - `.env`
-- `.aider.input.history`
-- `.aider.chat.history.md`
-- `.aider.llm.history`
-- `.aider*.log`
+- local assistant/tool histories, logs, or provider config
 
 Keep local Windows user-profile paths and account-like usernames out of tracked docs and chat summaries unless explicitly requested.
 
@@ -92,18 +89,6 @@ python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftAnchorSurve
 Use `--ghidra-timeout 14400` for a first-pass full import/auto-analysis of `rift_x64.exe`; use shorter script-only reruns against a retained project when possible. Call `scripts/ghidra_runner.py` directly only when debugging the lower-level wrapper itself.
 
 Prefer Java Ghidra scripts in this lane. Ghidra 12.1 headless did not run `.py` scripts in the validated `rift_x64.exe` launch mode; treat Python/Jython Ghidra scripts as unproven until a future validation shows otherwise.
-
-### Aider
-
-Aider is optional secondary tooling and must stay in its own lane until stabilized. Use diagnostics with `--no-gitignore`, `--no-check-update`, `--no-analytics`, and `--no-auto-commits` so it does not mutate repo policy or create commit noise.
-
-Recommended no-call startup check:
-
-```powershell
-aider --exit --no-git --no-gitignore --no-check-update --no-analytics --no-auto-commits --model gemini/gemini-2.5-pro --weak-model gemini/gemini-2.5-flash --no-show-model-warnings
-```
-
-Do not commit Aider history, logs, environment files, or provider config.
 
 ## Current Ghidra lane state
 

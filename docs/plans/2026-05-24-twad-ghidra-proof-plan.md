@@ -22,7 +22,6 @@ Prove the TWAD Ghidra lead without changing parser behavior: reuse the retained 
 | Improve reusable Ghidra workflow | 2 | Useful after we know which Ghidra facts need repeated extraction. |
 | Inspect `NiDataStream` / `NiMesh` leads | 3 | Valuable for geometry, but likely downstream of archive/package understanding. |
 | Change parser code now | Not yet | Static hints are not parser truth. |
-| Debug Aider now | Separate lane | Not part of the current asset-truth proof slice. |
 
 ## Milestone 1: TWAD proof packet
 
@@ -117,6 +116,6 @@ Avoid multiple agents writing overlapping files at once.
 ## Safety rules for this plan
 
 - Do not change parser behavior during this goal.
-- Do not stage or commit `Source/`, `Extracted/`, `Exports/`, build output, or Aider history.
+- Do not stage or commit `Source/`, `Extracted/`, `Exports/`, build output, or local assistant/tool history.
 - Treat Ghidra function names and addresses as hypotheses unless byte-level proof backs them.
 - Commit only tracked plan/proof/tooling/test files after validation.
