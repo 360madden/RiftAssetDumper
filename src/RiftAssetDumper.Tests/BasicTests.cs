@@ -271,4 +271,35 @@ public class BasicTests
       File.Delete(path);
     }
   }
+
+  [Fact]
+  public void TwadArchiveHeader_WarnsOnUnsupportedClientVersion()
+  {
+    var bytes = new byte[20];
+    Encoding.ASCII.GetBytes("TWAD").CopyTo(bytes, 0);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 2);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 20);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 0);
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), 0);
+
+    var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.assets");
+    File.WriteAllBytes(path, bytes);
+    try
+    {
+      var readArchive = typeof(Program).GetMethod("ReadArchive", BindingFlags.NonPublic | BindingFlags.Static);
+      Assert.NotNull(readArchive);
+
+      var probe = Assert.IsType<ArchiveProbe>(readArchive.Invoke(null, [path]));
+
+      Assert.True(probe.HeaderValid);
+      Assert.Equal(2u, probe.Header.Version);
+      Assert.Contains(
+          "Unsupported archive version word 2; client Ghidra proof accepts version words <= 1.",
+          probe.Warnings);
+    }
+    finally
+    {
+      File.Delete(path);
+    }
+  }
 }

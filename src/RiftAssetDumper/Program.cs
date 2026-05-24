@@ -358,6 +358,12 @@ internal static class Program
       return probe;
     }
 
+    var versionWord = header.Version & 0xffff;
+    if (versionWord > 1)
+    {
+      probe.Warnings.Add($"Unsupported archive version word {versionWord}; client Ghidra proof accepts version words <= 1.");
+    }
+
     if (header.HeaderSize != ArchiveHeaderSize)
     {
       probe.Warnings.Add($"Unexpected archive header size {header.HeaderSize}; expected {ArchiveHeaderSize}.");
