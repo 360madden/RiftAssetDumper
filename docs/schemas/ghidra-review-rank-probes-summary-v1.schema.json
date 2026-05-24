@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-review-rank-probes-summary-v1.schema.json",
+  "title": "Ghidra review-rank probe summary v1",
+  "description": "Candidate-only summary emitted by `python scripts/rift_workflow.py ghidra-review-rank-probes-summary`. The summary rolls up ignored manifest evidence under Exports/ and must not be consumed by decoder/export behavior until separately promoted through proof guards.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "GeneratedAt",
+    "ProbeRoot",
+    "ReviewKindFilter",
+    "ManifestCount",
+    "SelectedCountTotal",
+    "ReviewKinds"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-review-rank-probes-summary/v1" },
+    "CandidateOnly": { "const": true },
+    "GeneratedAt": {
+      "type": "string",
+      "description": "Local generation timestamp from the workflow runner."
+    },
+    "ProbeRoot": {
+      "type": "string",
+      "description": "Ignored output root containing per-rank probe manifests and summaries."
+    },
+    "ReviewKindFilter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ManifestCount": { "$ref": "#/$defs/nonNegativeInteger" },
+    "SelectedCountTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+    "ReviewKinds": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reviewKindSummary" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sampleMesh": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}#mesh[0-9]+$"
+    },
+    "reviewKindSummary": {
+      "type": "object",
+      "required": [
+        "ReviewKind",
+        "ManifestPath",
+        "SelectedCount",
+        "Ranks",
+        "SampleMeshes",
+        "GhidraRoleCounts"
+      ],
+      "properties": {
+        "ReviewKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ManifestPath": { "type": "string" },
+        "SelectedCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Ranks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/positiveInteger" }
+        },
+        "SampleMeshes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sampleMesh" }
+        },
+        "GhidraRoleCounts": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/nonNegativeInteger" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -21,6 +21,7 @@ The review report schema is documented at:
 ```text
 docs/schemas/ghidra-pairing-review-v1.schema.json
 docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json
+docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json
 docs/schemas/ghidra-attribute-candidate-v1.schema.json
 ```
 

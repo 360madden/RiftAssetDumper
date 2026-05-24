@@ -276,6 +276,9 @@ with TemporaryDirectory() as temp_dir:
     print("  PASS: vertex manifest schema validation")
 
 print("=== ghidra-review-rank-probes-summary ===")
+summary_schema = json.loads(
+    Path("docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json").read_text(encoding="utf-8")
+)
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     out_dir = temp_path / "summary-exports"
@@ -356,6 +359,8 @@ with TemporaryDirectory() as temp_dir:
     check("summary default filter", summary["ReviewKindFilter"], "all")
     check("summary manifest count", summary["ManifestCount"], 2)
     check("summary selected total", summary["SelectedCountTotal"], 3)
+    jsonschema.validate(summary, summary_schema)
+    print("  PASS: summary schema validation")
 
     filtered_argv = [
         "rift_workflow.py",
@@ -374,6 +379,8 @@ with TemporaryDirectory() as temp_dir:
     filtered_summary = json.loads((probe_root / "summary-vertex-semantic-change.json").read_text(encoding="utf-8"))
     check("filtered summary manifest count", filtered_summary["ManifestCount"], 1)
     check("filtered summary selected total", filtered_summary["SelectedCountTotal"], 1)
+    jsonschema.validate(filtered_summary, summary_schema)
+    print("  PASS: filtered summary schema validation")
 
 print(f"\n{'=' * 50}")
 if failed:

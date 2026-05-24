@@ -108,7 +108,7 @@ For `FunctionSiteSurvey.java` reports, use `ghidra-summarize` to produce a small
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
 
-For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-review-rank-probes-summary` to roll those manifests up for quick review, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`, and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
+For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-review-rank-probes-summary` to roll those manifests up for quick review, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json`, and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
 
 ## Current Ghidra lane state
 
@@ -136,6 +136,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra review-rank probe manifest and vertex semantic-change batch docs wired: `docs/handoffs/2026-05-24-ghidra-review-rank-manifest.md`
 - Ghidra review-rank probe manifest schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-manifest-schema.md`
 - Ghidra review-rank probe summary wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary.md`
+- Ghidra review-rank probe summary schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary-schema.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.

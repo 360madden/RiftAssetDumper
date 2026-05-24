@@ -58,4 +58,4 @@ Result: passed, summarized 2 per-kind manifests covering 25 selected rows (`ghid
 
 ## Remaining
 
-- If summary output becomes a durable contract, add a JSON schema and schema validation test in the same style as the manifest schema.
+- Summary schema is now tracked by `docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json`; update it with any future summary field changes.
