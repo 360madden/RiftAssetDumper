@@ -1,0 +1,109 @@
+"""Smoke tests for rift_workflow_guards.py guard routing."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any
+
+sys.path.insert(0, ".")
+
+from scripts.rift_workflow_guards import ghidra_pairing_non_export_guard
+
+failed = 0
+
+
+def check(desc: str, actual: Any, expected: Any) -> None:
+    global failed
+    if actual == expected:
+        print(f"  PASS: {desc}")
+    else:
+        print(f"  FAIL: {desc}  expected={expected!r}  actual={actual!r}")
+        failed += 1
+
+
+def check_raises(desc: str, fn: Any, exc_type: type[Exception] = ValueError) -> None:
+    global failed
+    try:
+        fn()
+        print(f"  FAIL: {desc} (no exception raised)")
+        failed += 1
+    except exc_type:
+        print(f"  PASS: {desc}")
+
+
+def minimal_program(extra_decode_line: str = "") -> str:
+    guarded_methods = "\n".join(
+        [
+            "  private static int DecodeNifGeometry(AppOptions options)\n"
+            "  {\n"
+            f"    {extra_decode_line}\n"
+            "    return 0;\n"
+            "  }\n",
+            "  private static List<NifMeshAttributeSetSample> FindNifMeshAttributeSets()\n"
+            "  {\n"
+            "    return new List<NifMeshAttributeSetSample>();\n"
+            "  }\n",
+            "  private static List<NifAttributeExtraStreamSample> FindNifAttributeSetExtraStreams()\n"
+            "  {\n"
+            "    return new List<NifAttributeExtraStreamSample>();\n"
+            "  }\n",
+            "  private static List<NifLinkedStreamPositionCandidate> ScanNifLinkedStreamPositionCandidates()\n"
+            "  {\n"
+            "    return new List<NifLinkedStreamPositionCandidate>();\n"
+            "  }\n",
+            "  private static List<NifAttributeVertexSample> BuildNifAttributeFloatVertexSamples()\n"
+            "  {\n"
+            "    return new List<NifAttributeVertexSample>();\n"
+            "  }\n",
+            "  private static List<NifAttributeVertexSample> BuildNifAttributeUInt16VertexSamples()\n"
+            "  {\n"
+            "    return new List<NifAttributeVertexSample>();\n"
+            "  }\n",
+        ]
+    )
+    return (
+        "internal static class Program\n"
+        "{\n"
+        "  private static int ProbeNifMesh(AppOptions options)\n"
+        "  {\n"
+        "    var ghidraPairings = FindNifMeshProbePairings(\n"
+        "          BuildNifGhidraRoleStreamSummaries(streamSummaries),\n"
+        "          pairingSource: \"ghidra-sidecar\",\n"
+        "          candidateOnly: true);\n"
+        "    return 0;\n"
+        "  }\n"
+        f"{guarded_methods}"
+        "}\n"
+    )
+
+
+print("=== Ghidra pairing non-export guard ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    safe_program = temp_path / "Program.safe.cs"
+    safe_program.write_text(minimal_program(), encoding="utf-8")
+    ghidra_pairing_non_export_guard(safe_program)
+    print("  PASS: safe candidate-only program")
+
+    unsafe_program = temp_path / "Program.unsafe.cs"
+    unsafe_program.write_text(
+        minimal_program("var promoted = BuildNifGhidraRoleStreamSummaries(streamSummaries);"),
+        encoding="utf-8",
+    )
+    check_raises("decode/export Ghidra use fails closed", lambda: ghidra_pairing_non_export_guard(unsafe_program))
+
+    unmarked_program = temp_path / "Program.unmarked.cs"
+    unmarked_program.write_text(minimal_program().replace("          candidateOnly: true", "          candidateOnly: false"), encoding="utf-8")
+    check_raises("unmarked sidecar fails closed", lambda: ghidra_pairing_non_export_guard(unmarked_program))
+
+check("actual Program.cs guard", True, True)
+ghidra_pairing_non_export_guard()
+
+print(f"\n{'=' * 50}")
+if failed:
+    print(f"FAILURES: {failed}")
+    sys.exit(1)
+else:
+    print("All tests passed!")

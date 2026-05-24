@@ -18,6 +18,7 @@ Commands (kebab-case):
     attribute-extra-sibling-proof-guard — sibling probes + guard
     usage-access-correlation-guard — inventory + guard
     residual-lead-guard          — inventory + residual guard
+    ghidra-pairing-non-export-guard — fail-closed static guard for candidate-only Ghidra pairings
     ghidra-pairing-review-report — inventory + Ghidra pairing review report
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
@@ -79,6 +80,7 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
+    ghidra_pairing_non_export_guard,
     position_source_sibling_lead_guard,
     residual_lead_guard,
     usage_access_correlation_guard,
@@ -155,6 +157,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
     "residual-lead-guard": {
         "dotnet": "inventory-nif-mesh-bindings",
         "base": "nif-mesh-binding-inventory",
+    },
+    "ghidra-pairing-non-export-guard": {
+        "dotnet": "",
+        "base": "",
     },
     "residual-position-classifier-report": {
         "dotnet": "inventory-nif-mesh-bindings",
@@ -283,6 +289,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "AttributeExtraSiblingProofGuard": "attribute-extra-sibling-proof-guard",
     "UsageAccessCorrelationGuard": "usage-access-correlation-guard",
     "ResidualLeadGuard": "residual-lead-guard",
+    "GhidraPairingNonExportGuard": "ghidra-pairing-non-export-guard",
     "GhidraPairingReviewReport": "ghidra-pairing-review-report",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
@@ -458,6 +465,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "generated-output-guard":
         generated_output_guard()
+        return
+
+    if command == "ghidra-pairing-non-export-guard":
+        ghidra_pairing_non_export_guard()
         return
 
     if command == "tools-status":
@@ -1446,7 +1457,7 @@ def _run_command(args: argparse.Namespace) -> None:
             print(f"  [WARN] Residual classifier report failed: {exc}")
             results.append({"step": "residual-position-classifier-report", "status": "FAILED"})
 
-        # --- Step 5: Guards (usage-access-correlation, residual-lead, position-source-sibling-lead) ---
+        # --- Step 5: Guards (usage-access-correlation, residual-lead, position-source-sibling-lead, ghidra isolation) ---
 
         print()
         print("  -- Step 5/7: Proof Guards --")
@@ -1456,6 +1467,7 @@ def _run_command(args: argparse.Namespace) -> None:
             ("usage-access-correlation-guard", lambda: usage_access_correlation_guard(str(inventory_path))),
             ("residual-lead-guard", lambda: residual_lead_guard(str(inventory_path))),
             ("position-source-sibling-lead-guard", lambda: position_source_sibling_lead_guard(str(inventory_path))),
+            ("ghidra-pairing-non-export-guard", ghidra_pairing_non_export_guard),
         ]
         for guard_name, guard_fn in guard_tasks:
             try:
@@ -1825,6 +1837,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+  python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
         """,

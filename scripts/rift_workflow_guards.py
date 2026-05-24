@@ -4,6 +4,8 @@
 Contains:
 - attribute_extra_proof_guard()       — @264 extra-stream existence guard (inventory-level)
 - attribute_extra_sibling_proof_guard() — deep per-asset @264 stream shape guard
+- ghidra_pairing_non_export_guard() — fail-closed static guard that keeps
+  Ghidra pairings out of decode/export paths until explicitly promoted
 
 All assertions raise ValueError on regression.  Called from rift_workflow.py.
 
@@ -56,6 +58,111 @@ from scripts.rift_workflow_utils import (  # noqa: E402
     safe_int,
     usage_access_guard_integer,
 )
+
+# ============================================================================
+# GhidraPairingNonExportGuard
+# ============================================================================
+
+
+GHIDRA_NON_EXPORT_FORBIDDEN_TOKENS: tuple[str, ...] = (
+    "BuildNifGhidraRoleStreamSummaries",
+    "GhidraPairings",
+    "TopGhidraPairings",
+    "TopGhidraPairingReviewFindings",
+    "GhidraOnlyPairings",
+    "GhidraSharedPairings",
+    "LegacyOnlyPairings",
+    "GhidraRoleDelta",
+    "GhidraIndexBodyFirst16",
+    "GhidraVertexBodyFirst16",
+    'pairingSource: "ghidra-sidecar"',
+)
+
+GHIDRA_NON_EXPORT_GUARDED_MEMBERS: tuple[str, ...] = (
+    "DecodeNifGeometry",
+    "FindNifMeshAttributeSets",
+    "FindNifAttributeSetExtraStreams",
+    "ScanNifLinkedStreamPositionCandidates",
+    "BuildNifAttributeFloatVertexSamples",
+    "BuildNifAttributeUInt16VertexSamples",
+)
+
+
+def _extract_csharp_static_member(source: str, member_name: str) -> str:
+    """Return a top-level static C# member body by line range.
+
+    This intentionally avoids brace counting because interpolated strings in
+    Program.cs contain many literal braces.  Program.cs class-level static
+    methods are consistently indented by two spaces, so the next top-level
+    static member marks the end of the current member.
+    """
+    lines = source.splitlines(keepends=True)
+    start = -1
+    declaration_pattern = re.compile(
+        rf"^  (?:private|internal|public)\s+static\b.*\b{re.escape(member_name)}\s*\("
+    )
+    next_member_pattern = re.compile(r"^  (?:private|internal|public)\s+static\b")
+    for index, line in enumerate(lines):
+        if declaration_pattern.search(line):
+            start = index
+            break
+    if start < 0:
+        raise ValueError(f"GhidraPairingNonExportGuard failed: missing C# member {member_name}.")
+
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if next_member_pattern.search(lines[index]):
+            end = index
+            break
+    return "".join(lines[start:end])
+
+
+def ghidra_pairing_non_export_guard(program_path: str | Path | None = None) -> None:
+    """Assert Ghidra pairing evidence is not consumed by geometry/export paths.
+
+    The Ghidra workflow is intentionally sidecar/candidate-only right now.  It
+    may appear in mesh probes and inventory/review reports, but decode/export
+    code must continue to use the legacy parser-derived stream summaries until
+    a separate promotion proof is added.
+    """
+    path = (
+        Path(program_path)
+        if program_path is not None
+        else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
+    )
+    source = path.read_text(encoding="utf-8-sig")
+
+    failures: list[str] = []
+    guarded_members: list[dict[str, Any]] = []
+    for member_name in GHIDRA_NON_EXPORT_GUARDED_MEMBERS:
+        body = _extract_csharp_static_member(source, member_name)
+        hits = [token for token in GHIDRA_NON_EXPORT_FORBIDDEN_TOKENS if token in body]
+        guarded_members.append({"Member": member_name, "ForbiddenHits": hits})
+        if hits:
+            failures.append(f"{member_name}: {', '.join(hits)}")
+
+    sidecar_call = (
+        "BuildNifGhidraRoleStreamSummaries(streamSummaries),\n"
+        '          pairingSource: "ghidra-sidecar",\n'
+        "          candidateOnly: true"
+    )
+    if sidecar_call not in source:
+        failures.append("ProbeNifMesh Ghidra sidecar pairings must be explicitly candidateOnly=true.")
+
+    assert_proof_guard(
+        not failures,
+        "Ghidra pairing evidence is wired into export/decode paths or lacks candidate-only marking: "
+        + "; ".join(failures),
+    )
+
+    print("\n--- GhidraPairingNonExportGuard candidate-only export isolation guard")
+    print(f"Program: {path}")
+    print(f"Guarded members: {len(guarded_members)}")
+    for item in guarded_members:
+        member = item["Member"]
+        hit_count = len(item["ForbiddenHits"])
+        print(f"  {member}: forbidden Ghidra token hits={hit_count}")
+    print("GhidraPairingNonExportGuard passed: Ghidra pairing evidence remains candidate-only/non-export-consuming.")
 
 # ============================================================================
 # AttributeExtraProofGuard  (inventory-level, rewritten for C# v2 output)
