@@ -21,6 +21,7 @@ Commands (kebab-case):
     ghidra-pairing-non-export-guard — fail-closed static guard for candidate-only Ghidra pairings
     ghidra-pairing-review-report — inventory + Ghidra pairing review report
     ghidra-attribute-candidate-report — group Ghidra-only review rows by sample mesh
+    ghidra-attribute-candidate-guard — grouped Ghidra candidate baseline guard
     residual-position-classifier-report — inventory + report
     residual-position-cluster-probe-report — cluster probe
     PositionSourceGapReport     — inventory + gap report
@@ -81,6 +82,7 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
+    ghidra_attribute_candidate_guard,
     ghidra_pairing_non_export_guard,
     position_source_sibling_lead_guard,
     residual_lead_guard,
@@ -173,6 +175,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "base": "nif-mesh-binding-inventory",
     },
     "ghidra-attribute-candidate-report": {
+        "dotnet": "",
+        "base": "",
+    },
+    "ghidra-attribute-candidate-guard": {
         "dotnet": "",
         "base": "",
     },
@@ -298,6 +304,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraPairingNonExportGuard": "ghidra-pairing-non-export-guard",
     "GhidraPairingReviewReport": "ghidra-pairing-review-report",
     "GhidraAttributeCandidateReport": "ghidra-attribute-candidate-report",
+    "GhidraAttributeCandidateGuard": "ghidra-attribute-candidate-guard",
     "ResidualPositionClassifierReport": "residual-position-classifier-report",
     "ResidualPositionClusterProbeReport": "residual-position-cluster-probe-report",
     "position-gap-report": "position-gap-report",
@@ -595,6 +602,27 @@ def _run_command(args: argparse.Namespace) -> None:
                 sys.exit(1)
             ghidra_pairing_review_report(str(inventory_path), out_dir, take=args.limit)
         ghidra_attribute_candidate_report(review_path, out_dir)
+        return
+
+    if command == "ghidra-attribute-candidate-guard":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        report_path = out_dir / "ghidra-attribute-candidate-report.json"
+        if not report_path.exists():
+            review_path = out_dir / "ghidra-pairing-review-report.json"
+            if not review_path.exists():
+                inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+                if not inventory_path.exists():
+                    print(
+                        "ERROR: ghidra-attribute-candidate-guard requires an existing "
+                        "ghidra-attribute-candidate-report.json, ghidra-pairing-review-report.json, "
+                        "or nif-mesh-binding-inventory.json.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                ghidra_pairing_review_report(str(inventory_path), out_dir, take=args.limit)
+                review_path = out_dir / "ghidra-pairing-review-report.json"
+            ghidra_attribute_candidate_report(review_path, out_dir)
+        ghidra_attribute_candidate_guard(report_path)
         return
 
     if command == "tools-status":
@@ -1970,6 +1998,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
+  python scripts/rift_workflow.py ghidra-attribute-candidate-guard
   python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
         """,
     )

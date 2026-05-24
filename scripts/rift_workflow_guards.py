@@ -6,6 +6,8 @@ Contains:
 - attribute_extra_sibling_proof_guard() — deep per-asset @264 stream shape guard
 - ghidra_pairing_non_export_guard() — fail-closed static guard that keeps
   Ghidra pairings out of decode/export paths until explicitly promoted
+- ghidra_attribute_candidate_guard() — fail-closed guard for grouped
+  Ghidra-only candidate report baseline
 
 All assertions raise ValueError on regression.  Called from rift_workflow.py.
 
@@ -163,6 +165,69 @@ def ghidra_pairing_non_export_guard(program_path: str | Path | None = None) -> N
         hit_count = len(item["ForbiddenHits"])
         print(f"  {member}: forbidden Ghidra token hits={hit_count}")
     print("GhidraPairingNonExportGuard passed: Ghidra pairing evidence remains candidate-only/non-export-consuming.")
+
+
+def ghidra_attribute_candidate_guard(report_path: str | Path) -> None:
+    """Assert grouped Ghidra attribute candidates remain candidate-only and incomplete.
+
+    The current evidence has useful partial position/normal/UV rows, but no
+    complete position+normal+UV group.  This guard should fail if a future
+    report silently changes that baseline before a deliberate promotion patch.
+    """
+    report = load_json_report(report_path)
+    assert_proof_guard(
+        str(report.get("SchemaVersion")) == "ghidra-attribute-candidate-report/v1",
+        "Ghidra attribute candidate report schema mismatch.",
+    )
+    assert_proof_guard(
+        required_json_boolean(report, "CandidateOnly", "GhidraAttributeCandidateReport") is True,
+        "Ghidra attribute candidate report must remain CandidateOnly=true.",
+    )
+    summary = required_json_value(report, "Summary", "GhidraAttributeCandidateReport")
+    assert_proof_guard(
+        isinstance(summary, dict),
+        "Ghidra attribute candidate report Summary must be an object.",
+    )
+    if not isinstance(summary, dict):
+        raise ValueError("GhidraAttributeCandidateGuard failed: Summary is not an object.")
+
+    expected = {
+        "GhidraOnlyGroups": 14,
+        "GhidraOnlyPairingsCovered": 64,
+        "GroupedSampleMeshes": 8,
+        "CompletePositionNormalUvCandidateGroups": 0,
+        "ProbeBackedRanks": 14,
+        "PositionReviewPassGroups": 4,
+        "NormalReviewPassGroups": 3,
+        "UvReviewPassGroups": 3,
+        "UvReviewFailGroups": 2,
+        "RejectedNoiseGroups": 2,
+    }
+    for key, expected_value in expected.items():
+        actual = required_json_integer(summary, key, "GhidraAttributeCandidateReport.Summary")
+        assert_proof_guard(
+            actual == expected_value,
+            f"{key} expected {expected_value}, found {actual}. Re-run triage before promotion.",
+        )
+
+    groups = required_json_value(report, "Groups", "GhidraAttributeCandidateReport")
+    assert_proof_guard(isinstance(groups, list), "Ghidra attribute candidate Groups must be an array.")
+    if not isinstance(groups, list):
+        raise ValueError("GhidraAttributeCandidateGuard failed: Groups is not an array.")
+    complete_groups = [
+        group
+        for group in groups
+        if isinstance(group, dict) and group.get("CompletePositionNormalUvCandidate") is True
+    ]
+    assert_proof_guard(
+        len(complete_groups) == 0,
+        "No complete Ghidra position+normal+UV candidate group is currently promoted.",
+    )
+
+    print("\n--- GhidraAttributeCandidateGuard grouped candidate baseline guard")
+    for key, expected_value in expected.items():
+        print(f"  {key}: {expected_value}")
+    print("GhidraAttributeCandidateGuard passed: current Ghidra-only candidates remain partial/report-only.")
 
 # ============================================================================
 # AttributeExtraProofGuard  (inventory-level, rewritten for C# v2 output)

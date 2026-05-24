@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -9,7 +10,10 @@ from typing import Any
 
 sys.path.insert(0, ".")
 
-from scripts.rift_workflow_guards import ghidra_pairing_non_export_guard
+from scripts.rift_workflow_guards import (
+    ghidra_attribute_candidate_guard,
+    ghidra_pairing_non_export_guard,
+)
 
 failed = 0
 
@@ -100,6 +104,44 @@ with TemporaryDirectory() as temp_dir:
 
 check("actual Program.cs guard", True, True)
 ghidra_pairing_non_export_guard()
+
+print("=== Ghidra attribute candidate guard ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    report_path = temp_path / "ghidra-attribute-candidate-report.json"
+    baseline = {
+        "SchemaVersion": "ghidra-attribute-candidate-report/v1",
+        "CandidateOnly": True,
+        "Summary": {
+            "GhidraOnlyGroups": 14,
+            "GhidraOnlyPairingsCovered": 64,
+            "GroupedSampleMeshes": 8,
+            "CompletePositionNormalUvCandidateGroups": 0,
+            "ProbeBackedRanks": 14,
+            "PositionReviewPassGroups": 4,
+            "NormalReviewPassGroups": 3,
+            "UvReviewPassGroups": 3,
+            "UvReviewFailGroups": 2,
+            "RejectedNoiseGroups": 2,
+        },
+        "Groups": [
+            {
+                "SampleIdPrefix": "25f30ec90608eab7",
+                "SampleMeshBlockIndex": 7,
+                "CompletePositionNormalUvCandidate": False,
+            }
+        ],
+    }
+    report_path.write_text(json.dumps(baseline), encoding="utf-8")
+    ghidra_attribute_candidate_guard(report_path)
+    print("  PASS: baseline attribute candidate report")
+
+    promoted_path = temp_path / "ghidra-attribute-candidate-report-promoted.json"
+    promoted = json.loads(json.dumps(baseline))
+    promoted["Summary"]["CompletePositionNormalUvCandidateGroups"] = 1
+    promoted["Groups"][0]["CompletePositionNormalUvCandidate"] = True
+    promoted_path.write_text(json.dumps(promoted), encoding="utf-8")
+    check_raises("complete Ghidra group fails closed", lambda: ghidra_attribute_candidate_guard(promoted_path))
 
 print(f"\n{'=' * 50}")
 if failed:
