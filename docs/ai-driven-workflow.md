@@ -118,6 +118,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Workflow-level Ghidra pairing review report wired: `docs/handoffs/2026-05-24-ghidra-pairing-review-report.md`
 - Focused mesh-probe Ghidra sidecar pairings wired: `docs/handoffs/2026-05-24-ghidra-mesh-probe-sidecar-pairings.md`
 - Ghidra non-export guard, `mesh-probe --review-rank`, schema, and promotion checklist wired: `docs/handoffs/2026-05-24-ghidra-workflow-guard-review-rank-schema.md`
+- Current Ghidra-only review groups probed 1-14, covering all 64 Ghidra-only pairings: `docs/handoffs/2026-05-24-ghidra-only-rank-1-14-probes.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
 - `NiDataStream::LoadBinary()` and mesh semantic-adapter validation have first-pass static proof; no parser behavior change is recommended yet.

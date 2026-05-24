@@ -46,6 +46,9 @@ As of the latest local report on 2026-05-24, the inventory reports:
 - shared legacy/Ghidra pairings: `4,195`
 - legacy-only pairings: `4`
 - Ghidra-only pairings: `64`
+- `ghidra-only` review groups: `14`, covering all `64` Ghidra-only pairings
+
+Full Ghidra-only probe coverage is documented in `docs/handoffs/2026-05-24-ghidra-only-rank-1-14-probes.md`.
 
 Top emitted review ranks:
 
