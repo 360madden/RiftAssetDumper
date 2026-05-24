@@ -198,7 +198,7 @@ with TemporaryDirectory() as temp_dir:
                 "MeshesEmitted": 1,
                 "CandidateLinks": 2,
                 "Pairings": 0,
-                "GhidraPairings": 1,
+                "GhidraPairings": 3,
                 "AttributeSets": 0,
                 "Meshes": [
                     {
@@ -221,6 +221,36 @@ with TemporaryDirectory() as temp_dir:
                                     "PassesBasicReview": True,
                                     "MaxExtent": 12.5,
                                 },
+                            },
+                            {
+                                "CandidateOnly": True,
+                                "IndexMeshPayloadOffset": 292,
+                                "IndexBlockIndex": 24,
+                                "IndexRole": "index-u16le-lead",
+                                "IndexMax": 47,
+                                "VertexMeshPayloadOffset": 196,
+                                "VertexBlockIndex": 22,
+                                "VertexRole": "normal-float3-lead",
+                                "VertexCount": 48,
+                                "VertexNormalVectorReview": {
+                                    "PassesBasicReview": True,
+                                    "NearUnitVectorRatio": 1.0,
+                                },
+                            },
+                            {
+                                "CandidateOnly": True,
+                                "IndexMeshPayloadOffset": 292,
+                                "IndexBlockIndex": 24,
+                                "IndexRole": "index-u16le-lead",
+                                "IndexMax": 47,
+                                "VertexMeshPayloadOffset": 204,
+                                "VertexBlockIndex": 23,
+                                "VertexRole": "uv-float2-lead",
+                                "VertexCount": 48,
+                                "VertexUvRangeReview": {
+                                    "PassesBasicReview": True,
+                                    "UvRangeRatio": 1.0,
+                                },
                             }
                         ],
                         "AttributeSets": [],
@@ -235,8 +265,10 @@ with TemporaryDirectory() as temp_dir:
     with redirect_stdout(buffer):
         show_report_summary("MeshProbe", str(report_path))
     text = buffer.getvalue()
-    check_contains("mesh probe ghidra count", text, "ghidraPairings=1")
+    check_contains("mesh probe ghidra count", text, "ghidraPairings=3")
     check_contains("mesh probe ghidra row", text, "candidateOnly=True index@292/#24 index-u16le-lead max=47")
+    check_contains("mesh probe normal review", text, "normalReview=True nearUnit=1.0")
+    check_contains("mesh probe uv review", text, "uvReview=True uvRange=1.0")
 
 print(f"\n{'=' * 50}")
 if failed:

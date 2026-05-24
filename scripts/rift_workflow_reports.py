@@ -629,7 +629,11 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
                             f"{json_value_or_dash(p, 'VertexRole')} "
                             f"v={json_value_or_dash(p, 'VertexCount')} "
                             f"posReview={json_value_or_dash(p.get('VertexPositionBoundsReview', {}), 'PassesBasicReview')} "
-                            f"extent={json_value_or_dash(p.get('VertexPositionBoundsReview', {}), 'MaxExtent')}"
+                            f"extent={json_value_or_dash(p.get('VertexPositionBoundsReview', {}), 'MaxExtent')} "
+                            f"normalReview={json_value_or_dash(p.get('VertexNormalVectorReview', {}), 'PassesBasicReview')} "
+                            f"nearUnit={json_value_or_dash(p.get('VertexNormalVectorReview', {}), 'NearUnitVectorRatio')} "
+                            f"uvReview={json_value_or_dash(p.get('VertexUvRangeReview', {}), 'PassesBasicReview')} "
+                            f"uvRange={json_value_or_dash(p.get('VertexUvRangeReview', {}), 'UvRangeRatio')}"
                         ),
                         5,
                     )

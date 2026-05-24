@@ -1967,7 +1967,13 @@ internal static class Program
         var positionReview = pairing.VertexPositionBoundsReview is null
             ? string.Empty
             : $" positionReview={pairing.VertexPositionBoundsReview.PassesBasicReview} finite={pairing.VertexPositionBoundsReview.FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} plausible={pairing.VertexPositionBoundsReview.PlausibleValueRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={pairing.VertexPositionBoundsReview.MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}";
-        Console.WriteLine($"  ghidra-pairing candidateOnly={pairing.CandidateOnly} index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}{positionReview}");
+        var normalReview = pairing.VertexNormalVectorReview is null
+            ? string.Empty
+            : $" normalReview={pairing.VertexNormalVectorReview.PassesBasicReview} nearUnit={pairing.VertexNormalVectorReview.NearUnitVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} finite={pairing.VertexNormalVectorReview.FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}";
+        var uvReview = pairing.VertexUvRangeReview is null
+            ? string.Empty
+            : $" uvReview={pairing.VertexUvRangeReview.PassesBasicReview} uvRange={pairing.VertexUvRangeReview.UvRangeRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} finite={pairing.VertexUvRangeReview.FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={pairing.VertexUvRangeReview.MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}";
+        Console.WriteLine($"  ghidra-pairing candidateOnly={pairing.CandidateOnly} index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}{positionReview}{normalReview}{uvReview}");
       }
 
       foreach (var attributeSet in mesh.AttributeSets.Take(3))
@@ -10836,6 +10842,141 @@ internal static class Program
         Prefix: vectorStats?.Prefix);
   }
 
+  private static NifMeshProbeNormalVectorReview? BuildNifNormalVectorReview(NifMeshStreamRoleStats roleStats)
+  {
+    if (!string.Equals(GetNifMeshRoleSemanticClass(roleStats.PrimaryRole), "normal", StringComparison.OrdinalIgnoreCase))
+    {
+      return null;
+    }
+
+    var vectorStats = roleStats.PrimaryRole.Contains("ror1", StringComparison.OrdinalIgnoreCase)
+        ? roleStats.RotatedFloat3Stats
+        : roleStats.Float3Stats;
+    var missReasons = new List<string>();
+    const int minVectorCount = 3;
+    const double minFiniteVectorRatio = 0.95;
+    const double minPlausibleValueRatio = 0.95;
+    const double minNonZeroVectorRatio = 0.95;
+    const double minNearUnitVectorRatio = 0.75;
+
+    if (vectorStats is null)
+    {
+      missReasons.Add("missing-float3-stats");
+    }
+    else
+    {
+      if (vectorStats.VectorCount < minVectorCount)
+      {
+        missReasons.Add("too-few-vectors");
+      }
+
+      if (vectorStats.FiniteVectorRatio < minFiniteVectorRatio)
+      {
+        missReasons.Add("low-finite-ratio");
+      }
+
+      if (vectorStats.PlausibleValueRatio < minPlausibleValueRatio)
+      {
+        missReasons.Add("low-plausible-ratio");
+      }
+
+      if (vectorStats.NonZeroVectorRatio < minNonZeroVectorRatio)
+      {
+        missReasons.Add("low-nonzero-ratio");
+      }
+
+      if (vectorStats.NearUnitVectorRatio < minNearUnitVectorRatio)
+      {
+        missReasons.Add("low-near-unit-ratio");
+      }
+    }
+
+    return new NifMeshProbeNormalVectorReview(
+        CandidateOnly: true,
+        Role: roleStats.PrimaryRole,
+        MinVectorCount: minVectorCount,
+        MinFiniteVectorRatio: minFiniteVectorRatio,
+        MinPlausibleValueRatio: minPlausibleValueRatio,
+        MinNonZeroVectorRatio: minNonZeroVectorRatio,
+        MinNearUnitVectorRatio: minNearUnitVectorRatio,
+        VectorCount: vectorStats?.VectorCount,
+        FiniteVectorRatio: vectorStats?.FiniteVectorRatio,
+        PlausibleValueRatio: vectorStats?.PlausibleValueRatio,
+        NonZeroVectorRatio: vectorStats?.NonZeroVectorRatio,
+        NearUnitVectorRatio: vectorStats?.NearUnitVectorRatio,
+        MaxExtent: vectorStats?.MaxExtent,
+        PassesBasicReview: missReasons.Count == 0,
+        MissReasons: missReasons,
+        Prefix: vectorStats?.Prefix);
+  }
+
+  private static NifMeshProbeUvRangeReview? BuildNifUvRangeReview(NifMeshStreamRoleStats roleStats)
+  {
+    if (!string.Equals(GetNifMeshRoleSemanticClass(roleStats.PrimaryRole), "uv", StringComparison.OrdinalIgnoreCase))
+    {
+      return null;
+    }
+
+    var vectorStats = roleStats.PrimaryRole.Contains("ror1", StringComparison.OrdinalIgnoreCase)
+        ? roleStats.RotatedFloat2Stats
+        : roleStats.Float2Stats;
+    var missReasons = new List<string>();
+    const int minVectorCount = 3;
+    const double minFiniteVectorRatio = 0.95;
+    const double minUvRangeRatio = 0.95;
+    const double minNonZeroVectorRatio = 0.50;
+    const double minMaxExtent = 0.0001;
+
+    if (vectorStats is null)
+    {
+      missReasons.Add("missing-float2-stats");
+    }
+    else
+    {
+      if (vectorStats.VectorCount < minVectorCount)
+      {
+        missReasons.Add("too-few-vectors");
+      }
+
+      if (vectorStats.FiniteVectorRatio < minFiniteVectorRatio)
+      {
+        missReasons.Add("low-finite-ratio");
+      }
+
+      if (vectorStats.UvRangeRatio < minUvRangeRatio)
+      {
+        missReasons.Add("low-uv-range-ratio");
+      }
+
+      if (vectorStats.NonZeroVectorRatio < minNonZeroVectorRatio)
+      {
+        missReasons.Add("low-nonzero-ratio");
+      }
+
+      if (vectorStats.MaxExtent < minMaxExtent)
+      {
+        missReasons.Add("low-extent");
+      }
+    }
+
+    return new NifMeshProbeUvRangeReview(
+        CandidateOnly: true,
+        Role: roleStats.PrimaryRole,
+        MinVectorCount: minVectorCount,
+        MinFiniteVectorRatio: minFiniteVectorRatio,
+        MinUvRangeRatio: minUvRangeRatio,
+        MinNonZeroVectorRatio: minNonZeroVectorRatio,
+        MinMaxExtent: minMaxExtent,
+        VectorCount: vectorStats?.VectorCount,
+        FiniteVectorRatio: vectorStats?.FiniteVectorRatio,
+        UvRangeRatio: vectorStats?.UvRangeRatio,
+        NonZeroVectorRatio: vectorStats?.NonZeroVectorRatio,
+        MaxExtent: vectorStats?.MaxExtent,
+        PassesBasicReview: missReasons.Count == 0,
+        MissReasons: missReasons,
+        Prefix: vectorStats?.Prefix);
+  }
+
   private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
       byte[] payload,
       NifHeaderInfo header,
@@ -10967,6 +11108,8 @@ internal static class Program
             VertexGhidraBodyFirst16: vertexStream.GhidraBodyFirst16,
             VertexRoleStats: vertexStream.RoleStats,
             VertexPositionBoundsReview: BuildNifPositionBoundsReview(vertexStream.RoleStats),
+            VertexNormalVectorReview: BuildNifNormalVectorReview(vertexStream.RoleStats),
+            VertexUvRangeReview: BuildNifUvRangeReview(vertexStream.RoleStats),
             VertexCount: compatibleVertexCount,
             IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
             DataStreamMetadataScore: dataStreamMetadataScore,
@@ -14569,6 +14712,8 @@ internal sealed record NifMeshProbePairing(
     string VertexGhidraBodyFirst16,
     NifMeshStreamRoleStats VertexRoleStats,
     NifMeshProbePositionBoundsReview? VertexPositionBoundsReview,
+    NifMeshProbeNormalVectorReview? VertexNormalVectorReview,
+    NifMeshProbeUvRangeReview? VertexUvRangeReview,
     int VertexCount,
     double IndexCoverageRatio,
     int DataStreamMetadataScore,
@@ -14585,6 +14730,41 @@ internal sealed record NifMeshProbePositionBoundsReview(
     int? VectorCount,
     double? FiniteVectorRatio,
     double? PlausibleValueRatio,
+    double? NonZeroVectorRatio,
+    double? MaxExtent,
+    bool PassesBasicReview,
+    List<string> MissReasons,
+    List<NifFloatVectorPrefix>? Prefix);
+
+internal sealed record NifMeshProbeNormalVectorReview(
+    bool CandidateOnly,
+    string Role,
+    int MinVectorCount,
+    double MinFiniteVectorRatio,
+    double MinPlausibleValueRatio,
+    double MinNonZeroVectorRatio,
+    double MinNearUnitVectorRatio,
+    int? VectorCount,
+    double? FiniteVectorRatio,
+    double? PlausibleValueRatio,
+    double? NonZeroVectorRatio,
+    double? NearUnitVectorRatio,
+    double? MaxExtent,
+    bool PassesBasicReview,
+    List<string> MissReasons,
+    List<NifFloatVectorPrefix>? Prefix);
+
+internal sealed record NifMeshProbeUvRangeReview(
+    bool CandidateOnly,
+    string Role,
+    int MinVectorCount,
+    double MinFiniteVectorRatio,
+    double MinUvRangeRatio,
+    double MinNonZeroVectorRatio,
+    double MinMaxExtent,
+    int? VectorCount,
+    double? FiniteVectorRatio,
+    double? UvRangeRatio,
     double? NonZeroVectorRatio,
     double? MaxExtent,
     bool PassesBasicReview,
