@@ -35,7 +35,11 @@ python scripts/rift_workflow.py generated-output-guard
 git diff --check
 ```
 
+## Follow-up completed
+
+- `scripts/test_rift_workflow_reports.py` now validates generated Ghidra pairing and attribute-candidate reports against their committed schemas.
+- CI installs `jsonschema` and runs the offline workflow smoke-test set through `scripts/test_*.py`.
+
 ## Remaining
 
-- Add optional schema validation wiring only if this workflow starts consuming generated reports beyond tests/docs.
 - Keep `ghidra-attribute-candidate-guard` as the promotion brake while the report still has zero complete position+normal+UV groups.

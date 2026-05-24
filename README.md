@@ -78,6 +78,7 @@ Current durable Ghidra truth:
 - `docs/handoffs/2026-05-24-ghidra-anchor-survey.md` — retained `rift_x64.exe` anchor survey and NIF/NiDataStream/NiMesh leads.
 - `docs/handoffs/2026-05-24-twad-ghidra-proof.md` — `TWAD` proven as archive file/header magic; no parser behavior change recommended.
 - `docs/ai-driven-workflow.md` — validation gate, generated-output hygiene, and Ghidra lane rules.
+- `.github/workflows/ci.yml` — CI runs all offline `scripts/test_*.py` workflow smoke tests, including Ghidra command wiring.
 - `.tools.json` — local Ghidra/JDK registry; installed tools live outside the repo.
 
 Keep Ghidra projects, reports, and one-off scripts under ignored `Exports/ghidra-*`. Prefer Java Ghidra scripts for this lane unless a future validation proves Python/Jython scripts work in the current headless launch mode.

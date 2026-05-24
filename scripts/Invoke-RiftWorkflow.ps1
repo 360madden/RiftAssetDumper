@@ -50,6 +50,10 @@ $PSModeToKebab = @{
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'
     'GhidraSummarize' = 'ghidra-summarize'
+    'GhidraPairingNonExportGuard' = 'ghidra-pairing-non-export-guard'
+    'GhidraPairingReviewReport' = 'ghidra-pairing-review-report'
+    'GhidraAttributeCandidateReport' = 'ghidra-attribute-candidate-report'
+    'GhidraAttributeCandidateGuard' = 'ghidra-attribute-candidate-guard'
     'NiDataStreamLayout' = 'nidatastream-layout'
     'All' = 'all'
 }

@@ -9,6 +9,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import jsonschema
+
 sys.path.insert(0, ".")
 
 from scripts.rift_workflow_reports import (
@@ -116,8 +118,8 @@ with TemporaryDirectory() as temp_dir:
                             "IndexBlockIndex": 24,
                             "VertexMeshPayloadOffset": 188,
                             "VertexBlockIndex": 21,
-                            "IndexBodyFirst16": "0000010002000300",
-                            "VertexBodyFirst16": "0000803f00000000",
+                            "IndexBodyFirst16": "00000100020003000000000000000000",
+                            "VertexBodyFirst16": "0000803f000000000000000000000000",
                         },
                         "LegacyPairing": {
                             "IndexRole": "index-u16be-strip-lead",
@@ -126,8 +128,8 @@ with TemporaryDirectory() as temp_dir:
                             "IndexBlockIndex": 24,
                             "VertexMeshPayloadOffset": 188,
                             "VertexBlockIndex": 21,
-                            "IndexBodyFirst16": "0001000200030004",
-                            "VertexBodyFirst16": "000000000000803f",
+                            "IndexBodyFirst16": "00010002000300040000000000000000",
+                            "VertexBodyFirst16": "000000000000803f0000000000000000",
                         },
                     }
                 ],
@@ -190,6 +192,8 @@ with TemporaryDirectory() as temp_dir:
         str(schema["properties"]["SchemaVersion"]["const"]),
         str(review_report["SchemaVersion"]),
     )
+    jsonschema.validate(review_report, schema)
+    print("  PASS: ghidra review schema validation")
 
     print("=== Ghidra attribute candidate report ===")
     attr_review_path = Path(temp_dir) / "ghidra-pairing-review-report.json"
@@ -280,6 +284,8 @@ with TemporaryDirectory() as temp_dir:
     )
     check_contains("ghidra attribute schema groups", json.dumps(attr_schema.get("required", [])), "Groups")
     check_contains("ghidra attribute schema completion marker", json.dumps(attr_schema), "CompletePositionNormalUvCandidate")
+    jsonschema.validate(attr_report, attr_schema)
+    print("  PASS: ghidra attribute schema validation")
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:

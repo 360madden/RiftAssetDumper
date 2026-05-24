@@ -26,8 +26,8 @@ python scripts/rift_workflow.py generated-output-guard
 For Python workflow changes, also run:
 
 ```powershell
-python -m py_compile scripts/rift_workflow.py scripts/rift_workflow_utils.py scripts/ghidra_runner.py scripts/test_rift_workflow_utils.py
-python scripts/test_rift_workflow_utils.py
+python -c "import pathlib, py_compile; [py_compile.compile(str(path), doraise=True) for path in pathlib.Path('scripts').glob('*.py')]"
+Get-ChildItem scripts/test_*.py | Sort-Object Name | ForEach-Object { python $_.FullName; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
 ruff check scripts/
 mypy scripts/ --no-error-summary
 ```
@@ -38,6 +38,7 @@ For tool-registry or Ghidra workflow changes, also run:
 python scripts/rift_workflow.py tools-status
 python scripts/rift_workflow.py ghidra-dry-run
 python scripts/test_ghidra_runner.py
+python scripts/test_rift_workflow_command_wiring.py
 ```
 
 Stage only the intended tracked files. Do not use broad staging such as `git add .` in this repo.
