@@ -619,6 +619,7 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
                     + top_text(
                         ghidra_pairings,
                         lambda p: (
+                            f"candidateOnly={json_value_or_dash(p, 'CandidateOnly')} "
                             f"index@{json_value_or_dash(p, 'IndexMeshPayloadOffset')}/"
                             f"#{json_value_or_dash(p, 'IndexBlockIndex')} "
                             f"{json_value_or_dash(p, 'IndexRole')} "
@@ -626,7 +627,9 @@ def _show_mesh_probe(report: dict[str, Any]) -> None:
                             f"stream@{json_value_or_dash(p, 'VertexMeshPayloadOffset')}/"
                             f"#{json_value_or_dash(p, 'VertexBlockIndex')} "
                             f"{json_value_or_dash(p, 'VertexRole')} "
-                            f"v={json_value_or_dash(p, 'VertexCount')}"
+                            f"v={json_value_or_dash(p, 'VertexCount')} "
+                            f"posReview={json_value_or_dash(p.get('VertexPositionBoundsReview', {}), 'PassesBasicReview')} "
+                            f"extent={json_value_or_dash(p.get('VertexPositionBoundsReview', {}), 'MaxExtent')}"
                         ),
                         5,
                     )

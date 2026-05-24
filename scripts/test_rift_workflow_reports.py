@@ -202,6 +202,7 @@ with TemporaryDirectory() as temp_dir:
                         "Pairings": [],
                         "GhidraPairings": [
                             {
+                                "CandidateOnly": True,
                                 "IndexMeshPayloadOffset": 292,
                                 "IndexBlockIndex": 24,
                                 "IndexRole": "index-u16le-lead",
@@ -210,6 +211,10 @@ with TemporaryDirectory() as temp_dir:
                                 "VertexBlockIndex": 21,
                                 "VertexRole": "position-float3-lead",
                                 "VertexCount": 48,
+                                "VertexPositionBoundsReview": {
+                                    "PassesBasicReview": True,
+                                    "MaxExtent": 12.5,
+                                },
                             }
                         ],
                         "AttributeSets": [],
@@ -225,7 +230,7 @@ with TemporaryDirectory() as temp_dir:
         show_report_summary("MeshProbe", str(report_path))
     text = buffer.getvalue()
     check_contains("mesh probe ghidra count", text, "ghidraPairings=1")
-    check_contains("mesh probe ghidra row", text, "index@292/#24 index-u16le-lead max=47")
+    check_contains("mesh probe ghidra row", text, "candidateOnly=True index@292/#24 index-u16le-lead max=47")
 
 print(f"\n{'=' * 50}")
 if failed:

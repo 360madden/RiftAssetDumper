@@ -1902,7 +1902,10 @@ internal static class Program
       var meshPayload = SliceNifBlockPayload(payload, meshBlock);
       var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
       var pairings = FindNifMeshProbePairings(streamSummaries);
-      var ghidraPairings = FindNifMeshProbePairings(BuildNifGhidraRoleStreamSummaries(streamSummaries));
+      var ghidraPairings = FindNifMeshProbePairings(
+          BuildNifGhidraRoleStreamSummaries(streamSummaries),
+          pairingSource: "ghidra-sidecar",
+          candidateOnly: true);
       var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
       var payloadWindows = FindNifMeshPayloadRoleWindows(
           meshPayload,
@@ -1961,7 +1964,10 @@ internal static class Program
 
       foreach (var pairing in mesh.GhidraPairings.Take(5))
       {
-        Console.WriteLine($"  ghidra-pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
+        var positionReview = pairing.VertexPositionBoundsReview is null
+            ? string.Empty
+            : $" positionReview={pairing.VertexPositionBoundsReview.PassesBasicReview} finite={pairing.VertexPositionBoundsReview.FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} plausible={pairing.VertexPositionBoundsReview.PlausibleValueRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={pairing.VertexPositionBoundsReview.MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"}";
+        Console.WriteLine($"  ghidra-pairing candidateOnly={pairing.CandidateOnly} index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}{positionReview}");
       }
 
       foreach (var attributeSet in mesh.AttributeSets.Take(3))
@@ -10763,6 +10769,73 @@ internal static class Program
     return null;
   }
 
+  private static NifMeshProbePositionBoundsReview? BuildNifPositionBoundsReview(NifMeshStreamRoleStats roleStats)
+  {
+    if (!string.Equals(GetNifMeshRoleSemanticClass(roleStats.PrimaryRole), "position", StringComparison.OrdinalIgnoreCase))
+    {
+      return null;
+    }
+
+    var vectorStats = roleStats.PrimaryRole.Contains("ror1", StringComparison.OrdinalIgnoreCase)
+        ? roleStats.RotatedFloat3Stats
+        : roleStats.Float3Stats;
+    var missReasons = new List<string>();
+    const int minVectorCount = 3;
+    const double minFiniteVectorRatio = 0.95;
+    const double minPlausibleValueRatio = 0.95;
+    const double minNonZeroVectorRatio = 0.50;
+    const double minMaxExtent = 0.0001;
+
+    if (vectorStats is null)
+    {
+      missReasons.Add("missing-float3-stats");
+    }
+    else
+    {
+      if (vectorStats.VectorCount < minVectorCount)
+      {
+        missReasons.Add("too-few-vectors");
+      }
+
+      if (vectorStats.FiniteVectorRatio < minFiniteVectorRatio)
+      {
+        missReasons.Add("low-finite-ratio");
+      }
+
+      if (vectorStats.PlausibleValueRatio < minPlausibleValueRatio)
+      {
+        missReasons.Add("low-plausible-ratio");
+      }
+
+      if (vectorStats.NonZeroVectorRatio < minNonZeroVectorRatio)
+      {
+        missReasons.Add("low-nonzero-ratio");
+      }
+
+      if (vectorStats.MaxExtent < minMaxExtent)
+      {
+        missReasons.Add("low-extent");
+      }
+    }
+
+    return new NifMeshProbePositionBoundsReview(
+        CandidateOnly: true,
+        Role: roleStats.PrimaryRole,
+        MinVectorCount: minVectorCount,
+        MinFiniteVectorRatio: minFiniteVectorRatio,
+        MinPlausibleValueRatio: minPlausibleValueRatio,
+        MinNonZeroVectorRatio: minNonZeroVectorRatio,
+        MinMaxExtent: minMaxExtent,
+        VectorCount: vectorStats?.VectorCount,
+        FiniteVectorRatio: vectorStats?.FiniteVectorRatio,
+        PlausibleValueRatio: vectorStats?.PlausibleValueRatio,
+        NonZeroVectorRatio: vectorStats?.NonZeroVectorRatio,
+        MaxExtent: vectorStats?.MaxExtent,
+        PassesBasicReview: missReasons.Count == 0,
+        MissReasons: missReasons,
+        Prefix: vectorStats?.Prefix);
+  }
+
   private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
       byte[] payload,
       NifHeaderInfo header,
@@ -10829,7 +10902,10 @@ internal static class Program
     return streamSummaries;
   }
 
-  private static List<NifMeshProbePairing> FindNifMeshProbePairings(List<NifMeshBoundStreamSummary> streams)
+  private static List<NifMeshProbePairing> FindNifMeshProbePairings(
+      List<NifMeshBoundStreamSummary> streams,
+      string pairingSource = "legacy",
+      bool candidateOnly = false)
   {
     var pairings = new List<NifMeshProbePairing>();
     var indexStreams = streams
@@ -10866,12 +10942,18 @@ internal static class Program
 
         var dataStreamMetadataScore = GetNifDataStreamMetadataScore(indexStream, vertexStream);
         pairings.Add(new NifMeshProbePairing(
+            PairingSource: pairingSource,
+            CandidateOnly: candidateOnly,
             IndexMeshPayloadOffset: indexStream.MeshPayloadOffset,
             IndexBlockIndex: indexStream.TargetBlockIndex,
             IndexDeclaredPayloadBytes: indexStream.DeclaredPayloadBytes,
             IndexDataStreamUsage: indexStream.DataStreamUsage,
             IndexDataStreamAccess: indexStream.DataStreamAccess,
             IndexRole: indexStream.RoleStats.PrimaryRole,
+            IndexTargetFirst16: indexStream.TargetFirst16,
+            IndexBodyFirst16: indexStream.BodyFirst16,
+            IndexGhidraBodyFirst16: indexStream.GhidraBodyFirst16,
+            IndexRoleStats: indexStream.RoleStats,
             IndexMax: maxIndex,
             IndexPairCount: indexStream.RoleStats.IndexPairCount,
             VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
@@ -10880,6 +10962,11 @@ internal static class Program
             VertexDataStreamUsage: vertexStream.DataStreamUsage,
             VertexDataStreamAccess: vertexStream.DataStreamAccess,
             VertexRole: vertexStream.RoleStats.PrimaryRole,
+            VertexTargetFirst16: vertexStream.TargetFirst16,
+            VertexBodyFirst16: vertexStream.BodyFirst16,
+            VertexGhidraBodyFirst16: vertexStream.GhidraBodyFirst16,
+            VertexRoleStats: vertexStream.RoleStats,
+            VertexPositionBoundsReview: BuildNifPositionBoundsReview(vertexStream.RoleStats),
             VertexCount: compatibleVertexCount,
             IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
             DataStreamMetadataScore: dataStreamMetadataScore,
@@ -14457,12 +14544,18 @@ internal sealed record NifMeshProbe(
     List<NifMeshPayloadRoleWindow> PayloadWindows);
 
 internal sealed record NifMeshProbePairing(
+    string PairingSource,
+    bool CandidateOnly,
     int IndexMeshPayloadOffset,
     int IndexBlockIndex,
     uint? IndexDeclaredPayloadBytes,
     string? IndexDataStreamUsage,
     string? IndexDataStreamAccess,
     string IndexRole,
+    string IndexTargetFirst16,
+    string IndexBodyFirst16,
+    string IndexGhidraBodyFirst16,
+    NifMeshStreamRoleStats IndexRoleStats,
     ushort IndexMax,
     int? IndexPairCount,
     int VertexMeshPayloadOffset,
@@ -14471,10 +14564,32 @@ internal sealed record NifMeshProbePairing(
     string? VertexDataStreamUsage,
     string? VertexDataStreamAccess,
     string VertexRole,
+    string VertexTargetFirst16,
+    string VertexBodyFirst16,
+    string VertexGhidraBodyFirst16,
+    NifMeshStreamRoleStats VertexRoleStats,
+    NifMeshProbePositionBoundsReview? VertexPositionBoundsReview,
     int VertexCount,
     double IndexCoverageRatio,
     int DataStreamMetadataScore,
     int Confidence);
+
+internal sealed record NifMeshProbePositionBoundsReview(
+    bool CandidateOnly,
+    string Role,
+    int MinVectorCount,
+    double MinFiniteVectorRatio,
+    double MinPlausibleValueRatio,
+    double MinNonZeroVectorRatio,
+    double MinMaxExtent,
+    int? VectorCount,
+    double? FiniteVectorRatio,
+    double? PlausibleValueRatio,
+    double? NonZeroVectorRatio,
+    double? MaxExtent,
+    bool PassesBasicReview,
+    List<string> MissReasons,
+    List<NifFloatVectorPrefix>? Prefix);
 
 internal sealed record NifMeshPayloadRoleWindow(
     int PayloadOffset,
