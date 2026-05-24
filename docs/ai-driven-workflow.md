@@ -140,6 +140,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra review-rank probe summary schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary-schema.md`
 - Ghidra FunctionSiteSurvey target registry wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-registry.md`
 - Ghidra FunctionSiteSurvey target registry schema wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-schema.md`
+- Ghidra NiDataStream descriptor targets registered: `docs/handoffs/2026-05-24-ghidra-nidatastream-descriptor-targets.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.

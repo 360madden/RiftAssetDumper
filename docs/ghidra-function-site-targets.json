@@ -39,6 +39,30 @@
       "SummaryPath": "Exports/ghidra-reports/nimesh_material_binding_caller_14111f570.md",
       "SummaryTerms": ["NiDX9MeshMaterialBinding::Create", "semantic adapter", "NiDataStream"],
       "Description": "DX9 mesh material-binding caller that invokes semantic-adapter validation."
+    },
+    {
+      "Key": "nidatastream-descriptor-helper",
+      "Address": "0x1411821f0",
+      "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_1411821f0.json",
+      "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_1411821f0.summary.md",
+      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "Description": "Descriptor/component helper called by the NiDataStream load path and related stream consumers."
+    },
+    {
+      "Key": "nidatastream-descriptor-builder-1770",
+      "Address": "0x141181770",
+      "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_141181770.json",
+      "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_141181770.summary.md",
+      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "Description": "Small descriptor-builder helper called by NiDataStream LoadBinary and semantic-adapter validation."
+    },
+    {
+      "Key": "nidatastream-descriptor-builder-17c0",
+      "Address": "0x1411817c0",
+      "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_1411817c0.json",
+      "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_1411817c0.summary.md",
+      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "Description": "Small descriptor-builder helper called from NiDataStream LoadBinary and adjacent stream routines."
     }
   ]
 }

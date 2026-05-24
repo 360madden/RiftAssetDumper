@@ -36,6 +36,9 @@ Initial target keys:
 - `nidatastream-loadbinary`
 - `nidatastream-semantic-adapter`
 - `nimesh-material-binding-caller`
+- `nidatastream-descriptor-helper`
+- `nidatastream-descriptor-builder-1770`
+- `nidatastream-descriptor-builder-17c0`
 
 ## Safety boundary
 
