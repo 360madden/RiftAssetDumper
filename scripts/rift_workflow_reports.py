@@ -206,7 +206,9 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
         f"shifted={json_value_or_dash(report, 'LegacyOffsetShiftedStreamBodies')} "
         f"roleDeltas={json_value_or_dash(report, 'GhidraRoleDeltaStreamBodies')} "
         f"pairMeshes={json_value_or_dash(report, 'PairCompatibleMeshes')} "
-        f"pairLinks={json_value_or_dash(report, 'PairCompatibleLinks')}"
+        f"pairLinks={json_value_or_dash(report, 'PairCompatibleLinks')} "
+        f"ghidraPairMeshes={json_value_or_dash(report, 'GhidraPairCompatibleMeshes')} "
+        f"ghidraPairLinks={json_value_or_dash(report, 'GhidraPairCompatibleLinks')}"
     )
 
     role_groups = report.get("RoleGroups")
@@ -369,6 +371,29 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
             "Top pairings: "
             + top_text(
                 top_pairings,
+                lambda g: (
+                    f"meshSize={json_value_or_dash(g, 'MeshSize')} "
+                    f"count={json_value_or_dash(g, 'Count')} "
+                    f"index[{format_nif_usage_access(g, 'IndexDataStreamUsage', 'IndexDataStreamAccess')}] "
+                    f"{json_value_or_dash(g, 'IndexRole')}->"
+                    f"vertex[{format_nif_usage_access(g, 'VertexDataStreamUsage', 'VertexDataStreamAccess')}] "
+                    f"{json_value_or_dash(g, 'VertexRole')} "
+                    f"v={json_value_or_dash(g, 'VertexCount')} "
+                    f"max={json_value_or_dash(g, 'MaxIndexObserved')} "
+                    f"pairs={json_value_or_dash(g, 'IndexPairCount')} "
+                    f"list={json_value_or_dash(g, 'TriangleListTriangleCount')} "
+                    f"strip={json_value_or_dash(g, 'TriangleStripWindowCount')} "
+                    f"cov={json_value_or_dash(g, 'MaxIndexCoverageRatio')}"
+                ),
+            )
+        )
+
+    top_ghidra_pairings = report.get("TopGhidraPairings")
+    if top_ghidra_pairings and isinstance(top_ghidra_pairings, list):
+        print(
+            "Top Ghidra pairings: "
+            + top_text(
+                top_ghidra_pairings,
                 lambda g: (
                     f"meshSize={json_value_or_dash(g, 'MeshSize')} "
                     f"count={json_value_or_dash(g, 'Count')} "

@@ -4095,6 +4095,7 @@ internal static class Program
     var ghidraRoleDeltaGroups = new Dictionary<string, NifMeshBindingGhidraRoleDeltaAccumulator>(StringComparer.OrdinalIgnoreCase);
     var patternGroups = new Dictionary<string, NifMeshBindingPatternAccumulator>(StringComparer.OrdinalIgnoreCase);
     var pairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
+    var ghidraPairingGroups = new Dictionary<string, NifMeshBindingPairingAccumulator>(StringComparer.OrdinalIgnoreCase);
     var positionSourceSiblingGroups = new Dictionary<string, NifPositionSourceSiblingAccumulator>(StringComparer.OrdinalIgnoreCase);
     var residualTargetGroups = new Dictionary<uint, NifMeshResidualTargetAccumulator>();
     var residualStreamGroups = new Dictionary<string, NifMeshResidualStreamAccumulator>(StringComparer.OrdinalIgnoreCase);
@@ -4115,6 +4116,8 @@ internal static class Program
     var ghidraRoleDeltaStreamBodies = 0;
     var pairCompatibleMeshes = 0;
     var pairCompatibleLinks = 0;
+    var ghidraPairCompatibleMeshes = 0;
+    var ghidraPairCompatibleLinks = 0;
     var attributeCompatibleMeshes = 0;
     var attributeCompatibleSets = 0;
 
@@ -4472,6 +4475,12 @@ internal static class Program
                 manifestEntry,
                 meshBlock,
                 streamSummaries);
+            var ghidraPairings = FindNifMeshBindingPairings(
+                archiveName,
+                entry,
+                manifestEntry,
+                meshBlock,
+                BuildNifGhidraRoleStreamSummaries(streamSummaries));
             var attributeSets = FindNifMeshAttributeSets(
                 archiveName,
                 entry,
@@ -4482,6 +4491,12 @@ internal static class Program
             {
               pairCompatibleMeshes++;
               pairCompatibleLinks += pairings.Count;
+            }
+
+            if (ghidraPairings.Count > 0)
+            {
+              ghidraPairCompatibleMeshes++;
+              ghidraPairCompatibleLinks += ghidraPairings.Count;
             }
 
             if (attributeSets.Count > 0)
@@ -4677,34 +4692,12 @@ internal static class Program
 
             foreach (var pairing in pairings)
             {
-              var key = $"meshSize={meshBlock.Size}|index@{pairing.IndexMeshPayloadOffset}:payload={pairing.IndexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)}:role={pairing.IndexRole}|vertex@{pairing.VertexMeshPayloadOffset}:payload={pairing.VertexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)}:role={pairing.VertexRole}:count={pairing.VertexCount}";
-              if (!pairingGroups.TryGetValue(key, out var pairingGroup))
-              {
-                pairingGroup = new NifMeshBindingPairingAccumulator(
-                    key,
-                    meshBlock.Size,
-                    pairing.IndexRole,
-                    pairing.VertexRole,
-                    pairing.IndexDeclaredPayloadBytes,
-                    pairing.VertexDeclaredPayloadBytes,
-                    pairing.IndexPairCount,
-                    pairing.IndexDataStreamUsage,
-                    pairing.IndexDataStreamAccess,
-                    pairing.VertexDataStreamUsage,
-                    pairing.VertexDataStreamAccess,
-                    pairing.VertexCount);
-                pairingGroups.Add(key, pairingGroup);
-              }
+              addPairingRecord(pairingGroups, pairing, entry.IdPrefix);
+            }
 
-              pairingGroup.Count++;
-              pairingGroup.NifIds.Add(entry.IdPrefix);
-              pairingGroup.MaxIndexObserved = Math.Max(pairingGroup.MaxIndexObserved, pairing.IndexMax);
-              pairingGroup.ConfidenceTotal += pairing.Confidence;
-              pairingGroup.IndexCoverageRatioTotal += pairing.IndexCoverageRatio;
-              if (pairingGroup.Samples.Count < 16)
-              {
-                pairingGroup.Samples.Add(pairing);
-              }
+            foreach (var pairing in ghidraPairings)
+            {
+              addPairingRecord(ghidraPairingGroups, pairing, entry.IdPrefix);
             }
           }
         }
@@ -5011,6 +5004,41 @@ internal static class Program
           Samples: group.Samples);
     }
 
+    static void addPairingRecord(
+        Dictionary<string, NifMeshBindingPairingAccumulator> groups,
+        NifMeshBindingPairingSample pairing,
+        string idPrefix)
+    {
+      var key = $"meshSize={pairing.MeshSize}|index@{pairing.IndexMeshPayloadOffset}:payload={pairing.IndexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)}:role={pairing.IndexRole}|vertex@{pairing.VertexMeshPayloadOffset}:payload={pairing.VertexDeclaredPayloadBytes}:{FormatNifDataStreamUsageAccessKey(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)}:role={pairing.VertexRole}:count={pairing.VertexCount}";
+      if (!groups.TryGetValue(key, out var pairingGroup))
+      {
+        pairingGroup = new NifMeshBindingPairingAccumulator(
+            key,
+            pairing.MeshSize,
+            pairing.IndexRole,
+            pairing.VertexRole,
+            pairing.IndexDeclaredPayloadBytes,
+            pairing.VertexDeclaredPayloadBytes,
+            pairing.IndexPairCount,
+            pairing.IndexDataStreamUsage,
+            pairing.IndexDataStreamAccess,
+            pairing.VertexDataStreamUsage,
+            pairing.VertexDataStreamAccess,
+            pairing.VertexCount);
+        groups.Add(key, pairingGroup);
+      }
+
+      pairingGroup.Count++;
+      pairingGroup.NifIds.Add(idPrefix);
+      pairingGroup.MaxIndexObserved = Math.Max(pairingGroup.MaxIndexObserved, pairing.IndexMax);
+      pairingGroup.ConfidenceTotal += pairing.Confidence;
+      pairingGroup.IndexCoverageRatioTotal += pairing.IndexCoverageRatio;
+      if (pairingGroup.Samples.Count < 16)
+      {
+        pairingGroup.Samples.Add(pairing);
+      }
+    }
+
     var report = new NifMeshBindingInventoryReport(
         RootDirectory: rootDirectory,
         ManifestPath: manifestPath,
@@ -5027,6 +5055,8 @@ internal static class Program
         GhidraRoleDeltaStreamBodies: ghidraRoleDeltaStreamBodies,
         PairCompatibleMeshes: pairCompatibleMeshes,
         PairCompatibleLinks: pairCompatibleLinks,
+        GhidraPairCompatibleMeshes: ghidraPairCompatibleMeshes,
+        GhidraPairCompatibleLinks: ghidraPairCompatibleLinks,
         AttributeCompatibleMeshes: attributeCompatibleMeshes,
         AttributeCompatibleSets: attributeCompatibleSets,
         RoleGroups: roleGroups.Values
@@ -5093,6 +5123,14 @@ internal static class Program
             .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
             .Take(options.Limit > 0 ? options.Limit : 100)
             .ToList(),
+        TopGhidraPairings: ghidraPairingGroups.Values
+            .Select(toPairingRecord)
+            .OrderByDescending(static g => g.Count)
+            .ThenByDescending(static g => g.AverageConfidence)
+            .ThenBy(static g => g.MeshSize)
+            .ThenBy(static g => g.Pattern, StringComparer.OrdinalIgnoreCase)
+            .Take(options.Limit > 0 ? options.Limit : 100)
+            .ToList(),
         TopAttributeSets: attributeSetGroups.Values
             .Select(toAttributeSetRecord)
             .OrderByDescending(static g => g.Count)
@@ -5143,6 +5181,8 @@ internal static class Program
     Console.WriteLine($"Ghidra role deltas: {ghidraRoleDeltaStreamBodies:N0}");
     Console.WriteLine($"Pair-compatible meshes: {pairCompatibleMeshes:N0}");
     Console.WriteLine($"Pair-compatible links: {pairCompatibleLinks:N0}");
+    Console.WriteLine($"Ghidra pair-compatible meshes: {ghidraPairCompatibleMeshes:N0}");
+    Console.WriteLine($"Ghidra pair-compatible links: {ghidraPairCompatibleLinks:N0}");
     Console.WriteLine($"Attribute-compatible meshes: {attributeCompatibleMeshes:N0}");
     Console.WriteLine($"Attribute-compatible sets: {attributeCompatibleSets:N0}");
     Console.WriteLine($"Top roles: {string.Join(", ", report.RoleGroups.Take(8).Select(static g => $"{g.Role}={g.Count:N0}"))}");
@@ -5152,6 +5192,7 @@ internal static class Program
     Console.WriteLine($"Residual target mesh sizes: {string.Join(" | ", report.ResidualTargetMeshSizes.Select(static g => $"meshSize={g.MeshSize} meshes={g.MeshBlockCount:N0} residuals={g.ResidualStreamCount:N0} patterns={g.ResidualPatternCount:N0}"))}");
     Console.WriteLine($"Top residual streams (target mesh sizes, known geometry/sentinel roles removed): {string.Join(" | ", report.TopResidualStreams.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} stream@{g.MeshPayloadOffset} payload={g.DeclaredPayloadBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} {FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)} {g.Role} c={g.RoleConfidence} string={g.StringValue ?? "-"} ror3=v{g.RotatedFloat3VectorCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} finite={g.RotatedFloat3FiniteVectorRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} plausible={g.RotatedFloat3PlausibleValueRatio?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} extent={g.RotatedFloat3MaxExtent?.ToString("g6", CultureInfo.InvariantCulture) ?? "-"} first16={g.BodyFirst16}"))}");
     Console.WriteLine($"Top pairings: {string.Join(" | ", report.TopPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved} pairs={g.IndexPairCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripWindowCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} cov={g.MaxIndexCoverageRatio.ToString("g6", CultureInfo.InvariantCulture)}"))}");
+    Console.WriteLine($"Top Ghidra pairings: {string.Join(" | ", report.TopGhidraPairings.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} index[{FormatNifDataStreamUsageAccessKey(g.IndexDataStreamUsage, g.IndexDataStreamAccess)}] {g.IndexRole}->vertex[{FormatNifDataStreamUsageAccessKey(g.VertexDataStreamUsage, g.VertexDataStreamAccess)}] {g.VertexRole} v={g.VertexCount} maxIndex={g.MaxIndexObserved} pairs={g.IndexPairCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripWindowCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} cov={g.MaxIndexCoverageRatio.ToString("g6", CultureInfo.InvariantCulture)}"))}");
     Console.WriteLine($"Top attribute sets: {string.Join(" | ", report.TopAttributeSets.Take(5).Select(static g => $"meshSize={g.MeshSize} count={g.Count:N0} p={g.PositionDeclaredPayloadBytes}/n={g.NormalDeclaredPayloadBytes}/uv={g.UvDeclaredPayloadBytes} v={g.VertexCount} topology={g.Topology.PrimaryTopology}"))}");
     Console.WriteLine($"Top attribute topologies: {string.Join(" | ", report.TopAttributeTopologies.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} count={g.Count:N0} list={g.TriangleListTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} strip={g.TriangleStripTriangleCount?.ToString(CultureInfo.InvariantCulture) ?? "-"} quad={g.QuadListQuadCount?.ToString(CultureInfo.InvariantCulture) ?? "-"}"))}");
     Console.WriteLine($"Top attribute extras: {string.Join(" | ", report.TopAttributeExtraStreams.Take(5).Select(static g => $"{g.Topology} v={g.VertexCount} extra@{g.ExtraMeshPayloadOffset} payload={g.ExtraDeclaredPayloadBytes} {g.ExtraRole} count={g.Count:N0} fit={g.FitSummary}"))}");
@@ -10297,6 +10338,18 @@ internal static class Program
     return score;
   }
 
+  private static List<NifMeshBoundStreamSummary> BuildNifGhidraRoleStreamSummaries(List<NifMeshBoundStreamSummary> streams)
+  {
+    return streams
+        .Where(static s => s.GhidraRoleStats is not null)
+        .Select(static s => s with
+        {
+          BodyFirst16 = string.IsNullOrWhiteSpace(s.GhidraBodyFirst16) ? s.BodyFirst16 : s.GhidraBodyFirst16,
+          RoleStats = s.GhidraRoleStats ?? s.RoleStats,
+        })
+        .ToList();
+  }
+
   private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
       byte[] payload,
       NifHeaderInfo header,
@@ -15077,6 +15130,8 @@ internal sealed record NifMeshBindingInventoryReport(
     int GhidraRoleDeltaStreamBodies,
     int PairCompatibleMeshes,
     int PairCompatibleLinks,
+    int GhidraPairCompatibleMeshes,
+    int GhidraPairCompatibleLinks,
     int AttributeCompatibleMeshes,
     int AttributeCompatibleSets,
     List<NifMeshBindingRoleGroup> RoleGroups,
@@ -15087,6 +15142,7 @@ internal sealed record NifMeshBindingInventoryReport(
     List<NifMeshResidualStreamGroup> TopResidualStreams,
     List<NifMeshBindingPatternGroup> TopPatterns,
     List<NifMeshBindingPairingGroup> TopPairings,
+    List<NifMeshBindingPairingGroup> TopGhidraPairings,
     List<NifMeshAttributeSetGroup> TopAttributeSets,
     List<NifAttributeTopologyGroup> TopAttributeTopologies,
     List<NifAttributeExtraStreamGroup> TopAttributeExtraStreams,
