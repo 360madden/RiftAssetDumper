@@ -198,6 +198,23 @@ check("record byte summary width", record_byte_summary["RecordWidthBytes"], 4)
 check("record byte offset count", len(record_byte_summary["ByteOffsets"]), 4)
 check("record byte offset 0 top value", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["ValueHex"], "aa")
 check("record byte offset 0 top count", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["Count"], 5)
+semantic_feasibility = compare["DescriptorSemanticFeasibility"]
+check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
+check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
+check("semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True)
+check("semantic feasibility mapping blocked", semantic_feasibility["SemanticMappingReady"], False)
+check("semantic feasibility static offsets", semantic_feasibility["StaticFieldMapOffsetCount"], 3)
+check("semantic feasibility record offsets", semantic_feasibility["DescriptorRecordByteOffsetCount"], 4)
+check("semantic feasibility mapped fields", semantic_feasibility["StreamDescriptorRecordMappedCount"], 0)
+check("semantic feasibility blocker present", "stream-record-semantics-unmapped" in semantic_feasibility["Blockers"], True)
+first_semantic_row = semantic_feasibility["OffsetComparisonRows"][0]
+check("semantic feasibility first field", first_semantic_row["Field"], "descriptor-enable-or-special-flag")
+check("semantic feasibility candidate offsets", first_semantic_row["CandidateRecordByteOffsets"], [0, 1, 2, 3])
+check(
+    "semantic feasibility mapping decision",
+    first_semantic_row["MappingDecision"],
+    "unmapped-static-table-offset-not-stream-byte-offset",
+)
 check("candidate field map count", len(compare["CandidateFieldMap"]), 4)
 stride_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
 format_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-format-size-lookup")
@@ -214,6 +231,7 @@ check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
 check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
+check("semantic blocker present", "stream-record-semantics-unmapped" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
 
 print("=== NiDataStream descriptor/sample-byte compare mismatch fixture ===")
@@ -301,6 +319,12 @@ check_validation_error("schema rejects promoted field-map entry", field_map_prom
 record_byte_promoted_compare = json.loads(json.dumps(compare))
 record_byte_promoted_compare["DescriptorRecordByteSummary"]["FieldOrderPromoted"] = True
 check_validation_error("schema rejects promoted descriptor record byte summary", record_byte_promoted_compare, schema)
+semantic_promoted_compare = json.loads(json.dumps(compare))
+semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
+semantic_ready_compare = json.loads(json.dumps(compare))
+semantic_ready_compare["DescriptorSemanticFeasibility"]["SemanticMappingReady"] = True
+check_validation_error("schema rejects semantic mapping promotion", semantic_ready_compare, schema)
 
 print("=== NiDataStream descriptor/sample-byte compare writes ignored reports ===")
 with TemporaryDirectory() as temp_dir:
@@ -338,6 +362,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown title", markdown, "# NiDataStream descriptor/sample-byte comparison")
     check_contains("markdown descriptor record byte distribution", markdown, "Descriptor record byte distribution")
     check_contains("markdown descriptor record byte value", markdown, "aa (5)")
+    check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
+    check_contains("markdown semantic mapping decision", markdown, "unmapped-static-table-offset-not-stream-byte-offset")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")
     check_contains("markdown format field", markdown, "descriptor-format-size-lookup")
 

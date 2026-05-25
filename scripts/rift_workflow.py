@@ -1933,6 +1933,102 @@ def _nidatastream_descriptor_record_byte_summary(byte_order_proof: dict[str, Any
     }
 
 
+def _nidatastream_descriptor_semantic_feasibility(
+    candidate_field_map: list[dict[str, Any]],
+    record_byte_summary: dict[str, Any],
+) -> dict[str, Any]:
+    """Compare static descriptor-table candidates with stream-record bytes without promoting semantics."""
+    field_map = [field for field in candidate_field_map if isinstance(field, dict)]
+    static_fields = [field for field in field_map if isinstance(field.get("StaticTableOffsetBytes"), int)]
+    mapped_fields = [
+        field
+        for field in static_fields
+        if field.get("StreamDescriptorRecordStatus") not in (None, "", "not-mapped-to-parser-field")
+    ]
+    byte_offset_rows = record_byte_summary.get("ByteOffsets")
+    byte_offsets = [
+        int(row["OffsetBytes"])
+        for row in byte_offset_rows
+        if isinstance(row, dict) and isinstance(row.get("OffsetBytes"), int)
+    ] if isinstance(byte_offset_rows, list) else []
+    record_width = _json_int_or_none(record_byte_summary.get("RecordWidthBytes")) or 0
+    observed_record_count = _json_int_or_none(record_byte_summary.get("ObservedRecordCount")) or 0
+    malformed_record_count = _json_int_or_none(record_byte_summary.get("MalformedRecordCount")) or 0
+    static_field_map_ready = bool(static_fields) and all(
+        field.get("PromotionStatus") == "candidate-only" for field in field_map
+    )
+    descriptor_record_byte_distribution_ready = (
+        bool(record_byte_summary.get("CandidateOnly"))
+        and not bool(record_byte_summary.get("FieldOrderPromoted"))
+        and observed_record_count > 0
+        and malformed_record_count == 0
+        and record_width > 0
+        and len(byte_offsets) == record_width
+    )
+
+    offset_comparison_rows = []
+    for field in static_fields:
+        stream_status = str(field.get("StreamDescriptorRecordStatus", ""))
+        record_byte_offset_mapped = stream_status not in ("", "not-mapped-to-parser-field")
+        stride = field.get("StaticTableStrideBytes")
+        offset_comparison_rows.append(
+            {
+                "Field": str(field.get("Field", "")),
+                "StaticTableOffsetBytes": int(field["StaticTableOffsetBytes"]),
+                "StaticTableStrideBytes": stride if isinstance(stride, int) else None,
+                "StreamDescriptorRecordStatus": stream_status,
+                "CandidateRecordByteOffsets": byte_offsets,
+                "RecordByteOffsetMapped": record_byte_offset_mapped,
+                "MappingDecision": (
+                    "mapped-candidate"
+                    if record_byte_offset_mapped
+                    else "unmapped-static-table-offset-not-stream-byte-offset"
+                ),
+            }
+        )
+
+    semantic_mapping_ready = (
+        static_field_map_ready
+        and descriptor_record_byte_distribution_ready
+        and bool(static_fields)
+        and len(mapped_fields) == len(static_fields)
+    )
+    blockers: list[str] = []
+    if not static_field_map_ready:
+        blockers.append("static-field-map-incomplete")
+    if not descriptor_record_byte_distribution_ready:
+        blockers.append("descriptor-record-byte-distribution-incomplete")
+    if not mapped_fields:
+        blockers.append("stream-record-semantics-unmapped")
+    elif len(mapped_fields) != len(static_fields):
+        blockers.append("stream-record-semantics-partial")
+
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "StaticFieldMapReady": static_field_map_ready,
+        "DescriptorRecordByteDistributionReady": descriptor_record_byte_distribution_ready,
+        "StaticFieldMapOffsetCount": len(static_fields),
+        "DescriptorRecordByteOffsetCount": len(byte_offsets),
+        "DescriptorRecordWidthBytes": record_width,
+        "StreamDescriptorRecordMapped": bool(mapped_fields),
+        "StreamDescriptorRecordMappedCount": len(mapped_fields),
+        "SemanticMappingReady": semantic_mapping_ready,
+        "OffsetComparisonRows": offset_comparison_rows,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Static descriptor-table offsets and first stream descriptor-record byte distributions are both "
+            "available as candidate evidence, but no stream record byte is assigned parser/export semantics."
+        ),
+        "NextAction": (
+            "Use Ghidra helper/control-flow evidence plus focused sample fixtures to map stream descriptor "
+            "record bytes before proposing any parser/export behavior change."
+        ),
+    }
+
+
 def _nidatastream_descriptor_byte_order_proof(
     layout_report: dict[str, Any] | None,
     layout_status: dict[str, Any],
@@ -1996,6 +2092,10 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
     byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
     record_byte_summary = _nidatastream_descriptor_record_byte_summary(byte_order_proof)
+    semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
+        descriptor_status["CandidateFieldMap"],
+        record_byte_summary,
+    )
     descriptor_sample_evidence_ready = (
         bool(descriptor_status["AllRequiredEvidenceReady"])
         and bool(layout_status["AllBlocksGhidraStyleValid"])
@@ -2014,6 +2114,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         blockers.append("sample-byte-uniformity-incomplete")
     if not byte_order_proof["AllExpectedFieldsUniform"]:
         blockers.append("descriptor-byte-order-incomplete")
+    for blocker in semantic_feasibility["Blockers"]:
+        if blocker not in blockers:
+            blockers.append(blocker)
     if not descriptor_status["FieldOrderPromoted"]:
         blockers.append("field-order-promoted-false")
     if not promotion_status["ParserExportPromotionAllowed"]:
@@ -2037,6 +2140,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "SampleByteSummary": sample_summary,
         "DescriptorByteOrderProof": byte_order_proof,
         "DescriptorRecordByteSummary": record_byte_summary,
+        "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
         "BlockerCount": len(blockers),
@@ -2060,6 +2164,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     sample = report["SampleByteSummary"]
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
+    semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
     lines = [
         "# NiDataStream descriptor/sample-byte comparison",
@@ -2105,6 +2210,10 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         (
             "| Descriptor record byte patterns | "
             f"{format_markdown_cell(record_bytes['RecordPatternCount'])} |"
+        ),
+        (
+            "| Descriptor semantic mapping ready | "
+            f"{format_markdown_cell(str(semantic['SemanticMappingReady']).lower())} |"
         ),
         "",
         "## Sample-byte uniformity checks",
@@ -2180,6 +2289,34 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor semantic feasibility",
+            "",
+            f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
+            f"- Parser/export promotion allowed: **{str(semantic['ParserExportPromotionAllowed']).lower()}**",
+            "",
+            "| Field | Static table offset | Static stride | Record offsets considered | Stream record status | Mapping decision |",
+            "|---|---:|---:|---|---|---|",
+        ]
+    )
+    for row in semantic["OffsetComparisonRows"]:
+        candidate_offsets = ", ".join(str(offset) for offset in row["CandidateRecordByteOffsets"])
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["Field"]),
+                    format_markdown_cell(row["StaticTableOffsetBytes"]),
+                    format_markdown_cell(row["StaticTableStrideBytes"]),
+                    format_markdown_cell(candidate_offsets),
+                    format_markdown_cell(row["StreamDescriptorRecordStatus"]),
+                    format_markdown_cell(row["MappingDecision"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Candidate descriptor field map",
             "",
             "| Field | Data address | Static table offset | Static table stride | Promotion | Evidence |",
@@ -2240,6 +2377,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     sample = report["SampleByteSummary"]
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
+    semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
         "Descriptor helper evidence-ready targets: "
@@ -2255,6 +2393,11 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     print(
         "Descriptor record byte patterns: "
         f"{record_bytes['RecordPatternCount']} patterns; width={record_bytes['RecordWidthBytes']}"
+    )
+    print(
+        "Descriptor semantic mapping ready: "
+        f"{str(semantic['SemanticMappingReady']).lower()}; "
+        f"mapped fields={semantic['StreamDescriptorRecordMappedCount']}/{semantic['StaticFieldMapOffsetCount']}"
     )
     print(f"Candidate field-map entries: {len(report['CandidateFieldMap'])}")
     print(f"Descriptor + sample evidence ready: {str(report['DescriptorAndSampleEvidenceReady']).lower()}")
@@ -2397,6 +2540,11 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     sample_corpus_status = _nidatastream_sample_corpus_status(layout_report)
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
     byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
+    record_byte_summary = _nidatastream_descriptor_record_byte_summary(byte_order_proof)
+    semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
+        descriptor_status["CandidateFieldMap"],
+        record_byte_summary,
+    )
     descriptor_sample_ready = (
         descriptor_ready
         and bool(layout_status["AllBlocksGhidraStyleValid"])
@@ -2420,6 +2568,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "Ghidra-style-valid NiDataStream blocks; "
             f"sample checks {sample_summary['PassedCount']}/{sample_summary['CheckCount']}; "
             f"byte-order checks {byte_order_proof['PassedCount']}/{byte_order_proof['CheckCount']}; "
+            f"semantic mapping ready {str(semantic_feasibility['SemanticMappingReady']).lower()}; "
             "still report-only."
         )
     else:
@@ -2464,6 +2613,19 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "Descriptor helper/builders prove concrete count/order/format/component byte mapping, not only names.",
             descriptor_evidence,
             "python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json",
+        ),
+        _nidatastream_gate(
+            "descriptor-semantic-map",
+            "candidate" if semantic_feasibility["SemanticMappingReady"] else "blocked",
+            not bool(semantic_feasibility["SemanticMappingReady"]),
+            "Static descriptor-table offsets and stream descriptor-record bytes are mapped field-by-field with semantics.",
+            (
+                f"Semantic feasibility has {semantic_feasibility['StaticFieldMapOffsetCount']} static offset(s), "
+                f"{semantic_feasibility['DescriptorRecordByteOffsetCount']} stream record byte offset(s), "
+                f"mapped fields {semantic_feasibility['StreamDescriptorRecordMappedCount']}/"
+                f"{semantic_feasibility['StaticFieldMapOffsetCount']}; still candidate-only."
+            ),
+            "python scripts/rift_workflow.py nidatastream-descriptor-sample-compare --list-json",
         ),
         _nidatastream_gate(
             "sample-byte-agreement",
@@ -2529,6 +2691,9 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "ByteOrderCheckCount": byte_order_proof["CheckCount"],
             "ByteOrderPassedCount": byte_order_proof["PassedCount"],
             "AllByteOrderFieldsUniform": byte_order_proof["AllExpectedFieldsUniform"],
+            "DescriptorRecordPatternCount": record_byte_summary["RecordPatternCount"],
+            "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
+            "DescriptorSemanticMappingReady": semantic_feasibility["SemanticMappingReady"],
             "DescriptorAndSampleEvidenceReady": descriptor_sample_ready,
         },
         "PairingImpactStatus": pairing_status,
@@ -2574,6 +2739,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         "Descriptor/sample compare: "
         f"sample checks {compare_status['SampleBytePassedCount']}/{compare_status['SampleByteCheckCount']}; "
         f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
+        f"semantic mapping ready={str(compare_status['DescriptorSemanticMappingReady']).lower()}; "
         f"ready={str(compare_status['DescriptorAndSampleEvidenceReady']).lower()}"
     )
     pairing_mark = "yes" if pairing_status["Exists"] else "no"
@@ -2666,6 +2832,14 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
             "| Descriptor byte-order checks | "
             f"{format_markdown_cell(compare_status['ByteOrderPassedCount'])}/"
             f"{format_markdown_cell(compare_status['ByteOrderCheckCount'])} |"
+        ),
+        (
+            "| Descriptor record byte patterns | "
+            f"{format_markdown_cell(compare_status['DescriptorRecordPatternCount'])} |"
+        ),
+        (
+            "| Descriptor semantic mapping ready | "
+            f"{format_markdown_cell(str(compare_status['DescriptorSemanticMappingReady']).lower())} |"
         ),
         (
             "| Descriptor/sample evidence ready | "

@@ -138,6 +138,9 @@
         "ByteOrderCheckCount",
         "ByteOrderPassedCount",
         "AllByteOrderFieldsUniform",
+        "DescriptorRecordPatternCount",
+        "DescriptorRecordWidthBytes",
+        "DescriptorSemanticMappingReady",
         "DescriptorAndSampleEvidenceReady"
       ],
       "properties": {
@@ -151,6 +154,9 @@
         "ByteOrderCheckCount": { "type": "integer", "minimum": 0 },
         "ByteOrderPassedCount": { "type": "integer", "minimum": 0 },
         "AllByteOrderFieldsUniform": { "type": "boolean" },
+        "DescriptorRecordPatternCount": { "type": "integer", "minimum": 0 },
+        "DescriptorRecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "DescriptorSemanticMappingReady": { "const": false },
         "DescriptorAndSampleEvidenceReady": { "type": "boolean" }
       },
       "additionalProperties": false

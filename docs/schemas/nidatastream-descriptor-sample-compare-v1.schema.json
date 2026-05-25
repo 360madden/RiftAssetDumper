@@ -16,6 +16,7 @@
     "SampleByteSummary",
     "DescriptorByteOrderProof",
     "DescriptorRecordByteSummary",
+    "DescriptorSemanticFeasibility",
     "CandidateFieldMap",
     "PromotionGateBlockers",
     "BlockerCount",
@@ -35,6 +36,7 @@
     "SampleByteSummary": { "$ref": "#/$defs/sampleByteSummary" },
     "DescriptorByteOrderProof": { "$ref": "#/$defs/descriptorByteOrderProof" },
     "DescriptorRecordByteSummary": { "$ref": "#/$defs/descriptorRecordByteSummary" },
+    "DescriptorSemanticFeasibility": { "$ref": "#/$defs/descriptorSemanticFeasibility" },
     "CandidateFieldMap": {
       "type": "array",
       "items": { "$ref": "#/$defs/fieldMap" }
@@ -311,6 +313,84 @@
         "ValueHex": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
         "ValueInteger": { "type": "integer", "minimum": 0, "maximum": 255 },
         "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSemanticFeasibility": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "StaticFieldMapReady",
+        "DescriptorRecordByteDistributionReady",
+        "StaticFieldMapOffsetCount",
+        "DescriptorRecordByteOffsetCount",
+        "DescriptorRecordWidthBytes",
+        "StreamDescriptorRecordMapped",
+        "StreamDescriptorRecordMappedCount",
+        "SemanticMappingReady",
+        "OffsetComparisonRows",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation",
+        "NextAction"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "StaticFieldMapReady": { "type": "boolean" },
+        "DescriptorRecordByteDistributionReady": { "type": "boolean" },
+        "StaticFieldMapOffsetCount": { "type": "integer", "minimum": 0 },
+        "DescriptorRecordByteOffsetCount": { "type": "integer", "minimum": 0 },
+        "DescriptorRecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "StreamDescriptorRecordMapped": { "type": "boolean" },
+        "StreamDescriptorRecordMappedCount": { "type": "integer", "minimum": 0 },
+        "SemanticMappingReady": { "const": false },
+        "OffsetComparisonRows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorSemanticOffsetComparison" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 },
+        "NextAction": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSemanticOffsetComparison": {
+      "type": "object",
+      "required": [
+        "Field",
+        "StaticTableOffsetBytes",
+        "StaticTableStrideBytes",
+        "StreamDescriptorRecordStatus",
+        "CandidateRecordByteOffsets",
+        "RecordByteOffsetMapped",
+        "MappingDecision"
+      ],
+      "properties": {
+        "Field": { "type": "string", "minLength": 1 },
+        "StaticTableOffsetBytes": { "type": "integer", "minimum": 0 },
+        "StaticTableStrideBytes": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "StreamDescriptorRecordStatus": { "type": "string", "minLength": 1 },
+        "CandidateRecordByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "RecordByteOffsetMapped": { "type": "boolean" },
+        "MappingDecision": {
+          "enum": [
+            "mapped-candidate",
+            "unmapped-static-table-offset-not-stream-byte-offset"
+          ]
+        }
       },
       "additionalProperties": false
     },

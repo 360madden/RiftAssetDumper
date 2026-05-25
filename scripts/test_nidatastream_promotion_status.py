@@ -207,6 +207,18 @@ check(
     isinstance(status["DescriptorSampleCompareStatus"]["AllByteOrderFieldsUniform"], bool),
     True,
 )
+check(
+    "descriptor semantic mapping remains blocked",
+    status["DescriptorSampleCompareStatus"]["DescriptorSemanticMappingReady"],
+    False,
+)
+check(
+    "descriptor record pattern count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternCount"], int),
+    True,
+)
+semantic_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-semantic-map")
+check("descriptor semantic gate blocks promotion", semantic_gate["State"], "blocked")
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
 missing_compare_status = json.loads(json.dumps(status))
@@ -215,6 +227,9 @@ check_validation_error("promotion status rejects missing descriptor/sample compa
 string_ready_status = json.loads(json.dumps(status))
 string_ready_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"] = "true"
 check_validation_error("promotion status rejects string descriptor/sample ready flag", string_ready_status, status_schema)
+semantic_ready_status = json.loads(json.dumps(status))
+semantic_ready_status["DescriptorSampleCompareStatus"]["DescriptorSemanticMappingReady"] = True
+check_validation_error("promotion status rejects semantic mapping promotion", semantic_ready_status, status_schema)
 string_stream_map_status = json.loads(json.dumps(status))
 string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
 check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
@@ -255,6 +270,7 @@ check("negative pairing complete groups", pairing_status["CompletePositionNormal
 missing_layout_compare = negative_status["DescriptorSampleCompareStatus"]
 check("missing layout sample checks pass count", missing_layout_compare["SampleBytePassedCount"], 0)
 check("missing layout byte-order checks pass count", missing_layout_compare["ByteOrderPassedCount"], 0)
+check("missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False)
 check("missing layout descriptor/sample ready false", missing_layout_compare["DescriptorAndSampleEvidenceReady"], False)
 pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
 check("negative pairing gate blocked", pairing_gate["State"], "blocked")
@@ -329,6 +345,7 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown field-map status", dashboard_markdown, "Descriptor candidate field-map entries")
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
+    check_contains("dashboard markdown semantic status", dashboard_markdown, "Descriptor semantic mapping ready")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
 print("=== NiDataStream promotion preflight ===")
