@@ -65,6 +65,48 @@ def check_validation_error(desc: str, payload: dict[str, Any], schema: dict[str,
         print(f"  PASS: {desc}")
 
 
+def promotion_status_for_out(out_dir: Path) -> dict[str, Any]:
+    output = io.StringIO()
+    with (
+        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", str(out_dir), "--list-json"]),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(output),
+    ):
+        rift_workflow.main()
+    return json.loads(output.getvalue())
+
+
+def minimal_layout_report(blocks: int = 2) -> dict[str, Any]:
+    def counter(value: int) -> list[dict[str, int]]:
+        return [{"Value": value, "Count": blocks}]
+
+    return {
+        "Schema": "nidatastream-layout-report/v1",
+        "Root": "Extracted",
+        "FilesScanned": 1,
+        "FilesParsed": 1,
+        "FilesWithNiDataStreamBlocks": 1,
+        "ParseErrorCount": 0,
+        "NiDataStreamBlocks": blocks,
+        "GhidraStyleLayoutValidBlocks": blocks,
+        "LegacyOffsetShiftedBlocks": blocks,
+        "TopPayloadPrefixBytes": counter(28),
+        "TopPayloadTrailerBytes": counter(1),
+        "TopTrailingFlags": counter(1),
+        "TopLegacyOffsetMinusGhidraOffset": counter(1),
+        "TopSecondUInt32": counter(0),
+        "TopPairCounts": counter(1),
+        "TopPairRecordOffsets": counter(12),
+        "TopFirstPairRecordBytes": [],
+        "TopDescriptorCounts": counter(1),
+        "TopDescriptorCountOffsets": counter(20),
+        "TopDescriptorRecordOffsets": counter(24),
+        "TopFirstDescriptorRecordBytes": [],
+        "ShiftedSamples": [],
+        "Warnings": [],
+    }
+
+
 print("=== NiDataStream evidence status ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -163,6 +205,12 @@ check(
 )
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
+missing_compare_status = json.loads(json.dumps(status))
+del missing_compare_status["DescriptorSampleCompareStatus"]
+check_validation_error("promotion status rejects missing descriptor/sample compare status", missing_compare_status, status_schema)
+string_ready_status = json.loads(json.dumps(status))
+string_ready_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"] = "true"
+check_validation_error("promotion status rejects string descriptor/sample ready flag", string_ready_status, status_schema)
 
 print("=== NiDataStream pairing impact negative fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -197,8 +245,52 @@ jsonschema.validate(negative_status, status_schema)
 pairing_status = negative_status["PairingImpactStatus"]
 check("negative pairing baseline fails", pairing_status["GuardBaselinePass"], False)
 check("negative pairing complete groups", pairing_status["CompletePositionNormalUvCandidateGroups"], 1)
+missing_layout_compare = negative_status["DescriptorSampleCompareStatus"]
+check("missing layout sample checks pass count", missing_layout_compare["SampleBytePassedCount"], 0)
+check("missing layout byte-order checks pass count", missing_layout_compare["ByteOrderPassedCount"], 0)
+check("missing layout descriptor/sample ready false", missing_layout_compare["DescriptorAndSampleEvidenceReady"], False)
 pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
 check("negative pairing gate blocked", pairing_gate["State"], "blocked")
+
+print("=== NiDataStream descriptor/sample status edge fixtures ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    (temp_path / "nidatastream-layout-report.json").write_text("{bad json", encoding="utf-8")
+    corrupt_status = promotion_status_for_out(temp_path)
+jsonschema.validate(corrupt_status, status_schema)
+print("  PASS: corrupt layout status schema validation")
+check("corrupt layout report error captured", bool(corrupt_status["LayoutReportStatus"]["Error"]), True)
+check("corrupt layout descriptor/sample ready false", corrupt_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"], False)
+corrupt_sample_gate = next(gate for gate in corrupt_status["Gates"] if gate["Key"] == "sample-byte-agreement")
+check("corrupt layout sample gate blocked", corrupt_sample_gate["State"], "blocked")
+
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    (temp_path / "nidatastream-layout-report.json").write_text(json.dumps([]), encoding="utf-8")
+    non_object_status = promotion_status_for_out(temp_path)
+jsonschema.validate(non_object_status, status_schema)
+print("  PASS: non-object layout status schema validation")
+check(
+    "non-object layout report error captured",
+    non_object_status["LayoutReportStatus"]["Error"],
+    "layout report root must be a JSON object",
+)
+check("non-object layout descriptor/sample ready false", non_object_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"], False)
+
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    partial_report = minimal_layout_report()
+    partial_report["TopPayloadPrefixBytes"] = [{"Value": 28, "Count": 1}]
+    (temp_path / "nidatastream-layout-report.json").write_text(json.dumps(partial_report), encoding="utf-8")
+    partial_status = promotion_status_for_out(temp_path)
+jsonschema.validate(partial_status, status_schema)
+print("  PASS: partial descriptor/sample status schema validation")
+partial_compare = partial_status["DescriptorSampleCompareStatus"]
+check("partial sample byte checks fail closed", partial_compare["AllSampleBytesUniform"], False)
+check("partial byte-order checks fail closed", partial_compare["AllByteOrderFieldsUniform"], False)
+check("partial descriptor/sample ready false", partial_compare["DescriptorAndSampleEvidenceReady"], False)
+partial_sample_gate = next(gate for gate in partial_status["Gates"] if gate["Key"] == "sample-byte-agreement")
+check("partial descriptor/sample sample gate blocked", partial_sample_gate["State"], "blocked")
 
 print("=== NiDataStream promotion dashboard ===")
 with TemporaryDirectory() as temp_dir:

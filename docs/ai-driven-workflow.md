@@ -175,6 +175,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - NiDataStream linked-stream nullable warning cleanup: `docs/handoffs/2026-05-25-nidatastream-nullable-warning-cleanup.md`
 - NiDataStream descriptor byte-order/corpus proof fields added: `docs/handoffs/2026-05-25-nidatastream-byte-order-proof.md`
 - NiDataStream promotion dashboard now surfaces descriptor/sample byte-order readiness: `docs/handoffs/2026-05-25-nidatastream-dashboard-byte-order-status.md`
+- NiDataStream promotion status edge fixtures added: `docs/handoffs/2026-05-25-nidatastream-status-edge-fixtures.md`
 - NiDataStream parser/export promotion decision template added: `docs/handoffs/2026-05-25-nidatastream-promotion-decision-template.md`
 - NiDataStream negative fixture guards added: `docs/handoffs/2026-05-25-nidatastream-negative-fixture-guards.md`
 - CI runtime warnings documented: `docs/handoffs/2026-05-25-ci-runtime-notes.md`

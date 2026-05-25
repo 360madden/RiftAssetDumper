@@ -1743,6 +1743,9 @@ def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, An
     except Exception as exc:
         status["Error"] = str(exc)
         return status
+    if not isinstance(report, dict):
+        status["Error"] = "layout report root must be a JSON object"
+        return status
 
     blocks = _json_int_or_none(report.get("NiDataStreamBlocks")) or 0
     valid_blocks = _json_int_or_none(report.get("GhidraStyleLayoutValidBlocks")) or 0
