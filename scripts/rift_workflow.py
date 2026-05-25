@@ -5160,8 +5160,8 @@ def _descriptor_reference_classify_markdown(report: dict[str, Any]) -> str:
         f"{format_markdown_cell(report.get('dataReferenceCount'))}/"
         f"{format_markdown_cell(report.get('addressLikeReferenceCount'))}**",
         "",
-        "| Field | Address | Bytes | Refs | Read | Write | Data | Address-like | Functions |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+        "| Field | Address | Block | Init | W | Bytes | Refs | Data | Address-like | Functions |",
+        "|---|---|---|---:|---:|---|---:|---:|---:|---:|",
     ]
     for field in fields:
         if not isinstance(field, dict):
@@ -5172,10 +5172,11 @@ def _descriptor_reference_classify_markdown(report: dict[str, Any]) -> str:
                 [
                     format_markdown_cell(field.get("field")),
                     format_markdown_cell(field.get("address")),
+                    format_markdown_cell(field.get("memoryBlockName")),
+                    format_markdown_cell(str(field.get("memoryBlockInitialized")).lower()),
+                    format_markdown_cell(str(field.get("memoryBlockWrite")).lower()),
                     format_markdown_cell(field.get("bytes")),
                     format_markdown_cell(field.get("referenceCountTo")),
-                    format_markdown_cell(field.get("readReferenceCount")),
-                    format_markdown_cell(field.get("writeReferenceCount")),
                     format_markdown_cell(field.get("dataReferenceCount")),
                     format_markdown_cell(field.get("addressLikeReferenceCount")),
                     format_markdown_cell(field.get("referencingFunctionCount")),

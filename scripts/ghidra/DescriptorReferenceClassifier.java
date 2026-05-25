@@ -5,6 +5,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.mem.Memory;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.ReferenceIterator;
@@ -133,6 +134,7 @@ public class DescriptorReferenceClassifier extends GhidraScript {
         item.put("references", references);
         if (address == null) {
             item.put("memoryBacked", false);
+            putMemoryBlockFields(item, null);
             item.put("byteCountRead", 0);
             item.put("bytes", "");
             item.put("symbolCount", 0);
@@ -146,8 +148,10 @@ public class DescriptorReferenceClassifier extends GhidraScript {
         }
 
         Memory memory = currentProgram.getMemory();
-        boolean memoryBacked = memory.getBlock(address) != null;
+        MemoryBlock block = memory.getBlock(address);
+        boolean memoryBacked = block != null;
         item.put("memoryBacked", memoryBacked);
+        putMemoryBlockFields(item, block);
         if (memoryBacked) {
             try {
                 byte[] bytes = new byte[byteCount];
@@ -220,6 +224,38 @@ public class DescriptorReferenceClassifier extends GhidraScript {
             functions.size()
         );
         return item;
+    }
+
+    private void putMemoryBlockFields(Map<String, Object> item, MemoryBlock block) {
+        if (block == null) {
+            item.put("memoryBlockName", "");
+            item.put("memoryBlockStart", "");
+            item.put("memoryBlockEnd", "");
+            item.put("memoryBlockSize", 0);
+            item.put("memoryBlockInitialized", false);
+            item.put("memoryBlockLoaded", false);
+            item.put("memoryBlockRead", false);
+            item.put("memoryBlockWrite", false);
+            item.put("memoryBlockExecute", false);
+            item.put("memoryBlockVolatile", false);
+            item.put("memoryBlockArtificial", false);
+            item.put("memoryBlockType", "");
+            item.put("memoryBlockSourceName", "");
+            return;
+        }
+        item.put("memoryBlockName", block.getName());
+        item.put("memoryBlockStart", block.getStart().toString());
+        item.put("memoryBlockEnd", block.getEnd().toString());
+        item.put("memoryBlockSize", block.getSize());
+        item.put("memoryBlockInitialized", block.isInitialized());
+        item.put("memoryBlockLoaded", block.isLoaded());
+        item.put("memoryBlockRead", block.isRead());
+        item.put("memoryBlockWrite", block.isWrite());
+        item.put("memoryBlockExecute", block.isExecute());
+        item.put("memoryBlockVolatile", block.isVolatile());
+        item.put("memoryBlockArtificial", block.isArtificial());
+        item.put("memoryBlockType", block.getType().toString());
+        item.put("memoryBlockSourceName", block.getSourceName() == null ? "" : block.getSourceName());
     }
 
     private void putReferenceCounts(
