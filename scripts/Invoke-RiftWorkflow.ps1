@@ -60,6 +60,7 @@ $PSModeToKebab = @{
     'NiDataStreamParserFieldProofGuard' = 'nidatastream-parser-field-proof-guard'
     'NiDataStreamParserExportNonConsumptionGuard' = 'nidatastream-parser-export-non-consumption-guard'
     'NiDataStreamDescriptorProofStatus' = 'nidatastream-descriptor-proof-status'
+    'NiDataStreamDescriptorSampleCompare' = 'nidatastream-descriptor-sample-compare'
     'GhidraPairingNonExportGuard' = 'ghidra-pairing-non-export-guard'
     'GhidraPairingReviewReport' = 'ghidra-pairing-review-report'
     'GhidraAttributeCandidateReport' = 'ghidra-attribute-candidate-report'

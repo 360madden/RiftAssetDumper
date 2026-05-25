@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/nidatastream-descriptor-sample-compare-v1.schema.json",
+  "title": "NiDataStream descriptor/sample-byte comparison v1",
+  "description": "Candidate-only comparison emitted by `python scripts/rift_workflow.py nidatastream-descriptor-sample-compare --list-json`.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "ParserExportPromotionAllowed",
+    "FieldOrderPromoted",
+    "DescriptorAndSampleEvidenceReady",
+    "DescriptorStatus",
+    "LayoutReportStatus",
+    "SampleByteSummary",
+    "CandidateFieldMap",
+    "PromotionGateBlockers",
+    "BlockerCount",
+    "Blockers",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-descriptor-sample-compare/v1" },
+    "CandidateOnly": { "const": true },
+    "ParserExportPromotionAllowed": { "const": false },
+    "FieldOrderPromoted": { "const": false },
+    "DescriptorAndSampleEvidenceReady": { "type": "boolean" },
+    "DescriptorStatus": { "$ref": "#/$defs/descriptorStatus" },
+    "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
+    "SampleByteSummary": { "$ref": "#/$defs/sampleByteSummary" },
+    "CandidateFieldMap": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldMap" }
+    },
+    "PromotionGateBlockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "BlockerCount": { "type": "integer", "minimum": 0 },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "counterValue": {
+      "anyOf": [
+        { "type": "integer" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "descriptorStatus": {
+      "type": "object",
+      "required": [
+        "SchemaVersion",
+        "RequiredTargetCount",
+        "EvidenceReadyCount",
+        "AllRequiredEvidenceReady",
+        "FieldOrderPromoted"
+      ],
+      "properties": {
+        "SchemaVersion": { "const": "nidatastream-descriptor-proof-status/v1" },
+        "RequiredTargetCount": { "type": "integer", "minimum": 0 },
+        "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
+        "AllRequiredEvidenceReady": { "type": "boolean" },
+        "FieldOrderPromoted": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "layoutReportStatus": {
+      "type": "object",
+      "required": [
+        "Path",
+        "Exists",
+        "Schema",
+        "FilesScanned",
+        "FilesParsed",
+        "NiDataStreamBlocks",
+        "GhidraStyleLayoutValidBlocks",
+        "LegacyOffsetShiftedBlocks",
+        "AllBlocksGhidraStyleValid",
+        "Error"
+      ],
+      "properties": {
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "Schema": { "type": "string" },
+        "FilesScanned": { "type": "integer", "minimum": 0 },
+        "FilesParsed": { "type": "integer", "minimum": 0 },
+        "NiDataStreamBlocks": { "type": "integer", "minimum": 0 },
+        "GhidraStyleLayoutValidBlocks": { "type": "integer", "minimum": 0 },
+        "LegacyOffsetShiftedBlocks": { "type": "integer", "minimum": 0 },
+        "AllBlocksGhidraStyleValid": { "type": "boolean" },
+        "Error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "sampleByteSummary": {
+      "type": "object",
+      "required": ["CheckCount", "PassedCount", "AllExpectedValuesUniform", "Checks"],
+      "properties": {
+        "CheckCount": { "type": "integer", "minimum": 0 },
+        "PassedCount": { "type": "integer", "minimum": 0 },
+        "AllExpectedValuesUniform": { "type": "boolean" },
+        "Checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sampleByteCheck" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sampleByteCheck": {
+      "type": "object",
+      "required": [
+        "Key",
+        "Source",
+        "ExpectedValue",
+        "ObservedValue",
+        "ObservedInteger",
+        "ObservedCount",
+        "ExpectedBlockCount",
+        "RowsSeen",
+        "Uniform",
+        "MatchesExpected",
+        "Meaning"
+      ],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "Source": { "type": "string", "minLength": 1 },
+        "ExpectedValue": { "type": "integer" },
+        "ObservedValue": { "$ref": "#/$defs/counterValue" },
+        "ObservedInteger": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }]
+        },
+        "ObservedCount": { "type": "integer", "minimum": 0 },
+        "ExpectedBlockCount": { "type": "integer", "minimum": 0 },
+        "RowsSeen": { "type": "integer", "minimum": 0 },
+        "Uniform": { "type": "boolean" },
+        "MatchesExpected": { "type": "boolean" },
+        "Meaning": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "fieldMap": {
+      "type": "object",
+      "required": ["Field", "Evidence", "EvidenceTargets"],
+      "properties": {
+        "Field": { "type": "string", "minLength": 1 },
+        "DataAddress": { "type": "string" },
+        "Evidence": { "type": "string", "minLength": 1 },
+        "EvidenceTargets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

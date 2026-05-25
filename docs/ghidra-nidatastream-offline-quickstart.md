@@ -53,9 +53,11 @@ For a first full import/analysis, use a much larger timeout such as `--ghidra-ti
 ```powershell
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/nidatastream_loadbinary.json --ghidra-summary-term NiDataStream --ghidra-summary-term LoadBinary --ghidra-summary-out Exports/ghidra-reports/nidatastream_loadbinary.md
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
+python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 ```
 
 Descriptor status is still candidate-only. `FieldOrderPromoted` must remain false until a separate promotion patch proves otherwise.
+The descriptor/sample compare command writes ignored JSON/Markdown under `Exports/` and checks descriptor-helper readiness against the copied-sample byte-counter evidence without changing parser/export behavior.
 
 ## 5. Refresh local sample-byte evidence only when needed
 
@@ -86,6 +88,7 @@ The preflight writes the ignored dashboard, prints ignored evidence artifact tim
 ```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-promotion-dashboard
+python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
 python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py ghidra-workflow-guard-suite --skip-build

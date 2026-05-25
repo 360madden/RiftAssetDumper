@@ -36,6 +36,7 @@
           "enum": [
             "function-site-report",
             "function-site-summary",
+            "descriptor-sample-compare",
             "pairing-impact",
             "pairing-review",
             "promotion-dashboard",

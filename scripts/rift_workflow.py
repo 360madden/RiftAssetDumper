@@ -60,6 +60,7 @@ Commands (kebab-case):
     nidatastream-parser-field-proof-guard — fail closed on premature NiDataStream parser/export promotion
     nidatastream-parser-export-non-consumption-guard — ensure candidate NiDataStream/Ghidra evidence stays report-only
     nidatastream-descriptor-proof-status — candidate-only descriptor helper evidence status
+    nidatastream-descriptor-sample-compare — compare descriptor proof with copied-sample byte evidence
     nidatastream-layout          — read-only NiDataStream layout report/validator
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
@@ -345,6 +346,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-sample-compare": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-layout": {
         "dotnet": "",
         "base": "nidatastream-layout-report",
@@ -409,6 +414,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
     "NiDataStreamParserExportNonConsumptionGuard": "nidatastream-parser-export-non-consumption-guard",
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
+    "NiDataStreamDescriptorSampleCompare": "nidatastream-descriptor-sample-compare",
     "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
     "All": "all",
@@ -1315,6 +1321,46 @@ DESCRIPTOR_CANDIDATE_FIELD_MAP = [
 ]
 
 
+SAMPLE_BYTE_UNIFORMITY_REQUIREMENTS = [
+    {
+        "Key": "payload-prefix-bytes",
+        "Source": "TopPayloadPrefixBytes",
+        "ExpectedValue": 28,
+        "Meaning": "Ghidra-aligned payload begins after a 28-byte descriptor/prefix region.",
+    },
+    {
+        "Key": "payload-trailer-bytes",
+        "Source": "TopPayloadTrailerBytes",
+        "ExpectedValue": 1,
+        "Meaning": "Ghidra-aligned declared payload leaves a 1-byte trailing flag.",
+    },
+    {
+        "Key": "trailing-flag",
+        "Source": "TopTrailingFlags",
+        "ExpectedValue": 1,
+        "Meaning": "The copied sample corpus currently exposes a uniform trailing flag value.",
+    },
+    {
+        "Key": "legacy-offset-minus-ghidra-offset",
+        "Source": "TopLegacyOffsetMinusGhidraOffset",
+        "ExpectedValue": 1,
+        "Meaning": "The legacy parser body offset is one byte later than the Ghidra-aligned payload offset.",
+    },
+    {
+        "Key": "pair-count",
+        "Source": "TopPairCounts",
+        "ExpectedValue": 1,
+        "Meaning": "The selected copied sample corpus has one pair record per observed NiDataStream block.",
+    },
+    {
+        "Key": "descriptor-count",
+        "Source": "TopDescriptorCounts",
+        "ExpectedValue": 1,
+        "Meaning": "The selected copied sample corpus has one descriptor record per observed NiDataStream block.",
+    },
+]
+
+
 def _report_path_from_target(target: dict[str, Any]) -> Path:
     """Return the repo-rooted ignored report path for a FunctionSiteSurvey target."""
     return REPO_ROOT / str(target.get("ReportPath", ""))
@@ -1516,6 +1562,16 @@ def _nidatastream_evidence_status_payload(args: argparse.Namespace) -> dict[str,
             out_dir / "nidatastream-layout-report.md",
         ),
         _artifact_status(
+            "nidatastream-descriptor-sample-compare-json",
+            "descriptor-sample-compare",
+            out_dir / "nidatastream-descriptor-sample-compare.json",
+        ),
+        _artifact_status(
+            "nidatastream-descriptor-sample-compare-markdown",
+            "descriptor-sample-compare",
+            out_dir / "nidatastream-descriptor-sample-compare.md",
+        ),
+        _artifact_status(
             "ghidra-attribute-candidate-report-json",
             "pairing-impact",
             out_dir / "ghidra-attribute-candidate-report.json",
@@ -1635,6 +1691,265 @@ def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, An
         }
     )
     return status
+
+
+def _read_nidatastream_layout_report(args: argparse.Namespace) -> tuple[dict[str, Any] | None, str]:
+    """Read the ignored local NiDataStream layout report for comparison surfaces."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = out_dir / "nidatastream-layout-report.json"
+    if not report_path.exists():
+        return None, ""
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return None, str(exc)
+    if not isinstance(report, dict):
+        return None, "layout report root must be a JSON object"
+    return report, ""
+
+
+def _counter_uniformity_check(
+    report: dict[str, Any] | None,
+    requirement: dict[str, Any],
+    expected_block_count: int,
+) -> dict[str, Any]:
+    """Return one sample-byte top-counter uniformity check."""
+    source = str(requirement["Source"])
+    rows_value = report.get(source) if report else None
+    rows = rows_value if isinstance(rows_value, list) else []
+    first_row = rows[0] if rows and isinstance(rows[0], dict) else {}
+    observed_value = first_row.get("Value")
+    observed_count = _json_int_or_none(first_row.get("Count")) or 0
+    observed_integer = _json_int_or_none(observed_value)
+    expected_value = int(requirement["ExpectedValue"])
+    uniform = expected_block_count > 0 and len(rows) == 1 and observed_count == expected_block_count
+    matches_expected = uniform and observed_integer == expected_value
+    return {
+        "Key": str(requirement["Key"]),
+        "Source": source,
+        "ExpectedValue": expected_value,
+        "ObservedValue": observed_value,
+        "ObservedInteger": observed_integer,
+        "ObservedCount": observed_count,
+        "ExpectedBlockCount": expected_block_count,
+        "RowsSeen": len(rows),
+        "Uniform": uniform,
+        "MatchesExpected": matches_expected,
+        "Meaning": str(requirement["Meaning"]),
+    }
+
+
+def _nidatastream_sample_byte_uniformity_summary(
+    layout_report: dict[str, Any] | None,
+    layout_status: dict[str, Any],
+) -> dict[str, Any]:
+    """Summarize whether ignored sample-byte counters match the current Ghidra-aligned hypothesis."""
+    expected_block_count = int(layout_status.get("NiDataStreamBlocks", 0))
+    checks = [
+        _counter_uniformity_check(layout_report, requirement, expected_block_count)
+        for requirement in SAMPLE_BYTE_UNIFORMITY_REQUIREMENTS
+    ]
+    passed_count = sum(1 for check in checks if check["MatchesExpected"])
+    return {
+        "CheckCount": len(checks),
+        "PassedCount": passed_count,
+        "AllExpectedValuesUniform": expected_block_count > 0 and passed_count == len(checks),
+        "Checks": checks,
+    }
+
+
+def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) -> dict[str, Any]:
+    """Return a candidate-only descriptor/static-proof vs sample-byte comparison report."""
+    descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
+    layout_status = _nidatastream_layout_report_status(args)
+    layout_report, layout_error = _read_nidatastream_layout_report(args)
+    if layout_error and not layout_status["Error"]:
+        layout_status["Error"] = layout_error
+    sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
+    descriptor_sample_evidence_ready = (
+        bool(descriptor_status["AllRequiredEvidenceReady"])
+        and bool(layout_status["AllBlocksGhidraStyleValid"])
+        and bool(sample_summary["AllExpectedValuesUniform"])
+    )
+    promotion_status = _nidatastream_promotion_status_payload(args)
+    blockers: list[str] = []
+    if not descriptor_status["AllRequiredEvidenceReady"]:
+        blockers.append("descriptor-helper-evidence-incomplete")
+    if layout_status["Error"]:
+        blockers.append("sample-byte-layout-report-invalid")
+    elif not layout_status["AllBlocksGhidraStyleValid"]:
+        blockers.append("sample-byte-layout-not-ghidra-style-valid")
+    if not sample_summary["AllExpectedValuesUniform"]:
+        blockers.append("sample-byte-uniformity-incomplete")
+    if not descriptor_status["FieldOrderPromoted"]:
+        blockers.append("field-order-promoted-false")
+    if not promotion_status["ParserExportPromotionAllowed"]:
+        blockers.append("parser-export-promotion-locked")
+
+    return {
+        "SchemaVersion": "nidatastream-descriptor-sample-compare/v1",
+        "CandidateOnly": True,
+        "ParserExportPromotionAllowed": False,
+        "FieldOrderPromoted": False,
+        "DescriptorAndSampleEvidenceReady": descriptor_sample_evidence_ready,
+        "DescriptorStatus": {
+            "SchemaVersion": descriptor_status["SchemaVersion"],
+            "RequiredTargetCount": descriptor_status["RequiredTargetCount"],
+            "EvidenceReadyCount": descriptor_status["EvidenceReadyCount"],
+            "AllRequiredEvidenceReady": descriptor_status["AllRequiredEvidenceReady"],
+            "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
+        },
+        "LayoutReportStatus": layout_status,
+        "SampleByteSummary": sample_summary,
+        "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
+        "PromotionGateBlockers": promotion_status["Blockers"],
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Decision": (
+            "Descriptor and copied-sample byte evidence may be used as candidate sidecar evidence only; "
+            "parser/export behavior remains unchanged."
+        ),
+        "NextAction": (
+            "Use this comparison to focus a narrow parser-field proof patch only after descriptor field order, "
+            "sample-byte corpus coverage, pairing impact, and negative fixtures are ready together."
+        ),
+    }
+
+
+def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> str:
+    """Build Markdown for the descriptor/sample-byte comparison report."""
+    descriptor = report["DescriptorStatus"]
+    layout = report["LayoutReportStatus"]
+    sample = report["SampleByteSummary"]
+    lines = [
+        "# NiDataStream descriptor/sample-byte comparison",
+        "",
+        f"- Candidate-only: **{str(report['CandidateOnly']).lower()}**",
+        f"- Parser/export promotion allowed: **{str(report['ParserExportPromotionAllowed']).lower()}**",
+        f"- Field order promoted: **{str(report['FieldOrderPromoted']).lower()}**",
+        (
+            "- Descriptor + sample evidence ready: "
+            f"**{str(report['DescriptorAndSampleEvidenceReady']).lower()}**"
+        ),
+        f"- Blocking items: **{format_markdown_cell(report['BlockerCount'])}**",
+        "",
+        "## Evidence snapshot",
+        "",
+        "| Evidence lane | Status |",
+        "|---|---:|",
+        (
+            "| Descriptor helper targets ready | "
+            f"{format_markdown_cell(descriptor['EvidenceReadyCount'])}/"
+            f"{format_markdown_cell(descriptor['RequiredTargetCount'])} |"
+        ),
+        (
+            "| Ghidra-style-valid sample blocks | "
+            f"{format_markdown_cell(layout['GhidraStyleLayoutValidBlocks'])}/"
+            f"{format_markdown_cell(layout['NiDataStreamBlocks'])} |"
+        ),
+        (
+            "| Uniform sample-byte checks | "
+            f"{format_markdown_cell(sample['PassedCount'])}/"
+            f"{format_markdown_cell(sample['CheckCount'])} |"
+        ),
+        "",
+        "## Sample-byte uniformity checks",
+        "",
+        "| Check | Expected | Observed | Count | Uniform | Match |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for check in sample["Checks"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(check["Key"]),
+                    format_markdown_cell(check["ExpectedValue"]),
+                    format_markdown_cell(check["ObservedValue"]),
+                    f"{format_markdown_cell(check['ObservedCount'])}/{format_markdown_cell(check['ExpectedBlockCount'])}",
+                    format_markdown_cell(str(check["Uniform"]).lower()),
+                    format_markdown_cell(str(check["MatchesExpected"]).lower()),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Current decision",
+            "",
+            report["Decision"],
+            "",
+            "## Blockers",
+            "",
+        ]
+    )
+    for blocker in report["Blockers"]:
+        lines.append(f"- {format_markdown_cell(blocker)}")
+    lines.extend(["", f"Next action: {report['NextAction']}", ""])
+    return "\n".join(lines)
+
+
+def _write_nidatastream_descriptor_sample_compare(
+    report: dict[str, Any],
+    args: argparse.Namespace,
+) -> tuple[Path, Path]:
+    """Write ignored descriptor/sample-byte comparison JSON/Markdown files."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "nidatastream-descriptor-sample-compare.json"
+    markdown_path = out_dir / "nidatastream-descriptor-sample-compare.md"
+    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    markdown_path.write_text(_nidatastream_descriptor_sample_compare_markdown(report), encoding="utf-8")
+    return json_path, markdown_path
+
+
+def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> None:
+    """Print a concise descriptor/sample-byte comparison summary."""
+    descriptor = report["DescriptorStatus"]
+    layout = report["LayoutReportStatus"]
+    sample = report["SampleByteSummary"]
+    print("--- NiDataStreamDescriptorSampleCompare")
+    print(
+        "Descriptor helper evidence-ready targets: "
+        f"{descriptor['EvidenceReadyCount']}/{descriptor['RequiredTargetCount']}"
+    )
+    print(
+        "Ghidra-style-valid sample blocks: "
+        f"{layout['GhidraStyleLayoutValidBlocks']}/{layout['NiDataStreamBlocks']}"
+    )
+    print(f"Uniform sample-byte checks: {sample['PassedCount']}/{sample['CheckCount']}")
+    print(f"Descriptor + sample evidence ready: {str(report['DescriptorAndSampleEvidenceReady']).lower()}")
+    print(f"Parser/export promotion allowed: {str(report['ParserExportPromotionAllowed']).lower()}")
+    print(f"Blocking items: {report['BlockerCount']}")
+    print("")
+    print(f"{'Check':36} {'Expected':8} {'Observed':8} {'Count':13} {'Match':6}")
+    print(f"{'-' * 36} {'-' * 8} {'-' * 8} {'-' * 13} {'-' * 6}")
+    for check in sample["Checks"]:
+        observed = "-" if check["ObservedValue"] is None else str(check["ObservedValue"])
+        print(
+            f"{check['Key']:36} "
+            f"{check['ExpectedValue']!s:8} "
+            f"{observed[:8]:8} "
+            f"{check['ObservedCount']}/{check['ExpectedBlockCount']:<11} "
+            f"{str(check['MatchesExpected']).lower():6}"
+        )
+    print("")
+    print(f"Decision: {report['Decision']}")
+    print(f"Next action: {report['NextAction']}")
+
+
+def _run_nidatastream_descriptor_sample_compare(args: argparse.Namespace) -> None:
+    """Write or list candidate-only descriptor/sample-byte comparison evidence."""
+    report = _nidatastream_descriptor_sample_compare_payload(args)
+    if args.list_json:
+        print(json.dumps(report, indent=2))
+        return
+    json_path, markdown_path = _write_nidatastream_descriptor_sample_compare(report, args)
+    _print_nidatastream_descriptor_sample_compare(report)
+    print(f"NiDataStreamDescriptorSampleCompare JSON: {json_path}")
+    print(f"NiDataStreamDescriptorSampleCompare markdown: {markdown_path}")
+    print("NiDataStreamDescriptorSampleCompare passed: comparison remains candidate-only/report-only.")
 
 
 def _ghidra_attribute_candidate_report_status(args: argparse.Namespace) -> dict[str, Any]:
@@ -2286,6 +2601,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-descriptor-proof-status":
         _run_nidatastream_descriptor_proof_status(args)
+        return
+
+    if command == "nidatastream-descriptor-sample-compare":
+        _run_nidatastream_descriptor_sample_compare(args)
         return
 
     if command == "nidatastream-layout":
@@ -3611,6 +3930,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
   python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
+  python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
@@ -3863,12 +4183,14 @@ Examples:
         "nidatastream-evidence-status",
         "nidatastream-promotion-status",
         "nidatastream-descriptor-proof-status",
+        "nidatastream-descriptor-sample-compare",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
-            "nidatastream-promotion-status, and nidatastream-descriptor-proof-status.",
+            "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
+            "and nidatastream-descriptor-sample-compare.",
             file=sys.stderr,
         )
         sys.exit(1)
