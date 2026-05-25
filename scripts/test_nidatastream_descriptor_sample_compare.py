@@ -235,6 +235,19 @@ role_by_offset = {row["OffsetBytes"]: row for row in record_byte_roles["Rows"]}
 check("record byte role offset 0", role_by_offset[0]["CandidateRole"], "static-descriptor-table-index")
 check("record byte role offset 1", role_by_offset[1]["CandidateRole"], "unmapped-variable-byte")
 check("record byte role offset 3", role_by_offset[3]["CandidateRole"], "zero-padding-or-reserved")
+record_pattern_matrix = compare["DescriptorRecordPatternMatrix"]
+check("record pattern matrix candidate-only", record_pattern_matrix["CandidateOnly"], True)
+check("record pattern matrix rows", record_pattern_matrix["RecordPatternCount"], 2)
+check("record pattern matrix observed count", record_pattern_matrix["ObservedRecordCount"], 5)
+check("record pattern matrix index offset", record_pattern_matrix["CandidateIndexByteOffset"], 0)
+check("record pattern matrix helper ignored offsets", record_pattern_matrix["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check("record pattern matrix sign guard offsets", record_pattern_matrix["CandidateSignGuardByteOffsets"], [3])
+check("record pattern matrix remaining offsets", record_pattern_matrix["RemainingUnmappedByteOffsets"], [1, 2])
+first_pattern_row = record_pattern_matrix["Rows"][0]
+check("record pattern matrix first hex", first_pattern_row["RecordHex"], "aa 04 03 00")
+check("record pattern matrix first index", first_pattern_row["CandidateIndexByte"]["ValueHex"], "aa")
+check("record pattern matrix first helper ignored count", len(first_pattern_row["CandidateHelperLookupIgnoredBytes"]), 2)
+check("record pattern matrix first remaining count", len(first_pattern_row["RemainingUnmappedBytes"]), 2)
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
@@ -381,6 +394,9 @@ check_validation_error("schema rejects promoted descriptor helper argument proof
 record_role_promoted_compare = json.loads(json.dumps(compare))
 record_role_promoted_compare["DescriptorRecordByteRoleCandidates"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor byte-role candidates", record_role_promoted_compare, schema)
+record_pattern_promoted_compare = json.loads(json.dumps(compare))
+record_pattern_promoted_compare["DescriptorRecordPatternMatrix"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor record pattern matrix", record_pattern_promoted_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -429,6 +445,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown helper high bytes proof", markdown, "Helper lookup high bytes proven unused")
     check_contains("markdown descriptor byte role candidates", markdown, "Descriptor record byte role candidates")
     check_contains("markdown descriptor padding candidate", markdown, "zero-padding-or-reserved")
+    check_contains("markdown descriptor record pattern matrix", markdown, "Descriptor record pattern matrix")
+    check_contains("markdown descriptor record pattern row", markdown, "aa 04 03 00")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
     check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")

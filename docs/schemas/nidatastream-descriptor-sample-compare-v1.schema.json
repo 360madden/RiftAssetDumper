@@ -19,6 +19,7 @@
     "DescriptorRecordIndexProof",
     "DescriptorHelperArgumentUseProof",
     "DescriptorRecordByteRoleCandidates",
+    "DescriptorRecordPatternMatrix",
     "DescriptorSemanticFeasibility",
     "CandidateFieldMap",
     "PromotionGateBlockers",
@@ -42,6 +43,7 @@
     "DescriptorRecordIndexProof": { "$ref": "#/$defs/descriptorRecordIndexProof" },
     "DescriptorHelperArgumentUseProof": { "$ref": "#/$defs/descriptorHelperArgumentUseProof" },
     "DescriptorRecordByteRoleCandidates": { "$ref": "#/$defs/descriptorRecordByteRoleCandidates" },
+    "DescriptorRecordPatternMatrix": { "$ref": "#/$defs/descriptorRecordPatternMatrix" },
     "DescriptorSemanticFeasibility": { "$ref": "#/$defs/descriptorSemanticFeasibility" },
     "CandidateFieldMap": {
       "type": "array",
@@ -522,6 +524,106 @@
         },
         "BlocksSemanticMapping": { "type": "boolean" },
         "Evidence": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordPatternMatrix": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "Source",
+        "RecordPatternCount",
+        "ObservedRecordCount",
+        "MalformedRecordCount",
+        "CandidateIndexByteOffset",
+        "CandidateHelperLookupIgnoredByteOffsets",
+        "CandidateSignGuardByteOffsets",
+        "RemainingUnmappedByteOffsets",
+        "Rows",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "Source": { "const": "TopFirstDescriptorRecordBytes" },
+        "RecordPatternCount": { "type": "integer", "minimum": 0 },
+        "ObservedRecordCount": { "type": "integer", "minimum": 0 },
+        "MalformedRecordCount": { "type": "integer", "minimum": 0 },
+        "CandidateIndexByteOffset": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "CandidateHelperLookupIgnoredByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "CandidateSignGuardByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "RemainingUnmappedByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "Rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordPatternRow" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordPatternRow": {
+      "type": "object",
+      "required": [
+        "PatternRank",
+        "RecordHex",
+        "Count",
+        "RecordWidthBytes",
+        "CandidateIndexByte",
+        "CandidateHelperLookupIgnoredBytes",
+        "CandidateSignGuardBytes",
+        "RemainingUnmappedBytes"
+      ],
+      "properties": {
+        "PatternRank": { "type": "integer", "minimum": 1 },
+        "RecordHex": { "type": "string", "pattern": "^[0-9a-f]{2}(?: [0-9a-f]{2})*$" },
+        "Count": { "type": "integer", "minimum": 0 },
+        "RecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "CandidateIndexByte": {
+          "anyOf": [{ "$ref": "#/$defs/descriptorRecordPatternValue" }, { "type": "null" }]
+        },
+        "CandidateHelperLookupIgnoredBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordPatternValue" }
+        },
+        "CandidateSignGuardBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordPatternValue" }
+        },
+        "RemainingUnmappedBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordPatternValue" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordPatternValue": {
+      "type": "object",
+      "required": ["OffsetBytes", "ValueHex", "ValueInteger"],
+      "properties": {
+        "OffsetBytes": { "type": "integer", "minimum": 0 },
+        "ValueHex": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
+        "ValueInteger": { "type": "integer", "minimum": 0, "maximum": 255 }
       },
       "additionalProperties": false
     },

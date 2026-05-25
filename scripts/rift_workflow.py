@@ -2281,6 +2281,139 @@ def _nidatastream_descriptor_record_byte_role_candidates(
     }
 
 
+def _descriptor_record_pattern_value(
+    parsed: list[int],
+    offset: int,
+) -> dict[str, Any] | None:
+    """Return one descriptor-record byte value row for a parsed record pattern."""
+    if offset < 0 or offset >= len(parsed):
+        return None
+    value = parsed[offset]
+    return {
+        "OffsetBytes": offset,
+        "ValueHex": f"{value:02x}",
+        "ValueInteger": value,
+    }
+
+
+def _descriptor_record_pattern_values(
+    parsed: list[int],
+    offsets: list[int],
+) -> list[dict[str, Any]]:
+    """Return descriptor-record byte value rows for selected offsets."""
+    values = []
+    for offset in offsets:
+        value = _descriptor_record_pattern_value(parsed, offset)
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _nidatastream_descriptor_record_pattern_matrix(
+    byte_order_proof: dict[str, Any],
+    record_index_proof: dict[str, Any] | None,
+    helper_argument_use_proof: dict[str, Any] | None,
+    record_byte_roles: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build a candidate-only matrix of observed descriptor record byte patterns."""
+    rows_value = byte_order_proof.get("TopFirstDescriptorRecordBytes")
+    rows = rows_value if isinstance(rows_value, list) else []
+    index_offset = (
+        record_index_proof.get("CandidateIndexByteOffset")
+        if isinstance(record_index_proof, dict)
+        and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
+        else None
+    )
+    helper_ignored_offsets = (
+        [
+            int(offset)
+            for offset in helper_argument_use_proof.get("CandidateHelperLookupIgnoredByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(helper_argument_use_proof, dict)
+        else []
+    )
+    sign_guard_offsets = (
+        [
+            int(offset)
+            for offset in helper_argument_use_proof.get("CandidateSignGuardByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(helper_argument_use_proof, dict)
+        else []
+    )
+    remaining_unmapped_offsets = (
+        [
+            int(offset)
+            for offset in record_byte_roles.get("RemainingUnmappedByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(record_byte_roles, dict)
+        else []
+    )
+
+    pattern_rows = []
+    malformed_record_count = 0
+    observed_record_count = 0
+    for rank, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            malformed_record_count += 1
+            continue
+        count = _json_int_or_none(row.get("Count")) or 0
+        parsed = _parse_hex_byte_record(row.get("Value"))
+        if parsed is None:
+            malformed_record_count += count
+            continue
+        observed_record_count += count
+        index_value = (
+            _descriptor_record_pattern_value(parsed, index_offset)
+            if isinstance(index_offset, int)
+            else None
+        )
+        pattern_rows.append(
+            {
+                "PatternRank": rank,
+                "RecordHex": " ".join(f"{byte:02x}" for byte in parsed),
+                "Count": count,
+                "RecordWidthBytes": len(parsed),
+                "CandidateIndexByte": index_value,
+                "CandidateHelperLookupIgnoredBytes": _descriptor_record_pattern_values(
+                    parsed,
+                    helper_ignored_offsets,
+                ),
+                "CandidateSignGuardBytes": _descriptor_record_pattern_values(parsed, sign_guard_offsets),
+                "RemainingUnmappedBytes": _descriptor_record_pattern_values(parsed, remaining_unmapped_offsets),
+            }
+        )
+
+    blockers = []
+    if malformed_record_count:
+        blockers.append("descriptor-record-pattern-malformed")
+    if remaining_unmapped_offsets:
+        blockers.append("descriptor-record-pattern-unmapped-bytes-present")
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "Source": "TopFirstDescriptorRecordBytes",
+        "RecordPatternCount": len(pattern_rows),
+        "ObservedRecordCount": observed_record_count,
+        "MalformedRecordCount": malformed_record_count,
+        "CandidateIndexByteOffset": index_offset,
+        "CandidateHelperLookupIgnoredByteOffsets": helper_ignored_offsets,
+        "CandidateSignGuardByteOffsets": sign_guard_offsets,
+        "RemainingUnmappedByteOffsets": remaining_unmapped_offsets,
+        "Rows": pattern_rows,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Observed descriptor record patterns are candidate-only review rows. The matrix joins byte-0 "
+            "static-table index candidates, helper-lookup ignored byte candidates, sign-guard candidates, "
+            "and parser/export-unmapped bytes without changing decoder/export behavior."
+        ),
+    }
+
+
 def _nidatastream_descriptor_semantic_feasibility(
     candidate_field_map: list[dict[str, Any]],
     record_byte_summary: dict[str, Any],
@@ -2522,6 +2655,12 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
     )
+    record_pattern_matrix = _nidatastream_descriptor_record_pattern_matrix(
+        byte_order_proof,
+        descriptor_status["DescriptorRecordIndexProof"],
+        descriptor_status["DescriptorHelperArgumentUseProof"],
+        record_byte_roles,
+    )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
@@ -2553,6 +2692,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     for blocker in descriptor_status["DescriptorHelperArgumentUseProof"]["Blockers"]:
         if blocker not in blockers:
             blockers.append(blocker)
+    for blocker in record_pattern_matrix["Blockers"]:
+        if blocker not in blockers:
+            blockers.append(blocker)
     if not descriptor_status["FieldOrderPromoted"]:
         blockers.append("field-order-promoted-false")
     if not promotion_status["ParserExportPromotionAllowed"]:
@@ -2579,6 +2721,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "DescriptorRecordIndexProof": descriptor_status["DescriptorRecordIndexProof"],
         "DescriptorHelperArgumentUseProof": descriptor_status["DescriptorHelperArgumentUseProof"],
         "DescriptorRecordByteRoleCandidates": record_byte_roles,
+        "DescriptorRecordPatternMatrix": record_pattern_matrix,
         "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
@@ -2606,6 +2749,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     record_index = report["DescriptorRecordIndexProof"]
     helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
+    record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
     semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
     lines = [
@@ -2665,6 +2809,10 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
             "| Descriptor record bytes classified | "
             f"{format_markdown_cell(record_roles['ClassifiedByteCount'])}/"
             f"{format_markdown_cell(record_roles['RecordWidthBytes'])} |"
+        ),
+        (
+            "| Descriptor record pattern matrix rows | "
+            f"{format_markdown_cell(record_pattern_matrix['RecordPatternCount'])} |"
         ),
         (
             "| Descriptor semantic mapping ready | "
@@ -2847,6 +2995,56 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor record pattern matrix",
+            "",
+            f"- Pattern rows: **{format_markdown_cell(record_pattern_matrix['RecordPatternCount'])}**",
+            (
+                "- Remaining unmapped byte offsets: **"
+                + format_markdown_cell(
+                    ", ".join(str(offset) for offset in record_pattern_matrix["RemainingUnmappedByteOffsets"])
+                )
+                + "**"
+            ),
+            "",
+            "| Rank | Record bytes | Count | Index byte | Helper-lookup ignored bytes | Sign-guard bytes | Remaining unmapped bytes |",
+            "|---:|---|---:|---|---|---|---|",
+        ]
+    )
+    for row in record_pattern_matrix["Rows"]:
+        index_byte = row["CandidateIndexByte"]
+        index_text = (
+            f"{index_byte['OffsetBytes']}={index_byte['ValueHex']}"
+            if isinstance(index_byte, dict)
+            else "-"
+        )
+        helper_ignored = ", ".join(
+            f"{value['OffsetBytes']}={value['ValueHex']}"
+            for value in row["CandidateHelperLookupIgnoredBytes"]
+        )
+        sign_guard = ", ".join(
+            f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["CandidateSignGuardBytes"]
+        )
+        remaining = ", ".join(
+            f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["RemainingUnmappedBytes"]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["PatternRank"]),
+                    format_markdown_cell(row["RecordHex"]),
+                    format_markdown_cell(row["Count"]),
+                    format_markdown_cell(index_text),
+                    format_markdown_cell(helper_ignored),
+                    format_markdown_cell(sign_guard),
+                    format_markdown_cell(remaining),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Descriptor semantic feasibility",
             "",
             f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
@@ -2938,6 +3136,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     record_index = report["DescriptorRecordIndexProof"]
     helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
+    record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
     semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
@@ -2970,6 +3169,11 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor record byte roles: "
         f"classified={record_roles['ClassifiedByteCount']}/{record_roles['RecordWidthBytes']}; "
         f"remaining={','.join(str(offset) for offset in record_roles['RemainingUnmappedByteOffsets']) or '-'}"
+    )
+    print(
+        "Descriptor record pattern matrix: "
+        f"rows={record_pattern_matrix['RecordPatternCount']}; "
+        f"remaining={','.join(str(offset) for offset in record_pattern_matrix['RemainingUnmappedByteOffsets']) or '-'}"
     )
     print(
         "Descriptor semantic mapping ready: "
@@ -3123,6 +3327,12 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     record_byte_roles = _nidatastream_descriptor_record_byte_role_candidates(
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
+    )
+    record_pattern_matrix = _nidatastream_descriptor_record_pattern_matrix(
+        byte_order_proof,
+        descriptor_status["DescriptorRecordIndexProof"],
+        descriptor_status["DescriptorHelperArgumentUseProof"],
+        record_byte_roles,
     )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
@@ -3286,6 +3496,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "ByteOrderPassedCount": byte_order_proof["PassedCount"],
             "AllByteOrderFieldsUniform": byte_order_proof["AllExpectedFieldsUniform"],
             "DescriptorRecordPatternCount": record_byte_summary["RecordPatternCount"],
+            "DescriptorRecordPatternMatrixRowCount": record_pattern_matrix["RecordPatternCount"],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
             "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
@@ -3347,6 +3558,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         f"sample checks {compare_status['SampleBytePassedCount']}/{compare_status['SampleByteCheckCount']}; "
         f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
         f"record byte 0 mapped={str(compare_status['DescriptorRecordIndexCandidateMapped']).lower()}; "
+        f"pattern rows={compare_status['DescriptorRecordPatternMatrixRowCount']}; "
         "helper high bytes proven unused="
         f"{str(compare_status['DescriptorHelperLookupHighBytesProvenUnused']).lower()}; "
         f"remaining bytes={compare_status['DescriptorRecordRemainingUnmappedByteCount']}; "
@@ -3447,6 +3659,10 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor record byte patterns | "
             f"{format_markdown_cell(compare_status['DescriptorRecordPatternCount'])} |"
+        ),
+        (
+            "| Descriptor record pattern matrix rows | "
+            f"{format_markdown_cell(compare_status['DescriptorRecordPatternMatrixRowCount'])} |"
         ),
         (
             "| Descriptor record byte 0 mapped | "

@@ -252,6 +252,11 @@ check(
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternCount"], int),
     True,
 )
+check(
+    "descriptor record pattern matrix row count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternMatrixRowCount"], int),
+    True,
+)
 semantic_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-semantic-map")
 check("descriptor semantic gate blocks promotion", semantic_gate["State"], "blocked")
 check("pairing impact status present", "PairingImpactStatus" in status, True)
@@ -408,6 +413,7 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown field-map status", dashboard_markdown, "Descriptor candidate field-map entries")
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
+    check_contains("dashboard markdown pattern matrix status", dashboard_markdown, "Descriptor record pattern matrix rows")
     check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
     check_contains(
         "dashboard markdown helper high bytes status",
