@@ -297,6 +297,7 @@ check("sample context descriptor samples", sample_context["SamplesWithDescriptor
 check("sample context pair samples", sample_context["SamplesWithPairRecord"], 5)
 check("sample context ready", sample_context["CorrelationReady"], True)
 check("sample context pattern count", sample_context["DescriptorPatternCount"], 2)
+check("sample context review queue count", sample_context["ReviewQueueCount"], 2)
 check(
     "sample context semantic blocker present",
     "descriptor-context-correlation-parser-semantics-unmapped" in sample_context["Blockers"],
@@ -308,6 +309,13 @@ check("sample context first sample count", first_context_row["SampleCount"], 3)
 check("sample context first pair pattern count", first_context_row["PairRecordPatternCount"], 2)
 check("sample context first top pair", first_context_row["TopPairRecordBytes"][0]["Value"], "00 00 00 00 05 00 00 00")
 check("sample context first top usage", first_context_row["TopUsageValues"][0]["Value"], "1")
+first_review_row = sample_context["ReviewQueueRows"][0]
+check("sample context review rank", first_review_row["Rank"], 1)
+check("sample context review descriptor", first_review_row["DescriptorRecordHex"], "aa 04 03 00")
+check("sample context review dominant pair", first_review_row["DominantPairRecordBytes"], "00 00 00 00 05 00 00 00")
+check("sample context review dominant pair count", first_review_row["DominantPairRecordCount"], 2)
+check("sample context review dominant usage", first_review_row["DominantUsageValue"], "1")
+check("sample context review rationale", "candidate-only" in first_review_row["ReviewRationale"].lower(), True)
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
@@ -527,6 +535,7 @@ malformed_context_status = malformed_context["DescriptorSampleContextCorrelation
 check("malformed context sample count", malformed_context_status["SampleCount"], 1)
 check("malformed context ready false", malformed_context_status["CorrelationReady"], False)
 check("malformed context rows absent", malformed_context_status["DescriptorPatternCount"], 0)
+check("malformed context review queue empty", malformed_context_status["ReviewQueueCount"], 0)
 check("malformed context malformed count", malformed_context_status["MalformedDescriptorRecordCount"], 1)
 check(
     "malformed context blocker present",
@@ -569,6 +578,9 @@ check_validation_error("schema rejects promoted descriptor sample context correl
 sample_context_string_ready_compare = json.loads(json.dumps(compare))
 sample_context_string_ready_compare["DescriptorSampleContextCorrelation"]["CorrelationReady"] = "true"
 check_validation_error("schema rejects string descriptor sample context ready flag", sample_context_string_ready_compare, schema)
+sample_context_bad_review_rank_compare = json.loads(json.dumps(compare))
+sample_context_bad_review_rank_compare["DescriptorSampleContextCorrelation"]["ReviewQueueRows"][0]["Rank"] = 0
+check_validation_error("schema rejects descriptor sample context review rank zero", sample_context_bad_review_rank_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -621,6 +633,7 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown descriptor record pattern row", markdown, "aa 04 03 00")
     check_contains("markdown descriptor sample context correlation", markdown, "Descriptor/sample context correlation")
     check_contains("markdown descriptor sample context pair", markdown, "00 00 00 00 05 00 00 00")
+    check_contains("markdown descriptor sample context review queue", markdown, "Descriptor/sample context review queue")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
     check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")

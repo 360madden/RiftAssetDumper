@@ -2435,6 +2435,61 @@ def _sample_text_value(sample: dict[str, Any], key: str) -> str:
     return str(value)
 
 
+def _first_counter_value(rows: Any) -> dict[str, Any]:
+    """Return the first counter row's value/count as primitive fields."""
+    if not isinstance(rows, list) or not rows:
+        return {"Value": "", "Count": 0}
+    row = rows[0]
+    if not isinstance(row, dict):
+        return {"Value": "", "Count": 0}
+    return {
+        "Value": str(row.get("Value", "")),
+        "Count": int(row.get("Count", 0)) if isinstance(row.get("Count"), int) else 0,
+    }
+
+
+def _nidatastream_descriptor_context_review_queue(
+    correlation_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rank descriptor/context clusters for candidate-only static follow-up."""
+    ranked_rows = sorted(
+        correlation_rows,
+        key=lambda row: (
+            -int(row.get("SampleCount", 0)),
+            -int(row.get("PairRecordPatternCount", 0)),
+            str(row.get("DescriptorRecordHex", "")),
+        ),
+    )
+    review_rows = []
+    for rank, row in enumerate(ranked_rows, start=1):
+        dominant_pair = _first_counter_value(row.get("TopPairRecordBytes"))
+        dominant_usage = _first_counter_value(row.get("TopUsageValues"))
+        dominant_access = _first_counter_value(row.get("TopAccessValues"))
+        dominant_type = _first_counter_value(row.get("TopTypeNames"))
+        review_rows.append(
+            {
+                "Rank": rank,
+                "DescriptorRecordHex": row["DescriptorRecordHex"],
+                "SampleCount": row["SampleCount"],
+                "PairRecordPatternCount": row["PairRecordPatternCount"],
+                "DominantPairRecordBytes": dominant_pair["Value"],
+                "DominantPairRecordCount": dominant_pair["Count"],
+                "DominantUsageValue": dominant_usage["Value"],
+                "DominantUsageCount": dominant_usage["Count"],
+                "DominantAccessValue": dominant_access["Value"],
+                "DominantAccessCount": dominant_access["Count"],
+                "DominantTypeName": dominant_type["Value"],
+                "DominantTypeNameCount": dominant_type["Count"],
+                "ReviewRationale": (
+                    "Candidate-only descriptor/context cluster selected by copied-sample coverage and "
+                    "pair-record variety. Use it to focus static helper/builder review for descriptor "
+                    "bytes 1-2; do not change parser/export behavior from this row alone."
+                ),
+            }
+        )
+    return review_rows
+
+
 def _nidatastream_descriptor_sample_context_correlation(
     layout_report: dict[str, Any] | None,
     record_pattern_matrix: dict[str, Any],
@@ -2526,6 +2581,7 @@ def _nidatastream_descriptor_sample_context_correlation(
             }
         )
 
+    review_queue_rows = _nidatastream_descriptor_context_review_queue(correlation_rows)
     correlation_ready = (
         bool(samples)
         and samples_with_descriptor > 0
@@ -2557,6 +2613,8 @@ def _nidatastream_descriptor_sample_context_correlation(
         "RemainingUnmappedByteOffsets": remaining_offsets,
         "DescriptorPatternCount": len(correlation_rows),
         "Rows": correlation_rows,
+        "ReviewQueueCount": len(review_queue_rows),
+        "ReviewQueueRows": review_queue_rows,
         "BlockerCount": len(blockers),
         "Blockers": blockers,
         "Interpretation": (
@@ -3259,6 +3317,48 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor/sample context review queue",
+            "",
+            "| Rank | Descriptor record | Samples | Pair patterns | Dominant pair record | Dominant usage | Dominant access | Dominant type |",
+            "|---:|---|---:|---:|---|---|---|---|",
+        ]
+    )
+    for row in sample_context["ReviewQueueRows"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["Rank"]),
+                    format_markdown_cell(row["DescriptorRecordHex"]),
+                    format_markdown_cell(row["SampleCount"]),
+                    format_markdown_cell(row["PairRecordPatternCount"]),
+                    format_markdown_cell(
+                        f"{row['DominantPairRecordBytes']} ({row['DominantPairRecordCount']})"
+                        if row["DominantPairRecordBytes"]
+                        else "-"
+                    ),
+                    format_markdown_cell(
+                        f"{row['DominantUsageValue']} ({row['DominantUsageCount']})"
+                        if row["DominantUsageValue"]
+                        else "-"
+                    ),
+                    format_markdown_cell(
+                        f"{row['DominantAccessValue']} ({row['DominantAccessCount']})"
+                        if row["DominantAccessValue"]
+                        else "-"
+                    ),
+                    format_markdown_cell(
+                        f"{row['DominantTypeName']} ({row['DominantTypeNameCount']})"
+                        if row["DominantTypeName"]
+                        else "-"
+                    ),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Descriptor semantic feasibility",
             "",
             f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
@@ -3394,6 +3494,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor/sample context correlation: "
         f"samples={sample_context['SampleCount']}; "
         f"patterns={sample_context['DescriptorPatternCount']}; "
+        f"review queue={sample_context['ReviewQueueCount']}; "
         f"ready={str(sample_context['CorrelationReady']).lower()}"
     )
     print(

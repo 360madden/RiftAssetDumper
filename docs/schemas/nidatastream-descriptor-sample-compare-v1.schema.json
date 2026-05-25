@@ -653,6 +653,8 @@
         "RemainingUnmappedByteOffsets",
         "DescriptorPatternCount",
         "Rows",
+        "ReviewQueueCount",
+        "ReviewQueueRows",
         "BlockerCount",
         "Blockers",
         "Interpretation"
@@ -675,6 +677,11 @@
         "Rows": {
           "type": "array",
           "items": { "$ref": "#/$defs/descriptorSampleContextCorrelationRow" }
+        },
+        "ReviewQueueCount": { "type": "integer", "minimum": 0 },
+        "ReviewQueueRows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorSampleContextReviewRow" }
         },
         "BlockerCount": { "type": "integer", "minimum": 0 },
         "Blockers": {
@@ -731,6 +738,40 @@
           "type": "array",
           "items": { "$ref": "#/$defs/stringCounterRow" }
         }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSampleContextReviewRow": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "DescriptorRecordHex",
+        "SampleCount",
+        "PairRecordPatternCount",
+        "DominantPairRecordBytes",
+        "DominantPairRecordCount",
+        "DominantUsageValue",
+        "DominantUsageCount",
+        "DominantAccessValue",
+        "DominantAccessCount",
+        "DominantTypeName",
+        "DominantTypeNameCount",
+        "ReviewRationale"
+      ],
+      "properties": {
+        "Rank": { "type": "integer", "minimum": 1 },
+        "DescriptorRecordHex": { "type": "string", "pattern": "^[0-9a-f]{2}(?: [0-9a-f]{2})*$" },
+        "SampleCount": { "type": "integer", "minimum": 0 },
+        "PairRecordPatternCount": { "type": "integer", "minimum": 0 },
+        "DominantPairRecordBytes": { "type": "string" },
+        "DominantPairRecordCount": { "type": "integer", "minimum": 0 },
+        "DominantUsageValue": { "type": "string" },
+        "DominantUsageCount": { "type": "integer", "minimum": 0 },
+        "DominantAccessValue": { "type": "string" },
+        "DominantAccessCount": { "type": "integer", "minimum": 0 },
+        "DominantTypeName": { "type": "string" },
+        "DominantTypeNameCount": { "type": "integer", "minimum": 0 },
+        "ReviewRationale": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
