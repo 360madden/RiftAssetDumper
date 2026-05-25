@@ -62,6 +62,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 
 1. Do descriptor-helper targets prove a field count/order that the C# parser is currently missing?
 2. Can the byte-order/context-correlation proof be expanded from structural offsets/record bytes into exact descriptor semantics before any exporter uses it?
-3. Does any current Ghidra-only mesh candidate become a complete position/normal/UV group after a field interpretation change?
+3. Do refreshed FunctionSiteSurvey descriptor-helper reports with `dataRefByteSamples` expose static table bytes that explain descriptor record bytes 1-2?
+4. Does any current Ghidra-only mesh candidate become a complete position/normal/UV group after a field interpretation change?
 
 Until those are answered with tests and guards, parser/export behavior remains unchanged.

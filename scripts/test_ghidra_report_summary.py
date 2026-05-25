@@ -71,6 +71,14 @@ sample_report = {
         }
     ],
     "dataRefsFromFunction": [{"from": "141186c00", "to": "142000000", "type": "DATA"}],
+    "dataRefByteSamples": [
+        {
+            "address": "142000000",
+            "byteCountRequested": 32,
+            "byteCountRead": 4,
+            "bytes": "37 04 03 00",
+        }
+    ],
     "decompile": {
         "completed": True,
         "errorMessage": "",
@@ -84,7 +92,9 @@ summary = summarize_report(sample_report, terms=["NiDataStream", "Desktop"], max
 check_contains("summary title", summary, "# Ghidra FunctionSiteSurvey summary")
 check_contains("function shown", summary, "FUN_141186980")
 check_contains("caller count shown", summary, "| Caller refs captured | 1 |")
+check_contains("data ref byte sample count shown", summary, "| Data ref byte samples captured | 1 |")
 check_contains("callee shown", summary, "FUN_1411821f0")
+check_contains("data ref byte sample shown", summary, "37 04 03 00")
 check_contains("term match shown", summary, "NiDataStream::LoadBinary")
 check("profile redaction", redact_user_profile_paths(r"C:\Users\example\Desktop\local.txt"), r"%USERPROFILE%\Desktop\local.txt")
 check_contains("profile redacted in summary", summary, r"%USERPROFILE%\Desktop\local.txt")

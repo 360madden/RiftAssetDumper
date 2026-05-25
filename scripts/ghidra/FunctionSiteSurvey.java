@@ -8,6 +8,7 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Listing;
+import ghidra.program.model.mem.Memory;
 import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.ReferenceIterator;
 
@@ -16,9 +17,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class FunctionSiteSurvey extends GhidraScript {
     @Override
@@ -50,7 +53,9 @@ public class FunctionSiteSurvey extends GhidraScript {
             report.put("functionInstructions", collectFunctionInstructions(function, 500));
             report.put("callers", collectCallers(function, 100));
             report.put("callsFromFunction", collectCallsFromFunction(function, 200));
-            report.put("dataRefsFromFunction", collectDataRefsFromFunction(function, 200));
+            List<Map<String, Object>> dataRefs = collectDataRefsFromFunction(function, 200);
+            report.put("dataRefsFromFunction", dataRefs);
+            report.put("dataRefByteSamples", collectDataRefByteSamples(dataRefs, 64, 32));
             report.put("decompile", decompile(function));
         }
 
@@ -210,6 +215,51 @@ public class FunctionSiteSurvey extends GhidraScript {
         return rows;
     }
 
+    private List<Map<String, Object>> collectDataRefByteSamples(
+            List<Map<String, Object>> dataRefs,
+            int limit,
+            int byteCount) {
+        List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
+        Set<String> seen = new HashSet<String>();
+        Memory memory = currentProgram.getMemory();
+        for (Map<String, Object> dataRef : dataRefs) {
+            Object typeValue = dataRef.get("type");
+            if (!(typeValue instanceof String) || !((String) typeValue).contains("DATA")) {
+                continue;
+            }
+            Object toValue = dataRef.get("to");
+            if (!(toValue instanceof String)) {
+                continue;
+            }
+            String toText = (String) toValue;
+            if (!seen.add(toText)) {
+                continue;
+            }
+            Address address = currentProgram.getAddressFactory().getAddress(toText);
+            if (address == null || memory.getBlock(address) == null) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("address", address.toString());
+            item.put("byteCountRequested", byteCount);
+            try {
+                byte[] bytes = new byte[byteCount];
+                int bytesRead = memory.getBytes(address, bytes);
+                item.put("byteCountRead", bytesRead);
+                item.put("bytes", bytesToHex(bytes, bytesRead));
+            } catch (Exception ex) {
+                item.put("byteCountRead", 0);
+                item.put("bytes", "");
+                item.put("error", ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            }
+            rows.add(item);
+            if (rows.size() >= limit) {
+                break;
+            }
+        }
+        return rows;
+    }
+
     private Map<String, Object> decompile(Function function) {
         Map<String, Object> item = new LinkedHashMap<String, Object>();
         DecompInterface decompiler = new DecompInterface();
@@ -228,8 +278,13 @@ public class FunctionSiteSurvey extends GhidraScript {
     }
 
     private String bytesToHex(byte[] bytes) {
+        return bytesToHex(bytes, bytes.length);
+    }
+
+    private String bytesToHex(byte[] bytes, int length) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < bytes.length; i++) {
+        int boundedLength = Math.max(0, Math.min(length, bytes.length));
+        for (int i = 0; i < boundedLength; i++) {
             if (i > 0) {
                 sb.append(' ');
             }

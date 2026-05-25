@@ -92,6 +92,12 @@
         "$ref": "#/$defs/dataRef"
       }
     },
+    "dataRefByteSamples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataRefByteSample"
+      }
+    },
     "decompile": {
       "type": "object",
       "properties": {
@@ -233,6 +239,35 @@
           "type": "string"
         },
         "toFunctionEntry": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "dataRefByteSample": {
+      "type": "object",
+      "required": [
+        "address",
+        "byteCountRequested",
+        "byteCountRead",
+        "bytes"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "byteCountRequested": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "byteCountRead": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bytes": {
+          "type": "string"
+        },
+        "error": {
           "type": "string"
         }
       },

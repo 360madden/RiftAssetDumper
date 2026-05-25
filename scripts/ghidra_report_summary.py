@@ -112,6 +112,7 @@ def summarize_report(
     callers = _as_list(report.get("callers"))
     calls = _as_list(report.get("callsFromFunction"))
     data_refs = _as_list(report.get("dataRefsFromFunction"))
+    data_ref_samples = _as_list(report.get("dataRefByteSamples"))
     instructions = _as_list(report.get("functionInstructions"))
     near_target = _as_list(report.get("instructionsNearTarget"))
     decompile = _as_mapping(report.get("decompile"))
@@ -138,6 +139,7 @@ def summarize_report(
             ("Caller refs captured", len(callers)),
             ("Call refs from function captured", len(calls)),
             ("Data refs from function captured", len(data_refs)),
+            ("Data ref byte samples captured", len(data_ref_samples)),
             ("Decompile completed", decompile.get("completed")),
             ("Decompile error", decompile.get("errorMessage")),
         ],
@@ -180,6 +182,18 @@ def summarize_report(
             ("From", "from"),
             ("To", "to"),
             ("Type", "type"),
+        ],
+        max_items,
+    )
+    _append_reference_table(
+        lines,
+        "Data ref byte samples",
+        data_ref_samples,
+        [
+            ("Address", "address"),
+            ("Bytes read", "byteCountRead"),
+            ("Bytes", "bytes"),
+            ("Error", "error"),
         ],
         max_items,
     )
