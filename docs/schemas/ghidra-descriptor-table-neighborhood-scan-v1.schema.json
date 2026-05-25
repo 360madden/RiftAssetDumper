@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json",
+  "title": "Ghidra descriptor table neighborhood scan report",
+  "description": "Candidate-only bounded nonzero-byte neighborhood scans around descriptor table data references.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "FieldOrderPromoted",
+    "ParserExportPromotionAllowed",
+    "programName",
+    "imageBase",
+    "beforeBytes",
+    "afterBytes",
+    "stepBytes",
+    "byteCountRequested",
+    "maxHits",
+    "fieldCount",
+    "scannedRowCount",
+    "memoryBackedRowCount",
+    "skippedRowCount",
+    "hitCount",
+    "truncated",
+    "hits",
+    "interpretation"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-descriptor-table-neighborhood-scan/v1" },
+    "CandidateOnly": { "const": true },
+    "FieldOrderPromoted": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "programName": { "type": "string" },
+    "imageBase": { "type": "string" },
+    "beforeBytes": { "type": "integer", "minimum": 0, "maximum": 8192 },
+    "afterBytes": { "type": "integer", "minimum": 0, "maximum": 8192 },
+    "stepBytes": { "type": "integer", "minimum": 1, "maximum": 256 },
+    "byteCountRequested": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "maxHits": { "type": "integer", "minimum": 1, "maximum": 512 },
+    "fieldCount": { "type": "integer", "minimum": 0 },
+    "scannedRowCount": { "type": "integer", "minimum": 0 },
+    "memoryBackedRowCount": { "type": "integer", "minimum": 0 },
+    "skippedRowCount": { "type": "integer", "minimum": 0 },
+    "hitCount": { "type": "integer", "minimum": 0 },
+    "truncated": { "type": "boolean" },
+    "hits": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hit" }
+    },
+    "interpretation": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hit": {
+      "type": "object",
+      "required": [
+        "field",
+        "baseAddress",
+        "relativeOffsetBytes",
+        "address",
+        "byteCountRead",
+        "bytes"
+      ],
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "baseAddress": { "type": "string", "pattern": "^[0-9a-fA-F]+$" },
+        "relativeOffsetBytes": { "type": "integer" },
+        "address": { "type": "string" },
+        "byteCountRead": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "string", "pattern": "^[0-9a-f]{2}(?: [0-9a-f]{2})*$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

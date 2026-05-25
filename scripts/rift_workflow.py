@@ -53,6 +53,7 @@ Commands (kebab-case):
     ghidra-function-site-status  — show ignored report/summary status for FunctionSiteSurvey targets
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
+    nidatastream-descriptor-neighborhood-scan — scan bounded nonzero neighborhoods around descriptor refs
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-evidence-status — list ignored local NiDataStream/Ghidra evidence artifact timestamps
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
@@ -319,6 +320,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-neighborhood-scan": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-summarize": {
         "dotnet": "",
         "base": "",
@@ -412,6 +417,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
+    "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
@@ -4870,6 +4876,204 @@ def _run_nidatastream_descriptor_table_sample(args: argparse.Namespace) -> None:
     print("NiDataStreamDescriptorTableSample passed: report remains candidate-only/report-only.")
 
 
+def _descriptor_neighborhood_scan_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Return default/overridden descriptor neighborhood scan report paths."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = (
+        Path(args.descriptor_neighborhood_report)
+        if args.descriptor_neighborhood_report
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_neighborhood_scan.json"
+    )
+    markdown_path = (
+        Path(args.descriptor_neighborhood_summary)
+        if args.descriptor_neighborhood_summary
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_neighborhood_scan.md"
+    )
+    return report_path, markdown_path
+
+
+def _descriptor_neighborhood_scan_plan(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a candidate-only bounded descriptor neighborhood scan plan."""
+    fields = _descriptor_table_field_specs()
+    report_path, markdown_path = _descriptor_neighborhood_scan_paths(args)
+    before_bytes = int(args.descriptor_neighborhood_before)
+    after_bytes = int(args.descriptor_neighborhood_after)
+    step_bytes = int(args.descriptor_neighborhood_step)
+    byte_count = int(args.descriptor_neighborhood_byte_count)
+    max_hits = int(args.descriptor_neighborhood_max_hits)
+    blockers = []
+    if not fields:
+        blockers.append("descriptor-neighborhood-fields-missing")
+    if before_bytes < 0 or before_bytes > 8192 or after_bytes < 0 or after_bytes > 8192:
+        blockers.append("descriptor-neighborhood-window-invalid")
+    if step_bytes <= 0 or step_bytes > 256:
+        blockers.append("descriptor-neighborhood-step-invalid")
+    if byte_count <= 0 or byte_count > 32:
+        blockers.append("descriptor-neighborhood-byte-count-invalid")
+    if max_hits <= 0 or max_hits > 512:
+        blockers.append("descriptor-neighborhood-max-hits-invalid")
+    field_args = [f"{field['Field']}:{field['DataAddress']}" for field in fields]
+    script = args.ghidra_script or "scripts/ghidra/DescriptorTableNeighborhoodScanner.java"
+    project_name = args.ghidra_project_name if args.ghidra_project_name != "TempProject" else "RiftAnchorSurvey"
+    process_path = args.ghidra_process or "rift_x64.exe"
+    return {
+        "SchemaVersion": "nidatastream-descriptor-neighborhood-scan-plan/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "ReportPath": str(report_path),
+        "MarkdownPath": str(markdown_path),
+        "Script": script,
+        "ProjectName": project_name,
+        "Process": process_path,
+        "BeforeBytes": before_bytes,
+        "AfterBytes": after_bytes,
+        "StepBytes": step_bytes,
+        "ByteCountRequested": byte_count,
+        "MaxHits": max_hits,
+        "FieldCount": len(fields),
+        "Fields": fields,
+        "ScriptArgs": [
+            str(report_path),
+            str(before_bytes),
+            str(after_bytes),
+            str(step_bytes),
+            str(byte_count),
+            str(max_hits),
+            *field_args,
+        ],
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Candidate-only dry-run plan for a bounded nonzero-byte scan around descriptor-table "
+            "data references. Hits are triage leads only."
+        ),
+    }
+
+
+def _descriptor_neighborhood_scan_markdown(report: dict[str, Any]) -> str:
+    """Render a compact Markdown summary for a descriptor neighborhood scan."""
+    raw_hits = report.get("hits")
+    hits: list[Any] = raw_hits if isinstance(raw_hits, list) else []
+    lines = [
+        "# Ghidra descriptor-table neighborhood scan",
+        "",
+        f"- Candidate-only: **{str(report.get('CandidateOnly')).lower()}**",
+        f"- Parser/export promotion allowed: **{str(report.get('ParserExportPromotionAllowed')).lower()}**",
+        f"- Program: **{format_markdown_cell(report.get('programName'))}**",
+        f"- Window before/after bytes: **{format_markdown_cell(report.get('beforeBytes'))}/{format_markdown_cell(report.get('afterBytes'))}**",
+        f"- Step bytes: **{format_markdown_cell(report.get('stepBytes'))}**",
+        f"- Rows scanned: **{format_markdown_cell(report.get('scannedRowCount'))}**",
+        f"- Memory-backed rows: **{format_markdown_cell(report.get('memoryBackedRowCount'))}**",
+        f"- Nonzero hits: **{format_markdown_cell(report.get('hitCount'))}**",
+        f"- Truncated: **{str(report.get('truncated')).lower()}**",
+        "",
+        "| Field | Relative offset | Address | Bytes |",
+        "|---|---:|---|---|",
+    ]
+    for hit in hits[:80]:
+        if not isinstance(hit, dict):
+            continue
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(hit.get("field")),
+                    format_markdown_cell(hit.get("relativeOffsetBytes")),
+                    format_markdown_cell(hit.get("address")),
+                    format_markdown_cell(hit.get("bytes")),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Interpretation guard", "", format_markdown_cell(report.get("interpretation")), ""])
+    return "\n".join(lines)
+
+
+def _print_descriptor_neighborhood_scan_plan(plan: dict[str, Any]) -> None:
+    """Print a human-readable descriptor neighborhood scan dry-run."""
+    print("--- NiDataStreamDescriptorNeighborhoodScan")
+    print(f"Report: {plan['ReportPath']}")
+    print(f"Markdown: {plan['MarkdownPath']}")
+    print(f"Script: {plan['Script']}")
+    print(f"Fields: {plan['FieldCount']}")
+    print(
+        "Window: "
+        f"-{plan['BeforeBytes']}..+{plan['AfterBytes']} step={plan['StepBytes']} "
+        f"bytes={plan['ByteCountRequested']} max_hits={plan['MaxHits']}"
+    )
+    if plan["Blockers"]:
+        print(f"Blockers: {', '.join(plan['Blockers'])}")
+    run_command = [
+        "python",
+        "scripts/rift_workflow.py",
+        "ghidra-run",
+        "--ghidra-project-name",
+        str(plan["ProjectName"]),
+        "--ghidra-process",
+        str(plan["Process"]),
+        "--ghidra-timeout",
+        "900",
+        "--ghidra-script",
+        str(plan["Script"]),
+    ]
+    for value in plan["ScriptArgs"]:
+        run_command += ["--ghidra-script-arg", str(value)]
+    run_command += ["--ghidra-no-analysis", "--ghidra-keep-project"]
+    print("\nRun command:")
+    print(" ".join(run_command))
+
+
+def _run_nidatastream_descriptor_neighborhood_scan(args: argparse.Namespace) -> None:
+    """Run or print a bounded candidate-only descriptor neighborhood scan."""
+    plan = _descriptor_neighborhood_scan_plan(args)
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    _print_descriptor_neighborhood_scan_plan(plan)
+    if plan["Blockers"]:
+        print("NiDataStreamDescriptorNeighborhoodScan blocked before Ghidra execution.")
+        if args.ghidra_execute:
+            sys.exit(1)
+        print("Dry-run only. Resolve blockers before adding --ghidra-execute.")
+        return
+    if not args.ghidra_execute:
+        print("\nDry-run only. Add --ghidra-execute to run this neighborhood scan.")
+        return
+
+    from scripts.ghidra_runner import run_ghidra_headless
+
+    report_path = Path(plan["ReportPath"])
+    markdown_path = Path(plan["MarkdownPath"])
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    result = run_ghidra_headless(
+        project_dir=_ghidra_project_dir_arg(args),
+        project_name=str(plan["ProjectName"]),
+        process_path=str(plan["Process"]),
+        script=str(plan["Script"]),
+        script_args=[str(value) for value in plan["ScriptArgs"]],
+        analyze=False,
+        delete_project=False,
+        timeout_seconds=args.ghidra_timeout,
+    )
+    _print_ghidra_result(result)
+    report = load_json_report(str(report_path))
+    if not report.get("CandidateOnly") or report.get("ParserExportPromotionAllowed"):
+        print("ERROR: descriptor neighborhood scan report is not candidate-only/promoted-false.", file=sys.stderr)
+        sys.exit(1)
+    markdown_path.write_text(_descriptor_neighborhood_scan_markdown(report), encoding="utf-8")
+    print(
+        "NiDataStreamDescriptorNeighborhoodScan rows: "
+        f"{report.get('scannedRowCount')}; nonzero hits: {report.get('hitCount')}; "
+        f"truncated={str(report.get('truncated')).lower()}"
+    )
+    print(f"NiDataStreamDescriptorNeighborhoodScan JSON: {report_path}")
+    print(f"NiDataStreamDescriptorNeighborhoodScan markdown: {markdown_path}")
+    print("NiDataStreamDescriptorNeighborhoodScan passed: report remains candidate-only/report-only.")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -4985,6 +5189,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-descriptor-table-sample":
         _run_nidatastream_descriptor_table_sample(args)
+        return
+
+    if command == "nidatastream-descriptor-neighborhood-scan":
+        _run_nidatastream_descriptor_neighborhood_scan(args)
         return
 
     if command == "ghidra-summarize":
@@ -6625,6 +6833,46 @@ Examples:
         default="",
         help="Optional Markdown output path for nidatastream-descriptor-table-sample",
     )
+    parser.add_argument(
+        "--descriptor-neighborhood-before",
+        type=int,
+        default=1024,
+        help="Bytes before each descriptor data reference to scan (default: 1024)",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-after",
+        type=int,
+        default=8192,
+        help="Bytes after each descriptor data reference to scan (default: 8192)",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-step",
+        type=int,
+        default=4,
+        help="Byte step for descriptor neighborhood scans (default: 4)",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-byte-count",
+        type=int,
+        default=4,
+        help="Bytes to read per descriptor neighborhood probe (default: 4)",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-max-hits",
+        type=int,
+        default=128,
+        help="Maximum nonzero descriptor neighborhood hits to record (default: 128)",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-report",
+        default="",
+        help="Optional JSON output path for nidatastream-descriptor-neighborhood-scan",
+    )
+    parser.add_argument(
+        "--descriptor-neighborhood-summary",
+        default="",
+        help="Optional Markdown output path for nidatastream-descriptor-neighborhood-scan",
+    )
 
     args = parser.parse_args()
 
@@ -6640,13 +6888,15 @@ Examples:
         "nidatastream-descriptor-proof-status",
         "nidatastream-descriptor-sample-compare",
         "nidatastream-descriptor-table-sample",
+        "nidatastream-descriptor-neighborhood-scan",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
-            "nidatastream-descriptor-sample-compare, and nidatastream-descriptor-table-sample.",
+            "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
+            "and nidatastream-descriptor-neighborhood-scan.",
             file=sys.stderr,
         )
         sys.exit(1)

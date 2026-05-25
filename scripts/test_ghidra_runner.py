@@ -313,6 +313,9 @@ print("=== rift_workflow NiDataStream descriptor table sampler routing ===")
 descriptor_sample_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-table-sample-v1.schema.json").read_text(encoding="utf-8")
 )
+descriptor_neighborhood_schema = json.loads(
+    Path("docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json").read_text(encoding="utf-8")
+)
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     report_file = temp_path / "reports" / "descriptor-table.json"
@@ -459,6 +462,103 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor table sample no-analysis", captured_sample["analyze"], False)
     check("descriptor table sample keeps project", captured_sample["delete_project"], False)
     check("descriptor table sample markdown written", summary_file.exists(), True)
+
+print("=== rift_workflow NiDataStream descriptor neighborhood scan routing ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    report_file = temp_path / "reports" / "descriptor-neighborhood.json"
+    summary_file = temp_path / "reports" / "descriptor-neighborhood.md"
+    project_dir = temp_path / "projects"
+    list_output = io.StringIO()
+    list_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-neighborhood-scan",
+        "--descriptor-neighborhood-before",
+        "16",
+        "--descriptor-neighborhood-after",
+        "32",
+        "--descriptor-neighborhood-report",
+        str(report_file),
+        "--descriptor-neighborhood-summary",
+        str(summary_file),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", list_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(list_output),
+    ):
+        rift_workflow.main()
+    neighborhood_plan = parse_json_object(list_output.getvalue())
+    check(
+        "descriptor neighborhood scan plan schema",
+        neighborhood_plan["SchemaVersion"],
+        "nidatastream-descriptor-neighborhood-scan-plan/v1",
+    )
+    check("descriptor neighborhood scan plan field count", neighborhood_plan["FieldCount"], 3)
+    check("descriptor neighborhood scan plan before", neighborhood_plan["BeforeBytes"], 16)
+    check("descriptor neighborhood scan plan after", neighborhood_plan["AfterBytes"], 32)
+    check("descriptor neighborhood scan candidate-only", neighborhood_plan["CandidateOnly"], True)
+
+    captured_scan: dict[str, Any] = {}
+
+    def fake_descriptor_neighborhood_run(**kwargs: Any) -> subprocess.CompletedProcess[str]:
+        captured_scan.update(kwargs)
+        output_path = Path(kwargs["script_args"][0])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "ghidra-descriptor-table-neighborhood-scan/v1",
+                    "CandidateOnly": True,
+                    "FieldOrderPromoted": False,
+                    "ParserExportPromotionAllowed": False,
+                    "programName": "rift_x64.exe",
+                    "imageBase": "140000000",
+                    "beforeBytes": 16,
+                    "afterBytes": 32,
+                    "stepBytes": 4,
+                    "byteCountRequested": 4,
+                    "maxHits": 128,
+                    "fieldCount": 3,
+                    "scannedRowCount": 39,
+                    "memoryBackedRowCount": 39,
+                    "skippedRowCount": 0,
+                    "hitCount": 1,
+                    "truncated": False,
+                    "hits": [
+                        {
+                            "field": "descriptor-component-class",
+                            "baseAddress": "143358be4",
+                            "relativeOffsetBytes": -4,
+                            "address": "143358be0",
+                            "byteCountRead": 4,
+                            "bytes": "01 02 03 04",
+                        }
+                    ],
+                    "interpretation": "candidate-only test fixture",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+
+    execute_argv = list_argv[:-1] + ["--ghidra-project-dir", str(project_dir), "--ghidra-execute"]
+    with (
+        patch.object(sys, "argv", execute_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.ghidra_runner.run_ghidra_headless", side_effect=fake_descriptor_neighborhood_run),
+    ):
+        rift_workflow.main()
+
+    neighborhood_report = json.loads(report_file.read_text(encoding="utf-8"))
+    jsonschema.validate(neighborhood_report, descriptor_neighborhood_schema)
+    print("  PASS: descriptor neighborhood scan report schema validation")
+    check("descriptor neighborhood scan script", captured_scan["script"], "scripts/ghidra/DescriptorTableNeighborhoodScanner.java")
+    check("descriptor neighborhood scan args report", captured_scan["script_args"][0], str(report_file))
+    check("descriptor neighborhood scan before arg", captured_scan["script_args"][1], "16")
+    check("descriptor neighborhood scan after arg", captured_scan["script_args"][2], "32")
+    check("descriptor neighborhood scan markdown written", summary_file.exists(), True)
 
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)

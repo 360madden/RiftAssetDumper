@@ -41,6 +41,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
     "NiDataStreamDescriptorSampleCompare": "nidatastream-descriptor-sample-compare",
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
+    "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
 }
 
 
