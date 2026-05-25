@@ -141,6 +141,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra review-rank probe manifest schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-manifest-schema.md`
 - Ghidra review-rank probe summary wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary.md`
 - Ghidra review-rank probe summary schema wired: `docs/handoffs/2026-05-24-ghidra-review-rank-probes-summary-schema.md`
+- Aggregate tracked schema/doc validation wired: `docs/handoffs/2026-05-25-schema-registry-validation.md`
 - Ghidra FunctionSiteSurvey target registry wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-registry.md`
 - Ghidra FunctionSiteSurvey target registry schema wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-schema.md`
 - Ghidra FunctionSiteSurvey target guard/list/status wired: `docs/handoffs/2026-05-25-ghidra-function-site-target-guard-status.md`
