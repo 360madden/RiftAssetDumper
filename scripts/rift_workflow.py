@@ -2200,16 +2200,36 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         "reports satisfy call/data-ref/decompile-term evidence; field order remains candidate-only."
     )
     layout_status = _nidatastream_layout_report_status(args)
+    layout_report, layout_error = _read_nidatastream_layout_report(args)
+    if layout_error and not layout_status["Error"]:
+        layout_status["Error"] = layout_error
+    sample_corpus_status = _nidatastream_sample_corpus_status(layout_report)
+    sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
+    byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
+    descriptor_sample_ready = (
+        descriptor_ready
+        and bool(layout_status["AllBlocksGhidraStyleValid"])
+        and bool(sample_summary["AllExpectedValuesUniform"])
+        and bool(byte_order_proof["AllExpectedFieldsUniform"])
+    )
     layout_blocks = int(layout_status["NiDataStreamBlocks"])
     layout_valid_blocks = int(layout_status["GhidraStyleLayoutValidBlocks"])
     if layout_status["Error"]:
         sample_state = "blocked"
         sample_evidence = f"Local NiDataStream layout report could not be parsed: {layout_status['Error']}"
     elif layout_status["Exists"]:
-        sample_state = "candidate" if layout_status["AllBlocksGhidraStyleValid"] else "blocked"
+        sample_evidence_ready = (
+            bool(layout_status["AllBlocksGhidraStyleValid"])
+            and bool(sample_summary["AllExpectedValuesUniform"])
+            and bool(byte_order_proof["AllExpectedFieldsUniform"])
+        )
+        sample_state = "candidate" if sample_evidence_ready else "blocked"
         sample_evidence = (
             f"Local layout report {layout_status['Path']} has {layout_valid_blocks}/{layout_blocks} "
-            "Ghidra-style-valid NiDataStream blocks; still report-only."
+            "Ghidra-style-valid NiDataStream blocks; "
+            f"sample checks {sample_summary['PassedCount']}/{sample_summary['CheckCount']}; "
+            f"byte-order checks {byte_order_proof['PassedCount']}/{byte_order_proof['CheckCount']}; "
+            "still report-only."
         )
     else:
         sample_state = "blocked"
@@ -2306,6 +2326,19 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
         },
         "LayoutReportStatus": layout_status,
+        "DescriptorSampleCompareStatus": {
+            "SampleCorpusRoot": sample_corpus_status["Root"],
+            "FilesScanned": sample_corpus_status["FilesScanned"],
+            "FilesParsed": sample_corpus_status["FilesParsed"],
+            "ParseErrorCount": sample_corpus_status["ParseErrorCount"],
+            "SampleByteCheckCount": sample_summary["CheckCount"],
+            "SampleBytePassedCount": sample_summary["PassedCount"],
+            "AllSampleBytesUniform": sample_summary["AllExpectedValuesUniform"],
+            "ByteOrderCheckCount": byte_order_proof["CheckCount"],
+            "ByteOrderPassedCount": byte_order_proof["PassedCount"],
+            "AllByteOrderFieldsUniform": byte_order_proof["AllExpectedFieldsUniform"],
+            "DescriptorAndSampleEvidenceReady": descriptor_sample_ready,
+        },
         "PairingImpactStatus": pairing_status,
         "ParserExportPromotionAllowed": False,
         "BlockerCount": len(blockers),
@@ -2320,6 +2353,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     target_status = status["FunctionSiteTargetStatus"]
     descriptor_status = status["DescriptorReportStatus"]
     layout_status = status["LayoutReportStatus"]
+    compare_status = status["DescriptorSampleCompareStatus"]
     pairing_status = status["PairingImpactStatus"]
     print("--- NiDataStreamPromotionStatus")
     print(f"Historical stage: {status['HistoricalStage']}")
@@ -2337,6 +2371,12 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         "NiDataStream layout report: "
         f"{layout_mark}; Ghidra-style-valid blocks "
         f"{layout_status['GhidraStyleLayoutValidBlocks']}/{layout_status['NiDataStreamBlocks']}"
+    )
+    print(
+        "Descriptor/sample compare: "
+        f"sample checks {compare_status['SampleBytePassedCount']}/{compare_status['SampleByteCheckCount']}; "
+        f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
+        f"ready={str(compare_status['DescriptorAndSampleEvidenceReady']).lower()}"
     )
     pairing_mark = "yes" if pairing_status["Exists"] else "no"
     print(
@@ -2370,6 +2410,7 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
     function_status = status["FunctionSiteTargetStatus"]
     descriptor_status = status["DescriptorReportStatus"]
     layout_status = status["LayoutReportStatus"]
+    compare_status = status["DescriptorSampleCompareStatus"]
     pairing_status = status["PairingImpactStatus"]
     lines = [
         "# NiDataStream promotion dashboard",
@@ -2402,6 +2443,25 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
             "| Layout Ghidra-style-valid blocks | "
             f"{format_markdown_cell(layout_status['GhidraStyleLayoutValidBlocks'])}/"
             f"{format_markdown_cell(layout_status['NiDataStreamBlocks'])} |"
+        ),
+        (
+            "| Sample corpus files parsed | "
+            f"{format_markdown_cell(compare_status['FilesParsed'])}/"
+            f"{format_markdown_cell(compare_status['FilesScanned'])} |"
+        ),
+        (
+            "| Descriptor/sample byte checks | "
+            f"{format_markdown_cell(compare_status['SampleBytePassedCount'])}/"
+            f"{format_markdown_cell(compare_status['SampleByteCheckCount'])} |"
+        ),
+        (
+            "| Descriptor byte-order checks | "
+            f"{format_markdown_cell(compare_status['ByteOrderPassedCount'])}/"
+            f"{format_markdown_cell(compare_status['ByteOrderCheckCount'])} |"
+        ),
+        (
+            "| Descriptor/sample evidence ready | "
+            f"{format_markdown_cell(str(compare_status['DescriptorAndSampleEvidenceReady']).lower())} |"
         ),
         (
             "| Complete Ghidra-only P+N+UV groups | "

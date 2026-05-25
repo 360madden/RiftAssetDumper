@@ -150,6 +150,17 @@ check("descriptor report status present", "DescriptorReportStatus" in status, Tr
 check("descriptor field order not promoted", status["DescriptorReportStatus"]["FieldOrderPromoted"], False)
 check("layout report status present", "LayoutReportStatus" in status, True)
 check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
+check("descriptor/sample compare status present", "DescriptorSampleCompareStatus" in status, True)
+check(
+    "descriptor/sample evidence ready flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"], bool),
+    True,
+)
+check(
+    "descriptor/sample byte-order flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["AllByteOrderFieldsUniform"], bool),
+    True,
+)
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
 
@@ -214,7 +225,9 @@ with TemporaryDirectory() as temp_dir:
     non_candidate_dashboard = json.loads(json.dumps(dashboard_status))
     non_candidate_dashboard["CandidateOnly"] = False
     check_validation_error("dashboard JSON rejects non-candidate output", non_candidate_dashboard, status_schema)
-    check_contains("dashboard markdown title", dashboard_md.read_text(encoding="utf-8"), "# NiDataStream promotion dashboard")
+    dashboard_markdown = dashboard_md.read_text(encoding="utf-8")
+    check_contains("dashboard markdown title", dashboard_markdown, "# NiDataStream promotion dashboard")
+    check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
 print("=== NiDataStream promotion preflight ===")

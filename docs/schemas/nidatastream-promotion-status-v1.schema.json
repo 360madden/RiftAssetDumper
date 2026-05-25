@@ -12,6 +12,7 @@
     "FunctionSiteTargetStatus",
     "DescriptorReportStatus",
     "LayoutReportStatus",
+    "DescriptorSampleCompareStatus",
     "PairingImpactStatus",
     "ParserExportPromotionAllowed",
     "BlockerCount",
@@ -27,6 +28,7 @@
     "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
     "DescriptorReportStatus": { "$ref": "#/$defs/descriptorReportStatus" },
     "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
+    "DescriptorSampleCompareStatus": { "$ref": "#/$defs/descriptorSampleCompareStatus" },
     "PairingImpactStatus": { "$ref": "#/$defs/pairingImpactStatus" },
     "ParserExportPromotionAllowed": { "const": false },
     "BlockerCount": { "type": "integer", "minimum": 0 },
@@ -96,6 +98,36 @@
         "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
         "AllRequiredEvidenceReady": { "type": "boolean" },
         "FieldOrderPromoted": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSampleCompareStatus": {
+      "type": "object",
+      "required": [
+        "SampleCorpusRoot",
+        "FilesScanned",
+        "FilesParsed",
+        "ParseErrorCount",
+        "SampleByteCheckCount",
+        "SampleBytePassedCount",
+        "AllSampleBytesUniform",
+        "ByteOrderCheckCount",
+        "ByteOrderPassedCount",
+        "AllByteOrderFieldsUniform",
+        "DescriptorAndSampleEvidenceReady"
+      ],
+      "properties": {
+        "SampleCorpusRoot": { "type": "string" },
+        "FilesScanned": { "type": "integer", "minimum": 0 },
+        "FilesParsed": { "type": "integer", "minimum": 0 },
+        "ParseErrorCount": { "type": "integer", "minimum": 0 },
+        "SampleByteCheckCount": { "type": "integer", "minimum": 0 },
+        "SampleBytePassedCount": { "type": "integer", "minimum": 0 },
+        "AllSampleBytesUniform": { "type": "boolean" },
+        "ByteOrderCheckCount": { "type": "integer", "minimum": 0 },
+        "ByteOrderPassedCount": { "type": "integer", "minimum": 0 },
+        "AllByteOrderFieldsUniform": { "type": "boolean" },
+        "DescriptorAndSampleEvidenceReady": { "type": "boolean" }
       },
       "additionalProperties": false
     },
