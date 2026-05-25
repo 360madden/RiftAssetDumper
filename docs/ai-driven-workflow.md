@@ -172,6 +172,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - NiDataStream promotion preflight command added: `docs/handoffs/2026-05-25-nidatastream-promotion-preflight.md`
 - NiDataStream descriptor/sample-byte comparison report added: `docs/handoffs/2026-05-25-nidatastream-descriptor-sample-compare.md`
 - NiDataStream preflight now refreshes descriptor/sample comparison: `docs/handoffs/2026-05-25-nidatastream-preflight-descriptor-sample-compare.md`
+- NiDataStream linked-stream nullable warning cleanup: `docs/handoffs/2026-05-25-nidatastream-nullable-warning-cleanup.md`
 - NiDataStream parser/export promotion decision template added: `docs/handoffs/2026-05-25-nidatastream-promotion-decision-template.md`
 - NiDataStream negative fixture guards added: `docs/handoffs/2026-05-25-nidatastream-negative-fixture-guards.md`
 - CI runtime warnings documented: `docs/handoffs/2026-05-25-ci-runtime-notes.md`

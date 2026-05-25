@@ -3318,6 +3318,9 @@ internal static class Program
 
     foreach (var stream in streamSummaries)
     {
+      if (stream.RoleStats is not { } roleStats)
+        continue;
+
       if (!blocksByIndex.TryGetValue(stream.TargetBlockIndex, out var streamBlock))
         continue;
 
@@ -3343,7 +3346,7 @@ internal static class Program
           // Skip float32 validation for streams identified as uint16-compatible
           // (body bytes look like valid-but-tiny floats when interpreted as float32)
           var valid = true;
-          if (stream.RoleStats?.PrimaryRole?.Contains("uint16", StringComparison.OrdinalIgnoreCase) != true)
+          if (!roleStats.PrimaryRole.Contains("uint16", StringComparison.OrdinalIgnoreCase))
           {
             var sampleCount = Math.Min(3, vertexCount);
             for (var vi = 0; vi < sampleCount; vi++)
@@ -3375,7 +3378,7 @@ internal static class Program
                 BodyFirst16: ToHex(body[..Math.Min(16, body.Length)]),
                 DataStreamUsage: stream.DataStreamUsage,
                 DataStreamAccess: stream.DataStreamAccess,
-                Role: stream.RoleStats.PrimaryRole,
+                Role: roleStats.PrimaryRole,
                 FirstFloat3: ToHex(body[..Math.Min(12, body.Length)])));
             continue;
           }
@@ -3403,7 +3406,7 @@ internal static class Program
                 BodyFirst16: ToHex(body[..Math.Min(16, body.Length)]),
                 DataStreamUsage: stream.DataStreamUsage,
                 DataStreamAccess: stream.DataStreamAccess,
-                Role: stream.RoleStats.PrimaryRole,
+                Role: roleStats.PrimaryRole,
                 FirstFloat3: ToHex(body[..Math.Min(12, body.Length)])));
           }
         }
