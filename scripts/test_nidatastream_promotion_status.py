@@ -272,8 +272,35 @@ check(
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationPatternCount"], int),
     True,
 )
+check(
+    "descriptor table sample report ready flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleReportReady"], bool),
+    True,
+)
+check(
+    "descriptor table sample row count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleRowCount"], int),
+    True,
+)
+check(
+    "descriptor table sample nonzero row count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleNonzeroRowCount"], int),
+    True,
+)
+check(
+    "descriptor table sample all-zero flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleAllRowsZero"], bool),
+    True,
+)
+check(
+    "descriptor table sample semantics explained flag is false",
+    status["DescriptorSampleCompareStatus"]["DescriptorTableSampleSemanticsExplained"],
+    False,
+)
 semantic_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-semantic-map")
 check("descriptor semantic gate blocks promotion", semantic_gate["State"], "blocked")
+table_sample_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-table-sample-proof")
+check("descriptor table sample gate blocks promotion", table_sample_gate["BlocksPromotion"], True)
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
 missing_compare_status = json.loads(json.dumps(status))
@@ -285,6 +312,9 @@ check_validation_error("promotion status rejects string descriptor/sample ready 
 semantic_ready_status = json.loads(json.dumps(status))
 semantic_ready_status["DescriptorSampleCompareStatus"]["DescriptorSemanticMappingReady"] = True
 check_validation_error("promotion status rejects semantic mapping promotion", semantic_ready_status, status_schema)
+table_sample_semantics_status = json.loads(json.dumps(status))
+table_sample_semantics_status["DescriptorSampleCompareStatus"]["DescriptorTableSampleSemanticsExplained"] = True
+check_validation_error("promotion status rejects table sample semantic promotion", table_sample_semantics_status, status_schema)
 string_index_status = json.loads(json.dumps(status))
 string_index_status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"] = "true"
 check_validation_error("promotion status rejects string record index mapped flag", string_index_status, status_schema)
@@ -445,6 +475,12 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown pattern matrix status", dashboard_markdown, "Descriptor record pattern matrix rows")
     check_contains("dashboard markdown context correlation samples", dashboard_markdown, "Descriptor/sample context correlation samples")
     check_contains("dashboard markdown context correlation ready", dashboard_markdown, "Descriptor/sample context correlation ready")
+    check_contains("dashboard markdown table sample rows", dashboard_markdown, "Descriptor-table sample rows")
+    check_contains(
+        "dashboard markdown table sample semantics",
+        dashboard_markdown,
+        "Descriptor-table sample semantics explained",
+    )
     check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
     check_contains(
         "dashboard markdown helper high bytes status",

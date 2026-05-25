@@ -2857,6 +2857,195 @@ def _nidatastream_sample_corpus_status(layout_report: dict[str, Any] | None) -> 
     }
 
 
+def _nidatastream_descriptor_table_sample_status(args: argparse.Namespace) -> dict[str, Any]:
+    """Summarize ignored descriptor-table sample evidence for fail-closed comparison reports."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = (
+        Path(args.descriptor_table_report)
+        if getattr(args, "descriptor_table_report", "")
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.json"
+    )
+    status: dict[str, Any] = {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "Path": _display_path(report_path),
+        "Exists": report_path.exists(),
+        "SchemaVersion": "",
+        "ReportCandidateOnly": False,
+        "ReportFieldOrderPromoted": False,
+        "ReportParserExportPromotionAllowed": False,
+        "IndexCount": 0,
+        "FieldCount": 0,
+        "RowCount": 0,
+        "NonzeroRowCount": 0,
+        "ErrorRowCount": 0,
+        "AllRowsZero": False,
+        "SampleReportReady": False,
+        "StreamSemanticsExplained": False,
+        "RowsByField": [],
+        "RowsByIndex": [],
+        "Error": "",
+        "BlockerCount": 0,
+        "Blockers": [],
+        "Interpretation": (
+            "Descriptor-table samples are candidate-only static Ghidra evidence and do not promote "
+            "parser/export behavior."
+        ),
+    }
+    blockers: list[str] = []
+    if not report_path.exists():
+        blockers.append("descriptor-table-sample-report-missing")
+        status["Blockers"] = blockers
+        status["BlockerCount"] = len(blockers)
+        status["Interpretation"] = (
+            "No ignored descriptor-table sample report exists; run "
+            "`python scripts/rift_workflow.py nidatastream-descriptor-table-sample --ghidra-execute` "
+            "before using table-entry evidence."
+        )
+        return status
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        blockers.append("descriptor-table-sample-report-invalid")
+        status["Error"] = str(exc)
+        status["Blockers"] = blockers
+        status["BlockerCount"] = len(blockers)
+        return status
+
+    rows_value = report.get("rows")
+    rows = [row for row in rows_value if isinstance(row, dict)] if isinstance(rows_value, list) else []
+    row_count = _json_int_or_none(report.get("rowCount")) or len(rows)
+    field_summaries: dict[str, dict[str, Any]] = {}
+    index_summaries: dict[str, dict[str, Any]] = {}
+    nonzero_rows = 0
+    error_rows = 0
+    for row in rows:
+        field = str(row.get("field", ""))
+        index_hex = str(row.get("indexHex", ""))
+        bytes_text = str(row.get("bytes", ""))
+        parsed = _parse_hex_byte_record(bytes_text)
+        has_error = bool(str(row.get("error", "")).strip())
+        has_nonzero = bool(parsed and any(byte != 0 for byte in parsed))
+        if has_error:
+            error_rows += 1
+        if has_nonzero:
+            nonzero_rows += 1
+        field_summary = field_summaries.setdefault(
+            field,
+            {
+                "Field": field,
+                "RowCount": 0,
+                "NonzeroRowCount": 0,
+                "AllRowsZero": False,
+                "_indices": set(),
+            },
+        )
+        field_summary["RowCount"] += 1
+        if has_nonzero:
+            field_summary["NonzeroRowCount"] += 1
+        if index_hex:
+            field_summary["_indices"].add(index_hex)
+        index_summary = index_summaries.setdefault(
+            index_hex,
+            {
+                "IndexHex": index_hex,
+                "RowCount": 0,
+                "NonzeroRowCount": 0,
+                "AllRowsZero": False,
+                "_fields": set(),
+            },
+        )
+        index_summary["RowCount"] += 1
+        if has_nonzero:
+            index_summary["NonzeroRowCount"] += 1
+        if field:
+            index_summary["_fields"].add(field)
+
+    rows_by_field = []
+    for field_summary in sorted(field_summaries.values(), key=lambda value: str(value["Field"])):
+        rows_by_field.append(
+            {
+                "Field": field_summary["Field"],
+                "RowCount": field_summary["RowCount"],
+                "NonzeroRowCount": field_summary["NonzeroRowCount"],
+                "AllRowsZero": field_summary["RowCount"] > 0 and field_summary["NonzeroRowCount"] == 0,
+                "Indices": sorted(field_summary["_indices"]),
+            }
+        )
+    rows_by_index = []
+    for index_summary in sorted(index_summaries.values(), key=lambda value: str(value["IndexHex"])):
+        rows_by_index.append(
+            {
+                "IndexHex": index_summary["IndexHex"],
+                "RowCount": index_summary["RowCount"],
+                "NonzeroRowCount": index_summary["NonzeroRowCount"],
+                "AllRowsZero": index_summary["RowCount"] > 0 and index_summary["NonzeroRowCount"] == 0,
+                "Fields": sorted(index_summary["_fields"]),
+            }
+        )
+
+    schema_version = str(report.get("SchemaVersion", ""))
+    report_candidate_only = report.get("CandidateOnly") is True
+    report_field_order_promoted = report.get("FieldOrderPromoted") is True
+    report_parser_export_promoted = report.get("ParserExportPromotionAllowed") is True
+    all_rows_zero = row_count > 0 and nonzero_rows == 0 and error_rows == 0
+    if schema_version != "ghidra-descriptor-table-sample/v1":
+        blockers.append("descriptor-table-sample-schema-mismatch")
+    if not report_candidate_only:
+        blockers.append("descriptor-table-sample-not-candidate-only")
+    if report_field_order_promoted:
+        blockers.append("descriptor-table-sample-field-order-promoted")
+    if report_parser_export_promoted:
+        blockers.append("descriptor-table-sample-parser-export-promoted")
+    if row_count <= 0:
+        blockers.append("descriptor-table-sample-empty")
+    if error_rows:
+        blockers.append("descriptor-table-sample-read-errors")
+    if all_rows_zero:
+        blockers.append("descriptor-table-sample-all-zero")
+    blockers.append("descriptor-table-sample-semantics-unmapped")
+    sample_ready = (
+        schema_version == "ghidra-descriptor-table-sample/v1"
+        and report_candidate_only
+        and not report_field_order_promoted
+        and not report_parser_export_promoted
+        and row_count > 0
+        and error_rows == 0
+    )
+    interpretation = (
+        "Current indexed descriptor-table samples are readable but all zero for observed indices; "
+        "this is blocker evidence against parser/export promotion from these candidate bases."
+        if all_rows_zero
+        else (
+            "Descriptor-table sample rows exist, but stream semantics remain unmapped until nonzero rows are "
+            "compared against descriptor records and guarded by parser/export promotion checks."
+        )
+    )
+    status.update(
+        {
+            "SchemaVersion": schema_version,
+            "ReportCandidateOnly": report_candidate_only,
+            "ReportFieldOrderPromoted": report_field_order_promoted,
+            "ReportParserExportPromotionAllowed": report_parser_export_promoted,
+            "IndexCount": _json_int_or_none(report.get("indexCount")) or 0,
+            "FieldCount": _json_int_or_none(report.get("fieldCount")) or 0,
+            "RowCount": row_count,
+            "NonzeroRowCount": nonzero_rows,
+            "ErrorRowCount": error_rows,
+            "AllRowsZero": all_rows_zero,
+            "SampleReportReady": sample_ready,
+            "StreamSemanticsExplained": False,
+            "RowsByField": rows_by_field,
+            "RowsByIndex": rows_by_index,
+            "BlockerCount": len(blockers),
+            "Blockers": blockers,
+            "Interpretation": interpretation,
+        }
+    )
+    return status
+
+
 def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return a candidate-only descriptor/static-proof vs sample-byte comparison report."""
     descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
@@ -2882,6 +3071,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         layout_report,
         record_pattern_matrix,
     )
+    descriptor_table_sample_status = _nidatastream_descriptor_table_sample_status(args)
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
@@ -2919,6 +3109,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     for blocker in sample_context_correlation["Blockers"]:
         if blocker not in blockers:
             blockers.append(blocker)
+    for blocker in descriptor_table_sample_status["Blockers"]:
+        if blocker not in blockers:
+            blockers.append(blocker)
     if not descriptor_status["FieldOrderPromoted"]:
         blockers.append("field-order-promoted-false")
     if not promotion_status["ParserExportPromotionAllowed"]:
@@ -2947,6 +3140,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "DescriptorRecordByteRoleCandidates": record_byte_roles,
         "DescriptorRecordPatternMatrix": record_pattern_matrix,
         "DescriptorSampleContextCorrelation": sample_context_correlation,
+        "DescriptorTableSampleStatus": descriptor_table_sample_status,
         "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
@@ -2976,6 +3170,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
     sample_context = report["DescriptorSampleContextCorrelation"]
+    table_sample = report["DescriptorTableSampleStatus"]
     semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
     lines = [
@@ -3044,6 +3239,12 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
             "| Descriptor/sample context correlation | "
             f"{format_markdown_cell(sample_context['DescriptorPatternCount'])} pattern(s); "
             f"ready={format_markdown_cell(str(sample_context['CorrelationReady']).lower())} |"
+        ),
+        (
+            "| Descriptor-table indexed samples | "
+            f"{format_markdown_cell(table_sample['RowCount'])} row(s); "
+            f"nonzero={format_markdown_cell(table_sample['NonzeroRowCount'])}; "
+            f"semantics={format_markdown_cell(str(table_sample['StreamSemanticsExplained']).lower())} |"
         ),
         (
             "| Descriptor semantic mapping ready | "
@@ -3365,6 +3566,36 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor-table indexed sample status",
+            "",
+            f"- Report exists: **{str(table_sample['Exists']).lower()}**",
+            f"- Sample report ready: **{str(table_sample['SampleReportReady']).lower()}**",
+            f"- Rows: **{format_markdown_cell(table_sample['RowCount'])}**",
+            f"- Nonzero rows: **{format_markdown_cell(table_sample['NonzeroRowCount'])}**",
+            f"- All rows zero: **{str(table_sample['AllRowsZero']).lower()}**",
+            f"- Stream semantics explained: **{str(table_sample['StreamSemanticsExplained']).lower()}**",
+            "",
+            "| Field | Rows | Nonzero rows | All rows zero | Indices |",
+            "|---|---:|---:|---:|---|",
+        ]
+    )
+    for row in table_sample["RowsByField"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["Field"]),
+                    format_markdown_cell(row["RowCount"]),
+                    format_markdown_cell(row["NonzeroRowCount"]),
+                    format_markdown_cell(str(row["AllRowsZero"]).lower()),
+                    format_markdown_cell(", ".join(row["Indices"])),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Descriptor semantic feasibility",
             "",
             f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
@@ -3458,6 +3689,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
     sample_context = report["DescriptorSampleContextCorrelation"]
+    table_sample = report["DescriptorTableSampleStatus"]
     semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
@@ -3502,6 +3734,14 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         f"patterns={sample_context['DescriptorPatternCount']}; "
         f"review queue={sample_context['ReviewQueueCount']}; "
         f"ready={str(sample_context['CorrelationReady']).lower()}"
+    )
+    print(
+        "Descriptor-table indexed samples: "
+        f"exists={str(table_sample['Exists']).lower()}; "
+        f"rows={table_sample['RowCount']}; "
+        f"nonzero={table_sample['NonzeroRowCount']}; "
+        f"all zero={str(table_sample['AllRowsZero']).lower()}; "
+        f"semantics explained={str(table_sample['StreamSemanticsExplained']).lower()}"
     )
     print(
         "Descriptor semantic mapping ready: "
@@ -3666,6 +3906,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         layout_report,
         record_pattern_matrix,
     )
+    descriptor_table_sample_status = _nidatastream_descriptor_table_sample_status(args)
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
@@ -3764,6 +4005,21 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "python scripts/rift_workflow.py nidatastream-descriptor-sample-compare --list-json",
         ),
         _nidatastream_gate(
+            "descriptor-table-sample-proof",
+            "candidate" if descriptor_table_sample_status["SampleReportReady"] else "blocked",
+            True,
+            "Computed descriptor-table entries for observed stream descriptor indices explain or explicitly block field semantics.",
+            (
+                f"Descriptor-table sample report exists={str(descriptor_table_sample_status['Exists']).lower()}, "
+                f"rows={descriptor_table_sample_status['RowCount']}, "
+                f"nonzero rows={descriptor_table_sample_status['NonzeroRowCount']}, "
+                f"all rows zero={str(descriptor_table_sample_status['AllRowsZero']).lower()}, "
+                f"semantics explained={str(descriptor_table_sample_status['StreamSemanticsExplained']).lower()}; "
+                "still candidate-only."
+            ),
+            "python scripts/rift_workflow.py nidatastream-descriptor-table-sample --ghidra-execute",
+        ),
+        _nidatastream_gate(
             "sample-byte-agreement",
             sample_state,
             True,
@@ -3832,6 +4088,11 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "DescriptorContextCorrelationReady": sample_context_correlation["CorrelationReady"],
             "DescriptorContextCorrelationSampleCount": sample_context_correlation["SampleCount"],
             "DescriptorContextCorrelationPatternCount": sample_context_correlation["DescriptorPatternCount"],
+            "DescriptorTableSampleReportReady": descriptor_table_sample_status["SampleReportReady"],
+            "DescriptorTableSampleRowCount": descriptor_table_sample_status["RowCount"],
+            "DescriptorTableSampleNonzeroRowCount": descriptor_table_sample_status["NonzeroRowCount"],
+            "DescriptorTableSampleAllRowsZero": descriptor_table_sample_status["AllRowsZero"],
+            "DescriptorTableSampleSemanticsExplained": descriptor_table_sample_status["StreamSemanticsExplained"],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
             "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
@@ -3895,6 +4156,8 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         f"record byte 0 mapped={str(compare_status['DescriptorRecordIndexCandidateMapped']).lower()}; "
         f"pattern rows={compare_status['DescriptorRecordPatternMatrixRowCount']}; "
         f"context samples={compare_status['DescriptorContextCorrelationSampleCount']}; "
+        f"table rows={compare_status['DescriptorTableSampleRowCount']}; "
+        f"table nonzero={compare_status['DescriptorTableSampleNonzeroRowCount']}; "
         "helper high bytes proven unused="
         f"{str(compare_status['DescriptorHelperLookupHighBytesProvenUnused']).lower()}; "
         f"remaining bytes={compare_status['DescriptorRecordRemainingUnmappedByteCount']}; "
@@ -4011,6 +4274,18 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor/sample context correlation ready | "
             f"{format_markdown_cell(str(compare_status['DescriptorContextCorrelationReady']).lower())} |"
+        ),
+        (
+            "| Descriptor-table sample rows | "
+            f"{format_markdown_cell(compare_status['DescriptorTableSampleRowCount'])} |"
+        ),
+        (
+            "| Descriptor-table sample nonzero rows | "
+            f"{format_markdown_cell(compare_status['DescriptorTableSampleNonzeroRowCount'])} |"
+        ),
+        (
+            "| Descriptor-table sample semantics explained | "
+            f"{format_markdown_cell(str(compare_status['DescriptorTableSampleSemanticsExplained']).lower())} |"
         ),
         (
             "| Descriptor record byte 0 mapped | "

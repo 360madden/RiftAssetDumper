@@ -200,6 +200,57 @@ def write_layout_fixture(
     )
 
 
+def write_descriptor_table_sample_fixture(out_dir: Path, *, first_bytes: str = "00 00 00 00") -> None:
+    report_dir = out_dir / "ghidra-reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {
+            "field": "descriptor-enable-or-special-flag",
+            "baseAddress": "143358be0",
+            "staticTableOffsetBytes": 0,
+            "index": 0xAA,
+            "indexHex": "aa",
+            "strideBytes": 12,
+            "byteCountRequested": 4,
+            "computedAddress": "1433593d8",
+            "byteCountRead": 4,
+            "bytes": first_bytes,
+        },
+        {
+            "field": "descriptor-component-class",
+            "baseAddress": "143358be4",
+            "staticTableOffsetBytes": 4,
+            "index": 0xBB,
+            "indexHex": "bb",
+            "strideBytes": 12,
+            "byteCountRequested": 4,
+            "computedAddress": "1433594a8",
+            "byteCountRead": 4,
+            "bytes": "00 00 00 00",
+        },
+    ]
+    (report_dir / "nidatastream_descriptor_table_samples.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-descriptor-table-sample/v1",
+                "CandidateOnly": True,
+                "FieldOrderPromoted": False,
+                "ParserExportPromotionAllowed": False,
+                "programName": "rift_x64.exe",
+                "imageBase": "140000000",
+                "strideBytes": 12,
+                "byteCountRequested": 4,
+                "indexCount": 2,
+                "fieldCount": 2,
+                "rowCount": len(rows),
+                "rows": rows,
+                "interpretation": "candidate-only fixture",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 schema = json.loads(
     Path("docs/schemas/nidatastream-descriptor-sample-compare-v1.schema.json").read_text(encoding="utf-8")
 )
@@ -210,6 +261,7 @@ with TemporaryDirectory() as temp_dir:
     out_dir = temp_path / "Exports"
     targets_file = write_descriptor_fixture(temp_path)
     write_layout_fixture(out_dir)
+    write_descriptor_table_sample_fixture(out_dir)
     compare_output = io.StringIO()
     with (
         patch.object(
@@ -316,6 +368,20 @@ check("sample context review dominant pair", first_review_row["DominantPairRecor
 check("sample context review dominant pair count", first_review_row["DominantPairRecordCount"], 2)
 check("sample context review dominant usage", first_review_row["DominantUsageValue"], "1")
 check("sample context review rationale", "candidate-only" in first_review_row["ReviewRationale"].lower(), True)
+table_sample = compare["DescriptorTableSampleStatus"]
+check("descriptor table sample candidate-only", table_sample["CandidateOnly"], True)
+check("descriptor table sample exists", table_sample["Exists"], True)
+check("descriptor table sample ready", table_sample["SampleReportReady"], True)
+check("descriptor table sample rows", table_sample["RowCount"], 2)
+check("descriptor table sample nonzero rows", table_sample["NonzeroRowCount"], 0)
+check("descriptor table sample all rows zero", table_sample["AllRowsZero"], True)
+check("descriptor table sample semantics blocked", table_sample["StreamSemanticsExplained"], False)
+check("descriptor table sample field summary count", len(table_sample["RowsByField"]), 2)
+check(
+    "descriptor table sample all-zero blocker",
+    "descriptor-table-sample-all-zero" in table_sample["Blockers"],
+    True,
+)
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
@@ -366,6 +432,7 @@ check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned
 check("sample corpus shifted samples", compare["SampleCorpusStatus"]["ShiftedSampleCount"], 5)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
+check("table sample blocker present", "descriptor-table-sample-all-zero" in compare["Blockers"], True)
 check("semantic blocker present", "stream-record-semantics-partial" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
 
@@ -404,6 +471,11 @@ check("mismatch descriptor + sample evidence not ready", mismatch["DescriptorAnd
 check("mismatch prefix observed", prefix_check["ObservedInteger"], 29)
 check("mismatch prefix does not match", prefix_check["MatchesExpected"], False)
 check("mismatch blocker present", "sample-byte-uniformity-incomplete" in mismatch["Blockers"], True)
+check(
+    "mismatch table sample missing blocker present",
+    "descriptor-table-sample-report-missing" in mismatch["DescriptorTableSampleStatus"]["Blockers"],
+    True,
+)
 
 print("=== NiDataStream descriptor byte-order mismatch fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -581,6 +653,12 @@ check_validation_error("schema rejects string descriptor sample context ready fl
 sample_context_bad_review_rank_compare = json.loads(json.dumps(compare))
 sample_context_bad_review_rank_compare["DescriptorSampleContextCorrelation"]["ReviewQueueRows"][0]["Rank"] = 0
 check_validation_error("schema rejects descriptor sample context review rank zero", sample_context_bad_review_rank_compare, schema)
+table_sample_promoted_compare = json.loads(json.dumps(compare))
+table_sample_promoted_compare["DescriptorTableSampleStatus"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor table sample status", table_sample_promoted_compare, schema)
+table_sample_semantics_compare = json.loads(json.dumps(compare))
+table_sample_semantics_compare["DescriptorTableSampleStatus"]["StreamSemanticsExplained"] = True
+check_validation_error("schema rejects descriptor table sample semantic promotion", table_sample_semantics_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
