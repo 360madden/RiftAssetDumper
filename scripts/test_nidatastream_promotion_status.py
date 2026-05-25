@@ -55,6 +55,16 @@ def check_raises(desc: str, fn: Any, expected_text: str) -> None:
             failed += 1
 
 
+def check_validation_error(desc: str, payload: dict[str, Any], schema: dict[str, Any]) -> None:
+    global failed
+    try:
+        jsonschema.validate(payload, schema)
+        print(f"  FAIL: {desc} no validation error")
+        failed += 1
+    except jsonschema.ValidationError:
+        print(f"  PASS: {desc}")
+
+
 print("=== NiDataStream promotion status ===")
 status_output = io.StringIO()
 with (
@@ -132,6 +142,15 @@ with TemporaryDirectory() as temp_dir:
     dashboard_status = json.loads(dashboard_json.read_text(encoding="utf-8"))
     jsonschema.validate(dashboard_status, status_schema)
     print("  PASS: dashboard JSON schema validation")
+    promoted_dashboard = json.loads(json.dumps(dashboard_status))
+    promoted_dashboard["ParserExportPromotionAllowed"] = True
+    check_validation_error("dashboard JSON rejects parser/export promotion", promoted_dashboard, status_schema)
+    field_promoted_dashboard = json.loads(json.dumps(dashboard_status))
+    field_promoted_dashboard["DescriptorReportStatus"]["FieldOrderPromoted"] = True
+    check_validation_error("dashboard JSON rejects descriptor field promotion", field_promoted_dashboard, status_schema)
+    non_candidate_dashboard = json.loads(json.dumps(dashboard_status))
+    non_candidate_dashboard["CandidateOnly"] = False
+    check_validation_error("dashboard JSON rejects non-candidate output", non_candidate_dashboard, status_schema)
     check_contains("dashboard markdown title", dashboard_md.read_text(encoding="utf-8"), "# NiDataStream promotion dashboard")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 

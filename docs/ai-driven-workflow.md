@@ -168,6 +168,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - NiDataStream negative fixture guards added: `docs/handoffs/2026-05-25-nidatastream-negative-fixture-guards.md`
 - CI runtime warnings documented: `docs/handoffs/2026-05-25-ci-runtime-notes.md`
 - NiDataStream parser/export non-consumption guard wired: `docs/handoffs/2026-05-25-nidatastream-parser-export-non-consumption-guard.md`
+- NiDataStream dashboard negative fixture guards added: `docs/handoffs/2026-05-25-nidatastream-dashboard-negative-fixtures.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
