@@ -145,6 +145,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra FunctionSiteSurvey target registry wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-registry.md`
 - Ghidra FunctionSiteSurvey target registry schema wired: `docs/handoffs/2026-05-24-ghidra-function-site-target-schema.md`
 - Ghidra FunctionSiteSurvey target guard/list/status wired: `docs/handoffs/2026-05-25-ghidra-function-site-target-guard-status.md`
+- Local FunctionSiteSurvey Markdown summaries refreshed under ignored `Exports/`: `docs/handoffs/2026-05-25-ghidra-function-site-summary-refresh.md`
 - Ghidra NiDataStream descriptor targets registered: `docs/handoffs/2026-05-24-ghidra-nidatastream-descriptor-targets.md`
 - Ghidra NiDataStream parser-field comparison documented: `docs/handoffs/2026-05-24-ghidra-nidatastream-parser-field-comparison.md`
 - Ghidra NiDataStream parser-field promotion checklist added: `docs/handoffs/2026-05-25-ghidra-nidatastream-parser-field-checklist.md`
