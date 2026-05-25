@@ -297,6 +297,31 @@ check(
     status["DescriptorSampleCompareStatus"]["DescriptorTableSampleSemanticsExplained"],
     False,
 )
+check(
+    "descriptor table sample compare report count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleCompareReportCount"], int),
+    True,
+)
+check(
+    "descriptor table sample compare existing count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleCompareExistingReportCount"], int),
+    True,
+)
+check(
+    "descriptor table sample compare ready count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleCompareReadyReportCount"], int),
+    True,
+)
+check(
+    "descriptor table sample compare nonzero count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleCompareNonzeroReportCount"], int),
+    True,
+)
+check(
+    "descriptor table sample compare all-zero flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorTableSampleCompareAllExistingReportsAllZero"], bool),
+    True,
+)
 semantic_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-semantic-map")
 check("descriptor semantic gate blocks promotion", semantic_gate["State"], "blocked")
 table_sample_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-table-sample-proof")

@@ -4108,6 +4108,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         record_pattern_matrix,
     )
     descriptor_table_sample_status = _nidatastream_descriptor_table_sample_status(args)
+    descriptor_table_sample_compare = _nidatastream_descriptor_table_sample_compare_packet(args)
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
@@ -4215,10 +4216,13 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
                 f"rows={descriptor_table_sample_status['RowCount']}, "
                 f"nonzero rows={descriptor_table_sample_status['NonzeroRowCount']}, "
                 f"all rows zero={str(descriptor_table_sample_status['AllRowsZero']).lower()}, "
+                f"known reports={descriptor_table_sample_compare['ExistingReportCount']}/"
+                f"{descriptor_table_sample_compare['ReportCount']}, "
+                f"nonzero reports={descriptor_table_sample_compare['NonzeroReportCount']}, "
                 f"semantics explained={str(descriptor_table_sample_status['StreamSemanticsExplained']).lower()}; "
                 "still candidate-only."
             ),
-            "python scripts/rift_workflow.py nidatastream-descriptor-table-sample --ghidra-execute",
+            "python scripts/rift_workflow.py nidatastream-descriptor-table-sample-compare --list-json",
         ),
         _nidatastream_gate(
             "sample-byte-agreement",
@@ -4294,6 +4298,13 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "DescriptorTableSampleNonzeroRowCount": descriptor_table_sample_status["NonzeroRowCount"],
             "DescriptorTableSampleAllRowsZero": descriptor_table_sample_status["AllRowsZero"],
             "DescriptorTableSampleSemanticsExplained": descriptor_table_sample_status["StreamSemanticsExplained"],
+            "DescriptorTableSampleCompareReportCount": descriptor_table_sample_compare["ReportCount"],
+            "DescriptorTableSampleCompareExistingReportCount": descriptor_table_sample_compare["ExistingReportCount"],
+            "DescriptorTableSampleCompareReadyReportCount": descriptor_table_sample_compare["ReadyReportCount"],
+            "DescriptorTableSampleCompareNonzeroReportCount": descriptor_table_sample_compare["NonzeroReportCount"],
+            "DescriptorTableSampleCompareAllExistingReportsAllZero": descriptor_table_sample_compare[
+                "AllExistingReportsAllZero"
+            ],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
             "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
