@@ -53,6 +53,7 @@ Commands (kebab-case):
     ghidra-function-site-status  — show ignored report/summary status for FunctionSiteSurvey targets
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
+    nidatastream-evidence-status — list ignored local NiDataStream/Ghidra evidence artifact timestamps
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
     nidatastream-promotion-dashboard — write compact Markdown dashboard for promotion gates
     nidatastream-promotion-preflight — run dashboard + Ghidra/NiDataStream promotion guard suite
@@ -320,6 +321,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-evidence-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-promotion-dashboard": {
         "dotnet": "",
         "base": "",
@@ -397,6 +402,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "GhidraSummarize": "ghidra-summarize",
+    "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
     "NiDataStreamPromotionDashboard": "nidatastream-promotion-dashboard",
     "NiDataStreamPromotionPreflight": "nidatastream-promotion-preflight",
@@ -1150,6 +1156,25 @@ def _display_path(path: Path) -> str:
         return text
 
 
+def _artifact_status(key: str, role: str, path: Path) -> dict[str, Any]:
+    """Return a small repo-safe status record for a local ignored evidence artifact."""
+    exists = path.exists()
+    modified_utc: str | None = None
+    size_bytes: int | None = None
+    if exists:
+        stat = path.stat()
+        modified_utc = datetime.fromtimestamp(stat.st_mtime, UTC).isoformat().replace("+00:00", "Z")
+        size_bytes = stat.st_size
+    return {
+        "Key": key,
+        "Role": role,
+        "Path": _display_path(path),
+        "Exists": exists,
+        "ModifiedUtc": modified_utc,
+        "SizeBytes": size_bytes,
+    }
+
+
 def _ghidra_function_site_status_payload(registry_path: Path) -> dict[str, Any]:
     """Return report/summary existence status for all safe FunctionSiteSurvey targets."""
     registry = _guard_ghidra_function_site_targets(registry_path, quiet=True)
@@ -1455,6 +1480,121 @@ def _run_nidatastream_descriptor_proof_status(args: argparse.Namespace) -> None:
         print(json.dumps(status, indent=2))
         return
     _print_nidatastream_descriptor_proof_status(status)
+
+
+def _repo_or_absolute_path(path_text: str) -> Path:
+    """Return a registry/output path as an absolute local Path."""
+    path = Path(path_text)
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
+
+
+def _nidatastream_evidence_status_payload(args: argparse.Namespace) -> dict[str, Any]:
+    """Return local ignored evidence artifact existence/timestamp status."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    registry = _guard_ghidra_function_site_targets(_ghidra_function_site_targets_path(args), quiet=True)
+    artifacts: list[dict[str, Any]] = [
+        _artifact_status(
+            "nidatastream-promotion-dashboard-json",
+            "promotion-dashboard",
+            out_dir / "nidatastream-promotion-dashboard.json",
+        ),
+        _artifact_status(
+            "nidatastream-promotion-dashboard-markdown",
+            "promotion-dashboard",
+            out_dir / "nidatastream-promotion-dashboard.md",
+        ),
+        _artifact_status(
+            "nidatastream-layout-report-json",
+            "sample-byte-layout",
+            out_dir / "nidatastream-layout-report.json",
+        ),
+        _artifact_status(
+            "nidatastream-layout-report-markdown",
+            "sample-byte-layout",
+            out_dir / "nidatastream-layout-report.md",
+        ),
+        _artifact_status(
+            "ghidra-attribute-candidate-report-json",
+            "pairing-impact",
+            out_dir / "ghidra-attribute-candidate-report.json",
+        ),
+        _artifact_status(
+            "ghidra-attribute-candidate-report-markdown",
+            "pairing-impact",
+            out_dir / "ghidra-attribute-candidate-report.md",
+        ),
+        _artifact_status(
+            "ghidra-pairing-review-report-json",
+            "pairing-review",
+            out_dir / "ghidra-pairing-review-report.json",
+        ),
+        _artifact_status(
+            "ghidra-pairing-review-report-markdown",
+            "pairing-review",
+            out_dir / "ghidra-pairing-review-report.md",
+        ),
+    ]
+    for target in registry.get("Targets", []):
+        if not isinstance(target, dict):
+            continue
+        key = _slugify_review_kind(str(target.get("Key", "")))
+        report_path = str(target.get("ReportPath", ""))
+        summary_path = str(target.get("SummaryPath", ""))
+        if report_path:
+            artifacts.append(
+                _artifact_status(
+                    f"function-site-{key}-report",
+                    "function-site-report",
+                    _repo_or_absolute_path(report_path),
+                )
+            )
+        if summary_path:
+            artifacts.append(
+                _artifact_status(
+                    f"function-site-{key}-summary",
+                    "function-site-summary",
+                    _repo_or_absolute_path(summary_path),
+                )
+            )
+
+    existing_count = sum(1 for artifact in artifacts if artifact["Exists"])
+    return {
+        "SchemaVersion": "nidatastream-evidence-status/v1",
+        "CandidateOnly": True,
+        "GeneratedAtUtc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "ArtifactCount": len(artifacts),
+        "ExistingCount": existing_count,
+        "MissingCount": len(artifacts) - existing_count,
+        "Artifacts": artifacts,
+    }
+
+
+def _print_nidatastream_evidence_status(status: dict[str, Any]) -> None:
+    """Print local ignored evidence artifact status."""
+    print("--- NiDataStreamEvidenceStatus")
+    print(
+        "Artifacts: "
+        f"{status['ExistingCount']}/{status['ArtifactCount']} present "
+        f"({status['MissingCount']} missing)"
+    )
+    print()
+    print(f"{'Key':48} {'Exists':6} {'ModifiedUtc':22} Path")
+    print(f"{'-' * 48} {'-' * 6} {'-' * 22} {'-' * 40}")
+    for artifact in status["Artifacts"]:
+        modified = artifact["ModifiedUtc"] or "-"
+        print(f"{artifact['Key'][:48]:48} {str(artifact['Exists']).lower():6} {modified[:22]:22} {artifact['Path']}")
+    print("NiDataStreamEvidenceStatus passed: artifact paths are report-only/candidate evidence.")
+
+
+def _run_nidatastream_evidence_status(args: argparse.Namespace) -> None:
+    """Show ignored local NiDataStream/Ghidra evidence artifact timestamps."""
+    status = _nidatastream_evidence_status_payload(args)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_nidatastream_evidence_status(status)
 
 
 def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, Any]:
@@ -2124,6 +2264,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-promotion-status":
         _run_nidatastream_promotion_status(args)
+        return
+
+    if command == "nidatastream-evidence-status":
+        _run_nidatastream_evidence_status(args)
         return
 
     if command == "nidatastream-promotion-dashboard":
@@ -3458,6 +3602,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-function-site-status --list-json
   python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
+  python scripts/rift_workflow.py nidatastream-evidence-status --list-json
   python scripts/rift_workflow.py nidatastream-promotion-status --list-json
   python scripts/rift_workflow.py nidatastream-promotion-dashboard
   python scripts/rift_workflow.py nidatastream-promotion-preflight
@@ -3713,14 +3858,15 @@ Examples:
     list_json_commands = {
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
+        "nidatastream-evidence-status",
         "nidatastream-promotion-status",
         "nidatastream-descriptor-proof-status",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with ghidra-function-site-survey, "
-            "ghidra-function-site-status, nidatastream-promotion-status, "
-            "and nidatastream-descriptor-proof-status.",
+            "ghidra-function-site-status, nidatastream-evidence-status, "
+            "nidatastream-promotion-status, and nidatastream-descriptor-proof-status.",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -20,6 +20,7 @@ Before proposing any parser/export behavior change, copy and fill `docs/nidatast
 ## Required commands before any future parser/export patch
 
 ```powershell
+python scripts/rift_workflow.py nidatastream-evidence-status --list-json
 python scripts/rift_workflow.py nidatastream-promotion-preflight
 ```
 

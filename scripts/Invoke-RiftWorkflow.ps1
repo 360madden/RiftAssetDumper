@@ -53,6 +53,7 @@ $PSModeToKebab = @{
     'GhidraFunctionSiteStatus' = 'ghidra-function-site-status'
     'GhidraFunctionSiteSurvey' = 'ghidra-function-site-survey'
     'GhidraSummarize' = 'ghidra-summarize'
+    'NiDataStreamEvidenceStatus' = 'nidatastream-evidence-status'
     'NiDataStreamPromotionStatus' = 'nidatastream-promotion-status'
     'NiDataStreamPromotionDashboard' = 'nidatastream-promotion-dashboard'
     'NiDataStreamPromotionPreflight' = 'nidatastream-promotion-preflight'

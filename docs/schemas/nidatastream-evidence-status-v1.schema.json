@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/nidatastream-evidence-status-v1.schema.json",
+  "title": "NiDataStream ignored evidence artifact status v1",
+  "description": "Machine-readable local artifact existence/timestamp status emitted by `python scripts/rift_workflow.py nidatastream-evidence-status --list-json`.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "GeneratedAtUtc",
+    "ArtifactCount",
+    "ExistingCount",
+    "MissingCount",
+    "Artifacts"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-evidence-status/v1" },
+    "CandidateOnly": { "const": true },
+    "GeneratedAtUtc": { "type": "string", "minLength": 1 },
+    "ArtifactCount": { "type": "integer", "minimum": 0 },
+    "ExistingCount": { "type": "integer", "minimum": 0 },
+    "MissingCount": { "type": "integer", "minimum": 0 },
+    "Artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["Key", "Role", "Path", "Exists", "ModifiedUtc", "SizeBytes"],
+      "properties": {
+        "Key": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "Role": {
+          "enum": [
+            "function-site-report",
+            "function-site-summary",
+            "pairing-impact",
+            "pairing-review",
+            "promotion-dashboard",
+            "sample-byte-layout"
+          ]
+        },
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "ModifiedUtc": {
+          "anyOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "null" }
+          ]
+        },
+        "SizeBytes": {
+          "anyOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

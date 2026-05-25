@@ -27,6 +27,7 @@ Expected result: the repo can find the configured Ghidra/JDK/tool paths and can 
 python scripts/rift_workflow.py ghidra-function-site-target-guard
 python scripts/rift_workflow.py ghidra-function-site-survey --list-json
 python scripts/rift_workflow.py ghidra-function-site-status --list-json
+python scripts/rift_workflow.py nidatastream-evidence-status --list-json
 ```
 
 Use target keys from `docs/ghidra-function-site-targets.json`. Reports and summaries must stay under ignored `Exports/ghidra-reports/`.

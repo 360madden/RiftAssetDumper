@@ -65,6 +65,69 @@ def check_validation_error(desc: str, payload: dict[str, Any], schema: dict[str,
         print(f"  PASS: {desc}")
 
 
+print("=== NiDataStream evidence status ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    report_dir = out_dir / "ghidra-reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "nidatastream-promotion-dashboard.json").write_text("{}", encoding="utf-8")
+    (out_dir / "nidatastream-layout-report.json").write_text("{}", encoding="utf-8")
+    (report_dir / "test-target.json").write_text("{}", encoding="utf-8")
+    (report_dir / "test-target.md").write_text("# test\n", encoding="utf-8")
+    targets_file = temp_path / "targets.json"
+    targets_file.write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-function-site-targets/v1",
+                "CandidateOnly": True,
+                "Targets": [
+                    {
+                        "Key": "nidatastream-test-target",
+                        "Address": "0x141186980",
+                        "ReportPath": "Exports/ghidra-reports/test-target.json",
+                        "SummaryPath": "Exports/ghidra-reports/test-target.md",
+                        "SummaryTerms": ["NiDataStream"],
+                        "Description": "test target",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    evidence_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-evidence-status",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(evidence_output),
+    ):
+        rift_workflow.main()
+evidence_status = json.loads(evidence_output.getvalue())
+evidence_schema = json.loads(Path("docs/schemas/nidatastream-evidence-status-v1.schema.json").read_text(encoding="utf-8"))
+jsonschema.validate(evidence_status, evidence_schema)
+print("  PASS: evidence status schema validation")
+check("evidence schema", evidence_status["SchemaVersion"], "nidatastream-evidence-status/v1")
+check("evidence candidate-only", evidence_status["CandidateOnly"], True)
+check("evidence artifact count", evidence_status["ArtifactCount"], 10)
+check("evidence existing count", evidence_status["ExistingCount"], 4)
+target_report = next(artifact for artifact in evidence_status["Artifacts"] if artifact["Key"] == "function-site-nidatastream-test-target-report")
+check("evidence report path redacted/repo-relative", target_report["Path"], "Exports/ghidra-reports/test-target.json")
+check("evidence report modified timestamp", target_report["ModifiedUtc"] is not None, True)
+
+
 print("=== NiDataStream promotion status ===")
 status_output = io.StringIO()
 with (
