@@ -8,6 +8,7 @@ Status: **candidate-only / report-only**. This note compares current repo parser
 |---|---|
 | Load routine anchor | `ghidra-function-site-survey --ghidra-target nidatastream-loadbinary` |
 | Descriptor/helper anchors | `nidatastream-descriptor-helper`, `nidatastream-descriptor-builder-1770`, `nidatastream-descriptor-builder-17c0` |
+| Descriptor-table sampled entries | `nidatastream-descriptor-table-sample`; schema `docs/schemas/ghidra-descriptor-table-sample-v1.schema.json` |
 | Semantic adapter anchor | `ghidra-function-site-survey --ghidra-target nidatastream-semantic-adapter` |
 | Parser-side comparison reports | `nidatastream-layout`, `inventory-nif-stream-bodies`, `inventory-nif-mesh-bindings` |
 
@@ -21,7 +22,7 @@ All Ghidra reports/summaries are ignored local evidence under `Exports/ghidra-re
 | Payload prefix | Load path evidence supports payload beginning before the old legacy body offset | `PayloadPrefixBytes`, `GhidraStyleLayoutValid` | Sidecar/report-only |
 | Legacy payload offset | Historical parser consumed the body after the older offset | `LegacyPayloadOffset`, `LegacyOffsetMinusPayloadPrefixBytes` | Still preserved for backward compatibility |
 | Trailing flag | Ghidra-aligned layout leaves a 1-byte trailer after declared payload | `PayloadTrailerBytes`, `TrailingFlag` | Sidecar/report-only |
-| Descriptor static lookup table | Descriptor helper/builders use a candidate 12-byte static table stride with offsets 0/4/8 for special flag, component/class, and format-size lookup evidence | `CandidateFieldMap` in `nidatastream-descriptor-proof-status` and `nidatastream-descriptor-sample-compare` | Candidate-only; stream descriptor record bytes are not mapped to parser/export fields |
+| Descriptor static lookup table | Descriptor helper/builders use a candidate 12-byte static table stride with offsets 0/4/8 for special flag, component/class, and format-size lookup evidence; the indexed table sampler can read computed entries for observed descriptor byte-0 values | `CandidateFieldMap` in `nidatastream-descriptor-proof-status` and `nidatastream-descriptor-sample-compare`; `nidatastream-descriptor-table-sample` | Candidate-only; first retained-project indexed sample produced 15 readable rows and 0 nonzero rows, so stream descriptor record bytes are not mapped to parser/export fields |
 | Stream descriptor record bytes | Copied/extracted samples expose first descriptor record byte distributions, a per-pattern matrix, and copied-sample context correlation against first pair record bytes plus usage/access/type names; Ghidra LoadBinary/helper evidence maps byte 0 as the candidate static-table index while current byte-role classification keeps variable bytes 1-2 unmapped and treats byte 3 as a uniform-zero padding/reserved candidate | `DescriptorRecordByteSummary`, `DescriptorRecordIndexProof`, `DescriptorRecordByteRoleCandidates`, `DescriptorRecordPatternMatrix`, and `DescriptorSampleContextCorrelation` in `nidatastream-descriptor-sample-compare` | Candidate-only; partial index/padding/pattern/context proof only |
 | Helper argument byte usage | Tracked descriptor helper/builders gate negative signed descriptor values, then mask the helper argument with `param_1 & 0xff`; current proof reports bytes 1-2 as not affecting tracked helper table lookup and byte 3 as sign-guard-only | `DescriptorHelperArgumentUseProof` in `nidatastream-descriptor-proof-status` and `nidatastream-descriptor-sample-compare` | Candidate-only; bytes 1-2 still unmapped for parser/export semantics |
 | Descriptor semantic feasibility | Static descriptor-table offsets are compared against observed stream descriptor-record byte offsets, the byte-0 index proof, and byte-role candidates, but remaining variable bytes and parser/export semantics stay blocked | `DescriptorSemanticFeasibility` in `nidatastream-descriptor-sample-compare` | Candidate-only; semantic mapping remains false and parser/export promotion remains locked |
@@ -39,6 +40,7 @@ Do not change decoder/export behavior until every required gate for the target f
 | Descriptor field order | Descriptor helper/builders prove count/order/format/component fields strongly enough to map bytes, not just names | `nidatastream-descriptor-proof-status --list-json`; descriptor builder targets | 🟨 Candidate-only; local status checks 4 descriptor helper/builders and exposes static table offsets, but stream record semantics remain unmapped |
 | Sample-byte agreement | Copied/extracted NIF samples agree with the proposed Ghidra-aligned prefix/payload/trailer interpretation | `nidatastream-layout --root Extracted --full`; schema `docs/schemas/nidatastream-layout-report-v1.schema.json` | 🟨 Local ignored report currently shows 184/184 Ghidra-style-valid blocks; still report-only |
 | Descriptor/sample compare | Descriptor-helper readiness, sample corpus metadata, copied-sample byte counters, candidate descriptor byte-order offsets, first descriptor-record byte distributions, record byte-0 index proof, helper argument-use proof, byte-role candidates, per-pattern matrix rows, copied-sample context correlation with a review queue, and static-vs-stream semantic feasibility are joined in one machine-readable report | `nidatastream-descriptor-sample-compare`; schema `docs/schemas/nidatastream-descriptor-sample-compare-v1.schema.json` | 🟨 Report-only; local compare currently shows descriptor/sample ready with 6/6 byte-counter checks and 7/7 byte-order checks, 5 descriptor pattern rows, sample-context correlation/review rows over copied samples, and tracked helpers not using bytes 1-2 for helper lookup, but variable descriptor bytes 1-2 remain unmapped for parser/export semantics, semantic mapping remains false, `FieldOrderPromoted=false`, and parser/export promotion locked |
+| Descriptor-table indexed samples | Computed candidate static-table entries for observed byte-0 descriptor indices explain stream descriptor bytes or fail closed as blocker evidence | `nidatastream-descriptor-table-sample`; schema `docs/schemas/ghidra-descriptor-table-sample-v1.schema.json` | 🟨 Report-only; command is wired and schema-backed, but current retained-project sample has 15 readable rows and 0 nonzero rows for observed indices, so it does not justify parser/export promotion |
 | Pairing impact | A field interpretation change creates complete position+normal+UV evidence without promoting noise/sentinels | `ghidra-attribute-candidate-report`; `ghidra-attribute-candidate-guard`; summarized by `nidatastream-promotion-status --list-json` | 🟨 Local ignored report has 0 complete position+normal+UV Ghidra-only groups across 14 groups; still candidate-only |
 | Export isolation | Ghidra evidence is not consumed by decode/export paths | `ghidra-workflow-guard-suite`; `ghidra-pairing-non-export-guard` | ✅ Guarded |
 | Narrow parser patch | Any future parser change is isolated to the smallest field-read surface and has regression tests before exporter use | Future C#/Python tests | 🟥 Not started |
@@ -50,6 +52,7 @@ python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
+python scripts/rift_workflow.py nidatastream-descriptor-table-sample
 ```
 
 ## Current decision
@@ -62,7 +65,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 
 1. Do descriptor-helper targets prove a field count/order that the C# parser is currently missing?
 2. Can the byte-order/context-correlation proof be expanded from structural offsets/record bytes into exact descriptor semantics before any exporter uses it?
-3. Do refreshed FunctionSiteSurvey descriptor-helper reports with `dataRefByteSamples` expose static table bytes that explain descriptor record bytes 1-2?
+3. Can the indexed descriptor-table sampler be joined into descriptor/sample compare as a durable fail-closed blocker while alternate table-base interpretations are investigated?
 4. Does any current Ghidra-only mesh candidate become a complete position/normal/UV group after a field interpretation change?
 
 Until those are answered with tests and guards, parser/export behavior remains unchanged.

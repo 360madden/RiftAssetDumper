@@ -54,10 +54,12 @@ For a first full import/analysis, use a much larger timeout such as `--ghidra-ti
 python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/nidatastream_loadbinary.json --ghidra-summary-term NiDataStream --ghidra-summary-term LoadBinary --ghidra-summary-out Exports/ghidra-reports/nidatastream_loadbinary.md
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
+python scripts/rift_workflow.py nidatastream-descriptor-table-sample
 ```
 
 Descriptor status is still candidate-only. `FieldOrderPromoted` must remain false until a separate promotion patch proves otherwise.
 The descriptor/sample compare command writes ignored JSON/Markdown under `Exports/` and checks descriptor-helper readiness against the copied-sample byte-counter evidence without changing parser/export behavior.
+The descriptor-table sample command prints a plan by default; use `--list-json` for machine-readable planning and `--ghidra-execute` only when intentionally refreshing ignored `Exports/ghidra-reports/nidatastream_descriptor_table_samples.*` evidence. Current sampled candidate table rows are readable but zero, so they are blocker evidence rather than promotion proof.
 
 ## 5. Refresh local sample-byte evidence only when needed
 

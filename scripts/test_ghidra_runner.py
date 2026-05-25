@@ -309,6 +309,133 @@ with TemporaryDirectory() as temp_dir:
     check("function survey summary output", captured_summary["output_path"], str(summary_file))
     check("function survey terms", captured_summary["terms"], ["NiDataStream", "LoadBinary"])
 
+print("=== rift_workflow NiDataStream descriptor table sampler routing ===")
+descriptor_sample_schema = json.loads(
+    Path("docs/schemas/ghidra-descriptor-table-sample-v1.schema.json").read_text(encoding="utf-8")
+)
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    report_file = temp_path / "reports" / "descriptor-table.json"
+    summary_file = temp_path / "reports" / "descriptor-table.md"
+    project_dir = temp_path / "projects"
+    list_output = io.StringIO()
+    list_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-table-sample",
+        "--descriptor-index",
+        "37,36",
+        "--descriptor-table-report",
+        str(report_file),
+        "--descriptor-table-summary",
+        str(summary_file),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", list_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(list_output),
+    ):
+        rift_workflow.main()
+    sample_plan = parse_json_object(list_output.getvalue())
+    check("descriptor table sample plan schema", sample_plan["SchemaVersion"], "nidatastream-descriptor-table-sample-plan/v1")
+    check("descriptor table sample plan index count", sample_plan["IndexCount"], 2)
+    check("descriptor table sample first index value", sample_plan["Indices"][0]["Value"], 55)
+    check("descriptor table sample second index value", sample_plan["Indices"][1]["Value"], 54)
+    check("descriptor table sample plan field count", sample_plan["FieldCount"], 3)
+    check("descriptor table sample plan rows", sample_plan["PlannedRowCount"], 6)
+    check("descriptor table sample plan candidate-only", sample_plan["CandidateOnly"], True)
+
+    blocked_output = io.StringIO()
+    blocked_argv = [
+        *list_argv[:-1],
+        "--descriptor-table-byte-count",
+        "65",
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", blocked_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(blocked_output),
+    ):
+        rift_workflow.main()
+    blocked_plan = parse_json_object(blocked_output.getvalue())
+    check_contains(
+        "descriptor table sample byte-count blocker",
+        ",".join(blocked_plan["Blockers"]),
+        "descriptor-table-sample-byte-count-too-large",
+    )
+
+    dry_run_output = io.StringIO()
+    dry_run_argv = list_argv[:-1]
+    with (
+        patch.object(sys, "argv", dry_run_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(dry_run_output),
+    ):
+        rift_workflow.main()
+    check_contains("descriptor table sample dry-run title", dry_run_output.getvalue(), "NiDataStreamDescriptorTableSample")
+    check_contains("descriptor table sample dry-run command", dry_run_output.getvalue(), "DescriptorTableSampler.java")
+
+    captured_sample: dict[str, Any] = {}
+
+    def fake_descriptor_table_run(**kwargs: Any) -> subprocess.CompletedProcess[str]:
+        captured_sample.update(kwargs)
+        output_path = Path(kwargs["script_args"][0])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "ghidra-descriptor-table-sample/v1",
+                    "CandidateOnly": True,
+                    "FieldOrderPromoted": False,
+                    "ParserExportPromotionAllowed": False,
+                    "programName": "rift_x64.exe",
+                    "imageBase": "140000000",
+                    "strideBytes": 12,
+                    "byteCountRequested": 4,
+                    "indexCount": 2,
+                    "fieldCount": 3,
+                    "rowCount": 1,
+                    "rows": [
+                        {
+                            "field": "descriptor-component-class",
+                            "baseAddress": "143358be4",
+                            "staticTableOffsetBytes": 4,
+                            "index": 55,
+                            "indexHex": "37",
+                            "strideBytes": 12,
+                            "byteCountRequested": 4,
+                            "computedAddress": "143358e78",
+                            "byteCountRead": 4,
+                            "bytes": "01 02 03 04",
+                        }
+                    ],
+                    "interpretation": "candidate-only test fixture",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+
+    execute_argv = dry_run_argv + ["--ghidra-project-dir", str(project_dir), "--ghidra-execute"]
+    with (
+        patch.object(sys, "argv", execute_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.ghidra_runner.run_ghidra_headless", side_effect=fake_descriptor_table_run),
+    ):
+        rift_workflow.main()
+
+    descriptor_report = json.loads(report_file.read_text(encoding="utf-8"))
+    jsonschema.validate(descriptor_report, descriptor_sample_schema)
+    print("  PASS: descriptor table sample report schema validation")
+    check("descriptor table sample script", captured_sample["script"], "scripts/ghidra/DescriptorTableSampler.java")
+    check("descriptor table sample args report", captured_sample["script_args"][0], str(report_file))
+    check("descriptor table sample first index arg", captured_sample["script_args"][3], "0x37")
+    check("descriptor table sample second index arg", captured_sample["script_args"][4], "0x36")
+    check("descriptor table sample no-analysis", captured_sample["analyze"], False)
+    check("descriptor table sample keeps project", captured_sample["delete_project"], False)
+    check("descriptor table sample markdown written", summary_file.exists(), True)
+
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     bad_targets_file = temp_path / "bad-targets.json"

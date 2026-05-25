@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/ghidra-descriptor-table-sample-v1.schema.json",
+  "title": "Ghidra descriptor table byte sample report",
+  "description": "Candidate-only indexed descriptor table byte samples from Ghidra. These reports are static-analysis sidecar evidence only and must stay out of parser/export behavior until promoted by separate proof guards.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "FieldOrderPromoted",
+    "ParserExportPromotionAllowed",
+    "programName",
+    "imageBase",
+    "strideBytes",
+    "byteCountRequested",
+    "indexCount",
+    "fieldCount",
+    "rowCount",
+    "rows",
+    "interpretation"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-descriptor-table-sample/v1" },
+    "CandidateOnly": { "const": true },
+    "FieldOrderPromoted": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "programName": { "type": "string" },
+    "imageBase": { "type": "string" },
+    "strideBytes": { "type": "integer", "minimum": 1 },
+    "byteCountRequested": { "type": "integer", "minimum": 1 },
+    "indexCount": { "type": "integer", "minimum": 0 },
+    "fieldCount": { "type": "integer", "minimum": 0 },
+    "rowCount": { "type": "integer", "minimum": 0 },
+    "rows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sampleRow" }
+    },
+    "interpretation": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sampleRow": {
+      "type": "object",
+      "required": [
+        "field",
+        "baseAddress",
+        "staticTableOffsetBytes",
+        "index",
+        "indexHex",
+        "strideBytes",
+        "byteCountRequested",
+        "computedAddress",
+        "byteCountRead",
+        "bytes"
+      ],
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "baseAddress": { "type": "string", "pattern": "^[0-9a-fA-F]+$" },
+        "staticTableOffsetBytes": { "type": "integer", "minimum": 0 },
+        "index": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "indexHex": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
+        "strideBytes": { "type": "integer", "minimum": 1 },
+        "byteCountRequested": { "type": "integer", "minimum": 1 },
+        "computedAddress": { "type": "string" },
+        "byteCountRead": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "string" },
+        "error": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

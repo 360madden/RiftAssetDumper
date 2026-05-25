@@ -52,6 +52,7 @@ Commands (kebab-case):
     ghidra-function-site-target-guard — validate tracked FunctionSiteSurvey target safety
     ghidra-function-site-status  — show ignored report/summary status for FunctionSiteSurvey targets
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
+    nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-evidence-status — list ignored local NiDataStream/Ghidra evidence artifact timestamps
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
@@ -314,6 +315,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-table-sample": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-summarize": {
         "dotnet": "",
         "base": "",
@@ -406,6 +411,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteTargetGuard": "ghidra-function-site-target-guard",
     "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
+    "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
@@ -4281,6 +4287,309 @@ def _run_ghidra_function_site_survey(args: argparse.Namespace) -> None:
         print(f"Wrote Ghidra summary: {summary_path}")
 
 
+def _parse_descriptor_index_token(token: str) -> int:
+    """Parse a descriptor-table index token as one byte, favoring hex notation."""
+    text = token.strip().lower().removeprefix("0x")
+    if not text:
+        raise ValueError("empty descriptor index")
+    try:
+        value = int(text, 16)
+    except ValueError as exc:
+        raise ValueError(f"invalid descriptor index {token!r}") from exc
+    if value < 0 or value > 0xFF:
+        raise ValueError(f"descriptor index out of byte range: {token!r}")
+    return value
+
+
+def _descriptor_table_field_specs() -> list[dict[str, Any]]:
+    """Return static descriptor-table field specs from the candidate field map."""
+    fields = []
+    for field in DESCRIPTOR_CANDIDATE_FIELD_MAP:
+        data_address = field.get("DataAddress")
+        offset = field.get("StaticTableOffsetBytes")
+        stride = field.get("StaticTableStrideBytes")
+        if not isinstance(data_address, str) or not isinstance(offset, int) or not isinstance(stride, int):
+            continue
+        fields.append(
+            {
+                "Field": str(field.get("Field", "")),
+                "DataAddress": data_address.lower().removeprefix("0x"),
+                "StaticTableOffsetBytes": offset,
+                "StaticTableStrideBytes": stride,
+            }
+        )
+    return sorted(fields, key=lambda row: int(row["StaticTableOffsetBytes"]))
+
+
+def _descriptor_table_indices_from_args(args: argparse.Namespace) -> list[int]:
+    """Return explicitly supplied descriptor indices, preserving first occurrence order."""
+    seen: set[int] = set()
+    indices = []
+    for token in args.descriptor_index or []:
+        for part in str(token).split(","):
+            if not part.strip():
+                continue
+            value = _parse_descriptor_index_token(part)
+            if value not in seen:
+                seen.add(value)
+                indices.append(value)
+    return indices
+
+
+def _descriptor_table_indices_from_samples(args: argparse.Namespace) -> list[int]:
+    """Derive descriptor indices from current descriptor/sample evidence."""
+    try:
+        compare = _nidatastream_descriptor_sample_compare_payload(args)
+    except Exception:
+        return []
+    matrix = compare.get("DescriptorRecordPatternMatrix")
+    rows = matrix.get("Rows") if isinstance(matrix, dict) else None
+    if not isinstance(rows, list):
+        return []
+    seen: set[int] = set()
+    indices = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        candidate = row.get("CandidateIndexByte")
+        if not isinstance(candidate, dict):
+            continue
+        value_hex = candidate.get("ValueHex")
+        if not isinstance(value_hex, str):
+            continue
+        try:
+            value = _parse_descriptor_index_token(value_hex)
+        except ValueError:
+            continue
+        if value not in seen:
+            seen.add(value)
+            indices.append(value)
+    return indices
+
+
+def _descriptor_table_sample_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Return default/overridden descriptor table sample report paths."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = (
+        Path(args.descriptor_table_report)
+        if args.descriptor_table_report
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.json"
+    )
+    markdown_path = (
+        Path(args.descriptor_table_summary)
+        if args.descriptor_table_summary
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.md"
+    )
+    return report_path, markdown_path
+
+
+def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a candidate-only plan for indexed descriptor-table sampling."""
+    fields = _descriptor_table_field_specs()
+    explicit_indices = _descriptor_table_indices_from_args(args)
+    indices = explicit_indices if explicit_indices else _descriptor_table_indices_from_samples(args)
+    stride_values = {int(field["StaticTableStrideBytes"]) for field in fields}
+    stride_bytes = sorted(stride_values)[0] if len(stride_values) == 1 else 0
+    byte_count = int(args.descriptor_table_byte_count)
+    report_path, markdown_path = _descriptor_table_sample_paths(args)
+    blockers = []
+    if not fields:
+        blockers.append("descriptor-table-sample-fields-missing")
+    if not indices:
+        blockers.append("descriptor-table-sample-indices-missing")
+    if stride_bytes <= 0:
+        blockers.append("descriptor-table-sample-stride-ambiguous")
+    if byte_count <= 0:
+        blockers.append("descriptor-table-sample-byte-count-invalid")
+    if byte_count > 64:
+        blockers.append("descriptor-table-sample-byte-count-too-large")
+    rows = []
+    for field in fields:
+        base_value = int(str(field["DataAddress"]), 16)
+        for index in indices:
+            rows.append(
+                {
+                    "Field": field["Field"],
+                    "BaseAddress": field["DataAddress"],
+                    "StaticTableOffsetBytes": field["StaticTableOffsetBytes"],
+                    "Index": index,
+                    "IndexHex": f"{index:02x}",
+                    "StrideBytes": stride_bytes,
+                    "ComputedAddress": f"{base_value + index * stride_bytes:x}" if stride_bytes > 0 else "",
+                }
+            )
+    field_args = [
+        f"{field['Field']}:{field['DataAddress']}:{field['StaticTableOffsetBytes']}"
+        for field in fields
+    ]
+    script = args.ghidra_script or "scripts/ghidra/DescriptorTableSampler.java"
+    project_name = args.ghidra_project_name if args.ghidra_project_name != "TempProject" else "RiftAnchorSurvey"
+    process_path = args.ghidra_process or "rift_x64.exe"
+    return {
+        "SchemaVersion": "nidatastream-descriptor-table-sample-plan/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "ReportPath": str(report_path),
+        "MarkdownPath": str(markdown_path),
+        "Script": script,
+        "ProjectName": project_name,
+        "Process": process_path,
+        "StrideBytes": stride_bytes,
+        "ByteCountRequested": byte_count,
+        "IndexCount": len(indices),
+        "Indices": [{"Value": index, "ValueHex": f"{index:02x}"} for index in indices],
+        "FieldCount": len(fields),
+        "Fields": fields,
+        "PlannedRowCount": len(rows),
+        "PlannedRows": rows,
+        "ScriptArgs": [
+            str(report_path),
+            str(stride_bytes),
+            str(byte_count),
+            *[f"0x{index:02x}" for index in indices],
+            *field_args,
+        ],
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Candidate-only dry-run plan for sampling computed descriptor-table entries. "
+            "Rows are static Ghidra evidence only and must not change parser/export behavior."
+        ),
+    }
+
+
+def _descriptor_table_sample_markdown(report: dict[str, Any]) -> str:
+    """Render a compact Markdown summary for a Ghidra descriptor table sample report."""
+    rows = report.get("rows") if isinstance(report.get("rows"), list) else []
+    lines = [
+        "# Ghidra descriptor table sample",
+        "",
+        f"- Candidate-only: **{str(report.get('CandidateOnly')).lower()}**",
+        f"- Parser/export promotion allowed: **{str(report.get('ParserExportPromotionAllowed')).lower()}**",
+        f"- Program: **{format_markdown_cell(report.get('programName'))}**",
+        f"- Stride bytes: **{format_markdown_cell(report.get('strideBytes'))}**",
+        f"- Byte count requested: **{format_markdown_cell(report.get('byteCountRequested'))}**",
+        f"- Rows: **{format_markdown_cell(report.get('rowCount'))}**",
+        "",
+        "| Field | Index | Computed address | Bytes read | Bytes | Error |",
+        "|---|---:|---|---:|---|---|",
+    ]
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row.get("field")),
+                    format_markdown_cell(row.get("indexHex")),
+                    format_markdown_cell(row.get("computedAddress")),
+                    format_markdown_cell(row.get("byteCountRead")),
+                    format_markdown_cell(row.get("bytes")),
+                    format_markdown_cell(row.get("error", "")),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Interpretation guard",
+            "",
+            format_markdown_cell(report.get("interpretation")),
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _print_descriptor_table_sample_plan(plan: dict[str, Any]) -> None:
+    """Print a human-readable indexed descriptor-table sample dry-run."""
+    print("--- NiDataStreamDescriptorTableSample")
+    print(f"Report: {plan['ReportPath']}")
+    print(f"Markdown: {plan['MarkdownPath']}")
+    print(f"Script: {plan['Script']}")
+    print(f"Indices: {', '.join(row['ValueHex'] for row in plan['Indices']) or '-'}")
+    print(f"Fields: {plan['FieldCount']}")
+    print(f"Planned rows: {plan['PlannedRowCount']}")
+    if plan["Blockers"]:
+        print(f"Blockers: {', '.join(plan['Blockers'])}")
+    run_command = [
+        "python",
+        "scripts/rift_workflow.py",
+        "ghidra-run",
+        "--ghidra-project-name",
+        str(plan["ProjectName"]),
+        "--ghidra-process",
+        str(plan["Process"]),
+        "--ghidra-timeout",
+        "900",
+        "--ghidra-script",
+        str(plan["Script"]),
+    ]
+    for value in plan["ScriptArgs"]:
+        run_command += ["--ghidra-script-arg", str(value)]
+    run_command += ["--ghidra-no-analysis", "--ghidra-keep-project"]
+    print("\nRun command:")
+    print(" ".join(run_command))
+
+
+def _run_nidatastream_descriptor_table_sample(args: argparse.Namespace) -> None:
+    """Run or print a candidate-only indexed descriptor-table sampling workflow."""
+    plan = _descriptor_table_sample_plan(args)
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    _print_descriptor_table_sample_plan(plan)
+    if plan["Blockers"]:
+        print("NiDataStreamDescriptorTableSample blocked before Ghidra execution.")
+        if args.ghidra_execute:
+            sys.exit(1)
+        print("Dry-run only. Resolve blockers before adding --ghidra-execute.")
+        return
+    if not args.ghidra_execute:
+        print("\nDry-run only. Add --ghidra-execute to run this indexed sampler.")
+        return
+
+    from scripts.ghidra_runner import run_ghidra_headless
+
+    report_path = Path(plan["ReportPath"])
+    markdown_path = Path(plan["MarkdownPath"])
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    result = run_ghidra_headless(
+        project_dir=_ghidra_project_dir_arg(args),
+        project_name=str(plan["ProjectName"]),
+        process_path=str(plan["Process"]),
+        script=str(plan["Script"]),
+        script_args=[str(value) for value in plan["ScriptArgs"]],
+        analyze=False,
+        delete_project=False,
+        timeout_seconds=args.ghidra_timeout,
+    )
+    _print_ghidra_result(result)
+    report = load_json_report(str(report_path))
+    if not report.get("CandidateOnly") or report.get("ParserExportPromotionAllowed"):
+        print("ERROR: descriptor table sample report is not candidate-only/promoted-false.", file=sys.stderr)
+        sys.exit(1)
+    markdown_path.write_text(_descriptor_table_sample_markdown(report), encoding="utf-8")
+    row_count = _json_int_or_none(report.get("rowCount")) or 0
+    nonzero_rows = 0
+    for row in report.get("rows", []):
+        if not isinstance(row, dict):
+            continue
+        bytes_text = str(row.get("bytes", ""))
+        parsed = _parse_hex_byte_record(bytes_text)
+        if parsed and any(byte != 0 for byte in parsed):
+            nonzero_rows += 1
+    print(f"NiDataStreamDescriptorTableSample rows: {row_count}; nonzero rows: {nonzero_rows}")
+    print(f"NiDataStreamDescriptorTableSample JSON: {report_path}")
+    print(f"NiDataStreamDescriptorTableSample markdown: {markdown_path}")
+    print("NiDataStreamDescriptorTableSample passed: report remains candidate-only/report-only.")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -4392,6 +4701,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "ghidra-function-site-survey":
         _run_ghidra_function_site_survey(args)
+        return
+
+    if command == "nidatastream-descriptor-table-sample":
+        _run_nidatastream_descriptor_table_sample(args)
         return
 
     if command == "ghidra-summarize":
@@ -6005,6 +6318,28 @@ Examples:
         default=12,
         help="Max decompile matches for ghidra-summarize (default: 12)",
     )
+    parser.add_argument(
+        "--descriptor-index",
+        action="append",
+        default=[],
+        help="Descriptor table index to sample as hex (for example 37 or 0x37); repeatable or comma-separated",
+    )
+    parser.add_argument(
+        "--descriptor-table-byte-count",
+        type=int,
+        default=4,
+        help="Bytes to read for each indexed descriptor table field (default: 4)",
+    )
+    parser.add_argument(
+        "--descriptor-table-report",
+        default="",
+        help="Optional JSON output path for nidatastream-descriptor-table-sample",
+    )
+    parser.add_argument(
+        "--descriptor-table-summary",
+        default="",
+        help="Optional Markdown output path for nidatastream-descriptor-table-sample",
+    )
 
     args = parser.parse_args()
 
@@ -6019,13 +6354,14 @@ Examples:
         "nidatastream-promotion-status",
         "nidatastream-descriptor-proof-status",
         "nidatastream-descriptor-sample-compare",
+        "nidatastream-descriptor-table-sample",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
-            "and nidatastream-descriptor-sample-compare.",
+            "nidatastream-descriptor-sample-compare, and nidatastream-descriptor-table-sample.",
             file=sys.stderr,
         )
         sys.exit(1)

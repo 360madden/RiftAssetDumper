@@ -40,6 +40,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "NiDataStreamParserExportNonConsumptionGuard": "nidatastream-parser-export-non-consumption-guard",
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
     "NiDataStreamDescriptorSampleCompare": "nidatastream-descriptor-sample-compare",
+    "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
 }
 
 
