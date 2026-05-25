@@ -49,6 +49,8 @@ Commands (kebab-case):
     tools-status                 — show configured third-party reverse-engineering tools
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
+    ghidra-function-site-target-guard — validate tracked FunctionSiteSurvey target safety
+    ghidra-function-site-status  — show ignored report/summary status for FunctionSiteSurvey targets
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-layout          — read-only NiDataStream layout report/validator
@@ -58,11 +60,13 @@ Commands (kebab-case):
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import subprocess
 import sys
-from datetime import datetime
-from pathlib import Path
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -288,6 +292,14 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "ghidra-function-site-target-guard": {
+        "dotnet": "",
+        "base": "",
+    },
+    "ghidra-function-site-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-function-site-survey": {
         "dotnet": "",
         "base": "",
@@ -349,6 +361,8 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ToolsStatus": "tools-status",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
+    "GhidraFunctionSiteTargetGuard": "ghidra-function-site-target-guard",
+    "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamLayout": "nidatastream-layout",
@@ -873,6 +887,7 @@ def _run_ghidra_workflow_guard_suite(args: argparse.Namespace) -> None:
     """Run Ghidra workflow promotion brakes together."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
     print("--- GhidraWorkflowGuardSuite")
+    _guard_ghidra_function_site_targets(_ghidra_function_site_targets_path(args))
     ghidra_pairing_non_export_guard()
     report_path = _ensure_ghidra_attribute_candidate_report(out_dir, args.limit)
     ghidra_attribute_candidate_guard(report_path)
@@ -921,6 +936,221 @@ def _load_ghidra_function_site_targets(path: Path) -> dict[str, Any]:
     return data
 
 
+def _ghidra_function_site_targets_path(args: argparse.Namespace) -> Path:
+    """Return the FunctionSiteSurvey target registry path."""
+    return Path(args.ghidra_targets_file) if args.ghidra_targets_file else REPO_ROOT / "docs" / "ghidra-function-site-targets.json"
+
+
+def _ghidra_ignored_report_path_error(value: Any, field_name: str, expected_suffix: str) -> str | None:
+    """Return an error when a registry output path can escape ignored Ghidra reports."""
+    if not isinstance(value, str) or not value.strip():
+        return f"{field_name} must be a non-empty string."
+
+    path_text = value.strip()
+    if "\\" in path_text:
+        return f"{field_name} must use forward slashes only: {path_text}"
+    if path_text.endswith("/"):
+        return f"{field_name} must name a file, not a directory: {path_text}"
+    if not path_text.startswith("Exports/ghidra-reports/"):
+        return f"{field_name} must stay under ignored Exports/ghidra-reports/: {path_text}"
+    if not path_text.endswith(expected_suffix):
+        return f"{field_name} must end with {expected_suffix}: {path_text}"
+
+    posix_path = PurePosixPath(path_text)
+    windows_path = PureWindowsPath(path_text)
+    if posix_path.is_absolute() or windows_path.is_absolute() or windows_path.drive:
+        return f"{field_name} must be repo-relative, not absolute or drive-qualified: {path_text}"
+    if any(part in {"", ".", ".."} for part in posix_path.parts):
+        return f"{field_name} must not contain empty, current-dir, or parent-dir segments: {path_text}"
+    if len(posix_path.parts) < 3:
+        return f"{field_name} must include a file name under Exports/ghidra-reports/: {path_text}"
+    return None
+
+
+def _guard_ghidra_function_site_targets(registry_path: Path, *, quiet: bool = False) -> dict[str, Any]:
+    """Fail closed when the FunctionSiteSurvey registry can write unsafe output paths."""
+    registry = _load_ghidra_function_site_targets(registry_path)
+    errors: list[str] = []
+
+    if registry.get("SchemaVersion") != "ghidra-function-site-targets/v1":
+        errors.append("registry SchemaVersion must be ghidra-function-site-targets/v1.")
+    if registry.get("CandidateOnly") is not True:
+        errors.append("registry CandidateOnly must be true.")
+
+    seen_keys: set[str] = set()
+    seen_report_paths: set[str] = set()
+    seen_summary_paths: set[str] = set()
+    targets = registry.get("Targets", [])
+    if not isinstance(targets, list) or not targets:
+        errors.append("registry Targets must be a non-empty array.")
+        targets = []
+
+    for index, target in enumerate(targets, start=1):
+        context = f"target #{index}"
+        if not isinstance(target, dict):
+            errors.append(f"{context} must be an object.")
+            continue
+
+        key = target.get("Key")
+        if not isinstance(key, str) or not key:
+            errors.append(f"{context} Key must be a non-empty string.")
+            key_text = context
+        else:
+            key_text = key
+            if key in seen_keys:
+                errors.append(f"duplicate target Key: {key}")
+            seen_keys.add(key)
+
+        address = target.get("Address")
+        if not isinstance(address, str) or not address.startswith("0x"):
+            errors.append(f"{key_text} Address must be a hex string starting with 0x.")
+
+        report_path = target.get("ReportPath")
+        report_error = _ghidra_ignored_report_path_error(report_path, f"{key_text} ReportPath", ".json")
+        if report_error:
+            errors.append(report_error)
+        elif isinstance(report_path, str):
+            if report_path in seen_report_paths:
+                errors.append(f"duplicate ReportPath: {report_path}")
+            seen_report_paths.add(report_path)
+
+        summary_path = target.get("SummaryPath")
+        summary_error = _ghidra_ignored_report_path_error(summary_path, f"{key_text} SummaryPath", ".md")
+        if summary_error:
+            errors.append(summary_error)
+        elif isinstance(summary_path, str):
+            if summary_path in seen_summary_paths:
+                errors.append(f"duplicate SummaryPath: {summary_path}")
+            seen_summary_paths.add(summary_path)
+            if summary_path == report_path:
+                errors.append(f"{key_text} SummaryPath must not equal ReportPath.")
+
+        terms = target.get("SummaryTerms")
+        if not isinstance(terms, list) or any(not isinstance(term, str) or not term for term in terms):
+            errors.append(f"{key_text} SummaryTerms must be an array of non-empty strings.")
+
+        description = target.get("Description")
+        if not isinstance(description, str) or not description:
+            errors.append(f"{key_text} Description must be a non-empty string.")
+
+    if errors:
+        details = "\n  - ".join(errors)
+        raise ValueError(f"GhidraFunctionSiteTargetGuard failed for {registry_path}:\n  - {details}")
+
+    if not quiet:
+        print("--- GhidraFunctionSiteTargetGuard")
+        print(f"Registry: {registry_path}")
+        print(f"Targets: {len(targets)}")
+        print("Candidate-only: true")
+        print("Output root: Exports/ghidra-reports/")
+        print("GhidraFunctionSiteTargetGuard passed: report/summary paths remain ignored, repo-relative, and unique.")
+    return registry
+
+
+def _run_ghidra_function_site_target_guard(args: argparse.Namespace) -> None:
+    """Validate FunctionSiteSurvey registry safety."""
+    _guard_ghidra_function_site_targets(_ghidra_function_site_targets_path(args))
+
+
+def _ghidra_function_site_target_list_payload(registry: dict[str, Any]) -> dict[str, Any]:
+    """Return a machine-readable FunctionSiteSurvey target list."""
+    targets = [target for target in registry.get("Targets", []) if isinstance(target, dict)]
+    return {
+        "SchemaVersion": "ghidra-function-site-target-list/v1",
+        "CandidateOnly": registry.get("CandidateOnly") is True,
+        "DefaultProjectName": registry.get("DefaultProjectName", ""),
+        "DefaultProcess": registry.get("DefaultProcess", ""),
+        "DefaultScript": registry.get("DefaultScript", ""),
+        "DefaultNoAnalysis": registry.get("DefaultNoAnalysis", False),
+        "DefaultKeepProject": registry.get("DefaultKeepProject", False),
+        "DefaultTimeoutSeconds": registry.get("DefaultTimeoutSeconds", 0),
+        "TargetCount": len(targets),
+        "Targets": [
+            {
+                "Key": str(target.get("Key", "")),
+                "Address": str(target.get("Address", "")),
+                "ReportPath": str(target.get("ReportPath", "")),
+                "SummaryPath": str(target.get("SummaryPath", "")),
+                "SummaryTerms": _as_string_list(target.get("SummaryTerms")),
+                "Description": str(target.get("Description", "")),
+            }
+            for target in targets
+        ],
+    }
+
+
+def _file_status_payload(path_text: str) -> dict[str, Any]:
+    """Return existence/size/mtime metadata for a repo-relative file path."""
+    path = REPO_ROOT / path_text
+    if not path.exists():
+        return {
+            "Path": path_text,
+            "Exists": False,
+            "Bytes": 0,
+            "MtimeUtc": "",
+        }
+    stat = path.stat()
+    mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC).replace(microsecond=0)
+    return {
+        "Path": path_text,
+        "Exists": True,
+        "Bytes": stat.st_size,
+        "MtimeUtc": mtime.isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _ghidra_function_site_status_payload(registry_path: Path) -> dict[str, Any]:
+    """Return report/summary existence status for all safe FunctionSiteSurvey targets."""
+    registry = _guard_ghidra_function_site_targets(registry_path, quiet=True)
+    targets = [target for target in registry.get("Targets", []) if isinstance(target, dict)]
+    status_targets = []
+    for target in targets:
+        report_path = str(target.get("ReportPath", ""))
+        summary_path = str(target.get("SummaryPath", ""))
+        report_status = _file_status_payload(report_path)
+        summary_status = _file_status_payload(summary_path)
+        status_targets.append(
+            {
+                "Key": str(target.get("Key", "")),
+                "Address": str(target.get("Address", "")),
+                "Report": report_status,
+                "Summary": summary_status,
+                "EvidenceReady": bool(report_status["Exists"]) and bool(summary_status["Exists"]),
+            }
+        )
+    return {
+        "SchemaVersion": "ghidra-function-site-status/v1",
+        "CandidateOnly": True,
+        "Registry": str(registry_path),
+        "TargetCount": len(status_targets),
+        "EvidenceReadyCount": sum(1 for item in status_targets if item["EvidenceReady"]),
+        "Targets": status_targets,
+    }
+
+
+def _run_ghidra_function_site_status(args: argparse.Namespace) -> None:
+    """Show report/summary existence status for FunctionSiteSurvey targets."""
+    status = _ghidra_function_site_status_payload(_ghidra_function_site_targets_path(args))
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+
+    print("--- GhidraFunctionSiteStatus")
+    print(f"Registry: {status['Registry']}")
+    print(f"Targets: {status['TargetCount']}")
+    print(f"Evidence-ready targets: {status['EvidenceReadyCount']}")
+    print("")
+    print(f"{'Key':38} {'Report':8} {'Summary':8} {'Bytes':>10}")
+    print(f"{'-' * 38} {'-' * 8} {'-' * 8} {'-' * 10}")
+    for target in status["Targets"]:
+        report = target["Report"]
+        summary = target["Summary"]
+        bytes_total = int(report["Bytes"]) + int(summary["Bytes"])
+        report_mark = "yes" if report["Exists"] else "no"
+        summary_mark = "yes" if summary["Exists"] else "no"
+        print(f"{target['Key']:38} {report_mark:8} {summary_mark:8} {bytes_total:10}")
+
+
 def _print_ghidra_function_site_targets(registry: dict[str, Any]) -> None:
     """Print available FunctionSiteSurvey targets."""
     print("Available Ghidra FunctionSiteSurvey targets:")
@@ -932,8 +1162,12 @@ def _print_ghidra_function_site_targets(registry: dict[str, Any]) -> None:
 
 def _run_ghidra_function_site_survey(args: argparse.Namespace) -> None:
     """Run or print a serialized Ghidra FunctionSiteSurvey target from the registry."""
-    registry_path = Path(args.ghidra_targets_file) if args.ghidra_targets_file else REPO_ROOT / "docs" / "ghidra-function-site-targets.json"
+    registry_path = _ghidra_function_site_targets_path(args)
     registry = _load_ghidra_function_site_targets(registry_path)
+    if args.list_json:
+        print(json.dumps(_ghidra_function_site_target_list_payload(registry), indent=2))
+        return
+
     target_key = str(args.ghidra_target or "")
     if not target_key:
         _print_ghidra_function_site_targets(registry)
@@ -1139,6 +1373,14 @@ def _run_command(args: argparse.Namespace) -> None:
             timeout_seconds=args.ghidra_timeout,
         )
         _print_ghidra_result(result)
+        return
+
+    if command == "ghidra-function-site-target-guard":
+        _run_ghidra_function_site_target_guard(args)
+        return
+
+    if command == "ghidra-function-site-status":
+        _run_ghidra_function_site_status(args)
         return
 
     if command == "ghidra-function-site-survey":
@@ -2477,6 +2719,8 @@ Examples:
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
+  python scripts/rift_workflow.py ghidra-function-site-target-guard
+  python scripts/rift_workflow.py ghidra-function-site-status --list-json
   python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -2619,6 +2863,11 @@ Examples:
         help="Show full dotnet output for batch commands",
     )
     parser.add_argument(
+        "--list-json",
+        action="store_true",
+        help="Print machine-readable JSON for supported listing/status commands",
+    )
+    parser.add_argument(
         "--ghidra-project-dir",
         default="",
         help=f"Ghidra project directory (default: {DEFAULT_OUT / 'ghidra-projects'})",
@@ -2720,15 +2969,29 @@ Examples:
     if args.no_smoke:
         args.full = True
 
+    list_json_commands = {"ghidra-function-site-survey", "ghidra-function-site-status"}
+    if args.list_json and args.command not in list_json_commands:
+        print(
+            "ERROR: --list-json is only supported with ghidra-function-site-survey and ghidra-function-site-status.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # --- Safety guard: always run generated_output_guard first ---
-    print("\n--- GeneratedOutputGuard (Python)")
+    if not args.list_json:
+        print("\n--- GeneratedOutputGuard (Python)")
     try:
-        generated_output_guard()
+        if args.list_json:
+            with contextlib.redirect_stdout(io.StringIO()):
+                generated_output_guard()
+        else:
+            generated_output_guard()
     except Exception as exc:
         print(f"\nGeneratedOutputGuard FAILED: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\n==> {args.command} (Python)")
+    if not args.list_json:
+        print(f"\n==> {args.command} (Python)")
 
     try:
         _run_command(args)

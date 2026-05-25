@@ -26,6 +26,8 @@ EXPECTED_GHIDRA_ALIASES = {
     "GhidraPairingReviewReport": "ghidra-pairing-review-report",
     "GhidraAttributeCandidateReport": "ghidra-attribute-candidate-report",
     "GhidraAttributeCandidateGuard": "ghidra-attribute-candidate-guard",
+    "GhidraFunctionSiteTargetGuard": "ghidra-function-site-target-guard",
+    "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "GhidraReviewRankProbes": "ghidra-review-rank-probes",
     "GhidraReviewRankProbesSummary": "ghidra-review-rank-probes-summary",

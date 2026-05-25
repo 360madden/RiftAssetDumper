@@ -40,6 +40,24 @@ def check_contains(desc: str, text: str, expected: str) -> None:
         failed += 1
 
 
+def check_raises(desc: str, fn: Any, expected_text: str) -> None:
+    global failed
+    try:
+        fn()
+        print(f"  FAIL: {desc}  no exception raised")
+        failed += 1
+    except Exception as exc:  # noqa: BLE001 - smoke-test helper checks failure text
+        if expected_text in str(exc):
+            print(f"  PASS: {desc}")
+        else:
+            print(f"  FAIL: {desc}  missing={expected_text!r} actual={exc!r}")
+            failed += 1
+
+
+def parse_json_object(text: str) -> dict[str, Any]:
+    return json.loads(text)
+
+
 print("=== Ghidra environment ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -168,6 +186,36 @@ target_schema = json.loads(Path("docs/schemas/ghidra-function-site-targets-v1.sc
 target_registry = json.loads(Path("docs/ghidra-function-site-targets.json").read_text(encoding="utf-8"))
 jsonschema.validate(target_registry, target_schema)
 check("function survey target registry schema", target_registry["SchemaVersion"], "ghidra-function-site-targets/v1")
+guarded_registry = rift_workflow._guard_ghidra_function_site_targets(Path("docs/ghidra-function-site-targets.json"))
+check("function survey target guard count", len(guarded_registry["Targets"]), len(target_registry["Targets"]))
+guard_output = io.StringIO()
+with (
+    patch.object(sys, "argv", ["rift_workflow.py", "ghidra-function-site-target-guard"]),
+    patch("scripts.rift_workflow.generated_output_guard"),
+    redirect_stdout(guard_output),
+):
+    rift_workflow.main()
+check_contains("function survey target guard command", guard_output.getvalue(), "GhidraFunctionSiteTargetGuard passed")
+list_output = io.StringIO()
+with (
+    patch.object(sys, "argv", ["rift_workflow.py", "ghidra-function-site-survey", "--list-json"]),
+    patch("scripts.rift_workflow.generated_output_guard"),
+    redirect_stdout(list_output),
+):
+    rift_workflow.main()
+list_payload = parse_json_object(list_output.getvalue())
+check("function survey list-json schema", list_payload["SchemaVersion"], "ghidra-function-site-target-list/v1")
+check("function survey list-json count", list_payload["TargetCount"], len(target_registry["Targets"]))
+status_output = io.StringIO()
+with (
+    patch.object(sys, "argv", ["rift_workflow.py", "ghidra-function-site-status", "--list-json"]),
+    patch("scripts.rift_workflow.generated_output_guard"),
+    redirect_stdout(status_output),
+):
+    rift_workflow.main()
+status_payload = parse_json_object(status_output.getvalue())
+check("function survey status schema", status_payload["SchemaVersion"], "ghidra-function-site-status/v1")
+check("function survey status count", status_payload["TargetCount"], len(target_registry["Targets"]))
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     script_file = temp_path / "FunctionSiteSurvey.java"
@@ -250,6 +298,27 @@ with TemporaryDirectory() as temp_dir:
     check("function survey summary input", captured_summary["input_path"], str(report_file))
     check("function survey summary output", captured_summary["output_path"], str(summary_file))
     check("function survey terms", captured_summary["terms"], ["NiDataStream", "LoadBinary"])
+
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    bad_targets_file = temp_path / "bad-targets.json"
+    bad_registry = dict(target_registry)
+    bad_registry["Targets"] = [
+        {
+            "Key": "unsafe-target",
+            "Address": "0x141186980",
+            "ReportPath": "Exports/ghidra-reports/../unsafe.json",
+            "SummaryPath": "Exports/ghidra-reports/unsafe.md",
+            "SummaryTerms": ["NiDataStream"],
+            "Description": "unsafe path target",
+        }
+    ]
+    bad_targets_file.write_text(json.dumps(bad_registry), encoding="utf-8")
+    check_raises(
+        "function survey target guard rejects parent traversal",
+        lambda: rift_workflow._guard_ghidra_function_site_targets(bad_targets_file),
+        "parent-dir",
+    )
 
 print(f"\n{'=' * 50}")
 if failed:
