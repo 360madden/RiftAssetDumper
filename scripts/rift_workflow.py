@@ -2225,6 +2225,32 @@ def _ghidra_attribute_candidate_report_status(args: argparse.Namespace) -> dict[
     return status
 
 
+def _nidatastream_descriptor_field_map_status(descriptor_status: dict[str, Any]) -> dict[str, Any]:
+    """Summarize candidate descriptor field-map promotion readiness for dashboard/status output."""
+    field_map_value = descriptor_status.get("CandidateFieldMap")
+    field_map = [field for field in field_map_value if isinstance(field, dict)] if isinstance(field_map_value, list) else []
+    candidate_only_count = sum(1 for field in field_map if field.get("PromotionStatus") == "candidate-only")
+    static_offset_count = sum(1 for field in field_map if "StaticTableOffsetBytes" in field)
+    stream_mapped_count = sum(
+        1
+        for field in field_map
+        if field.get("StreamDescriptorRecordStatus") not in (None, "", "not-mapped-to-parser-field")
+    )
+    stride_values = {
+        field.get("StaticTableStrideBytes")
+        for field in field_map
+        if isinstance(field.get("StaticTableStrideBytes"), int)
+    }
+    return {
+        "FieldMapCount": len(field_map),
+        "CandidateOnlyEntryCount": candidate_only_count,
+        "StaticTableOffsetCount": static_offset_count,
+        "StaticTableStrideBytes": next(iter(stride_values)) if len(stride_values) == 1 else None,
+        "StreamDescriptorRecordMappedCount": stream_mapped_count,
+        "StreamDescriptorRecordMapped": stream_mapped_count > 0,
+    }
+
+
 def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return the current post-Stage-18 NiDataStream parser/export promotion gate state."""
     registry_path = _ghidra_function_site_targets_path(args)
@@ -2237,11 +2263,14 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         f"{ready_count}/{target_count} FunctionSiteSurvey targets have ignored local JSON reports and Markdown summaries."
     )
     descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
+    field_map_status = _nidatastream_descriptor_field_map_status(descriptor_status)
     descriptor_ready = bool(descriptor_status["AllRequiredEvidenceReady"])
     descriptor_state = "candidate" if descriptor_ready else "blocked"
     descriptor_evidence = (
         f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']} descriptor helper "
-        "reports satisfy call/data-ref/decompile-term evidence; field order remains candidate-only."
+        "reports satisfy call/data-ref/decompile-term evidence; "
+        f"static field-map entries {field_map_status['CandidateOnlyEntryCount']}/{field_map_status['FieldMapCount']}; "
+        "stream descriptor record semantics remain unmapped."
     )
     layout_status = _nidatastream_layout_report_status(args)
     layout_report, layout_error = _read_nidatastream_layout_report(args)
@@ -2369,6 +2398,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "AllRequiredEvidenceReady": descriptor_status["AllRequiredEvidenceReady"],
             "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
         },
+        "DescriptorFieldMapStatus": field_map_status,
         "LayoutReportStatus": layout_status,
         "DescriptorSampleCompareStatus": {
             "SampleCorpusRoot": sample_corpus_status["Root"],
@@ -2396,6 +2426,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     """Print a human-readable NiDataStream parser-field promotion status."""
     target_status = status["FunctionSiteTargetStatus"]
     descriptor_status = status["DescriptorReportStatus"]
+    field_map_status = status["DescriptorFieldMapStatus"]
     layout_status = status["LayoutReportStatus"]
     compare_status = status["DescriptorSampleCompareStatus"]
     pairing_status = status["PairingImpactStatus"]
@@ -2409,6 +2440,11 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     print(
         "Descriptor helper evidence-ready targets: "
         f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']}"
+    )
+    print(
+        "Descriptor field map: "
+        f"candidate entries {field_map_status['CandidateOnlyEntryCount']}/{field_map_status['FieldMapCount']}; "
+        f"stream record mapped={str(field_map_status['StreamDescriptorRecordMapped']).lower()}"
     )
     layout_mark = "yes" if layout_status["Exists"] else "no"
     print(
@@ -2453,6 +2489,7 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
     """Build a compact Markdown dashboard for current NiDataStream promotion gates."""
     function_status = status["FunctionSiteTargetStatus"]
     descriptor_status = status["DescriptorReportStatus"]
+    field_map_status = status["DescriptorFieldMapStatus"]
     layout_status = status["LayoutReportStatus"]
     compare_status = status["DescriptorSampleCompareStatus"]
     pairing_status = status["PairingImpactStatus"]
@@ -2482,6 +2519,15 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor field order promoted | "
             f"{format_markdown_cell(str(descriptor_status['FieldOrderPromoted']).lower())} |"
+        ),
+        (
+            "| Descriptor candidate field-map entries | "
+            f"{format_markdown_cell(field_map_status['CandidateOnlyEntryCount'])}/"
+            f"{format_markdown_cell(field_map_status['FieldMapCount'])} |"
+        ),
+        (
+            "| Stream descriptor record mapped | "
+            f"{format_markdown_cell(str(field_map_status['StreamDescriptorRecordMapped']).lower())} |"
         ),
         (
             "| Layout Ghidra-style-valid blocks | "

@@ -11,6 +11,7 @@
     "CurrentLane",
     "FunctionSiteTargetStatus",
     "DescriptorReportStatus",
+    "DescriptorFieldMapStatus",
     "LayoutReportStatus",
     "DescriptorSampleCompareStatus",
     "PairingImpactStatus",
@@ -27,6 +28,7 @@
     "CurrentLane": { "type": "string", "minLength": 1 },
     "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
     "DescriptorReportStatus": { "$ref": "#/$defs/descriptorReportStatus" },
+    "DescriptorFieldMapStatus": { "$ref": "#/$defs/descriptorFieldMapStatus" },
     "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
     "DescriptorSampleCompareStatus": { "$ref": "#/$defs/descriptorSampleCompareStatus" },
     "PairingImpactStatus": { "$ref": "#/$defs/pairingImpactStatus" },
@@ -98,6 +100,28 @@
         "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
         "AllRequiredEvidenceReady": { "type": "boolean" },
         "FieldOrderPromoted": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "descriptorFieldMapStatus": {
+      "type": "object",
+      "required": [
+        "FieldMapCount",
+        "CandidateOnlyEntryCount",
+        "StaticTableOffsetCount",
+        "StaticTableStrideBytes",
+        "StreamDescriptorRecordMappedCount",
+        "StreamDescriptorRecordMapped"
+      ],
+      "properties": {
+        "FieldMapCount": { "type": "integer", "minimum": 0 },
+        "CandidateOnlyEntryCount": { "type": "integer", "minimum": 0 },
+        "StaticTableOffsetCount": { "type": "integer", "minimum": 0 },
+        "StaticTableStrideBytes": {
+          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+        },
+        "StreamDescriptorRecordMappedCount": { "type": "integer", "minimum": 0 },
+        "StreamDescriptorRecordMapped": { "type": "boolean" }
       },
       "additionalProperties": false
     },

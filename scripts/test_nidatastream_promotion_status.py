@@ -190,6 +190,10 @@ check("has blocking gates", status["BlockerCount"] > 0, True)
 check_contains("promotion lane", status["CurrentLane"], "post-Stage-18")
 check("descriptor report status present", "DescriptorReportStatus" in status, True)
 check("descriptor field order not promoted", status["DescriptorReportStatus"]["FieldOrderPromoted"], False)
+check("descriptor field map status present", "DescriptorFieldMapStatus" in status, True)
+check("descriptor field map entry count", status["DescriptorFieldMapStatus"]["FieldMapCount"], 4)
+check("descriptor field map static offset count", status["DescriptorFieldMapStatus"]["StaticTableOffsetCount"], 3)
+check("stream descriptor record not mapped", status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"], False)
 check("layout report status present", "LayoutReportStatus" in status, True)
 check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
 check("descriptor/sample compare status present", "DescriptorSampleCompareStatus" in status, True)
@@ -211,6 +215,9 @@ check_validation_error("promotion status rejects missing descriptor/sample compa
 string_ready_status = json.loads(json.dumps(status))
 string_ready_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"] = "true"
 check_validation_error("promotion status rejects string descriptor/sample ready flag", string_ready_status, status_schema)
+string_stream_map_status = json.loads(json.dumps(status))
+string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
+check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
 
 print("=== NiDataStream pairing impact negative fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -319,6 +326,8 @@ with TemporaryDirectory() as temp_dir:
     check_validation_error("dashboard JSON rejects non-candidate output", non_candidate_dashboard, status_schema)
     dashboard_markdown = dashboard_md.read_text(encoding="utf-8")
     check_contains("dashboard markdown title", dashboard_markdown, "# NiDataStream promotion dashboard")
+    check_contains("dashboard markdown field-map status", dashboard_markdown, "Descriptor candidate field-map entries")
+    check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
