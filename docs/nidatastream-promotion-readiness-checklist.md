@@ -13,6 +13,8 @@ Current v1 contracts intentionally lock promotion off:
 - `nidatastream-parser-field-proof-guard` passes only while promotion remains blocked.
 - `nidatastream-parser-export-non-consumption-guard` verifies decode/export-sensitive C# consumers do not read candidate NiDataStream/Ghidra body-layout fields.
 
+Before changing any promotion-critical schema, follow `docs/nidatastream-ghidra-schema-policy.md`.
+
 ## Required commands before any future parser/export patch
 
 ```powershell
