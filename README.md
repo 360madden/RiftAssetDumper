@@ -22,6 +22,8 @@ Short version: keep high/extra-high reasoning for truth, proof, schema, runtime,
 
 Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
 
+Current stage terminology: the historical geometry/export pipeline is **Stage 18 complete**. Active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**, where Ghidra evidence stays candidate-only until parser/export promotion gates are executable and green.
+
 Optionized workflow helper:
 
 ```powershell
@@ -69,6 +71,8 @@ python scripts/rift_workflow.py ghidra-function-site-target-guard
 python scripts/rift_workflow.py ghidra-function-site-survey --list-json
 python scripts/rift_workflow.py ghidra-function-site-status --list-json
 python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
+python scripts/rift_workflow.py nidatastream-promotion-status --list-json
+python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard

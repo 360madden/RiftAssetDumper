@@ -32,6 +32,8 @@ EXPECTED_GHIDRA_ALIASES = {
     "GhidraReviewRankProbes": "ghidra-review-rank-probes",
     "GhidraReviewRankProbesSummary": "ghidra-review-rank-probes-summary",
     "GhidraWorkflowGuardSuite": "ghidra-workflow-guard-suite",
+    "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
+    "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
 }
 
 

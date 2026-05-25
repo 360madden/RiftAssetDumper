@@ -2,6 +2,8 @@
 
 This repo uses a Codex-first autonomous milestone loop for safe asset-discovery work.
 
+Canonical stage label: the historical geometry/export pipeline is **Stage 18 complete**. Current active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**; do not renumber this as a new Stage 4. Treat dated stage tables in older status docs as historical unless refreshed by current git state, CI, and latest handoffs.
+
 ## Default loop
 
 1. Read `AGENTS.md`, `knowledge.md`, `docs/current-status.md`, and the newest handoff before changing direction.
@@ -90,6 +92,8 @@ python scripts/rift_workflow.py ghidra-function-site-target-guard
 python scripts/rift_workflow.py ghidra-function-site-survey --list-json
 python scripts/rift_workflow.py ghidra-function-site-status --list-json
 python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
+python scripts/rift_workflow.py nidatastream-promotion-status --list-json
+python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -110,9 +114,9 @@ Run retained-project Ghidra jobs serially. Parallel `ghidra-run` calls against t
 
 For `FunctionSiteSurvey.java` reports, use `ghidra-function-site-target-guard` to validate that tracked targets remain candidate-only and write only repo-relative ignored `Exports/ghidra-reports/` files. Use `ghidra-function-site-survey --list-json` for an agent-readable target list, `ghidra-function-site-status --list-json` to inspect which ignored reports/summaries currently exist, and `ghidra-function-site-survey --ghidra-target <key>` with targets from `docs/ghidra-function-site-targets.json` to print serialized rerun/summarize commands; the target registry schema is `docs/schemas/ghidra-function-site-targets-v1.schema.json`, and the list/status schemas are `docs/schemas/ghidra-function-site-target-list-v1.schema.json` and `docs/schemas/ghidra-function-site-status-v1.schema.json`. `--list-json` mode still runs the generated-output guard but suppresses success banners so stdout is parseable JSON. Add `--ghidra-execute` only when intentionally running one target against the retained project. Use `ghidra-summarize` to produce a small Markdown review. The generated report JSON schema is documented at `docs/schemas/ghidra-function-site-survey-v1.schema.json`; raw reports and optional summaries should stay under ignored `Exports/ghidra-reports/`.
 
-For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
+For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-promotion-status --list-json` and `nidatastream-parser-field-proof-guard` before considering decoder/export changes. The status command reports the post-Stage-18 parser/export promotion gates, and the proof guard fails closed on premature promotion while current descriptor/sample/pairing gates remain candidate-only or blocked. Use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`.
 
-For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-review-rank-probes-summary` to roll those manifests up for quick review, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. `ghidra-workflow-guard-suite` now includes the FunctionSiteSurvey target-path guard before running promotion brakes. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json`, and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
+For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-review-rank-probes-summary` to roll those manifests up for quick review, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. `ghidra-workflow-guard-suite` now includes the FunctionSiteSurvey target-path guard and `nidatastream-parser-field-proof-guard` before running the grouped attribute candidate baseline. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json`, and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
 
 ## Current Ghidra lane state
 
@@ -150,6 +154,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra NiDataStream descriptor targets registered: `docs/handoffs/2026-05-24-ghidra-nidatastream-descriptor-targets.md`
 - Ghidra NiDataStream parser-field comparison documented: `docs/handoffs/2026-05-24-ghidra-nidatastream-parser-field-comparison.md`
 - Ghidra NiDataStream parser-field promotion checklist added: `docs/handoffs/2026-05-25-ghidra-nidatastream-parser-field-checklist.md`
+- Post-Stage-18 NiDataStream promotion status/guard wired: `docs/handoffs/2026-05-25-nidatastream-promotion-status-guard.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.

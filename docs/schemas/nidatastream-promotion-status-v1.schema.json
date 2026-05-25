@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/nidatastream-promotion-status-v1.schema.json",
+  "title": "NiDataStream parser/export promotion status v1",
+  "description": "Machine-readable post-Stage-18 NiDataStream promotion gate status emitted by `python scripts/rift_workflow.py nidatastream-promotion-status --list-json`.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "HistoricalStage",
+    "CurrentLane",
+    "FunctionSiteTargetStatus",
+    "ParserExportPromotionAllowed",
+    "BlockerCount",
+    "Blockers",
+    "Gates",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-promotion-status/v1" },
+    "CandidateOnly": { "const": true },
+    "HistoricalStage": { "const": "Stage 18 complete" },
+    "CurrentLane": { "type": "string", "minLength": 1 },
+    "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "BlockerCount": { "type": "integer", "minimum": 0 },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "functionSiteTargetStatus": {
+      "type": "object",
+      "required": ["TargetCount", "EvidenceReadyCount", "EvidenceReady"],
+      "properties": {
+        "TargetCount": { "type": "integer", "minimum": 0 },
+        "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
+        "EvidenceReady": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "required": ["Key", "State", "BlocksPromotion", "RequiredProof", "Evidence", "Command"],
+      "properties": {
+        "Key": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "State": { "enum": ["pass", "candidate", "blocked"] },
+        "BlocksPromotion": { "type": "boolean" },
+        "RequiredProof": { "type": "string", "minLength": 1 },
+        "Evidence": { "type": "string", "minLength": 1 },
+        "Command": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
