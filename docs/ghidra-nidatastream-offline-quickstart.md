@@ -77,6 +77,12 @@ Current guard baseline expects zero complete Ghidra-only position+normal+UV cand
 ## 7. Run promotion brakes before any parser/export work
 
 ```powershell
+python scripts/rift_workflow.py nidatastream-promotion-preflight
+```
+
+The preflight writes the ignored dashboard, runs the current Ghidra/NiDataStream promotion guard suite, and reruns generated-output safety at the end. Expanded equivalent checks:
+
+```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-promotion-dashboard
 python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard

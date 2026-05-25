@@ -154,6 +154,32 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown title", dashboard_md.read_text(encoding="utf-8"), "# NiDataStream promotion dashboard")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
+print("=== NiDataStream promotion preflight ===")
+with TemporaryDirectory() as temp_dir:
+    preflight_output = io.StringIO()
+    preflight_calls = {"guard_suite": False, "generated_output_guard": 0}
+
+    def fake_generated_output_guard() -> None:
+        preflight_calls["generated_output_guard"] += 1
+        print("fake generated-output guard")
+
+    def fake_guard_suite(args: Any) -> None:
+        preflight_calls["guard_suite"] = True
+        print(f"fake guard suite out={args.out}")
+
+    with (
+        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-preflight", "--out", temp_dir]),
+        patch("scripts.rift_workflow.generated_output_guard", side_effect=fake_generated_output_guard),
+        patch("scripts.rift_workflow._run_ghidra_workflow_guard_suite", side_effect=fake_guard_suite),
+        redirect_stdout(preflight_output),
+    ):
+        rift_workflow.main()
+    check("preflight dashboard json written", (Path(temp_dir) / "nidatastream-promotion-dashboard.json").exists(), True)
+    check("preflight dashboard markdown written", (Path(temp_dir) / "nidatastream-promotion-dashboard.md").exists(), True)
+    check("preflight runs guard suite", preflight_calls["guard_suite"], True)
+    check("preflight runs initial and final generated-output guards", preflight_calls["generated_output_guard"], 2)
+    check_contains("preflight console", preflight_output.getvalue(), "NiDataStreamPromotionPreflight passed")
+
 print("=== NiDataStream parser-field proof guard ===")
 guard_output = io.StringIO()
 called = {"non_export": False}

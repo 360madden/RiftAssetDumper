@@ -55,6 +55,7 @@ Commands (kebab-case):
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
     nidatastream-promotion-dashboard — write compact Markdown dashboard for promotion gates
+    nidatastream-promotion-preflight — run dashboard + Ghidra/NiDataStream promotion guard suite
     nidatastream-parser-field-proof-guard — fail closed on premature NiDataStream parser/export promotion
     nidatastream-parser-export-non-consumption-guard — ensure candidate NiDataStream/Ghidra evidence stays report-only
     nidatastream-descriptor-proof-status — candidate-only descriptor helper evidence status
@@ -323,6 +324,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-promotion-preflight": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-parser-field-proof-guard": {
         "dotnet": "",
         "base": "",
@@ -394,6 +399,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
     "NiDataStreamPromotionDashboard": "nidatastream-promotion-dashboard",
+    "NiDataStreamPromotionPreflight": "nidatastream-promotion-preflight",
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
     "NiDataStreamParserExportNonConsumptionGuard": "nidatastream-parser-export-non-consumption-guard",
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
@@ -1803,15 +1809,38 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
 def _run_nidatastream_promotion_dashboard(args: argparse.Namespace) -> None:
     """Write a compact ignored Markdown/JSON dashboard for NiDataStream promotion gates."""
     status = _nidatastream_promotion_status_payload(args)
+    json_path, markdown_path = _write_nidatastream_promotion_dashboard(status, args)
+    print(f"NiDataStreamPromotionDashboard JSON: {json_path}")
+    print(f"NiDataStreamPromotionDashboard markdown: {markdown_path}")
+    print("NiDataStreamPromotionDashboard passed: dashboard remains candidate-only/report-only.")
+
+
+def _write_nidatastream_promotion_dashboard(
+    status: dict[str, Any],
+    args: argparse.Namespace,
+) -> tuple[Path, Path]:
+    """Write ignored NiDataStream promotion dashboard JSON/Markdown files."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "nidatastream-promotion-dashboard.json"
     markdown_path = out_dir / "nidatastream-promotion-dashboard.md"
     json_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
     markdown_path.write_text(_nidatastream_promotion_dashboard_markdown(status), encoding="utf-8")
-    print(f"NiDataStreamPromotionDashboard JSON: {json_path}")
-    print(f"NiDataStreamPromotionDashboard markdown: {markdown_path}")
-    print("NiDataStreamPromotionDashboard passed: dashboard remains candidate-only/report-only.")
+    return json_path, markdown_path
+
+
+def _run_nidatastream_promotion_preflight(args: argparse.Namespace) -> None:
+    """Run the practical pre-parser/export promotion brake sequence."""
+    print("--- NiDataStreamPromotionPreflight")
+    status = _nidatastream_promotion_status_payload(args)
+    _print_nidatastream_promotion_status(status)
+    json_path, markdown_path = _write_nidatastream_promotion_dashboard(status, args)
+    print(f"\nPreflight dashboard JSON: {json_path}")
+    print(f"Preflight dashboard markdown: {markdown_path}")
+    _run_ghidra_workflow_guard_suite(args)
+    print("\n--- Final GeneratedOutputGuard")
+    generated_output_guard()
+    print("NiDataStreamPromotionPreflight passed: dashboard, promotion brakes, Ghidra guard suite, and output safety passed.")
 
 
 def _run_nidatastream_parser_field_proof_guard(args: argparse.Namespace) -> None:
@@ -2099,6 +2128,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-promotion-dashboard":
         _run_nidatastream_promotion_dashboard(args)
+        return
+
+    if command == "nidatastream-promotion-preflight":
+        _run_nidatastream_promotion_preflight(args)
         return
 
     if command == "nidatastream-parser-field-proof-guard":
@@ -3427,6 +3460,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
   python scripts/rift_workflow.py nidatastream-promotion-status --list-json
   python scripts/rift_workflow.py nidatastream-promotion-dashboard
+  python scripts/rift_workflow.py nidatastream-promotion-preflight
   python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
   python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json

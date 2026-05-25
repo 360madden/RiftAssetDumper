@@ -18,6 +18,12 @@ Before changing any promotion-critical schema, follow `docs/nidatastream-ghidra-
 ## Required commands before any future parser/export patch
 
 ```powershell
+python scripts/rift_workflow.py nidatastream-promotion-preflight
+```
+
+Expanded equivalent command sequence:
+
+```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-promotion-dashboard
 python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
