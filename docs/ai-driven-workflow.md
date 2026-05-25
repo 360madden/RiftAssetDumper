@@ -79,7 +79,7 @@ Codex is the primary driver for multi-step work:
 
 Ghidra is an explicit offline static-analysis support tool, not part of the default discovery suite.
 
-Use it first for target-bound questions such as TWAD, NIF, or `NiDataStream` parser anchors. Keep generated projects under ignored `Exports/ghidra-projects/`. Treat findings as hypotheses until parser output and proof guards validate them.
+Use it first for target-bound questions such as TWAD, NIF, or `NiDataStream` parser anchors. Keep generated projects under ignored `Exports/ghidra-projects/`. Treat findings as hypotheses until parser output and proof guards validate them. For the current offline/static NiDataStream lane, start with `docs/ghidra-nidatastream-offline-quickstart.md`.
 
 Use the repo workflow surface first:
 
@@ -169,6 +169,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - CI runtime warnings documented: `docs/handoffs/2026-05-25-ci-runtime-notes.md`
 - NiDataStream parser/export non-consumption guard wired: `docs/handoffs/2026-05-25-nidatastream-parser-export-non-consumption-guard.md`
 - NiDataStream dashboard negative fixture guards added: `docs/handoffs/2026-05-25-nidatastream-dashboard-negative-fixtures.md`
+- Ghidra/NiDataStream offline quickstart documented: `docs/handoffs/2026-05-25-ghidra-nidatastream-offline-quickstart.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
