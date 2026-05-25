@@ -4687,7 +4687,16 @@ def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
     explicit_indices = _descriptor_table_indices_from_args(args)
     indices = explicit_indices if explicit_indices else _descriptor_table_indices_from_samples(args)
     stride_values = {int(field["StaticTableStrideBytes"]) for field in fields}
-    stride_bytes = sorted(stride_values)[0] if len(stride_values) == 1 else 0
+    stride_override = int(getattr(args, "descriptor_table_stride", 0) or 0)
+    if stride_override > 0:
+        stride_bytes = stride_override
+        stride_source = "override"
+    elif len(stride_values) == 1:
+        stride_bytes = sorted(stride_values)[0]
+        stride_source = "candidate-field-map"
+    else:
+        stride_bytes = 0
+        stride_source = "ambiguous-candidate-field-map"
     byte_count = int(args.descriptor_table_byte_count)
     report_path, markdown_path = _descriptor_table_sample_paths(args)
     blockers = []
@@ -4695,6 +4704,8 @@ def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("descriptor-table-sample-fields-missing")
     if not indices:
         blockers.append("descriptor-table-sample-indices-missing")
+    if stride_override < 0:
+        blockers.append("descriptor-table-sample-stride-invalid")
     if stride_bytes <= 0:
         blockers.append("descriptor-table-sample-stride-ambiguous")
     if byte_count <= 0:
@@ -4734,6 +4745,7 @@ def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
         "ProjectName": project_name,
         "Process": process_path,
         "StrideBytes": stride_bytes,
+        "StrideSource": stride_source,
         "ByteCountRequested": byte_count,
         "AllByteIndices": bool(getattr(args, "descriptor_table_all_byte_indices", False)),
         "IndexCount": len(indices),
@@ -7369,6 +7381,12 @@ Examples:
         type=int,
         default=4,
         help="Bytes to read for each indexed descriptor table field (default: 4)",
+    )
+    parser.add_argument(
+        "--descriptor-table-stride",
+        type=int,
+        default=0,
+        help="Optional candidate stride override for descriptor table sampling; 0 uses CandidateFieldMap stride",
     )
     parser.add_argument(
         "--descriptor-table-report",

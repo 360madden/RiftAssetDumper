@@ -378,6 +378,48 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor table sample all-index last", all_indices_plan["Indices"][-1]["ValueHex"], "ff")
     check("descriptor table sample all-index rows", all_indices_plan["PlannedRowCount"], 768)
 
+    stride_override_output = io.StringIO()
+    stride_override_argv = [
+        *list_argv[:-1],
+        "--descriptor-table-stride",
+        "4",
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", stride_override_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(stride_override_output),
+    ):
+        rift_workflow.main()
+    stride_override_plan = parse_json_object(stride_override_output.getvalue())
+    check("descriptor table sample stride override", stride_override_plan["StrideBytes"], 4)
+    check("descriptor table sample stride source override", stride_override_plan["StrideSource"], "override")
+    check(
+        "descriptor table sample stride override row address",
+        stride_override_plan["PlannedRows"][0]["ComputedAddress"],
+        "143358cbc",
+    )
+
+    invalid_stride_output = io.StringIO()
+    invalid_stride_argv = [
+        *list_argv[:-1],
+        "--descriptor-table-stride",
+        "-1",
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", invalid_stride_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(invalid_stride_output),
+    ):
+        rift_workflow.main()
+    invalid_stride_plan = parse_json_object(invalid_stride_output.getvalue())
+    check_contains(
+        "descriptor table sample invalid stride blocker",
+        ",".join(invalid_stride_plan["Blockers"]),
+        "descriptor-table-sample-stride-invalid",
+    )
+
     blocked_output = io.StringIO()
     blocked_argv = [
         *list_argv[:-1],
@@ -463,6 +505,7 @@ with TemporaryDirectory() as temp_dir:
     print("  PASS: descriptor table sample report schema validation")
     check("descriptor table sample script", captured_sample["script"], "scripts/ghidra/DescriptorTableSampler.java")
     check("descriptor table sample args report", captured_sample["script_args"][0], str(report_file))
+    check("descriptor table sample args stride", captured_sample["script_args"][1], "12")
     check("descriptor table sample first index arg", captured_sample["script_args"][3], "0x37")
     check("descriptor table sample second index arg", captured_sample["script_args"][4], "0x36")
     check("descriptor table sample no-analysis", captured_sample["analyze"], False)
