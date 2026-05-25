@@ -24,6 +24,8 @@ Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign st
 
 Current stage terminology: the historical geometry/export pipeline is **Stage 18 complete**. Active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**, where Ghidra evidence stays candidate-only until parser/export promotion gates are executable and green.
 
+Promotion-readiness checklist: `docs/nidatastream-promotion-readiness-checklist.md`.
+
 Optionized workflow helper:
 
 ```powershell

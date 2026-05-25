@@ -117,6 +117,8 @@ For `FunctionSiteSurvey.java` reports, use `ghidra-function-site-target-guard` t
 
 For `NiDataStream::LoadBinary()` follow-up, use `nidatastream-promotion-status --list-json`, `nidatastream-descriptor-proof-status --list-json`, and `nidatastream-parser-field-proof-guard` before considering decoder/export changes. The status command reports the post-Stage-18 parser/export promotion gates, including descriptor-helper evidence, ignored local `nidatastream-layout-report.json` sample-byte status, and ignored local `ghidra-attribute-candidate-report.json` pairing-impact status. The proof guard fails closed on premature promotion while current descriptor/sample/pairing gates remain candidate-only or blocked. Use `nidatastream-layout` before changing decoder behavior. It validates the candidate prefix/payload/trailing-flag layout across copied/extracted NIF samples and writes ignored report files under `Exports/`; the report schema is `docs/schemas/nidatastream-layout-report-v1.schema.json`.
 
+Before any future parser/export patch, read `docs/nidatastream-promotion-readiness-checklist.md`. The v1 schemas intentionally lock `ParserExportPromotionAllowed=false` and `FieldOrderPromoted=false`.
+
 For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable queue, `mesh-probe --review-rank N` for a single focused probe, `ghidra-review-rank-probes` to batch-refresh ignored `Exports/ghidra-review-rank-probes/rankNN/` folders plus per-kind `manifest-*.json`/`.md`, `ghidra-review-rank-probes-summary` to roll those manifests up for quick review, `ghidra-attribute-candidate-report` for grouped sample-mesh triage, `ghidra-attribute-candidate-guard` for the current incomplete-group proof baseline, and `ghidra-workflow-guard-suite`/`ghidra-pairing-non-export-guard` before any commit that touches Ghidra/mesh export boundaries. `ghidra-workflow-guard-suite` now includes the FunctionSiteSurvey target-path guard and `nidatastream-parser-field-proof-guard` before running the grouped attribute candidate baseline. The report schemas are `docs/schemas/ghidra-pairing-review-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-manifest-v1.schema.json`, `docs/schemas/ghidra-review-rank-probes-summary-v1.schema.json`, and `docs/schemas/ghidra-attribute-candidate-v1.schema.json`; the promotion gate is `docs/ghidra-pairing-promotion-checklist.md`.
 
 ## Current Ghidra lane state
@@ -159,6 +161,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - NiDataStream layout schema/status wired into promotion status: `docs/handoffs/2026-05-25-nidatastream-layout-schema-status.md`
 - NiDataStream descriptor proof status wired: `docs/handoffs/2026-05-25-nidatastream-descriptor-proof-status.md`
 - NiDataStream pairing-impact status wired into promotion status: `docs/handoffs/2026-05-25-nidatastream-pairing-impact-status.md`
+- NiDataStream promotion-readiness locks documented/tested: `docs/handoffs/2026-05-25-nidatastream-promotion-readiness-lock.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.
