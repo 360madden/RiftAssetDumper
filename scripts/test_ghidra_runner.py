@@ -313,6 +313,9 @@ print("=== rift_workflow NiDataStream descriptor table sampler routing ===")
 descriptor_sample_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-table-sample-v1.schema.json").read_text(encoding="utf-8")
 )
+descriptor_sample_status_schema = json.loads(
+    Path("docs/schemas/nidatastream-descriptor-table-sample-status-v1.schema.json").read_text(encoding="utf-8")
+)
 descriptor_neighborhood_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json").read_text(encoding="utf-8")
 )
@@ -511,6 +514,28 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor table sample no-analysis", captured_sample["analyze"], False)
     check("descriptor table sample keeps project", captured_sample["delete_project"], False)
     check("descriptor table sample markdown written", summary_file.exists(), True)
+
+    sample_status_output = io.StringIO()
+    sample_status_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-table-sample-status",
+        "--descriptor-table-report",
+        str(report_file),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", sample_status_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(sample_status_output),
+    ):
+        rift_workflow.main()
+    sample_status = parse_json_object(sample_status_output.getvalue())
+    jsonschema.validate(sample_status, descriptor_sample_status_schema)
+    print("  PASS: descriptor table sample status schema validation")
+    check("descriptor table sample status schema", sample_status["SchemaVersion"], "nidatastream-descriptor-table-sample-status/v1")
+    check("descriptor table sample status explicit path", sample_status["Status"]["Path"], rift_workflow._display_path(report_file))
+    check("descriptor table sample status rows", sample_status["Status"]["RowCount"], 1)
+    check("descriptor table sample status nonzero rows", sample_status["Status"]["NonzeroRowCount"], 1)
 
 print("=== rift_workflow NiDataStream descriptor neighborhood scan routing ===")
 with TemporaryDirectory() as temp_dir:

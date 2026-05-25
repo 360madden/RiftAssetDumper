@@ -53,6 +53,7 @@ Commands (kebab-case):
     ghidra-function-site-status  — show ignored report/summary status for FunctionSiteSurvey targets
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
+    nidatastream-descriptor-table-sample-status — summarize ignored descriptor table sample evidence
     nidatastream-descriptor-neighborhood-scan — scan bounded nonzero neighborhoods around descriptor refs
     nidatastream-descriptor-reference-classify — classify references to descriptor data refs
     nidatastream-descriptor-base-model-review — summarize descriptor base/stride model candidates
@@ -323,6 +324,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-table-sample-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-descriptor-neighborhood-scan": {
         "dotnet": "",
         "base": "",
@@ -428,6 +433,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteStatus": "ghidra-function-site-status",
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
+    "NiDataStreamDescriptorTableSampleStatus": "nidatastream-descriptor-table-sample-status",
     "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
     "NiDataStreamDescriptorReferenceClassify": "nidatastream-descriptor-reference-classify",
     "NiDataStreamDescriptorBaseModelReview": "nidatastream-descriptor-base-model-review",
@@ -3065,6 +3071,47 @@ def _nidatastream_descriptor_table_sample_status(args: argparse.Namespace) -> di
         }
     )
     return status
+
+
+def _nidatastream_descriptor_table_sample_status_packet(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a machine-readable descriptor-table sample status packet."""
+    return {
+        "SchemaVersion": "nidatastream-descriptor-table-sample-status/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "Status": _nidatastream_descriptor_table_sample_status(args),
+    }
+
+
+def _print_nidatastream_descriptor_table_sample_status(packet: dict[str, Any]) -> None:
+    """Print a concise descriptor-table sample status summary."""
+    status = packet["Status"]
+    print("--- NiDataStreamDescriptorTableSampleStatus")
+    print(f"Report: {status['Path']}")
+    print(f"Exists: {str(status['Exists']).lower()}")
+    print(f"Schema: {status['SchemaVersion'] or '-'}")
+    print(
+        "Rows: "
+        f"{status['RowCount']}; nonzero={status['NonzeroRowCount']}; "
+        f"errors={status['ErrorRowCount']}; all-zero={str(status['AllRowsZero']).lower()}"
+    )
+    print(f"Sample ready: {str(status['SampleReportReady']).lower()}")
+    print(f"Semantics explained: {str(status['StreamSemanticsExplained']).lower()}")
+    if status["Blockers"]:
+        print("Blockers:")
+        for blocker in status["Blockers"]:
+            print(f"- {blocker}")
+    print(status["Interpretation"])
+
+
+def _run_nidatastream_descriptor_table_sample_status(args: argparse.Namespace) -> None:
+    """Run the descriptor-table sample status command."""
+    packet = _nidatastream_descriptor_table_sample_status_packet(args)
+    if args.list_json:
+        print(json.dumps(packet, indent=2))
+        return
+    _print_nidatastream_descriptor_table_sample_status(packet)
 
 
 def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) -> dict[str, Any]:
@@ -5740,6 +5787,10 @@ def _run_command(args: argparse.Namespace) -> None:
         _run_nidatastream_descriptor_table_sample(args)
         return
 
+    if command == "nidatastream-descriptor-table-sample-status":
+        _run_nidatastream_descriptor_table_sample_status(args)
+        return
+
     if command == "nidatastream-descriptor-neighborhood-scan":
         _run_nidatastream_descriptor_neighborhood_scan(args)
         return
@@ -7124,6 +7175,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
+  python scripts/rift_workflow.py nidatastream-descriptor-table-sample-status --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
   python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -7490,6 +7542,7 @@ Examples:
         "nidatastream-descriptor-proof-status",
         "nidatastream-descriptor-sample-compare",
         "nidatastream-descriptor-table-sample",
+        "nidatastream-descriptor-table-sample-status",
         "nidatastream-descriptor-neighborhood-scan",
         "nidatastream-descriptor-reference-classify",
         "nidatastream-descriptor-base-model-review",
@@ -7500,7 +7553,8 @@ Examples:
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
-            "nidatastream-descriptor-neighborhood-scan, and "
+            "nidatastream-descriptor-table-sample-status, "
+            "nidatastream-descriptor-neighborhood-scan, "
             "nidatastream-descriptor-reference-classify, and "
             "nidatastream-descriptor-base-model-review.",
             file=sys.stderr,
