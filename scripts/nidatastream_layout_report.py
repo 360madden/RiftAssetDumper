@@ -168,9 +168,15 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
     second_u32 = None
     pair_count = None
     descriptor_count = None
+    pair_records_offset = None
+    descriptor_count_offset = None
+    descriptor_records_offset = None
     payload_prefix_bytes = None
+    payload_end_offset = None
     payload_trailer_bytes = None
     trailing_flag = None
+    first_pair_record_bytes = ""
+    first_descriptor_record_bytes = ""
     ghidra_valid = False
     warning = None
 
@@ -181,18 +187,26 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
         offset += 4
         if pair_count > 100_000 or offset + (pair_count * 8) > len(payload):
             raise NifParseError(f"Pair count {pair_count} does not fit in block.")
+        pair_records_offset = offset
+        first_pair_record_bytes = _hex_prefix(payload[pair_records_offset : pair_records_offset + min(8, pair_count * 8)], 8)
         offset += pair_count * 8
+        descriptor_count_offset = offset
         descriptor_count = _u32le(payload, offset)
         offset += 4
         if descriptor_count > 100_000 or offset + (descriptor_count * 4) > len(payload):
             raise NifParseError(f"Descriptor count {descriptor_count} does not fit in block.")
+        descriptor_records_offset = offset
+        first_descriptor_record_bytes = _hex_prefix(
+            payload[descriptor_records_offset : descriptor_records_offset + min(4, descriptor_count * 4)],
+            4,
+        )
         offset += descriptor_count * 4
         payload_prefix_bytes = offset
-        payload_end = payload_prefix_bytes + declared
-        if payload_end > len(payload):
+        payload_end_offset = payload_prefix_bytes + declared
+        if payload_end_offset > len(payload):
             raise NifParseError("Descriptor prefix plus declared payload extends past block.")
-        payload_trailer_bytes = len(payload) - payload_end
-        trailing_flag = payload[payload_end] if payload_trailer_bytes >= 1 else None
+        payload_trailer_bytes = len(payload) - payload_end_offset
+        trailing_flag = payload[payload_end_offset] if payload_trailer_bytes >= 1 else None
         ghidra_valid = payload_trailer_bytes == 1 and trailing_flag in (0, 1)
     except NifParseError as exc:
         warning = str(exc)
@@ -209,9 +223,15 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
         "ValidDeclaredPayload": valid_declared,
         "SecondUInt32": second_u32,
         "PairCount": pair_count,
+        "PairRecordsOffset": pair_records_offset,
+        "FirstPairRecordBytes": first_pair_record_bytes,
+        "DescriptorCountOffset": descriptor_count_offset,
         "DescriptorCount": descriptor_count,
+        "DescriptorRecordsOffset": descriptor_records_offset,
+        "FirstDescriptorRecordBytes": first_descriptor_record_bytes,
         "LegacyPayloadOffset": legacy_offset,
         "PayloadPrefixBytes": payload_prefix_bytes,
+        "PayloadEndOffset": payload_end_offset,
         "PayloadTrailerBytes": payload_trailer_bytes,
         "TrailingFlag": trailing_flag,
         "GhidraStyleLayoutValid": ghidra_valid,
@@ -301,8 +321,16 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
     trailer_counts: Counter[Any] = Counter(block.get("PayloadTrailerBytes") for block in all_blocks)
     flag_counts: Counter[Any] = Counter(block.get("TrailingFlag") for block in all_blocks)
     shift_counts: Counter[Any] = Counter(block.get("LegacyOffsetMinusGhidraOffset") for block in all_blocks)
+    second_u32_counts: Counter[Any] = Counter(block.get("SecondUInt32") for block in all_blocks)
     pair_counts: Counter[Any] = Counter(block.get("PairCount") for block in all_blocks)
+    pair_record_offset_counts: Counter[Any] = Counter(block.get("PairRecordsOffset") for block in all_blocks)
+    first_pair_record_bytes_counts: Counter[Any] = Counter(block.get("FirstPairRecordBytes") for block in all_blocks)
     descriptor_counts: Counter[Any] = Counter(block.get("DescriptorCount") for block in all_blocks)
+    descriptor_count_offset_counts: Counter[Any] = Counter(block.get("DescriptorCountOffset") for block in all_blocks)
+    descriptor_record_offset_counts: Counter[Any] = Counter(block.get("DescriptorRecordsOffset") for block in all_blocks)
+    first_descriptor_record_bytes_counts: Counter[Any] = Counter(
+        block.get("FirstDescriptorRecordBytes") for block in all_blocks
+    )
 
     report = {
         "Schema": "nidatastream-layout-report/v1",
@@ -322,8 +350,14 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
         "TopPayloadTrailerBytes": _counter_rows(trailer_counts),
         "TopTrailingFlags": _counter_rows(flag_counts),
         "TopLegacyOffsetMinusGhidraOffset": _counter_rows(shift_counts),
+        "TopSecondUInt32": _counter_rows(second_u32_counts),
         "TopPairCounts": _counter_rows(pair_counts),
+        "TopPairRecordOffsets": _counter_rows(pair_record_offset_counts),
+        "TopFirstPairRecordBytes": _counter_rows(first_pair_record_bytes_counts),
         "TopDescriptorCounts": _counter_rows(descriptor_counts),
+        "TopDescriptorCountOffsets": _counter_rows(descriptor_count_offset_counts),
+        "TopDescriptorRecordOffsets": _counter_rows(descriptor_record_offset_counts),
+        "TopFirstDescriptorRecordBytes": _counter_rows(first_descriptor_record_bytes_counts),
         "ShiftedSamples": shifted[:sample_limit],
         "Warnings": parse_errors[:sample_limit],
     }
@@ -356,8 +390,14 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
         ("Payload trailer bytes", "TopPayloadTrailerBytes"),
         ("Trailing flags", "TopTrailingFlags"),
         ("Legacy offset minus Ghidra offset", "TopLegacyOffsetMinusGhidraOffset"),
+        ("Second UInt32 values", "TopSecondUInt32"),
         ("Pair counts", "TopPairCounts"),
+        ("Pair record offsets", "TopPairRecordOffsets"),
+        ("First pair record bytes", "TopFirstPairRecordBytes"),
         ("Descriptor counts", "TopDescriptorCounts"),
+        ("Descriptor count offsets", "TopDescriptorCountOffsets"),
+        ("Descriptor record offsets", "TopDescriptorRecordOffsets"),
+        ("First descriptor record bytes", "TopFirstDescriptorRecordBytes"),
     ]:
         lines.extend([f"### {title}", "", "| Value | Count |", "|---|---:|"])
         rows = report.get(key)
@@ -370,7 +410,7 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
         lines.append("")
 
     samples = report.get("ShiftedSamples")
-    lines.extend(["## Shifted samples", "", "| File | Block | Size | Declared | Legacy offset | Ghidra offset | Trailer | Flag | Legacy first16 | Ghidra first16 |", "|---|---:|---:|---:|---:|---:|---:|---:|---|---|"])
+    lines.extend(["## Shifted samples", "", "| File | Block | Size | Declared | Pair record | Descriptor record | Legacy offset | Ghidra offset | Trailer | Flag | Legacy first16 | Ghidra first16 |", "|---|---:|---:|---:|---|---|---:|---:|---:|---:|---|---|"])
     if isinstance(samples, list) and samples:
         for sample_value in samples[:20]:
             sample = sample_value if isinstance(sample_value, Mapping) else {}
@@ -382,6 +422,8 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
                         markdown_cell(sample.get("BlockIndex")),
                         markdown_cell(sample.get("BlockSize")),
                         markdown_cell(sample.get("DeclaredPayloadBytes")),
+                        markdown_cell(sample.get("FirstPairRecordBytes")),
+                        markdown_cell(sample.get("FirstDescriptorRecordBytes")),
                         markdown_cell(sample.get("LegacyPayloadOffset")),
                         markdown_cell(sample.get("PayloadPrefixBytes")),
                         markdown_cell(sample.get("PayloadTrailerBytes")),
@@ -393,7 +435,7 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
                 + " |"
             )
     else:
-        lines.append("| - | - | - | - | - | - | - | - | - | - |")
+        lines.append("| - | - | - | - | - | - | - | - | - | - | - | - |")
 
     lines.extend(
         [

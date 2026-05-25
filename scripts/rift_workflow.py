@@ -1361,6 +1361,73 @@ SAMPLE_BYTE_UNIFORMITY_REQUIREMENTS = [
 ]
 
 
+DESCRIPTOR_BYTE_ORDER_REQUIREMENTS = [
+    {
+        "Key": "second-u32",
+        "Source": "TopSecondUInt32",
+        "ExpectedValue": 0,
+        "OffsetBytes": 4,
+        "WidthBytes": 4,
+        "Encoding": "uint32-le",
+        "Meaning": "The currently observed copied-sample corpus carries a zero second uint32 before pair records.",
+    },
+    {
+        "Key": "pair-count",
+        "Source": "TopPairCounts",
+        "ExpectedValue": 1,
+        "OffsetBytes": 8,
+        "WidthBytes": 4,
+        "Encoding": "uint32-le",
+        "Meaning": "Pair count appears immediately after declared payload bytes and the second uint32.",
+    },
+    {
+        "Key": "pair-record-offset",
+        "Source": "TopPairRecordOffsets",
+        "ExpectedValue": 12,
+        "OffsetBytes": 12,
+        "WidthBytes": 8,
+        "Encoding": "byte-record",
+        "Meaning": "The first pair record starts at byte offset 12 in the NiDataStream block payload.",
+    },
+    {
+        "Key": "descriptor-count-offset",
+        "Source": "TopDescriptorCountOffsets",
+        "ExpectedValue": 20,
+        "OffsetBytes": 20,
+        "WidthBytes": 4,
+        "Encoding": "uint32-le",
+        "Meaning": "Descriptor count follows one 8-byte pair record at byte offset 20.",
+    },
+    {
+        "Key": "descriptor-count",
+        "Source": "TopDescriptorCounts",
+        "ExpectedValue": 1,
+        "OffsetBytes": 20,
+        "WidthBytes": 4,
+        "Encoding": "uint32-le",
+        "Meaning": "The selected copied-sample corpus has one descriptor record per observed NiDataStream block.",
+    },
+    {
+        "Key": "descriptor-record-offset",
+        "Source": "TopDescriptorRecordOffsets",
+        "ExpectedValue": 24,
+        "OffsetBytes": 24,
+        "WidthBytes": 4,
+        "Encoding": "byte-record",
+        "Meaning": "The first descriptor record starts at byte offset 24 in the NiDataStream block payload.",
+    },
+    {
+        "Key": "payload-prefix-bytes",
+        "Source": "TopPayloadPrefixBytes",
+        "ExpectedValue": 28,
+        "OffsetBytes": 28,
+        "WidthBytes": 0,
+        "Encoding": "payload-start",
+        "Meaning": "Declared payload starts at byte offset 28 after descriptor/pair prefix fields.",
+    },
+]
+
+
 def _report_path_from_target(target: dict[str, Any]) -> Path:
     """Return the repo-rooted ignored report path for a FunctionSiteSurvey target."""
     return REPO_ROOT / str(target.get("ReportPath", ""))
@@ -1758,6 +1825,66 @@ def _nidatastream_sample_byte_uniformity_summary(
     }
 
 
+def _top_counter_rows(report: dict[str, Any] | None, key: str) -> list[dict[str, Any]]:
+    """Return top counter rows from a layout report as dictionaries."""
+    rows_value = report.get(key) if report else None
+    if not isinstance(rows_value, list):
+        return []
+    return [row for row in rows_value if isinstance(row, dict)]
+
+
+def _nidatastream_descriptor_byte_order_proof(
+    layout_report: dict[str, Any] | None,
+    layout_status: dict[str, Any],
+) -> dict[str, Any]:
+    """Summarize exact candidate byte offsets for the observed descriptor/pair prefix."""
+    expected_block_count = int(layout_status.get("NiDataStreamBlocks", 0))
+    checks = []
+    for requirement in DESCRIPTOR_BYTE_ORDER_REQUIREMENTS:
+        check = _counter_uniformity_check(layout_report, requirement, expected_block_count)
+        check.update(
+            {
+                "OffsetBytes": int(requirement["OffsetBytes"]),
+                "WidthBytes": int(requirement["WidthBytes"]),
+                "Encoding": str(requirement["Encoding"]),
+            }
+        )
+        checks.append(check)
+    passed_count = sum(1 for check in checks if check["MatchesExpected"])
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "CheckCount": len(checks),
+        "PassedCount": passed_count,
+        "AllExpectedFieldsUniform": expected_block_count > 0 and passed_count == len(checks),
+        "Checks": checks,
+        "TopFirstPairRecordBytes": _top_counter_rows(layout_report, "TopFirstPairRecordBytes"),
+        "TopFirstDescriptorRecordBytes": _top_counter_rows(layout_report, "TopFirstDescriptorRecordBytes"),
+        "Interpretation": (
+            "Candidate byte-order proof only: offsets are from copied sample bytes and Ghidra-aligned "
+            "descriptor-helper evidence, but descriptor semantics are not parser/export truth."
+        ),
+    }
+
+
+def _nidatastream_sample_corpus_status(layout_report: dict[str, Any] | None) -> dict[str, Any]:
+    """Return report-local corpus metadata for the copied/extracted sample evidence."""
+    warnings = layout_report.get("Warnings") if layout_report else None
+    samples = layout_report.get("ShiftedSamples") if layout_report else None
+    return {
+        "Root": str(layout_report.get("Root", "")) if layout_report else "",
+        "MaxFiles": layout_report.get("MaxFiles") if layout_report else None,
+        "FilesScanned": _json_int_or_none(layout_report.get("FilesScanned")) or 0 if layout_report else 0,
+        "FilesParsed": _json_int_or_none(layout_report.get("FilesParsed")) or 0 if layout_report else 0,
+        "FilesWithNiDataStreamBlocks": (
+            _json_int_or_none(layout_report.get("FilesWithNiDataStreamBlocks")) or 0 if layout_report else 0
+        ),
+        "ParseErrorCount": _json_int_or_none(layout_report.get("ParseErrorCount")) or 0 if layout_report else 0,
+        "ShiftedSampleCount": len(samples) if isinstance(samples, list) else 0,
+        "WarningCount": len(warnings) if isinstance(warnings, list) else 0,
+    }
+
+
 def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return a candidate-only descriptor/static-proof vs sample-byte comparison report."""
     descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
@@ -1765,11 +1892,14 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     layout_report, layout_error = _read_nidatastream_layout_report(args)
     if layout_error and not layout_status["Error"]:
         layout_status["Error"] = layout_error
+    sample_corpus_status = _nidatastream_sample_corpus_status(layout_report)
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
+    byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
     descriptor_sample_evidence_ready = (
         bool(descriptor_status["AllRequiredEvidenceReady"])
         and bool(layout_status["AllBlocksGhidraStyleValid"])
         and bool(sample_summary["AllExpectedValuesUniform"])
+        and bool(byte_order_proof["AllExpectedFieldsUniform"])
     )
     promotion_status = _nidatastream_promotion_status_payload(args)
     blockers: list[str] = []
@@ -1781,6 +1911,8 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         blockers.append("sample-byte-layout-not-ghidra-style-valid")
     if not sample_summary["AllExpectedValuesUniform"]:
         blockers.append("sample-byte-uniformity-incomplete")
+    if not byte_order_proof["AllExpectedFieldsUniform"]:
+        blockers.append("descriptor-byte-order-incomplete")
     if not descriptor_status["FieldOrderPromoted"]:
         blockers.append("field-order-promoted-false")
     if not promotion_status["ParserExportPromotionAllowed"]:
@@ -1800,7 +1932,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
             "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
         },
         "LayoutReportStatus": layout_status,
+        "SampleCorpusStatus": sample_corpus_status,
         "SampleByteSummary": sample_summary,
+        "DescriptorByteOrderProof": byte_order_proof,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
         "BlockerCount": len(blockers),
@@ -1820,7 +1954,9 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     """Build Markdown for the descriptor/sample-byte comparison report."""
     descriptor = report["DescriptorStatus"]
     layout = report["LayoutReportStatus"]
+    corpus = report["SampleCorpusStatus"]
     sample = report["SampleByteSummary"]
+    byte_order = report["DescriptorByteOrderProof"]
     lines = [
         "# NiDataStream descriptor/sample-byte comparison",
         "",
@@ -1848,9 +1984,19 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
             f"{format_markdown_cell(layout['NiDataStreamBlocks'])} |"
         ),
         (
+            "| Sample corpus files parsed | "
+            f"{format_markdown_cell(corpus['FilesParsed'])}/"
+            f"{format_markdown_cell(corpus['FilesScanned'])} |"
+        ),
+        (
             "| Uniform sample-byte checks | "
             f"{format_markdown_cell(sample['PassedCount'])}/"
             f"{format_markdown_cell(sample['CheckCount'])} |"
+        ),
+        (
+            "| Descriptor byte-order checks | "
+            f"{format_markdown_cell(byte_order['PassedCount'])}/"
+            f"{format_markdown_cell(byte_order['CheckCount'])} |"
         ),
         "",
         "## Sample-byte uniformity checks",
@@ -1868,6 +2014,32 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
                     format_markdown_cell(check["ObservedValue"]),
                     f"{format_markdown_cell(check['ObservedCount'])}/{format_markdown_cell(check['ExpectedBlockCount'])}",
                     format_markdown_cell(str(check["Uniform"]).lower()),
+                    format_markdown_cell(str(check["MatchesExpected"]).lower()),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Descriptor byte-order proof",
+            "",
+            "| Check | Offset | Width | Encoding | Expected | Observed | Count | Match |",
+            "|---|---:|---:|---|---:|---:|---:|---:|",
+        ]
+    )
+    for check in byte_order["Checks"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(check["Key"]),
+                    format_markdown_cell(check["OffsetBytes"]),
+                    format_markdown_cell(check["WidthBytes"]),
+                    format_markdown_cell(check["Encoding"]),
+                    format_markdown_cell(check["ExpectedValue"]),
+                    format_markdown_cell(check["ObservedValue"]),
+                    f"{format_markdown_cell(check['ObservedCount'])}/{format_markdown_cell(check['ExpectedBlockCount'])}",
                     format_markdown_cell(str(check["MatchesExpected"]).lower()),
                 ]
             )
@@ -1908,7 +2080,9 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     """Print a concise descriptor/sample-byte comparison summary."""
     descriptor = report["DescriptorStatus"]
     layout = report["LayoutReportStatus"]
+    corpus = report["SampleCorpusStatus"]
     sample = report["SampleByteSummary"]
+    byte_order = report["DescriptorByteOrderProof"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
         "Descriptor helper evidence-ready targets: "
@@ -1918,7 +2092,9 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Ghidra-style-valid sample blocks: "
         f"{layout['GhidraStyleLayoutValidBlocks']}/{layout['NiDataStreamBlocks']}"
     )
+    print(f"Sample corpus files parsed: {corpus['FilesParsed']}/{corpus['FilesScanned']}")
     print(f"Uniform sample-byte checks: {sample['PassedCount']}/{sample['CheckCount']}")
+    print(f"Descriptor byte-order checks: {byte_order['PassedCount']}/{byte_order['CheckCount']}")
     print(f"Descriptor + sample evidence ready: {str(report['DescriptorAndSampleEvidenceReady']).lower()}")
     print(f"Parser/export promotion allowed: {str(report['ParserExportPromotionAllowed']).lower()}")
     print(f"Blocking items: {report['BlockerCount']}")
@@ -1932,6 +2108,18 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
             f"{check['ExpectedValue']!s:8} "
             f"{observed[:8]:8} "
             f"{check['ObservedCount']}/{check['ExpectedBlockCount']:<11} "
+            f"{str(check['MatchesExpected']).lower():6}"
+        )
+    print("")
+    print(f"{'Byte-order check':36} {'Offset':6} {'Expected':8} {'Observed':8} {'Match':6}")
+    print(f"{'-' * 36} {'-' * 6} {'-' * 8} {'-' * 8} {'-' * 6}")
+    for check in byte_order["Checks"]:
+        observed = "-" if check["ObservedValue"] is None else str(check["ObservedValue"])
+        print(
+            f"{check['Key']:36} "
+            f"{check['OffsetBytes']!s:6} "
+            f"{check['ExpectedValue']!s:8} "
+            f"{observed[:8]:8} "
             f"{str(check['MatchesExpected']).lower():6}"
         )
     print("")

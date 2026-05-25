@@ -65,7 +65,7 @@ The descriptor/sample compare command writes ignored JSON/Markdown under `Export
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 ```
 
-This scans copied/extracted local samples and writes ignored `Exports/nidatastream-layout-report.json` and `.md` files. Do not stage those outputs.
+This scans copied/extracted local samples and writes ignored `Exports/nidatastream-layout-report.json` and `.md` files. The report includes sample corpus metadata, prefix/trailer distributions, pair/descriptor count offsets, and first pair/descriptor record byte examples. Do not stage those outputs.
 
 ## 6. Check Ghidra pairing impact
 

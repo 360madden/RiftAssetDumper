@@ -34,7 +34,7 @@ Do not change decoder/export behavior until every required gate for the target f
 | Ghidra evidence availability | The target has both a local ignored JSON report and Markdown summary before being cited as fresh evidence | `ghidra-function-site-status --list-json` | ✅ Local 7/7 evidence-ready as of the 2026-05-25 summary refresh; still ignored/generated and candidate-only |
 | Descriptor field order | Descriptor helper/builders prove count/order/format/component fields strongly enough to map bytes, not just names | `nidatastream-descriptor-proof-status --list-json`; descriptor builder targets | 🟨 Candidate-only; local status checks 4 descriptor helper/builders for call/data-ref/decompile-term evidence |
 | Sample-byte agreement | Copied/extracted NIF samples agree with the proposed Ghidra-aligned prefix/payload/trailer interpretation | `nidatastream-layout --root Extracted --full`; schema `docs/schemas/nidatastream-layout-report-v1.schema.json` | 🟨 Local ignored report currently shows 184/184 Ghidra-style-valid blocks; still report-only |
-| Descriptor/sample compare | Descriptor-helper readiness and copied-sample byte counters agree in one machine-readable report | `nidatastream-descriptor-sample-compare`; schema `docs/schemas/nidatastream-descriptor-sample-compare-v1.schema.json` | 🟨 Report-only; keeps `FieldOrderPromoted=false` and parser/export promotion locked |
+| Descriptor/sample compare | Descriptor-helper readiness, sample corpus metadata, copied-sample byte counters, and candidate descriptor byte-order offsets agree in one machine-readable report | `nidatastream-descriptor-sample-compare`; schema `docs/schemas/nidatastream-descriptor-sample-compare-v1.schema.json` | 🟨 Report-only; local compare currently shows descriptor/sample ready with 6/6 byte-counter checks and 7/7 byte-order checks, but keeps `FieldOrderPromoted=false` and parser/export promotion locked |
 | Pairing impact | A field interpretation change creates complete position+normal+UV evidence without promoting noise/sentinels | `ghidra-attribute-candidate-report`; `ghidra-attribute-candidate-guard`; summarized by `nidatastream-promotion-status --list-json` | 🟨 Local ignored report has 0 complete position+normal+UV Ghidra-only groups across 14 groups; still candidate-only |
 | Export isolation | Ghidra evidence is not consumed by decode/export paths | `ghidra-workflow-guard-suite`; `ghidra-pairing-non-export-guard` | ✅ Guarded |
 | Narrow parser patch | Any future parser change is isolated to the smallest field-read surface and has regression tests before exporter use | Future C#/Python tests | 🟥 Not started |
@@ -57,7 +57,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 ## Next safe proof questions
 
 1. Do descriptor-helper targets prove a field count/order that the C# parser is currently missing?
-2. Can the descriptor/sample comparison be expanded from uniform counters into exact byte-level descriptor field order before any exporter uses it?
+2. Can the byte-order proof be expanded from structural offsets/record bytes into exact descriptor semantics before any exporter uses it?
 3. Does any current Ghidra-only mesh candidate become a complete position/normal/UV group after a field interpretation change?
 
 Until those are answered with tests and guards, parser/export behavior remains unchanged.

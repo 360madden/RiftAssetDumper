@@ -12,7 +12,9 @@
     "DescriptorAndSampleEvidenceReady",
     "DescriptorStatus",
     "LayoutReportStatus",
+    "SampleCorpusStatus",
     "SampleByteSummary",
+    "DescriptorByteOrderProof",
     "CandidateFieldMap",
     "PromotionGateBlockers",
     "BlockerCount",
@@ -28,7 +30,9 @@
     "DescriptorAndSampleEvidenceReady": { "type": "boolean" },
     "DescriptorStatus": { "$ref": "#/$defs/descriptorStatus" },
     "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
+    "SampleCorpusStatus": { "$ref": "#/$defs/sampleCorpusStatus" },
     "SampleByteSummary": { "$ref": "#/$defs/sampleByteSummary" },
+    "DescriptorByteOrderProof": { "$ref": "#/$defs/descriptorByteOrderProof" },
     "CandidateFieldMap": {
       "type": "array",
       "items": { "$ref": "#/$defs/fieldMap" }
@@ -55,6 +59,15 @@
         { "type": "boolean" },
         { "type": "null" }
       ]
+    },
+    "counterRow": {
+      "type": "object",
+      "required": ["Value", "Count"],
+      "properties": {
+        "Value": { "$ref": "#/$defs/counterValue" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
     },
     "descriptorStatus": {
       "type": "object",
@@ -116,6 +129,32 @@
       },
       "additionalProperties": false
     },
+    "sampleCorpusStatus": {
+      "type": "object",
+      "required": [
+        "Root",
+        "MaxFiles",
+        "FilesScanned",
+        "FilesParsed",
+        "FilesWithNiDataStreamBlocks",
+        "ParseErrorCount",
+        "ShiftedSampleCount",
+        "WarningCount"
+      ],
+      "properties": {
+        "Root": { "type": "string" },
+        "MaxFiles": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "FilesScanned": { "type": "integer", "minimum": 0 },
+        "FilesParsed": { "type": "integer", "minimum": 0 },
+        "FilesWithNiDataStreamBlocks": { "type": "integer", "minimum": 0 },
+        "ParseErrorCount": { "type": "integer", "minimum": 0 },
+        "ShiftedSampleCount": { "type": "integer", "minimum": 0 },
+        "WarningCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "sampleByteCheck": {
       "type": "object",
       "required": [
@@ -145,6 +184,79 @@
         "Uniform": { "type": "boolean" },
         "MatchesExpected": { "type": "boolean" },
         "Meaning": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorByteOrderProof": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "CheckCount",
+        "PassedCount",
+        "AllExpectedFieldsUniform",
+        "Checks",
+        "TopFirstPairRecordBytes",
+        "TopFirstDescriptorRecordBytes",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "CheckCount": { "type": "integer", "minimum": 0 },
+        "PassedCount": { "type": "integer", "minimum": 0 },
+        "AllExpectedFieldsUniform": { "type": "boolean" },
+        "Checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorByteOrderCheck" }
+        },
+        "TopFirstPairRecordBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/counterRow" }
+        },
+        "TopFirstDescriptorRecordBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/counterRow" }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorByteOrderCheck": {
+      "type": "object",
+      "required": [
+        "Key",
+        "Source",
+        "ExpectedValue",
+        "ObservedValue",
+        "ObservedInteger",
+        "ObservedCount",
+        "ExpectedBlockCount",
+        "RowsSeen",
+        "Uniform",
+        "MatchesExpected",
+        "Meaning",
+        "OffsetBytes",
+        "WidthBytes",
+        "Encoding"
+      ],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "Source": { "type": "string", "minLength": 1 },
+        "ExpectedValue": { "type": "integer" },
+        "ObservedValue": { "$ref": "#/$defs/counterValue" },
+        "ObservedInteger": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }]
+        },
+        "ObservedCount": { "type": "integer", "minimum": 0 },
+        "ExpectedBlockCount": { "type": "integer", "minimum": 0 },
+        "RowsSeen": { "type": "integer", "minimum": 0 },
+        "Uniform": { "type": "boolean" },
+        "MatchesExpected": { "type": "boolean" },
+        "Meaning": { "type": "string", "minLength": 1 },
+        "OffsetBytes": { "type": "integer", "minimum": 0 },
+        "WidthBytes": { "type": "integer", "minimum": 0 },
+        "Encoding": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

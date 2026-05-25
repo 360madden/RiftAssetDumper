@@ -101,7 +101,13 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
     return targets_file
 
 
-def write_layout_fixture(out_dir: Path, *, payload_prefix: int = 28, payload_prefix_count: int | None = None) -> None:
+def write_layout_fixture(
+    out_dir: Path,
+    *,
+    payload_prefix: int = 28,
+    payload_prefix_count: int | None = None,
+    descriptor_record_offset: int = 24,
+) -> None:
     block_count = 5
     prefix_count = block_count if payload_prefix_count is None else payload_prefix_count
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -110,8 +116,12 @@ def write_layout_fixture(out_dir: Path, *, payload_prefix: int = 28, payload_pre
             {
                 "Schema": "nidatastream-layout-report/v1",
                 "CandidateOnly": True,
+                "Root": "Extracted",
+                "MaxFiles": None,
                 "FilesScanned": 2,
                 "FilesParsed": 2,
+                "FilesWithNiDataStreamBlocks": 2,
+                "ParseErrorCount": 0,
                 "NiDataStreamBlocks": block_count,
                 "GhidraStyleLayoutValidBlocks": block_count,
                 "LegacyOffsetShiftedBlocks": block_count,
@@ -119,8 +129,16 @@ def write_layout_fixture(out_dir: Path, *, payload_prefix: int = 28, payload_pre
                 "TopPayloadTrailerBytes": [{"Value": 1, "Count": block_count}],
                 "TopTrailingFlags": [{"Value": 1, "Count": block_count}],
                 "TopLegacyOffsetMinusGhidraOffset": [{"Value": 1, "Count": block_count}],
+                "TopSecondUInt32": [{"Value": 0, "Count": block_count}],
                 "TopPairCounts": [{"Value": 1, "Count": block_count}],
+                "TopPairRecordOffsets": [{"Value": 12, "Count": block_count}],
+                "TopFirstPairRecordBytes": [{"Value": "04 00 00 00 05 00 00 00", "Count": block_count}],
                 "TopDescriptorCounts": [{"Value": 1, "Count": block_count}],
+                "TopDescriptorCountOffsets": [{"Value": 20, "Count": block_count}],
+                "TopDescriptorRecordOffsets": [{"Value": descriptor_record_offset, "Count": block_count}],
+                "TopFirstDescriptorRecordBytes": [{"Value": "aa 00 00 00", "Count": block_count}],
+                "ShiftedSamples": [],
+                "Warnings": [],
             }
         ),
         encoding="utf-8",
@@ -166,9 +184,19 @@ check("promotion locked", compare["ParserExportPromotionAllowed"], False)
 check("field order locked", compare["FieldOrderPromoted"], False)
 check("descriptor ready", compare["DescriptorStatus"]["AllRequiredEvidenceReady"], True)
 check("sample checks ready", compare["SampleByteSummary"]["AllExpectedValuesUniform"], True)
+check("byte-order checks ready", compare["DescriptorByteOrderProof"]["AllExpectedFieldsUniform"], True)
 check("descriptor + sample evidence ready", compare["DescriptorAndSampleEvidenceReady"], True)
 check("sample check count", compare["SampleByteSummary"]["CheckCount"], 6)
 check("sample passed count", compare["SampleByteSummary"]["PassedCount"], 6)
+check("byte-order check count", compare["DescriptorByteOrderProof"]["CheckCount"], 7)
+check("byte-order passed count", compare["DescriptorByteOrderProof"]["PassedCount"], 7)
+descriptor_record_check = next(
+    check for check in compare["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
+)
+check("descriptor record offset observed", descriptor_record_check["ObservedInteger"], 24)
+check("descriptor byte examples present", compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 00 00 00")
+check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
+check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
@@ -208,6 +236,43 @@ check("mismatch descriptor + sample evidence not ready", mismatch["DescriptorAnd
 check("mismatch prefix observed", prefix_check["ObservedInteger"], 29)
 check("mismatch prefix does not match", prefix_check["MatchesExpected"], False)
 check("mismatch blocker present", "sample-byte-uniformity-incomplete" in mismatch["Blockers"], True)
+
+print("=== NiDataStream descriptor byte-order mismatch fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    targets_file = write_descriptor_fixture(temp_path)
+    write_layout_fixture(out_dir, descriptor_record_offset=25)
+    byte_order_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-sample-compare",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(byte_order_output),
+    ):
+        rift_workflow.main()
+byte_order_mismatch = json.loads(byte_order_output.getvalue())
+jsonschema.validate(byte_order_mismatch, schema)
+print("  PASS: byte-order mismatch comparison schema validation")
+descriptor_offset_check = next(
+    check for check in byte_order_mismatch["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
+)
+check("byte-order mismatch checks fail", byte_order_mismatch["DescriptorByteOrderProof"]["AllExpectedFieldsUniform"], False)
+check("byte-order mismatch descriptor + sample evidence not ready", byte_order_mismatch["DescriptorAndSampleEvidenceReady"], False)
+check("byte-order mismatch observed", descriptor_offset_check["ObservedInteger"], 25)
+check("byte-order mismatch blocker present", "descriptor-byte-order-incomplete" in byte_order_mismatch["Blockers"], True)
 
 promoted_compare = json.loads(json.dumps(compare))
 promoted_compare["ParserExportPromotionAllowed"] = True
