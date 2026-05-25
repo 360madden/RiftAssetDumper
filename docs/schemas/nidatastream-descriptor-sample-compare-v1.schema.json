@@ -15,6 +15,7 @@
     "SampleCorpusStatus",
     "SampleByteSummary",
     "DescriptorByteOrderProof",
+    "DescriptorRecordByteSummary",
     "CandidateFieldMap",
     "PromotionGateBlockers",
     "BlockerCount",
@@ -33,6 +34,7 @@
     "SampleCorpusStatus": { "$ref": "#/$defs/sampleCorpusStatus" },
     "SampleByteSummary": { "$ref": "#/$defs/sampleByteSummary" },
     "DescriptorByteOrderProof": { "$ref": "#/$defs/descriptorByteOrderProof" },
+    "DescriptorRecordByteSummary": { "$ref": "#/$defs/descriptorRecordByteSummary" },
     "CandidateFieldMap": {
       "type": "array",
       "items": { "$ref": "#/$defs/fieldMap" }
@@ -257,6 +259,58 @@
         "OffsetBytes": { "type": "integer", "minimum": 0 },
         "WidthBytes": { "type": "integer", "minimum": 0 },
         "Encoding": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordByteSummary": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "Source",
+        "RecordPatternCount",
+        "ObservedRecordCount",
+        "MalformedRecordCount",
+        "RecordWidthBytes",
+        "ByteOffsets",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "Source": { "const": "TopFirstDescriptorRecordBytes" },
+        "RecordPatternCount": { "type": "integer", "minimum": 0 },
+        "ObservedRecordCount": { "type": "integer", "minimum": 0 },
+        "MalformedRecordCount": { "type": "integer", "minimum": 0 },
+        "RecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "ByteOffsets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordByteOffset" }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordByteOffset": {
+      "type": "object",
+      "required": ["OffsetBytes", "UniqueValueCount", "TopValues"],
+      "properties": {
+        "OffsetBytes": { "type": "integer", "minimum": 0 },
+        "UniqueValueCount": { "type": "integer", "minimum": 0 },
+        "TopValues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordByteValue" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordByteValue": {
+      "type": "object",
+      "required": ["ValueHex", "ValueInteger", "Count"],
+      "properties": {
+        "ValueHex": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
+        "ValueInteger": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "Count": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },

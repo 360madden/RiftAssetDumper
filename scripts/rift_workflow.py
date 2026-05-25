@@ -1851,6 +1851,88 @@ def _top_counter_rows(report: dict[str, Any] | None, key: str) -> list[dict[str,
     return [row for row in rows_value if isinstance(row, dict)]
 
 
+def _parse_hex_byte_record(value: Any) -> list[int] | None:
+    """Parse a space-delimited hex byte record from layout counter output."""
+    if not isinstance(value, str):
+        return None
+    parts = value.split()
+    if not parts:
+        return None
+    bytes_out: list[int] = []
+    for part in parts:
+        if len(part) > 2:
+            return None
+        try:
+            byte_value = int(part, 16)
+        except ValueError:
+            return None
+        if byte_value < 0 or byte_value > 0xFF:
+            return None
+        bytes_out.append(byte_value)
+    return bytes_out
+
+
+def _nidatastream_descriptor_record_byte_summary(byte_order_proof: dict[str, Any]) -> dict[str, Any]:
+    """Summarize first descriptor-record byte distributions without assigning parser semantics."""
+    rows_value = byte_order_proof.get("TopFirstDescriptorRecordBytes")
+    rows = rows_value if isinstance(rows_value, list) else []
+    parsed_rows: list[tuple[list[int], int]] = []
+    malformed_record_count = 0
+    observed_record_count = 0
+    record_width = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            malformed_record_count += 1
+            continue
+        count = _json_int_or_none(row.get("Count")) or 0
+        parsed = _parse_hex_byte_record(row.get("Value"))
+        if parsed is None:
+            malformed_record_count += count
+            continue
+        parsed_rows.append((parsed, count))
+        observed_record_count += count
+        record_width = max(record_width, len(parsed))
+
+    byte_offsets: list[dict[str, Any]] = []
+    for offset in range(record_width):
+        counts: dict[int, int] = {}
+        for parsed, count in parsed_rows:
+            if offset >= len(parsed):
+                continue
+            byte_value = parsed[offset]
+            counts[byte_value] = counts.get(byte_value, 0) + count
+        top_values = [
+            {
+                "ValueHex": f"{byte_value:02x}",
+                "ValueInteger": byte_value,
+                "Count": value_count,
+            }
+            for byte_value, value_count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        ]
+        byte_offsets.append(
+            {
+                "OffsetBytes": offset,
+                "UniqueValueCount": len(counts),
+                "TopValues": top_values,
+            }
+        )
+
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "Source": "TopFirstDescriptorRecordBytes",
+        "RecordPatternCount": len(parsed_rows),
+        "ObservedRecordCount": observed_record_count,
+        "MalformedRecordCount": malformed_record_count,
+        "RecordWidthBytes": record_width,
+        "ByteOffsets": byte_offsets,
+        "Interpretation": (
+            "First descriptor-record byte distributions are sample evidence only; "
+            "byte positions are not mapped to parser/export semantics."
+        ),
+    }
+
+
 def _nidatastream_descriptor_byte_order_proof(
     layout_report: dict[str, Any] | None,
     layout_status: dict[str, Any],
@@ -1913,6 +1995,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     sample_corpus_status = _nidatastream_sample_corpus_status(layout_report)
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
     byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
+    record_byte_summary = _nidatastream_descriptor_record_byte_summary(byte_order_proof)
     descriptor_sample_evidence_ready = (
         bool(descriptor_status["AllRequiredEvidenceReady"])
         and bool(layout_status["AllBlocksGhidraStyleValid"])
@@ -1953,6 +2036,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "SampleCorpusStatus": sample_corpus_status,
         "SampleByteSummary": sample_summary,
         "DescriptorByteOrderProof": byte_order_proof,
+        "DescriptorRecordByteSummary": record_byte_summary,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
         "BlockerCount": len(blockers),
@@ -1975,6 +2059,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     corpus = report["SampleCorpusStatus"]
     sample = report["SampleByteSummary"]
     byte_order = report["DescriptorByteOrderProof"]
+    record_bytes = report["DescriptorRecordByteSummary"]
     field_map = report["CandidateFieldMap"]
     lines = [
         "# NiDataStream descriptor/sample-byte comparison",
@@ -2016,6 +2101,10 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
             "| Descriptor byte-order checks | "
             f"{format_markdown_cell(byte_order['PassedCount'])}/"
             f"{format_markdown_cell(byte_order['CheckCount'])} |"
+        ),
+        (
+            "| Descriptor record byte patterns | "
+            f"{format_markdown_cell(record_bytes['RecordPatternCount'])} |"
         ),
         "",
         "## Sample-byte uniformity checks",
@@ -2060,6 +2149,30 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
                     format_markdown_cell(check["ObservedValue"]),
                     f"{format_markdown_cell(check['ObservedCount'])}/{format_markdown_cell(check['ExpectedBlockCount'])}",
                     format_markdown_cell(str(check["MatchesExpected"]).lower()),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Descriptor record byte distribution",
+            "",
+            "| Byte offset | Unique values | Top values |",
+            "|---:|---:|---|",
+        ]
+    )
+    for offset in record_bytes["ByteOffsets"]:
+        top_values = ", ".join(
+            f"{value['ValueHex']} ({value['Count']})" for value in offset["TopValues"][:8]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(offset["OffsetBytes"]),
+                    format_markdown_cell(offset["UniqueValueCount"]),
+                    format_markdown_cell(top_values),
                 ]
             )
             + " |"
@@ -2126,6 +2239,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     corpus = report["SampleCorpusStatus"]
     sample = report["SampleByteSummary"]
     byte_order = report["DescriptorByteOrderProof"]
+    record_bytes = report["DescriptorRecordByteSummary"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
         "Descriptor helper evidence-ready targets: "
@@ -2138,6 +2252,10 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     print(f"Sample corpus files parsed: {corpus['FilesParsed']}/{corpus['FilesScanned']}")
     print(f"Uniform sample-byte checks: {sample['PassedCount']}/{sample['CheckCount']}")
     print(f"Descriptor byte-order checks: {byte_order['PassedCount']}/{byte_order['CheckCount']}")
+    print(
+        "Descriptor record byte patterns: "
+        f"{record_bytes['RecordPatternCount']} patterns; width={record_bytes['RecordWidthBytes']}"
+    )
     print(f"Candidate field-map entries: {len(report['CandidateFieldMap'])}")
     print(f"Descriptor + sample evidence ready: {str(report['DescriptorAndSampleEvidenceReady']).lower()}")
     print(f"Parser/export promotion allowed: {str(report['ParserExportPromotionAllowed']).lower()}")

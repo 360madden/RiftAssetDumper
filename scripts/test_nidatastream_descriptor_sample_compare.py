@@ -190,6 +190,14 @@ check("sample check count", compare["SampleByteSummary"]["CheckCount"], 6)
 check("sample passed count", compare["SampleByteSummary"]["PassedCount"], 6)
 check("byte-order check count", compare["DescriptorByteOrderProof"]["CheckCount"], 7)
 check("byte-order passed count", compare["DescriptorByteOrderProof"]["PassedCount"], 7)
+record_byte_summary = compare["DescriptorRecordByteSummary"]
+check("record byte summary candidate-only", record_byte_summary["CandidateOnly"], True)
+check("record byte summary pattern count", record_byte_summary["RecordPatternCount"], 1)
+check("record byte summary observed count", record_byte_summary["ObservedRecordCount"], 5)
+check("record byte summary width", record_byte_summary["RecordWidthBytes"], 4)
+check("record byte offset count", len(record_byte_summary["ByteOffsets"]), 4)
+check("record byte offset 0 top value", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["ValueHex"], "aa")
+check("record byte offset 0 top count", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["Count"], 5)
 check("candidate field map count", len(compare["CandidateFieldMap"]), 4)
 stride_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
 format_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-format-size-lookup")
@@ -290,6 +298,9 @@ check_validation_error("schema rejects field order promotion", field_promoted_co
 field_map_promoted_compare = json.loads(json.dumps(compare))
 field_map_promoted_compare["CandidateFieldMap"][0]["PromotionStatus"] = "promoted"
 check_validation_error("schema rejects promoted field-map entry", field_map_promoted_compare, schema)
+record_byte_promoted_compare = json.loads(json.dumps(compare))
+record_byte_promoted_compare["DescriptorRecordByteSummary"]["FieldOrderPromoted"] = True
+check_validation_error("schema rejects promoted descriptor record byte summary", record_byte_promoted_compare, schema)
 
 print("=== NiDataStream descriptor/sample-byte compare writes ignored reports ===")
 with TemporaryDirectory() as temp_dir:
@@ -325,6 +336,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("console reports candidate-only", console.getvalue(), "candidate-only/report-only")
     markdown = markdown_path.read_text(encoding="utf-8")
     check_contains("markdown title", markdown, "# NiDataStream descriptor/sample-byte comparison")
+    check_contains("markdown descriptor record byte distribution", markdown, "Descriptor record byte distribution")
+    check_contains("markdown descriptor record byte value", markdown, "aa (5)")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")
     check_contains("markdown format field", markdown, "descriptor-format-size-lookup")
 
