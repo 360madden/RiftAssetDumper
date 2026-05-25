@@ -34,6 +34,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "GhidraWorkflowGuardSuite": "ghidra-workflow-guard-suite",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
+    "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
 }
 
 

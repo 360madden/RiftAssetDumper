@@ -10,6 +10,7 @@
     "HistoricalStage",
     "CurrentLane",
     "FunctionSiteTargetStatus",
+    "DescriptorReportStatus",
     "LayoutReportStatus",
     "ParserExportPromotionAllowed",
     "BlockerCount",
@@ -23,6 +24,7 @@
     "HistoricalStage": { "const": "Stage 18 complete" },
     "CurrentLane": { "type": "string", "minLength": 1 },
     "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
+    "DescriptorReportStatus": { "$ref": "#/$defs/descriptorReportStatus" },
     "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
     "ParserExportPromotionAllowed": { "const": false },
     "BlockerCount": { "type": "integer", "minimum": 0 },
@@ -74,6 +76,24 @@
         "LegacyOffsetShiftedBlocks": { "type": "integer", "minimum": 0 },
         "AllBlocksGhidraStyleValid": { "type": "boolean" },
         "Error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "descriptorReportStatus": {
+      "type": "object",
+      "required": [
+        "SchemaVersion",
+        "RequiredTargetCount",
+        "EvidenceReadyCount",
+        "AllRequiredEvidenceReady",
+        "FieldOrderPromoted"
+      ],
+      "properties": {
+        "SchemaVersion": { "const": "nidatastream-descriptor-proof-status/v1" },
+        "RequiredTargetCount": { "type": "integer", "minimum": 0 },
+        "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
+        "AllRequiredEvidenceReady": { "type": "boolean" },
+        "FieldOrderPromoted": { "const": false }
       },
       "additionalProperties": false
     },

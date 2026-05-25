@@ -72,6 +72,8 @@ check("historical stage", status["HistoricalStage"], "Stage 18 complete")
 check("promotion blocked", status["ParserExportPromotionAllowed"], False)
 check("has blocking gates", status["BlockerCount"] > 0, True)
 check_contains("promotion lane", status["CurrentLane"], "post-Stage-18")
+check("descriptor report status present", "DescriptorReportStatus" in status, True)
+check("descriptor field order not promoted", status["DescriptorReportStatus"]["FieldOrderPromoted"], False)
 check("layout report status present", "LayoutReportStatus" in status, True)
 check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
 

@@ -55,6 +55,7 @@ Commands (kebab-case):
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
     nidatastream-parser-field-proof-guard — fail closed on premature NiDataStream parser/export promotion
+    nidatastream-descriptor-proof-status — candidate-only descriptor helper evidence status
     nidatastream-layout          — read-only NiDataStream layout report/validator
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
 """
@@ -318,6 +319,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-proof-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-layout": {
         "dotnet": "",
         "base": "nidatastream-layout-report",
@@ -377,6 +382,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
+    "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
     "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
     "All": "all",
@@ -1195,6 +1201,242 @@ def _nidatastream_gate(
     }
 
 
+DESCRIPTOR_PROOF_REQUIREMENTS: dict[str, dict[str, Any]] = {
+    "nidatastream-loadbinary": {
+        "RequiredCalls": ["1411821f0", "141181770", "1411817c0"],
+        "RequiredDataRefs": [],
+        "RequiredTerms": [],
+        "EvidenceRole": "LoadBinary calls all tracked descriptor helper/builders.",
+    },
+    "nidatastream-descriptor-helper": {
+        "RequiredCalls": ["141182280"],
+        "RequiredDataRefs": ["143358be0", "143358be4", "143358be8"],
+        "RequiredTerms": ["* 0xc"],
+        "EvidenceRole": "Descriptor helper reads 12-byte descriptor table fields and calls the format-size helper.",
+    },
+    "nidatastream-descriptor-builder-1770": {
+        "RequiredCalls": [],
+        "RequiredDataRefs": ["143358be0", "143358be4", "143358b01"],
+        "RequiredTerms": ["* 0xc"],
+        "EvidenceRole": "Builder checks descriptor table flag/count-class fields and sentinel/default data.",
+    },
+    "nidatastream-descriptor-builder-17c0": {
+        "RequiredCalls": ["141182280"],
+        "RequiredDataRefs": ["143358be0", "143358be8", "143358b04"],
+        "RequiredTerms": ["* 0xc"],
+        "EvidenceRole": "Builder checks descriptor table flag/format fields and calls the format-size helper.",
+    },
+}
+
+
+DESCRIPTOR_CANDIDATE_FIELD_MAP = [
+    {
+        "Field": "descriptor-table-stride",
+        "Evidence": "Descriptor helpers index the candidate table with a 0xc-byte stride.",
+        "EvidenceTargets": [
+            "nidatastream-descriptor-helper",
+            "nidatastream-descriptor-builder-1770",
+            "nidatastream-descriptor-builder-17c0",
+        ],
+    },
+    {
+        "Field": "descriptor-enable-or-special-flag",
+        "DataAddress": "143358be0",
+        "Evidence": "Helpers branch on DAT_143358be0 before choosing special/default handling.",
+        "EvidenceTargets": [
+            "nidatastream-descriptor-helper",
+            "nidatastream-descriptor-builder-1770",
+            "nidatastream-descriptor-builder-17c0",
+        ],
+    },
+    {
+        "Field": "descriptor-component-class",
+        "DataAddress": "143358be4",
+        "Evidence": "Helpers use DAT_143358be4 to derive component/class count candidates.",
+        "EvidenceTargets": [
+            "nidatastream-descriptor-helper",
+            "nidatastream-descriptor-builder-1770",
+        ],
+    },
+    {
+        "Field": "descriptor-format-size-lookup",
+        "DataAddress": "143358be8",
+        "Evidence": "Helpers pass DAT_143358be8 values to FUN_141182280 for size/format mapping.",
+        "EvidenceTargets": [
+            "nidatastream-descriptor-helper",
+            "nidatastream-descriptor-builder-17c0",
+        ],
+    },
+]
+
+
+def _report_path_from_target(target: dict[str, Any]) -> Path:
+    """Return the repo-rooted ignored report path for a FunctionSiteSurvey target."""
+    return REPO_ROOT / str(target.get("ReportPath", ""))
+
+
+def _hex_without_prefix(value: str) -> str:
+    """Normalize a hex address token to lower-case without 0x."""
+    return value.lower().removeprefix("0x")
+
+
+def _report_call_targets(report: dict[str, Any]) -> set[str]:
+    """Return normalized call target addresses from a FunctionSiteSurvey report."""
+    calls = report.get("callsFromFunction")
+    if not isinstance(calls, list):
+        return set()
+    targets: set[str] = set()
+    for call in calls:
+        if not isinstance(call, dict):
+            continue
+        target = call.get("calleeEntry") or call.get("to")
+        if isinstance(target, str) and target:
+            targets.add(_hex_without_prefix(target))
+    return targets
+
+
+def _report_data_ref_targets(report: dict[str, Any]) -> set[str]:
+    """Return normalized data reference targets from a FunctionSiteSurvey report."""
+    refs = report.get("dataRefsFromFunction")
+    if not isinstance(refs, list):
+        return set()
+    targets: set[str] = set()
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        target = ref.get("to")
+        if isinstance(target, str) and target:
+            targets.add(_hex_without_prefix(target))
+    return targets
+
+
+def _report_decompile_text(report: dict[str, Any]) -> str:
+    """Return decompiler text from a FunctionSiteSurvey report."""
+    decompile = report.get("decompile")
+    if not isinstance(decompile, dict):
+        return ""
+    text = decompile.get("c")
+    return text if isinstance(text, str) else ""
+
+
+def _report_decompile_completed(report: dict[str, Any]) -> bool:
+    """Return whether the report says decompilation completed."""
+    decompile = report.get("decompile")
+    return isinstance(decompile, dict) and decompile.get("completed") is True
+
+
+def _descriptor_target_status(target: dict[str, Any], requirements: dict[str, Any]) -> dict[str, Any]:
+    """Build descriptor-helper evidence status for one FunctionSiteSurvey target."""
+    key = str(target.get("Key", ""))
+    report_path_text = str(target.get("ReportPath", ""))
+    report_path = _report_path_from_target(target)
+    report_exists = bool(report_path_text) and report_path.exists()
+    required_calls = _as_string_list(requirements.get("RequiredCalls"))
+    required_data_refs = _as_string_list(requirements.get("RequiredDataRefs"))
+    required_terms = _as_string_list(requirements.get("RequiredTerms"))
+    base = {
+        "Key": key,
+        "ReportPath": report_path_text,
+        "Exists": report_exists,
+        "FunctionEntry": "",
+        "DecompileCompleted": False,
+        "RequiredCalls": required_calls,
+        "MissingCalls": required_calls,
+        "RequiredDataRefs": required_data_refs,
+        "MissingDataRefs": required_data_refs,
+        "RequiredTerms": required_terms,
+        "MissingTerms": required_terms,
+        "EvidenceReady": False,
+        "EvidenceRole": str(requirements.get("EvidenceRole", "")),
+        "Error": "",
+    }
+    if not report_exists:
+        return base
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        base["Error"] = str(exc)
+        return base
+
+    function = report.get("function")
+    function_entry = str(function.get("entry", "")) if isinstance(function, dict) else ""
+    calls = _report_call_targets(report)
+    data_refs = _report_data_ref_targets(report)
+    decompile_text = _report_decompile_text(report)
+    missing_calls = [address for address in required_calls if _hex_without_prefix(address) not in calls]
+    missing_data_refs = [address for address in required_data_refs if _hex_without_prefix(address) not in data_refs]
+    missing_terms = [term for term in required_terms if term not in decompile_text]
+    decompile_completed = _report_decompile_completed(report)
+    evidence_ready = decompile_completed and not missing_calls and not missing_data_refs and not missing_terms
+    base.update(
+        {
+            "FunctionEntry": function_entry,
+            "DecompileCompleted": decompile_completed,
+            "MissingCalls": missing_calls,
+            "MissingDataRefs": missing_data_refs,
+            "MissingTerms": missing_terms,
+            "EvidenceReady": evidence_ready,
+        }
+    )
+    return base
+
+
+def _nidatastream_descriptor_proof_status_payload(args: argparse.Namespace) -> dict[str, Any]:
+    """Return candidate-only descriptor helper evidence status from local FunctionSiteSurvey reports."""
+    registry = _guard_ghidra_function_site_targets(_ghidra_function_site_targets_path(args), quiet=True)
+    targets = [target for target in registry.get("Targets", []) if isinstance(target, dict)]
+    by_key = {str(target.get("Key", "")): target for target in targets}
+    target_statuses = [
+        _descriptor_target_status(by_key.get(key, {"Key": key}), requirements)
+        for key, requirements in DESCRIPTOR_PROOF_REQUIREMENTS.items()
+    ]
+    ready_count = sum(1 for target in target_statuses if target["EvidenceReady"])
+    return {
+        "SchemaVersion": "nidatastream-descriptor-proof-status/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "RequiredTargetCount": len(target_statuses),
+        "EvidenceReadyCount": ready_count,
+        "AllRequiredEvidenceReady": ready_count == len(target_statuses),
+        "Targets": target_statuses,
+        "CandidateFieldMap": DESCRIPTOR_CANDIDATE_FIELD_MAP,
+        "NextAction": "Use descriptor status as candidate evidence only; pair it with sample-byte and pairing-impact proof before parser/export promotion.",
+    }
+
+
+def _print_nidatastream_descriptor_proof_status(status: dict[str, Any]) -> None:
+    """Print descriptor helper evidence status."""
+    print("--- NiDataStreamDescriptorProofStatus")
+    print(f"Evidence-ready targets: {status['EvidenceReadyCount']}/{status['RequiredTargetCount']}")
+    print(f"Field-order promoted: {str(status['FieldOrderPromoted']).lower()}")
+    print("")
+    print(f"{'Target':42} {'Ready':7} {'Function':14} Missing")
+    print(f"{'-' * 42} {'-' * 7} {'-' * 14} {'-' * 40}")
+    for target in status["Targets"]:
+        missing = []
+        for key in ("MissingCalls", "MissingDataRefs", "MissingTerms"):
+            values = target.get(key)
+            if isinstance(values, list) and values:
+                missing.append(f"{key}={','.join(str(value) for value in values)}")
+        print(
+            f"{target['Key']:42} "
+            f"{'yes' if target['EvidenceReady'] else 'no':7} "
+            f"{target['FunctionEntry'] or '-':14} "
+            f"{'; '.join(missing) if missing else '-'}"
+        )
+    print("")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_nidatastream_descriptor_proof_status(args: argparse.Namespace) -> None:
+    """Show candidate-only NiDataStream descriptor helper evidence status."""
+    status = _nidatastream_descriptor_proof_status_payload(args)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_nidatastream_descriptor_proof_status(status)
+
+
 def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, Any]:
     """Return status for the ignored local NiDataStream layout report, if present."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
@@ -1246,6 +1488,13 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     evidence_text = (
         f"{ready_count}/{target_count} FunctionSiteSurvey targets have ignored local JSON reports and Markdown summaries."
     )
+    descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
+    descriptor_ready = bool(descriptor_status["AllRequiredEvidenceReady"])
+    descriptor_state = "candidate" if descriptor_ready else "blocked"
+    descriptor_evidence = (
+        f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']} descriptor helper "
+        "reports satisfy call/data-ref/decompile-term evidence; field order remains candidate-only."
+    )
     layout_status = _nidatastream_layout_report_status(args)
     layout_blocks = int(layout_status["NiDataStreamBlocks"])
     layout_valid_blocks = int(layout_status["GhidraStyleLayoutValidBlocks"])
@@ -1281,11 +1530,11 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         ),
         _nidatastream_gate(
             "descriptor-field-order-proof",
-            "candidate",
+            descriptor_state,
             True,
             "Descriptor helper/builders prove concrete count/order/format/component byte mapping, not only names.",
-            "Current descriptor-helper targets are useful client-code anchors, but field-order proof is not promoted.",
-            "python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-descriptor-helper",
+            descriptor_evidence,
+            "python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json",
         ),
         _nidatastream_gate(
             "sample-byte-agreement",
@@ -1331,6 +1580,13 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "EvidenceReadyCount": ready_count,
             "EvidenceReady": evidence_ready,
         },
+        "DescriptorReportStatus": {
+            "SchemaVersion": descriptor_status["SchemaVersion"],
+            "RequiredTargetCount": descriptor_status["RequiredTargetCount"],
+            "EvidenceReadyCount": descriptor_status["EvidenceReadyCount"],
+            "AllRequiredEvidenceReady": descriptor_status["AllRequiredEvidenceReady"],
+            "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
+        },
         "LayoutReportStatus": layout_status,
         "ParserExportPromotionAllowed": False,
         "BlockerCount": len(blockers),
@@ -1343,6 +1599,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
 def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     """Print a human-readable NiDataStream parser-field promotion status."""
     target_status = status["FunctionSiteTargetStatus"]
+    descriptor_status = status["DescriptorReportStatus"]
     layout_status = status["LayoutReportStatus"]
     print("--- NiDataStreamPromotionStatus")
     print(f"Historical stage: {status['HistoricalStage']}")
@@ -1350,6 +1607,10 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     print(
         "FunctionSite evidence-ready targets: "
         f"{target_status['EvidenceReadyCount']}/{target_status['TargetCount']}"
+    )
+    print(
+        "Descriptor helper evidence-ready targets: "
+        f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']}"
     )
     layout_mark = "yes" if layout_status["Exists"] else "no"
     print(
@@ -1658,6 +1919,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-parser-field-proof-guard":
         _run_nidatastream_parser_field_proof_guard(args)
+        return
+
+    if command == "nidatastream-descriptor-proof-status":
+        _run_nidatastream_descriptor_proof_status(args)
         return
 
     if command == "nidatastream-layout":
@@ -2978,6 +3243,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
   python scripts/rift_workflow.py nidatastream-promotion-status --list-json
   python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
+  python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
@@ -3228,11 +3494,13 @@ Examples:
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
         "nidatastream-promotion-status",
+        "nidatastream-descriptor-proof-status",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with ghidra-function-site-survey, "
-            "ghidra-function-site-status, and nidatastream-promotion-status.",
+            "ghidra-function-site-status, nidatastream-promotion-status, "
+            "and nidatastream-descriptor-proof-status.",
             file=sys.stderr,
         )
         sys.exit(1)

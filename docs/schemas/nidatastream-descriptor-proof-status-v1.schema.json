@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/nidatastream-descriptor-proof-status-v1.schema.json",
+  "title": "NiDataStream descriptor proof status v1",
+  "description": "Candidate-only FunctionSiteSurvey evidence status for NiDataStream descriptor helper/builders.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "FieldOrderPromoted",
+    "RequiredTargetCount",
+    "EvidenceReadyCount",
+    "AllRequiredEvidenceReady",
+    "Targets",
+    "CandidateFieldMap",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-descriptor-proof-status/v1" },
+    "CandidateOnly": { "const": true },
+    "FieldOrderPromoted": { "const": false },
+    "RequiredTargetCount": { "type": "integer", "minimum": 0 },
+    "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
+    "AllRequiredEvidenceReady": { "type": "boolean" },
+    "Targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/targetStatus" }
+    },
+    "CandidateFieldMap": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldMap" }
+    },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "targetStatus": {
+      "type": "object",
+      "required": [
+        "Key",
+        "ReportPath",
+        "Exists",
+        "FunctionEntry",
+        "DecompileCompleted",
+        "RequiredCalls",
+        "MissingCalls",
+        "RequiredDataRefs",
+        "MissingDataRefs",
+        "RequiredTerms",
+        "MissingTerms",
+        "EvidenceReady",
+        "EvidenceRole",
+        "Error"
+      ],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "ReportPath": { "type": "string" },
+        "Exists": { "type": "boolean" },
+        "FunctionEntry": { "type": "string" },
+        "DecompileCompleted": { "type": "boolean" },
+        "RequiredCalls": { "$ref": "#/$defs/stringList" },
+        "MissingCalls": { "$ref": "#/$defs/stringList" },
+        "RequiredDataRefs": { "$ref": "#/$defs/stringList" },
+        "MissingDataRefs": { "$ref": "#/$defs/stringList" },
+        "RequiredTerms": { "$ref": "#/$defs/stringList" },
+        "MissingTerms": { "$ref": "#/$defs/stringList" },
+        "EvidenceReady": { "type": "boolean" },
+        "EvidenceRole": { "type": "string" },
+        "Error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "fieldMap": {
+      "type": "object",
+      "required": ["Field", "Evidence", "EvidenceTargets"],
+      "properties": {
+        "Field": { "type": "string", "minLength": 1 },
+        "DataAddress": { "type": "string" },
+        "Evidence": { "type": "string", "minLength": 1 },
+        "EvidenceTargets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

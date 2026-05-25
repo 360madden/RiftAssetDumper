@@ -32,7 +32,7 @@ Do not change decoder/export behavior until every required gate for the target f
 |---|---|---|---|
 | Target registry safety | FunctionSiteSurvey targets are candidate-only, unique, and write only repo-relative ignored `Exports/ghidra-reports/` files | `ghidra-function-site-target-guard`; included in `ghidra-workflow-guard-suite` | ✅ Guarded |
 | Ghidra evidence availability | The target has both a local ignored JSON report and Markdown summary before being cited as fresh evidence | `ghidra-function-site-status --list-json` | ✅ Local 7/7 evidence-ready as of the 2026-05-25 summary refresh; still ignored/generated and candidate-only |
-| Descriptor field order | Descriptor helper/builders prove count/order/format/component fields strongly enough to map bytes, not just names | `ghidra-function-site-survey --ghidra-target nidatastream-descriptor-helper`; descriptor builder targets | 🟨 Candidate-only |
+| Descriptor field order | Descriptor helper/builders prove count/order/format/component fields strongly enough to map bytes, not just names | `nidatastream-descriptor-proof-status --list-json`; descriptor builder targets | 🟨 Candidate-only; local status checks 4 descriptor helper/builders for call/data-ref/decompile-term evidence |
 | Sample-byte agreement | Copied/extracted NIF samples agree with the proposed Ghidra-aligned prefix/payload/trailer interpretation | `nidatastream-layout --root Extracted --full`; schema `docs/schemas/nidatastream-layout-report-v1.schema.json` | 🟨 Local ignored report currently shows 184/184 Ghidra-style-valid blocks; still report-only |
 | Pairing impact | A field interpretation change creates complete position+normal+UV evidence without promoting noise/sentinels | `ghidra-attribute-candidate-report`; `ghidra-attribute-candidate-guard` | 🟥 Not promoted: guard currently expects zero complete groups |
 | Export isolation | Ghidra evidence is not consumed by decode/export paths | `ghidra-workflow-guard-suite`; `ghidra-pairing-non-export-guard` | ✅ Guarded |
@@ -43,6 +43,7 @@ Executable status/guard surface:
 ```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
+python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 ```
 
 ## Current decision
