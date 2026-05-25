@@ -206,6 +206,11 @@ with (
 list_payload = parse_json_object(list_output.getvalue())
 check("function survey list-json schema", list_payload["SchemaVersion"], "ghidra-function-site-target-list/v1")
 check("function survey list-json count", list_payload["TargetCount"], len(target_registry["Targets"]))
+target_list_schema = json.loads(
+    Path("docs/schemas/ghidra-function-site-target-list-v1.schema.json").read_text(encoding="utf-8")
+)
+jsonschema.validate(list_payload, target_list_schema)
+print("  PASS: function survey list-json schema validation")
 status_output = io.StringIO()
 with (
     patch.object(sys, "argv", ["rift_workflow.py", "ghidra-function-site-status", "--list-json"]),
@@ -216,6 +221,11 @@ with (
 status_payload = parse_json_object(status_output.getvalue())
 check("function survey status schema", status_payload["SchemaVersion"], "ghidra-function-site-status/v1")
 check("function survey status count", status_payload["TargetCount"], len(target_registry["Targets"]))
+target_status_schema = json.loads(
+    Path("docs/schemas/ghidra-function-site-status-v1.schema.json").read_text(encoding="utf-8")
+)
+jsonschema.validate(status_payload, target_status_schema)
+print("  PASS: function survey status schema validation")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     script_file = temp_path / "FunctionSiteSurvey.java"

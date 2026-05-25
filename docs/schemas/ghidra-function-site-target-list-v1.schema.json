@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-function-site-target-list-v1.schema.json",
+  "title": "Ghidra FunctionSiteSurvey target list v1",
+  "description": "Machine-readable target list emitted by `python scripts/rift_workflow.py ghidra-function-site-survey --list-json`.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "DefaultProjectName",
+    "DefaultProcess",
+    "DefaultScript",
+    "DefaultNoAnalysis",
+    "DefaultKeepProject",
+    "DefaultTimeoutSeconds",
+    "TargetCount",
+    "Targets"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-function-site-target-list/v1" },
+    "CandidateOnly": { "const": true },
+    "DefaultProjectName": { "type": "string" },
+    "DefaultProcess": { "type": "string" },
+    "DefaultScript": { "type": "string" },
+    "DefaultNoAnalysis": { "type": "boolean" },
+    "DefaultKeepProject": { "type": "boolean" },
+    "DefaultTimeoutSeconds": { "type": "integer", "minimum": 0 },
+    "TargetCount": { "type": "integer", "minimum": 0 },
+    "Targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/target" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "target": {
+      "type": "object",
+      "required": ["Key", "Address", "ReportPath", "SummaryPath", "SummaryTerms", "Description"],
+      "properties": {
+        "Key": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "Address": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "ReportPath": { "type": "string", "pattern": "^Exports/ghidra-reports/[^\\\\]+$" },
+        "SummaryPath": { "type": "string", "pattern": "^Exports/ghidra-reports/[^\\\\]+$" },
+        "SummaryTerms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Description": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

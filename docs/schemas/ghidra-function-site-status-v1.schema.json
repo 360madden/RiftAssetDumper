@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/ghidra-function-site-status-v1.schema.json",
+  "title": "Ghidra FunctionSiteSurvey target status v1",
+  "description": "Machine-readable status emitted by `python scripts/rift_workflow.py ghidra-function-site-status --list-json`.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "Registry",
+    "TargetCount",
+    "EvidenceReadyCount",
+    "Targets"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "ghidra-function-site-status/v1" },
+    "CandidateOnly": { "const": true },
+    "Registry": { "type": "string", "minLength": 1 },
+    "TargetCount": { "type": "integer", "minimum": 0 },
+    "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
+    "Targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/targetStatus" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ignoredOutputStatus": {
+      "type": "object",
+      "required": ["Path", "Exists", "Bytes", "MtimeUtc"],
+      "properties": {
+        "Path": { "type": "string", "pattern": "^Exports/ghidra-reports/[^\\\\]+$" },
+        "Exists": { "type": "boolean" },
+        "Bytes": { "type": "integer", "minimum": 0 },
+        "MtimeUtc": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "targetStatus": {
+      "type": "object",
+      "required": ["Key", "Address", "Report", "Summary", "EvidenceReady"],
+      "properties": {
+        "Key": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "Address": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "Report": { "$ref": "#/$defs/ignoredOutputStatus" },
+        "Summary": { "$ref": "#/$defs/ignoredOutputStatus" },
+        "EvidenceReady": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
