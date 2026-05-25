@@ -60,9 +60,9 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
             "FUN_141181770(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
             "FUN_1411817c0(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
         ],
-        "nidatastream-descriptor-helper": ["(ulonglong)(param_1 & 0xff) * 0xc"],
-        "nidatastream-descriptor-builder-1770": ["(ulonglong)(param_1 & 0xff) * 0xc"],
-        "nidatastream-descriptor-builder-17c0": ["(ulonglong)(param_1 & 0xff) * 0xc"],
+        "nidatastream-descriptor-helper": ["(int)param_1 < 0", "(ulonglong)(param_1 & 0xff) * 0xc"],
+        "nidatastream-descriptor-builder-1770": ["(int)param_1 < 0", "(ulonglong)(param_1 & 0xff) * 0xc"],
+        "nidatastream-descriptor-builder-17c0": ["(int)param_1 < 0", "(ulonglong)(param_1 & 0xff) * 0xc"],
     }
     for index, (key, requirements) in enumerate(rift_workflow.DESCRIPTOR_PROOF_REQUIREMENTS.items(), start=1):
         report_path = report_dir / f"{key}.json"
@@ -217,6 +217,13 @@ check("record index proof mapped", record_index_proof["CandidateRecordIndexMappe
 check("record index proof byte offset", record_index_proof["CandidateIndexByteOffset"], 0)
 check("record index proof passed count", record_index_proof["PassedEvidenceCount"], 5)
 check("record index proof remaining bytes", record_index_proof["RemainingUnmappedByteOffsets"], [1, 2, 3])
+helper_argument_use = compare["DescriptorHelperArgumentUseProof"]
+check("helper argument proof candidate-only", helper_argument_use["CandidateOnly"], True)
+check("helper argument proof high bytes unused", helper_argument_use["HelperLookupHighBytesProvenUnused"], True)
+check("helper argument proof high bytes used flag", helper_argument_use["HelperLookupHighBytesUsed"], False)
+check("helper argument proof passed count", helper_argument_use["PassedEvidenceCount"], 3)
+check("helper argument proof ignored offsets", helper_argument_use["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check("helper argument proof sign guard offsets", helper_argument_use["CandidateSignGuardByteOffsets"], [3])
 record_byte_roles = compare["DescriptorRecordByteRoleCandidates"]
 check("record byte roles candidate-only", record_byte_roles["CandidateOnly"], True)
 check("record byte roles all classified", record_byte_roles["AllBytesClassified"], True)
@@ -234,6 +241,11 @@ check("semantic feasibility static field map ready", semantic_feasibility["Stati
 check("semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True)
 check("semantic feasibility record index mapped", semantic_feasibility["DescriptorRecordIndexCandidateMapped"], True)
 check("semantic feasibility byte roles classified", semantic_feasibility["DescriptorRecordByteRolesClassified"], True)
+check(
+    "semantic feasibility high bytes proven unused",
+    semantic_feasibility["DescriptorHelperLookupHighBytesProvenUnused"],
+    True,
+)
 check("semantic feasibility mapping blocked", semantic_feasibility["SemanticMappingReady"], False)
 check("semantic feasibility static offsets", semantic_feasibility["StaticFieldMapOffsetCount"], 3)
 check("semantic feasibility record offsets", semantic_feasibility["DescriptorRecordByteOffsetCount"], 4)
@@ -245,6 +257,8 @@ check(
     True,
 )
 check("semantic feasibility padding offsets", semantic_feasibility["CandidatePaddingByteOffsets"], [3])
+check("semantic feasibility helper ignored offsets", semantic_feasibility["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check("semantic feasibility sign guard offsets", semantic_feasibility["CandidateSignGuardByteOffsets"], [3])
 check("semantic feasibility remaining offsets", semantic_feasibility["RemainingUnmappedRecordByteOffsets"], [1, 2])
 first_semantic_row = semantic_feasibility["OffsetComparisonRows"][0]
 check("semantic feasibility first field", first_semantic_row["Field"], "descriptor-enable-or-special-flag")
@@ -361,6 +375,9 @@ check_validation_error("schema rejects promoted descriptor record byte summary",
 record_index_promoted_compare = json.loads(json.dumps(compare))
 record_index_promoted_compare["DescriptorRecordIndexProof"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor record index proof", record_index_promoted_compare, schema)
+helper_argument_promoted_compare = json.loads(json.dumps(compare))
+helper_argument_promoted_compare["DescriptorHelperArgumentUseProof"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor helper argument proof", helper_argument_promoted_compare, schema)
 record_role_promoted_compare = json.loads(json.dumps(compare))
 record_role_promoted_compare["DescriptorRecordByteRoleCandidates"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor byte-role candidates", record_role_promoted_compare, schema)
@@ -408,6 +425,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown descriptor record byte distribution", markdown, "Descriptor record byte distribution")
     check_contains("markdown descriptor record byte value", markdown, "aa (3)")
     check_contains("markdown descriptor record index proof", markdown, "Descriptor record index proof")
+    check_contains("markdown descriptor helper argument proof", markdown, "Descriptor helper argument-use proof")
+    check_contains("markdown helper high bytes proof", markdown, "Helper lookup high bytes proven unused")
     check_contains("markdown descriptor byte role candidates", markdown, "Descriptor record byte role candidates")
     check_contains("markdown descriptor padding candidate", markdown, "zero-padding-or-reserved")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")

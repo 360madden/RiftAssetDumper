@@ -14,6 +14,7 @@
     "Targets",
     "CandidateFieldMap",
     "DescriptorRecordIndexProof",
+    "DescriptorHelperArgumentUseProof",
     "NextAction"
   ],
   "properties": {
@@ -32,6 +33,7 @@
       "items": { "$ref": "#/$defs/fieldMap" }
     },
     "DescriptorRecordIndexProof": { "$ref": "#/$defs/descriptorRecordIndexProof" },
+    "DescriptorHelperArgumentUseProof": { "$ref": "#/$defs/descriptorHelperArgumentUseProof" },
     "NextAction": { "type": "string", "minLength": 1 }
   },
   "additionalProperties": false,
@@ -159,6 +161,88 @@
         "DecompileCompleted": { "type": "boolean" },
         "RequiredTerms": { "$ref": "#/$defs/stringList" },
         "MissingTerms": { "$ref": "#/$defs/stringList" },
+        "Evidence": { "type": "string", "minLength": 1 },
+        "Passed": { "type": "boolean" },
+        "Error": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "descriptorHelperArgumentUseProof": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "HelperArgumentWidthBytes",
+        "CandidateIndexByteOffset",
+        "CandidateHelperLookupIgnoredByteOffsets",
+        "CandidateSignGuardByteOffsets",
+        "HelperLookupHighBytesUsed",
+        "HelperLookupHighBytesProvenUnused",
+        "RequiredEvidenceCount",
+        "PassedEvidenceCount",
+        "Checks",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "HelperArgumentWidthBytes": { "const": 4 },
+        "CandidateIndexByteOffset": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "CandidateHelperLookupIgnoredByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "CandidateSignGuardByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "HelperLookupHighBytesUsed": { "type": "boolean" },
+        "HelperLookupHighBytesProvenUnused": { "type": "boolean" },
+        "RequiredEvidenceCount": { "type": "integer", "minimum": 0 },
+        "PassedEvidenceCount": { "type": "integer", "minimum": 0 },
+        "Checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorHelperArgumentUseCheck" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorHelperArgumentUseCheck": {
+      "type": "object",
+      "required": [
+        "Key",
+        "TargetKey",
+        "ReportPath",
+        "DecompileCompleted",
+        "RequiredTerms",
+        "MissingTerms",
+        "ForbiddenHighByteTerms",
+        "PresentForbiddenHighByteTerms",
+        "Evidence",
+        "Passed",
+        "Error"
+      ],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "TargetKey": { "type": "string", "minLength": 1 },
+        "ReportPath": { "type": "string" },
+        "DecompileCompleted": { "type": "boolean" },
+        "RequiredTerms": { "$ref": "#/$defs/stringList" },
+        "MissingTerms": { "$ref": "#/$defs/stringList" },
+        "ForbiddenHighByteTerms": { "$ref": "#/$defs/stringList" },
+        "PresentForbiddenHighByteTerms": { "$ref": "#/$defs/stringList" },
         "Evidence": { "type": "string", "minLength": 1 },
         "Passed": { "type": "boolean" },
         "Error": { "type": "string" }

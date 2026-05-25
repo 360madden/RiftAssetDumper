@@ -218,6 +218,21 @@ check(
     True,
 )
 check(
+    "descriptor helper high bytes proof flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorHelperLookupHighBytesProvenUnused"], bool),
+    True,
+)
+check(
+    "descriptor helper ignored byte count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorHelperLookupIgnoredByteCount"], int),
+    True,
+)
+check(
+    "descriptor sign guard byte count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorSignGuardByteCount"], int),
+    True,
+)
+check(
     "descriptor record bytes classified flag is boolean",
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"], bool),
     True,
@@ -253,6 +268,13 @@ check_validation_error("promotion status rejects semantic mapping promotion", se
 string_index_status = json.loads(json.dumps(status))
 string_index_status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"] = "true"
 check_validation_error("promotion status rejects string record index mapped flag", string_index_status, status_schema)
+string_helper_high_bytes_status = json.loads(json.dumps(status))
+string_helper_high_bytes_status["DescriptorSampleCompareStatus"]["DescriptorHelperLookupHighBytesProvenUnused"] = "true"
+check_validation_error(
+    "promotion status rejects string helper high bytes proof flag",
+    string_helper_high_bytes_status,
+    status_schema,
+)
 string_classified_status = json.loads(json.dumps(status))
 string_classified_status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"] = "false"
 check_validation_error("promotion status rejects string record bytes classified flag", string_classified_status, status_schema)
@@ -299,6 +321,11 @@ check("missing layout byte-order checks pass count", missing_layout_compare["Byt
 check(
     "missing layout record index mapped flag is boolean",
     isinstance(missing_layout_compare["DescriptorRecordIndexCandidateMapped"], bool),
+    True,
+)
+check(
+    "missing layout helper high bytes proof flag is boolean",
+    isinstance(missing_layout_compare["DescriptorHelperLookupHighBytesProvenUnused"], bool),
     True,
 )
 check(
@@ -382,6 +409,11 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
     check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
+    check_contains(
+        "dashboard markdown helper high bytes status",
+        dashboard_markdown,
+        "Descriptor helper high bytes proven unused",
+    )
     check_contains("dashboard markdown padding byte status", dashboard_markdown, "Descriptor record padding byte candidates")
     check_contains("dashboard markdown remaining byte status", dashboard_markdown, "Descriptor record remaining unmapped bytes")
     check_contains("dashboard markdown semantic status", dashboard_markdown, "Descriptor semantic mapping ready")

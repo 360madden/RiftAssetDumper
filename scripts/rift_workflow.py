@@ -1373,6 +1373,61 @@ DESCRIPTOR_RECORD_INDEX_PROOF_REQUIREMENTS = [
 ]
 
 
+DESCRIPTOR_HELPER_ARGUMENT_USE_PROOF_REQUIREMENTS = [
+    {
+        "Key": "descriptor-helper-low-byte-lookup",
+        "TargetKey": "nidatastream-descriptor-helper",
+        "RequiredTerms": ["(int)param_1 < 0", "param_1 & 0xff", "* 0xc"],
+        "ForbiddenHighByteTerms": [
+            "param_1 >> 8",
+            "param_1 >> 0x8",
+            "param_1 >> 16",
+            "param_1 >> 0x10",
+            "param_1 & 0xff00",
+            "param_1 & 0xffff00",
+        ],
+        "Evidence": (
+            "The descriptor size helper gates negative signed values, then masks the record argument "
+            "to byte 0 for static-table lookup."
+        ),
+    },
+    {
+        "Key": "descriptor-builder-1770-low-byte-lookup",
+        "TargetKey": "nidatastream-descriptor-builder-1770",
+        "RequiredTerms": ["(int)param_1 < 0", "param_1 & 0xff", "* 0xc"],
+        "ForbiddenHighByteTerms": [
+            "param_1 >> 8",
+            "param_1 >> 0x8",
+            "param_1 >> 16",
+            "param_1 >> 0x10",
+            "param_1 & 0xff00",
+            "param_1 & 0xffff00",
+        ],
+        "Evidence": (
+            "The component/count builder gates negative signed values, then masks the record argument "
+            "to byte 0 for static-table lookup."
+        ),
+    },
+    {
+        "Key": "descriptor-builder-17c0-low-byte-lookup",
+        "TargetKey": "nidatastream-descriptor-builder-17c0",
+        "RequiredTerms": ["(int)param_1 < 0", "param_1 & 0xff", "* 0xc"],
+        "ForbiddenHighByteTerms": [
+            "param_1 >> 8",
+            "param_1 >> 0x8",
+            "param_1 >> 16",
+            "param_1 >> 0x10",
+            "param_1 & 0xff00",
+            "param_1 & 0xffff00",
+        ],
+        "Evidence": (
+            "The format-size builder gates negative signed values, then masks the record argument "
+            "to byte 0 for static-table lookup."
+        ),
+    },
+]
+
+
 SAMPLE_BYTE_UNIFORMITY_REQUIREMENTS = [
     {
         "Key": "payload-prefix-bytes",
@@ -1659,6 +1714,77 @@ def _nidatastream_descriptor_record_index_proof(
     }
 
 
+def _nidatastream_descriptor_helper_argument_use_proof(
+    targets_by_key: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Return candidate-only proof for which descriptor-record bytes affect helper table lookup."""
+    checks = []
+    high_byte_lookup_terms_present = False
+    for requirement in DESCRIPTOR_HELPER_ARGUMENT_USE_PROOF_REQUIREMENTS:
+        target_key = str(requirement["TargetKey"])
+        target = targets_by_key.get(target_key, {"Key": target_key})
+        report, error = _descriptor_target_report_payload(target)
+        decompile_text = _report_decompile_text(report) if report else ""
+        decompile_completed = _report_decompile_completed(report) if report else False
+        required_terms = _as_string_list(requirement.get("RequiredTerms"))
+        forbidden_terms = _as_string_list(requirement.get("ForbiddenHighByteTerms"))
+        missing_terms = [term for term in required_terms if term not in decompile_text]
+        present_forbidden_terms = [term for term in forbidden_terms if term in decompile_text]
+        if present_forbidden_terms:
+            high_byte_lookup_terms_present = True
+        checks.append(
+            {
+                "Key": str(requirement["Key"]),
+                "TargetKey": target_key,
+                "ReportPath": str(target.get("ReportPath", "")),
+                "DecompileCompleted": decompile_completed,
+                "RequiredTerms": required_terms,
+                "MissingTerms": missing_terms,
+                "ForbiddenHighByteTerms": forbidden_terms,
+                "PresentForbiddenHighByteTerms": present_forbidden_terms,
+                "Evidence": str(requirement["Evidence"]),
+                "Passed": (
+                    bool(report)
+                    and decompile_completed
+                    and not missing_terms
+                    and not present_forbidden_terms
+                ),
+                "Error": error,
+            }
+        )
+
+    passed_count = sum(1 for check in checks if check["Passed"])
+    helper_lookup_high_bytes_proven_unused = (
+        passed_count == len(checks) and not high_byte_lookup_terms_present
+    )
+    blockers: list[str] = []
+    if not helper_lookup_high_bytes_proven_unused:
+        blockers.append("descriptor-helper-argument-use-proof-incomplete")
+    blockers.append("descriptor-record-bytes-1-2-unmapped-for-parser-export")
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "HelperArgumentWidthBytes": 4,
+        "CandidateIndexByteOffset": 0 if helper_lookup_high_bytes_proven_unused else None,
+        "CandidateHelperLookupIgnoredByteOffsets": [1, 2] if helper_lookup_high_bytes_proven_unused else [],
+        "CandidateSignGuardByteOffsets": [3] if helper_lookup_high_bytes_proven_unused else [],
+        "HelperLookupHighBytesUsed": high_byte_lookup_terms_present,
+        "HelperLookupHighBytesProvenUnused": helper_lookup_high_bytes_proven_unused,
+        "RequiredEvidenceCount": len(checks),
+        "PassedEvidenceCount": passed_count,
+        "Checks": checks,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Candidate-only Ghidra helper evidence indicates byte 0 selects the static descriptor table "
+            "for helper lookup, bytes 1-2 do not affect the tracked helper lookup when the proof passes, "
+            "and byte 3 is only represented by the signed-negative guard. Bytes 1-2 remain unmapped for "
+            "parser/export semantics."
+        ),
+    }
+
+
 def _nidatastream_descriptor_proof_status_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return candidate-only descriptor helper evidence status from local FunctionSiteSurvey reports."""
     registry = _guard_ghidra_function_site_targets(_ghidra_function_site_targets_path(args), quiet=True)
@@ -1670,6 +1796,7 @@ def _nidatastream_descriptor_proof_status_payload(args: argparse.Namespace) -> d
     ]
     ready_count = sum(1 for target in target_statuses if target["EvidenceReady"])
     record_index_proof = _nidatastream_descriptor_record_index_proof(by_key)
+    helper_argument_use_proof = _nidatastream_descriptor_helper_argument_use_proof(by_key)
     return {
         "SchemaVersion": "nidatastream-descriptor-proof-status/v1",
         "CandidateOnly": True,
@@ -1680,6 +1807,7 @@ def _nidatastream_descriptor_proof_status_payload(args: argparse.Namespace) -> d
         "Targets": target_statuses,
         "CandidateFieldMap": DESCRIPTOR_CANDIDATE_FIELD_MAP,
         "DescriptorRecordIndexProof": record_index_proof,
+        "DescriptorHelperArgumentUseProof": helper_argument_use_proof,
         "NextAction": "Use descriptor status as candidate evidence only; pair it with sample-byte and pairing-impact proof before parser/export promotion.",
     }
 
@@ -1687,6 +1815,7 @@ def _nidatastream_descriptor_proof_status_payload(args: argparse.Namespace) -> d
 def _print_nidatastream_descriptor_proof_status(status: dict[str, Any]) -> None:
     """Print descriptor helper evidence status."""
     record_index = status["DescriptorRecordIndexProof"]
+    helper_argument_use = status["DescriptorHelperArgumentUseProof"]
     print("--- NiDataStreamDescriptorProofStatus")
     print(f"Evidence-ready targets: {status['EvidenceReadyCount']}/{status['RequiredTargetCount']}")
     print(f"Field-order promoted: {str(status['FieldOrderPromoted']).lower()}")
@@ -1694,6 +1823,14 @@ def _print_nidatastream_descriptor_proof_status(status: dict[str, Any]) -> None:
         "Descriptor record index proof: "
         f"{record_index['PassedEvidenceCount']}/{record_index['RequiredEvidenceCount']} checks; "
         f"record byte 0 mapped={str(record_index['CandidateRecordIndexMapped']).lower()}"
+    )
+    print(
+        "Descriptor helper argument-use proof: "
+        f"{helper_argument_use['PassedEvidenceCount']}/{helper_argument_use['RequiredEvidenceCount']} checks; "
+        "high bytes affect helper lookup="
+        f"{str(helper_argument_use['HelperLookupHighBytesUsed']).lower()}; "
+        "high bytes proven unused="
+        f"{str(helper_argument_use['HelperLookupHighBytesProvenUnused']).lower()}"
     )
     print("")
     print(f"{'Target':42} {'Ready':7} {'Function':14} Missing")
@@ -2149,6 +2286,7 @@ def _nidatastream_descriptor_semantic_feasibility(
     record_byte_summary: dict[str, Any],
     record_index_proof: dict[str, Any] | None,
     record_byte_roles: dict[str, Any] | None,
+    helper_argument_use_proof: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Compare static descriptor-table candidates with stream-record bytes without promoting semantics."""
     field_map = [field for field in candidate_field_map if isinstance(field, dict)]
@@ -2212,6 +2350,28 @@ def _nidatastream_descriptor_semantic_feasibility(
         else []
     )
     byte_roles_classified = bool(isinstance(record_byte_roles, dict) and record_byte_roles.get("AllBytesClassified"))
+    helper_lookup_high_bytes_proven_unused = bool(
+        isinstance(helper_argument_use_proof, dict)
+        and helper_argument_use_proof.get("HelperLookupHighBytesProvenUnused")
+    )
+    candidate_helper_lookup_ignored_offsets = (
+        [
+            int(offset)
+            for offset in helper_argument_use_proof.get("CandidateHelperLookupIgnoredByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(helper_argument_use_proof, dict)
+        else []
+    )
+    candidate_sign_guard_offsets = (
+        [
+            int(offset)
+            for offset in helper_argument_use_proof.get("CandidateSignGuardByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(helper_argument_use_proof, dict)
+        else []
+    )
 
     offset_comparison_rows = []
     for field in static_fields:
@@ -2245,6 +2405,8 @@ def _nidatastream_descriptor_semantic_feasibility(
         blockers.append("static-field-map-incomplete")
     if not descriptor_record_byte_distribution_ready:
         blockers.append("descriptor-record-byte-distribution-incomplete")
+    if not helper_lookup_high_bytes_proven_unused:
+        blockers.append("descriptor-helper-argument-use-proof-incomplete")
     if record_index_candidate_mapped:
         blockers.append("stream-record-semantics-partial")
     elif not mapped_fields:
@@ -2264,8 +2426,11 @@ def _nidatastream_descriptor_semantic_feasibility(
         "DescriptorRecordByteDistributionReady": descriptor_record_byte_distribution_ready,
         "DescriptorRecordIndexCandidateMapped": record_index_candidate_mapped,
         "DescriptorRecordByteRolesClassified": byte_roles_classified,
+        "DescriptorHelperLookupHighBytesProvenUnused": helper_lookup_high_bytes_proven_unused,
         "CandidateIndexByteOffset": candidate_index_byte_offset,
         "CandidatePaddingByteOffsets": candidate_padding_offsets,
+        "CandidateHelperLookupIgnoredByteOffsets": candidate_helper_lookup_ignored_offsets,
+        "CandidateSignGuardByteOffsets": candidate_sign_guard_offsets,
         "RemainingUnmappedRecordByteOffsets": remaining_unmapped_offsets,
         "StaticFieldMapOffsetCount": len(static_fields),
         "DescriptorRecordByteOffsetCount": len(byte_offsets),
@@ -2279,8 +2444,9 @@ def _nidatastream_descriptor_semantic_feasibility(
         "Interpretation": (
             "Static descriptor-table offsets and first stream descriptor-record byte distributions are both "
             "available as candidate evidence; Ghidra maps record byte 0 as the candidate static-table index "
-            "when proof is present and uniform zero bytes may be padding/reserved candidates, but remaining "
-            "variable bytes and parser/export semantics are not fully mapped."
+            "when proof is present, tracked helpers do not use bytes 1-2 for helper lookup when the helper "
+            "argument-use proof passes, and uniform zero bytes may be padding/reserved candidates, but "
+            "remaining variable bytes and parser/export semantics are not fully mapped."
         ),
         "NextAction": (
             "Use Ghidra helper/control-flow evidence plus focused sample fixtures to map stream descriptor "
@@ -2361,6 +2527,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
         record_byte_roles,
+        descriptor_status["DescriptorHelperArgumentUseProof"],
     )
     descriptor_sample_evidence_ready = (
         bool(descriptor_status["AllRequiredEvidenceReady"])
@@ -2381,6 +2548,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     if not byte_order_proof["AllExpectedFieldsUniform"]:
         blockers.append("descriptor-byte-order-incomplete")
     for blocker in semantic_feasibility["Blockers"]:
+        if blocker not in blockers:
+            blockers.append(blocker)
+    for blocker in descriptor_status["DescriptorHelperArgumentUseProof"]["Blockers"]:
         if blocker not in blockers:
             blockers.append(blocker)
     if not descriptor_status["FieldOrderPromoted"]:
@@ -2407,6 +2577,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "DescriptorByteOrderProof": byte_order_proof,
         "DescriptorRecordByteSummary": record_byte_summary,
         "DescriptorRecordIndexProof": descriptor_status["DescriptorRecordIndexProof"],
+        "DescriptorHelperArgumentUseProof": descriptor_status["DescriptorHelperArgumentUseProof"],
         "DescriptorRecordByteRoleCandidates": record_byte_roles,
         "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
@@ -2433,6 +2604,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
     record_index = report["DescriptorRecordIndexProof"]
+    helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
@@ -2484,6 +2656,10 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         (
             "| Descriptor record index mapped | "
             f"{format_markdown_cell(str(record_index['CandidateRecordIndexMapped']).lower())} |"
+        ),
+        (
+            "| Descriptor helper high bytes proven unused | "
+            f"{format_markdown_cell(str(helper_argument_use['HelperLookupHighBytesProvenUnused']).lower())} |"
         ),
         (
             "| Descriptor record bytes classified | "
@@ -2587,6 +2763,52 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
                     format_markdown_cell(check["TargetKey"]),
                     format_markdown_cell(str(check["Passed"]).lower()),
                     format_markdown_cell(", ".join(str(term) for term in check["MissingTerms"])),
+                    format_markdown_cell(check["Evidence"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Descriptor helper argument-use proof",
+            "",
+            (
+                "- Helper lookup high bytes proven unused: "
+                f"**{str(helper_argument_use['HelperLookupHighBytesProvenUnused']).lower()}**"
+            ),
+            (
+                "- Candidate helper-lookup ignored byte offsets: "
+                "**"
+                + format_markdown_cell(
+                    ", ".join(str(offset) for offset in helper_argument_use["CandidateHelperLookupIgnoredByteOffsets"])
+                )
+                + "**"
+            ),
+            (
+                "- Candidate sign-guard byte offsets: **"
+                + format_markdown_cell(
+                    ", ".join(str(offset) for offset in helper_argument_use["CandidateSignGuardByteOffsets"])
+                )
+                + "**"
+            ),
+            "",
+            "| Check | Target | Passed | Missing terms | Forbidden high-byte terms present | Evidence |",
+            "|---|---|---:|---|---|---|",
+        ]
+    )
+    for check in helper_argument_use["Checks"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(check["Key"]),
+                    format_markdown_cell(check["TargetKey"]),
+                    format_markdown_cell(str(check["Passed"]).lower()),
+                    format_markdown_cell(", ".join(str(term) for term in check["MissingTerms"])),
+                    format_markdown_cell(
+                        ", ".join(str(term) for term in check["PresentForbiddenHighByteTerms"])
+                    ),
                     format_markdown_cell(check["Evidence"]),
                 ]
             )
@@ -2714,6 +2936,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
     record_index = report["DescriptorRecordIndexProof"]
+    helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
@@ -2736,6 +2959,12 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor record index proof: "
         f"{record_index['PassedEvidenceCount']}/{record_index['RequiredEvidenceCount']} checks; "
         f"record byte 0 mapped={str(record_index['CandidateRecordIndexMapped']).lower()}"
+    )
+    print(
+        "Descriptor helper argument-use proof: "
+        f"{helper_argument_use['PassedEvidenceCount']}/{helper_argument_use['RequiredEvidenceCount']} checks; "
+        "high bytes proven unused="
+        f"{str(helper_argument_use['HelperLookupHighBytesProvenUnused']).lower()}"
     )
     print(
         "Descriptor record byte roles: "
@@ -2879,6 +3108,8 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']} descriptor helper "
         "reports satisfy call/data-ref/decompile-term evidence; "
         f"static field-map entries {field_map_status['CandidateOnlyEntryCount']}/{field_map_status['FieldMapCount']}; "
+        "helper lookup high bytes proven unused "
+        f"{str(descriptor_status['DescriptorHelperArgumentUseProof']['HelperLookupHighBytesProvenUnused']).lower()}; "
         "stream descriptor record semantics remain unmapped."
     )
     layout_status = _nidatastream_layout_report_status(args)
@@ -2898,6 +3129,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
         record_byte_roles,
+        descriptor_status["DescriptorHelperArgumentUseProof"],
     )
     descriptor_sample_ready = (
         descriptor_ready
@@ -2923,6 +3155,8 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             f"sample checks {sample_summary['PassedCount']}/{sample_summary['CheckCount']}; "
             f"byte-order checks {byte_order_proof['PassedCount']}/{byte_order_proof['CheckCount']}; "
             f"record byte 0 mapped {str(semantic_feasibility['DescriptorRecordIndexCandidateMapped']).lower()}; "
+            "helper high bytes proven unused "
+            f"{str(descriptor_status['DescriptorHelperArgumentUseProof']['HelperLookupHighBytesProvenUnused']).lower()}; "
             f"remaining bytes {len(record_byte_roles['RemainingUnmappedByteOffsets'])}; "
             f"semantic mapping ready {str(semantic_feasibility['SemanticMappingReady']).lower()}; "
             "still report-only."
@@ -2980,6 +3214,8 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
                 f"{str(semantic_feasibility['DescriptorRecordIndexCandidateMapped']).lower()}, "
                 f"{semantic_feasibility['StaticFieldMapOffsetCount']} static offset(s), "
                 f"{semantic_feasibility['DescriptorRecordByteOffsetCount']} stream record byte offset(s), "
+                "helper high bytes proven unused="
+                f"{str(semantic_feasibility['DescriptorHelperLookupHighBytesProvenUnused']).lower()}, "
                 f"mapped fields {semantic_feasibility['StreamDescriptorRecordMappedCount']}/"
                 f"{semantic_feasibility['StaticFieldMapOffsetCount']}; still candidate-only."
             ),
@@ -3052,6 +3288,15 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "DescriptorRecordPatternCount": record_byte_summary["RecordPatternCount"],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
+            "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
+                "DescriptorHelperArgumentUseProof"
+            ]["HelperLookupHighBytesProvenUnused"],
+            "DescriptorHelperLookupIgnoredByteCount": len(
+                descriptor_status["DescriptorHelperArgumentUseProof"]["CandidateHelperLookupIgnoredByteOffsets"]
+            ),
+            "DescriptorSignGuardByteCount": len(
+                descriptor_status["DescriptorHelperArgumentUseProof"]["CandidateSignGuardByteOffsets"]
+            ),
             "DescriptorRecordBytesClassified": record_byte_roles["AllBytesClassified"],
             "DescriptorRecordPaddingByteCount": len(record_byte_roles["CandidatePaddingByteOffsets"]),
             "DescriptorRecordRemainingUnmappedByteCount": len(record_byte_roles["RemainingUnmappedByteOffsets"]),
@@ -3102,6 +3347,8 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         f"sample checks {compare_status['SampleBytePassedCount']}/{compare_status['SampleByteCheckCount']}; "
         f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
         f"record byte 0 mapped={str(compare_status['DescriptorRecordIndexCandidateMapped']).lower()}; "
+        "helper high bytes proven unused="
+        f"{str(compare_status['DescriptorHelperLookupHighBytesProvenUnused']).lower()}; "
         f"remaining bytes={compare_status['DescriptorRecordRemainingUnmappedByteCount']}; "
         f"semantic mapping ready={str(compare_status['DescriptorSemanticMappingReady']).lower()}; "
         f"ready={str(compare_status['DescriptorAndSampleEvidenceReady']).lower()}"
@@ -3204,6 +3451,18 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor record byte 0 mapped | "
             f"{format_markdown_cell(str(compare_status['DescriptorRecordIndexCandidateMapped']).lower())} |"
+        ),
+        (
+            "| Descriptor helper high bytes proven unused | "
+            f"{format_markdown_cell(str(compare_status['DescriptorHelperLookupHighBytesProvenUnused']).lower())} |"
+        ),
+        (
+            "| Descriptor helper-lookup ignored byte candidates | "
+            f"{format_markdown_cell(compare_status['DescriptorHelperLookupIgnoredByteCount'])} |"
+        ),
+        (
+            "| Descriptor sign-guard byte candidates | "
+            f"{format_markdown_cell(compare_status['DescriptorSignGuardByteCount'])} |"
         ),
         (
             "| Descriptor record padding byte candidates | "

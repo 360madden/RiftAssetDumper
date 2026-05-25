@@ -104,21 +104,21 @@ with TemporaryDirectory() as temp_dir:
         "1411821f0",
         ["141182280"],
         ["143358be0", "143358be4", "143358be8"],
-        ["(&DAT_143358be0)[(ulonglong)(param_1 & 0xff) * 0xc]"],
+        ["(int)param_1 < 0", "(&DAT_143358be0)[(ulonglong)(param_1 & 0xff) * 0xc]"],
     )
     make_report(
         report_root / "descriptor-builder-1770.json",
         "141181770",
         [],
         ["143358be0", "143358be4", "143358b01"],
-        ["(&DAT_143358be4)[(ulonglong)(param_1 & 0xff) * 0xc]"],
+        ["(int)param_1 < 0", "(&DAT_143358be4)[(ulonglong)(param_1 & 0xff) * 0xc]"],
     )
     make_report(
         report_root / "descriptor-builder-17c0.json",
         "1411817c0",
         ["141182280"],
         ["143358be0", "143358be8", "143358b04"],
-        ["(&DAT_143358be8 + (ulonglong)(param_1 & 0xff) * 0xc)"],
+        ["(int)param_1 < 0", "(&DAT_143358be8 + (ulonglong)(param_1 & 0xff) * 0xc)"],
     )
     targets_file = temp_path / "targets.json"
     registry = {
@@ -162,12 +162,22 @@ check("record index proof mapped", record_index_proof["CandidateRecordIndexMappe
 check("record index proof byte offset", record_index_proof["CandidateIndexByteOffset"], 0)
 check("record index proof passed count", record_index_proof["PassedEvidenceCount"], 5)
 check("record index remaining bytes", record_index_proof["RemainingUnmappedByteOffsets"], [1, 2, 3])
+helper_argument_use = status["DescriptorHelperArgumentUseProof"]
+check("helper argument proof candidate-only", helper_argument_use["CandidateOnly"], True)
+check("helper argument proof high bytes unused", helper_argument_use["HelperLookupHighBytesProvenUnused"], True)
+check("helper argument proof high bytes used flag", helper_argument_use["HelperLookupHighBytesUsed"], False)
+check("helper argument proof passed count", helper_argument_use["PassedEvidenceCount"], 3)
+check("helper argument proof ignored offsets", helper_argument_use["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check("helper argument proof sign guard offsets", helper_argument_use["CandidateSignGuardByteOffsets"], [3])
 promoted_field_status = json.loads(json.dumps(status))
 promoted_field_status["CandidateFieldMap"][0]["PromotionStatus"] = "promoted"
 check_validation_error("schema rejects promoted field-map entry", promoted_field_status, schema)
 promoted_record_index_status = json.loads(json.dumps(status))
 promoted_record_index_status["DescriptorRecordIndexProof"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted record index proof", promoted_record_index_status, schema)
+promoted_helper_argument_status = json.loads(json.dumps(status))
+promoted_helper_argument_status["DescriptorHelperArgumentUseProof"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted helper argument proof", promoted_helper_argument_status, schema)
 
 print("=== NiDataStream descriptor proof negative fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -216,6 +226,11 @@ check("negative descriptor evidence blocks readiness", negative_status["AllRequi
 helper_status = next(target for target in negative_status["Targets"] if target["Key"] == "nidatastream-descriptor-helper")
 check("negative descriptor missing call", helper_status["MissingCalls"], ["141182280"])
 check("negative record index proof blocks", negative_status["DescriptorRecordIndexProof"]["CandidateRecordIndexMapped"], False)
+check(
+    "negative helper argument proof blocks",
+    negative_status["DescriptorHelperArgumentUseProof"]["HelperLookupHighBytesProvenUnused"],
+    False,
+)
 
 print(f"\n{'=' * 50}")
 if failed:
