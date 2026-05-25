@@ -200,7 +200,12 @@ def write_layout_fixture(
     )
 
 
-def write_descriptor_table_sample_fixture(out_dir: Path, *, first_bytes: str = "00 00 00 00") -> None:
+def write_descriptor_table_sample_fixture(
+    out_dir: Path,
+    *,
+    file_name: str = "nidatastream_descriptor_table_samples.json",
+    first_bytes: str = "00 00 00 00",
+) -> None:
     report_dir = out_dir / "ghidra-reports"
     report_dir.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -229,7 +234,7 @@ def write_descriptor_table_sample_fixture(out_dir: Path, *, first_bytes: str = "
             "bytes": "00 00 00 00",
         },
     ]
-    (report_dir / "nidatastream_descriptor_table_samples.json").write_text(
+    (report_dir / file_name).write_text(
         json.dumps(
             {
                 "SchemaVersion": "ghidra-descriptor-table-sample/v1",
@@ -435,6 +440,45 @@ check("promotion lock blocker present", "parser-export-promotion-locked" in comp
 check("table sample blocker present", "descriptor-table-sample-all-zero" in compare["Blockers"], True)
 check("semantic blocker present", "stream-record-semantics-partial" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
+
+print("=== NiDataStream descriptor/sample-byte compare all-index table preference ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    targets_file = write_descriptor_fixture(temp_path)
+    write_layout_fixture(out_dir)
+    write_descriptor_table_sample_fixture(out_dir)
+    write_descriptor_table_sample_fixture(
+        out_dir,
+        file_name="nidatastream_descriptor_table_all_indices.json",
+        first_bytes="01 00 00 00",
+    )
+    all_index_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-sample-compare",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(all_index_output),
+    ):
+        rift_workflow.main()
+all_index_compare = json.loads(all_index_output.getvalue())
+jsonschema.validate(all_index_compare, schema)
+all_index_table = all_index_compare["DescriptorTableSampleStatus"]
+check("all-index table sample preferred", all_index_table["Path"].endswith("nidatastream_descriptor_table_all_indices.json"), True)
+check("all-index table sample nonzero rows", all_index_table["NonzeroRowCount"], 1)
+check("all-index table sample all rows zero false", all_index_table["AllRowsZero"], False)
 
 print("=== NiDataStream descriptor/sample-byte compare mismatch fixture ===")
 with TemporaryDirectory() as temp_dir:

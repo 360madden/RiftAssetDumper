@@ -2860,11 +2860,13 @@ def _nidatastream_sample_corpus_status(layout_report: dict[str, Any] | None) -> 
 def _nidatastream_descriptor_table_sample_status(args: argparse.Namespace) -> dict[str, Any]:
     """Summarize ignored descriptor-table sample evidence for fail-closed comparison reports."""
     out_dir = Path(args.out) if args.out else DEFAULT_OUT
-    report_path = (
-        Path(args.descriptor_table_report)
-        if getattr(args, "descriptor_table_report", "")
-        else out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.json"
-    )
+    explicit_report = getattr(args, "descriptor_table_report", "")
+    if explicit_report:
+        report_path = Path(explicit_report)
+    else:
+        all_index_report = out_dir / "ghidra-reports" / "nidatastream_descriptor_table_all_indices.json"
+        default_report = out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.json"
+        report_path = all_index_report if all_index_report.exists() else default_report
     status: dict[str, Any] = {
         "CandidateOnly": True,
         "FieldOrderPromoted": False,
@@ -4598,6 +4600,8 @@ def _descriptor_table_field_specs() -> list[dict[str, Any]]:
 
 def _descriptor_table_indices_from_args(args: argparse.Namespace) -> list[int]:
     """Return explicitly supplied descriptor indices, preserving first occurrence order."""
+    if getattr(args, "descriptor_table_all_byte_indices", False):
+        return list(range(0x100))
     seen: set[int] = set()
     indices = []
     for token in args.descriptor_index or []:
@@ -4712,6 +4716,7 @@ def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
         "Process": process_path,
         "StrideBytes": stride_bytes,
         "ByteCountRequested": byte_count,
+        "AllByteIndices": bool(getattr(args, "descriptor_table_all_byte_indices", False)),
         "IndexCount": len(indices),
         "Indices": [{"Value": index, "ValueHex": f"{index:02x}"} for index in indices],
         "FieldCount": len(fields),
@@ -6598,6 +6603,11 @@ Examples:
         action="append",
         default=[],
         help="Descriptor table index to sample as hex (for example 37 or 0x37); repeatable or comma-separated",
+    )
+    parser.add_argument(
+        "--descriptor-table-all-byte-indices",
+        action="store_true",
+        help="Sample all 256 possible one-byte descriptor table indices instead of deriving observed indices",
     )
     parser.add_argument(
         "--descriptor-table-byte-count",

@@ -345,6 +345,30 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor table sample plan rows", sample_plan["PlannedRowCount"], 6)
     check("descriptor table sample plan candidate-only", sample_plan["CandidateOnly"], True)
 
+    all_indices_output = io.StringIO()
+    all_indices_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-table-sample",
+        "--descriptor-table-all-byte-indices",
+        "--descriptor-table-report",
+        str(report_file),
+        "--descriptor-table-summary",
+        str(summary_file),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", all_indices_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(all_indices_output),
+    ):
+        rift_workflow.main()
+    all_indices_plan = parse_json_object(all_indices_output.getvalue())
+    check("descriptor table sample all-index flag", all_indices_plan["AllByteIndices"], True)
+    check("descriptor table sample all-index count", all_indices_plan["IndexCount"], 256)
+    check("descriptor table sample all-index first", all_indices_plan["Indices"][0]["ValueHex"], "00")
+    check("descriptor table sample all-index last", all_indices_plan["Indices"][-1]["ValueHex"], "ff")
+    check("descriptor table sample all-index rows", all_indices_plan["PlannedRowCount"], 768)
+
     blocked_output = io.StringIO()
     blocked_argv = [
         *list_argv[:-1],
