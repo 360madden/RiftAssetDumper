@@ -20,6 +20,7 @@
     "DescriptorHelperArgumentUseProof",
     "DescriptorRecordByteRoleCandidates",
     "DescriptorRecordPatternMatrix",
+    "DescriptorSampleContextCorrelation",
     "DescriptorSemanticFeasibility",
     "CandidateFieldMap",
     "PromotionGateBlockers",
@@ -44,6 +45,7 @@
     "DescriptorHelperArgumentUseProof": { "$ref": "#/$defs/descriptorHelperArgumentUseProof" },
     "DescriptorRecordByteRoleCandidates": { "$ref": "#/$defs/descriptorRecordByteRoleCandidates" },
     "DescriptorRecordPatternMatrix": { "$ref": "#/$defs/descriptorRecordPatternMatrix" },
+    "DescriptorSampleContextCorrelation": { "$ref": "#/$defs/descriptorSampleContextCorrelation" },
     "DescriptorSemanticFeasibility": { "$ref": "#/$defs/descriptorSemanticFeasibility" },
     "CandidateFieldMap": {
       "type": "array",
@@ -81,6 +83,15 @@
       "required": ["Value", "Count"],
       "properties": {
         "Value": { "$ref": "#/$defs/counterValue" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "stringCounterRow": {
+      "type": "object",
+      "required": ["Value", "Count"],
+      "properties": {
+        "Value": { "type": "string" },
         "Count": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
@@ -624,6 +635,102 @@
         "OffsetBytes": { "type": "integer", "minimum": 0 },
         "ValueHex": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
         "ValueInteger": { "type": "integer", "minimum": 0, "maximum": 255 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSampleContextCorrelation": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "Source",
+        "SampleCount",
+        "SamplesWithDescriptorRecord",
+        "SamplesWithPairRecord",
+        "MalformedDescriptorRecordCount",
+        "CorrelationReady",
+        "RemainingUnmappedByteOffsets",
+        "DescriptorPatternCount",
+        "Rows",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "Source": { "const": "ShiftedSamples" },
+        "SampleCount": { "type": "integer", "minimum": 0 },
+        "SamplesWithDescriptorRecord": { "type": "integer", "minimum": 0 },
+        "SamplesWithPairRecord": { "type": "integer", "minimum": 0 },
+        "MalformedDescriptorRecordCount": { "type": "integer", "minimum": 0 },
+        "CorrelationReady": { "type": "boolean" },
+        "RemainingUnmappedByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "DescriptorPatternCount": { "type": "integer", "minimum": 0 },
+        "Rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorSampleContextCorrelationRow" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorSampleContextCorrelationRow": {
+      "type": "object",
+      "required": [
+        "DescriptorRecordHex",
+        "SampleCount",
+        "CandidateIndexByte",
+        "RemainingUnmappedBytes",
+        "PairRecordPatternCount",
+        "TopPairRecordBytes",
+        "UsageValueCount",
+        "TopUsageValues",
+        "AccessValueCount",
+        "TopAccessValues",
+        "TypeNameValueCount",
+        "TopTypeNames"
+      ],
+      "properties": {
+        "DescriptorRecordHex": { "type": "string", "pattern": "^[0-9a-f]{2}(?: [0-9a-f]{2})*$" },
+        "SampleCount": { "type": "integer", "minimum": 0 },
+        "CandidateIndexByte": {
+          "anyOf": [{ "$ref": "#/$defs/descriptorRecordPatternValue" }, { "type": "null" }]
+        },
+        "RemainingUnmappedBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordPatternValue" }
+        },
+        "PairRecordPatternCount": { "type": "integer", "minimum": 0 },
+        "TopPairRecordBytes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stringCounterRow" }
+        },
+        "UsageValueCount": { "type": "integer", "minimum": 0 },
+        "TopUsageValues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stringCounterRow" }
+        },
+        "AccessValueCount": { "type": "integer", "minimum": 0 },
+        "TopAccessValues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stringCounterRow" }
+        },
+        "TypeNameValueCount": { "type": "integer", "minimum": 0 },
+        "TopTypeNames": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stringCounterRow" }
+        }
       },
       "additionalProperties": false
     },

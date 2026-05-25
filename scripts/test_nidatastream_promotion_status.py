@@ -257,6 +257,21 @@ check(
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternMatrixRowCount"], int),
     True,
 )
+check(
+    "descriptor context correlation ready flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationReady"], bool),
+    True,
+)
+check(
+    "descriptor context correlation sample count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationSampleCount"], int),
+    True,
+)
+check(
+    "descriptor context correlation pattern count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationPatternCount"], int),
+    True,
+)
 semantic_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-semantic-map")
 check("descriptor semantic gate blocks promotion", semantic_gate["State"], "blocked")
 check("pairing impact status present", "PairingImpactStatus" in status, True)
@@ -283,6 +298,13 @@ check_validation_error(
 string_classified_status = json.loads(json.dumps(status))
 string_classified_status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"] = "false"
 check_validation_error("promotion status rejects string record bytes classified flag", string_classified_status, status_schema)
+string_context_ready_status = json.loads(json.dumps(status))
+string_context_ready_status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationReady"] = "true"
+check_validation_error(
+    "promotion status rejects string descriptor context correlation ready flag",
+    string_context_ready_status,
+    status_schema,
+)
 string_stream_map_status = json.loads(json.dumps(status))
 string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
 check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
@@ -338,6 +360,13 @@ check(
     isinstance(missing_layout_compare["DescriptorRecordBytesClassified"], bool),
     True,
 )
+check(
+    "missing layout context correlation ready flag is boolean",
+    isinstance(missing_layout_compare["DescriptorContextCorrelationReady"], bool),
+    True,
+)
+check("missing layout context correlation samples", missing_layout_compare["DescriptorContextCorrelationSampleCount"], 0)
+check("missing layout context correlation patterns", missing_layout_compare["DescriptorContextCorrelationPatternCount"], 0)
 check("missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False)
 check("missing layout descriptor/sample ready false", missing_layout_compare["DescriptorAndSampleEvidenceReady"], False)
 pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
@@ -414,6 +443,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
     check_contains("dashboard markdown pattern matrix status", dashboard_markdown, "Descriptor record pattern matrix rows")
+    check_contains("dashboard markdown context correlation samples", dashboard_markdown, "Descriptor/sample context correlation samples")
+    check_contains("dashboard markdown context correlation ready", dashboard_markdown, "Descriptor/sample context correlation ready")
     check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
     check_contains(
         "dashboard markdown helper high bytes status",

@@ -2414,6 +2414,159 @@ def _nidatastream_descriptor_record_pattern_matrix(
     }
 
 
+def _counter_rows_from_strings(values: list[str]) -> list[dict[str, Any]]:
+    """Return sorted counter rows for string values."""
+    counts: dict[str, int] = {}
+    for value in values:
+        if not value:
+            continue
+        counts[value] = counts.get(value, 0) + 1
+    return [
+        {"Value": value, "Count": count}
+        for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+
+def _sample_text_value(sample: dict[str, Any], key: str) -> str:
+    """Return a compact string value from a sample row."""
+    value = sample.get(key)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _nidatastream_descriptor_sample_context_correlation(
+    layout_report: dict[str, Any] | None,
+    record_pattern_matrix: dict[str, Any],
+) -> dict[str, Any]:
+    """Correlate descriptor patterns with available copied-sample pair/context rows."""
+    samples_value = layout_report.get("ShiftedSamples") if layout_report else None
+    samples = [sample for sample in samples_value if isinstance(sample, dict)] if isinstance(samples_value, list) else []
+    remaining_offsets = [
+        int(offset)
+        for offset in record_pattern_matrix.get("RemainingUnmappedByteOffsets", [])
+        if isinstance(offset, int)
+    ]
+    pattern_by_record = {
+        str(row.get("RecordHex")): row
+        for row in record_pattern_matrix.get("Rows", [])
+        if isinstance(row, dict) and row.get("RecordHex")
+    }
+
+    grouped: dict[str, dict[str, Any]] = {}
+    samples_with_descriptor = 0
+    samples_with_pair = 0
+    malformed_descriptor_count = 0
+    for sample in samples:
+        raw_descriptor_record = _sample_text_value(sample, "FirstDescriptorRecordBytes")
+        raw_pair_record = _sample_text_value(sample, "FirstPairRecordBytes")
+        pair_record_bytes = _parse_hex_byte_record(raw_pair_record)
+        pair_record = (
+            " ".join(f"{byte:02x}" for byte in pair_record_bytes) if pair_record_bytes is not None else raw_pair_record
+        )
+        if raw_descriptor_record:
+            samples_with_descriptor += 1
+        if pair_record:
+            samples_with_pair += 1
+        parsed_descriptor = _parse_hex_byte_record(raw_descriptor_record)
+        if raw_descriptor_record and parsed_descriptor is None:
+            malformed_descriptor_count += 1
+            continue
+        if not raw_descriptor_record:
+            continue
+        descriptor_record = " ".join(f"{byte:02x}" for byte in parsed_descriptor or [])
+        group = grouped.setdefault(
+            descriptor_record,
+            {
+                "SampleCount": 0,
+                "PairRecords": [],
+                "UsageValues": [],
+                "AccessValues": [],
+                "TypeNames": [],
+            },
+        )
+        group["SampleCount"] = int(group["SampleCount"]) + 1
+        pair_records = group["PairRecords"]
+        usage_values = group["UsageValues"]
+        access_values = group["AccessValues"]
+        type_names = group["TypeNames"]
+        if isinstance(pair_records, list):
+            pair_records.append(pair_record)
+        if isinstance(usage_values, list):
+            usage_values.append(_sample_text_value(sample, "DataStreamUsage"))
+        if isinstance(access_values, list):
+            access_values.append(_sample_text_value(sample, "DataStreamAccess"))
+        if isinstance(type_names, list):
+            type_names.append(_sample_text_value(sample, "TypeName"))
+
+    correlation_rows = []
+    for descriptor_record, group in sorted(
+        grouped.items(),
+        key=lambda item: (-int(item[1]["SampleCount"]), item[0]),
+    ):
+        pattern = pattern_by_record.get(descriptor_record, {})
+        pair_rows = _counter_rows_from_strings(group["PairRecords"] if isinstance(group["PairRecords"], list) else [])
+        usage_rows = _counter_rows_from_strings(group["UsageValues"] if isinstance(group["UsageValues"], list) else [])
+        access_rows = _counter_rows_from_strings(group["AccessValues"] if isinstance(group["AccessValues"], list) else [])
+        type_rows = _counter_rows_from_strings(group["TypeNames"] if isinstance(group["TypeNames"], list) else [])
+        correlation_rows.append(
+            {
+                "DescriptorRecordHex": descriptor_record,
+                "SampleCount": int(group["SampleCount"]),
+                "CandidateIndexByte": pattern.get("CandidateIndexByte"),
+                "RemainingUnmappedBytes": pattern.get("RemainingUnmappedBytes", []),
+                "PairRecordPatternCount": len(pair_rows),
+                "TopPairRecordBytes": pair_rows,
+                "UsageValueCount": len(usage_rows),
+                "TopUsageValues": usage_rows,
+                "AccessValueCount": len(access_rows),
+                "TopAccessValues": access_rows,
+                "TypeNameValueCount": len(type_rows),
+                "TopTypeNames": type_rows,
+            }
+        )
+
+    correlation_ready = (
+        bool(samples)
+        and samples_with_descriptor > 0
+        and samples_with_pair > 0
+        and malformed_descriptor_count == 0
+        and bool(correlation_rows)
+    )
+    blockers = []
+    if not samples:
+        blockers.append("descriptor-context-correlation-samples-missing")
+    if malformed_descriptor_count:
+        blockers.append("descriptor-context-correlation-malformed-descriptor-records")
+    if samples_with_descriptor == 0:
+        blockers.append("descriptor-context-correlation-descriptor-records-missing")
+    if samples_with_pair == 0:
+        blockers.append("descriptor-context-correlation-pair-records-missing")
+    if remaining_offsets:
+        blockers.append("descriptor-context-correlation-parser-semantics-unmapped")
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "Source": "ShiftedSamples",
+        "SampleCount": len(samples),
+        "SamplesWithDescriptorRecord": samples_with_descriptor,
+        "SamplesWithPairRecord": samples_with_pair,
+        "MalformedDescriptorRecordCount": malformed_descriptor_count,
+        "CorrelationReady": correlation_ready,
+        "RemainingUnmappedByteOffsets": remaining_offsets,
+        "DescriptorPatternCount": len(correlation_rows),
+        "Rows": correlation_rows,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Descriptor/sample context correlation is candidate-only. It groups observed descriptor "
+            "records by available copied-sample pair record bytes and usage/access/type context so bytes "
+            "1-2 can be reviewed without changing parser/export behavior."
+        ),
+    }
+
+
 def _nidatastream_descriptor_semantic_feasibility(
     candidate_field_map: list[dict[str, Any]],
     record_byte_summary: dict[str, Any],
@@ -2661,6 +2814,10 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         descriptor_status["DescriptorHelperArgumentUseProof"],
         record_byte_roles,
     )
+    sample_context_correlation = _nidatastream_descriptor_sample_context_correlation(
+        layout_report,
+        record_pattern_matrix,
+    )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
@@ -2695,6 +2852,9 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     for blocker in record_pattern_matrix["Blockers"]:
         if blocker not in blockers:
             blockers.append(blocker)
+    for blocker in sample_context_correlation["Blockers"]:
+        if blocker not in blockers:
+            blockers.append(blocker)
     if not descriptor_status["FieldOrderPromoted"]:
         blockers.append("field-order-promoted-false")
     if not promotion_status["ParserExportPromotionAllowed"]:
@@ -2722,6 +2882,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "DescriptorHelperArgumentUseProof": descriptor_status["DescriptorHelperArgumentUseProof"],
         "DescriptorRecordByteRoleCandidates": record_byte_roles,
         "DescriptorRecordPatternMatrix": record_pattern_matrix,
+        "DescriptorSampleContextCorrelation": sample_context_correlation,
         "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
@@ -2750,6 +2911,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
+    sample_context = report["DescriptorSampleContextCorrelation"]
     semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
     lines = [
@@ -2813,6 +2975,11 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         (
             "| Descriptor record pattern matrix rows | "
             f"{format_markdown_cell(record_pattern_matrix['RecordPatternCount'])} |"
+        ),
+        (
+            "| Descriptor/sample context correlation | "
+            f"{format_markdown_cell(sample_context['DescriptorPatternCount'])} pattern(s); "
+            f"ready={format_markdown_cell(str(sample_context['CorrelationReady']).lower())} |"
         ),
         (
             "| Descriptor semantic mapping ready | "
@@ -3045,6 +3212,53 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor/sample context correlation",
+            "",
+            f"- Source samples: **{format_markdown_cell(sample_context['SampleCount'])}**",
+            f"- Correlation ready: **{str(sample_context['CorrelationReady']).lower()}**",
+            (
+                "- Remaining unmapped byte offsets: **"
+                + format_markdown_cell(
+                    ", ".join(str(offset) for offset in sample_context["RemainingUnmappedByteOffsets"])
+                )
+                + "**"
+            ),
+            "",
+            "| Descriptor record | Samples | Pair patterns | Top pair records | Usage values | Access values | Type names |",
+            "|---|---:|---:|---|---|---|---|",
+        ]
+    )
+    for row in sample_context["Rows"]:
+        top_pairs = ", ".join(
+            f"{value['Value']} ({value['Count']})" for value in row["TopPairRecordBytes"][:6]
+        )
+        top_usage = ", ".join(
+            f"{value['Value']} ({value['Count']})" for value in row["TopUsageValues"][:6]
+        )
+        top_access = ", ".join(
+            f"{value['Value']} ({value['Count']})" for value in row["TopAccessValues"][:6]
+        )
+        top_types = ", ".join(
+            f"{value['Value']} ({value['Count']})" for value in row["TopTypeNames"][:4]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["DescriptorRecordHex"]),
+                    format_markdown_cell(row["SampleCount"]),
+                    format_markdown_cell(row["PairRecordPatternCount"]),
+                    format_markdown_cell(top_pairs),
+                    format_markdown_cell(top_usage),
+                    format_markdown_cell(top_access),
+                    format_markdown_cell(top_types),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Descriptor semantic feasibility",
             "",
             f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
@@ -3137,6 +3351,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     helper_argument_use = report["DescriptorHelperArgumentUseProof"]
     record_roles = report["DescriptorRecordByteRoleCandidates"]
     record_pattern_matrix = report["DescriptorRecordPatternMatrix"]
+    sample_context = report["DescriptorSampleContextCorrelation"]
     semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
@@ -3174,6 +3389,12 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor record pattern matrix: "
         f"rows={record_pattern_matrix['RecordPatternCount']}; "
         f"remaining={','.join(str(offset) for offset in record_pattern_matrix['RemainingUnmappedByteOffsets']) or '-'}"
+    )
+    print(
+        "Descriptor/sample context correlation: "
+        f"samples={sample_context['SampleCount']}; "
+        f"patterns={sample_context['DescriptorPatternCount']}; "
+        f"ready={str(sample_context['CorrelationReady']).lower()}"
     )
     print(
         "Descriptor semantic mapping ready: "
@@ -3333,6 +3554,10 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         descriptor_status["DescriptorRecordIndexProof"],
         descriptor_status["DescriptorHelperArgumentUseProof"],
         record_byte_roles,
+    )
+    sample_context_correlation = _nidatastream_descriptor_sample_context_correlation(
+        layout_report,
+        record_pattern_matrix,
     )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
@@ -3497,6 +3722,9 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "AllByteOrderFieldsUniform": byte_order_proof["AllExpectedFieldsUniform"],
             "DescriptorRecordPatternCount": record_byte_summary["RecordPatternCount"],
             "DescriptorRecordPatternMatrixRowCount": record_pattern_matrix["RecordPatternCount"],
+            "DescriptorContextCorrelationReady": sample_context_correlation["CorrelationReady"],
+            "DescriptorContextCorrelationSampleCount": sample_context_correlation["SampleCount"],
+            "DescriptorContextCorrelationPatternCount": sample_context_correlation["DescriptorPatternCount"],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
             "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
@@ -3559,6 +3787,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
         f"record byte 0 mapped={str(compare_status['DescriptorRecordIndexCandidateMapped']).lower()}; "
         f"pattern rows={compare_status['DescriptorRecordPatternMatrixRowCount']}; "
+        f"context samples={compare_status['DescriptorContextCorrelationSampleCount']}; "
         "helper high bytes proven unused="
         f"{str(compare_status['DescriptorHelperLookupHighBytesProvenUnused']).lower()}; "
         f"remaining bytes={compare_status['DescriptorRecordRemainingUnmappedByteCount']}; "
@@ -3663,6 +3892,18 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor record pattern matrix rows | "
             f"{format_markdown_cell(compare_status['DescriptorRecordPatternMatrixRowCount'])} |"
+        ),
+        (
+            "| Descriptor/sample context correlation samples | "
+            f"{format_markdown_cell(compare_status['DescriptorContextCorrelationSampleCount'])} |"
+        ),
+        (
+            "| Descriptor/sample context correlation patterns | "
+            f"{format_markdown_cell(compare_status['DescriptorContextCorrelationPatternCount'])} |"
+        ),
+        (
+            "| Descriptor/sample context correlation ready | "
+            f"{format_markdown_cell(str(compare_status['DescriptorContextCorrelationReady']).lower())} |"
         ),
         (
             "| Descriptor record byte 0 mapped | "

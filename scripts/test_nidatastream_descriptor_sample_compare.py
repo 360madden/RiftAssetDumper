@@ -119,9 +119,47 @@ def write_layout_fixture(
     payload_prefix_count: int | None = None,
     descriptor_record_offset: int = 24,
     descriptor_records: list[dict[str, Any]] | None = None,
+    shifted_samples: list[dict[str, Any]] | None = None,
 ) -> None:
     block_count = 5
     prefix_count = block_count if payload_prefix_count is None else payload_prefix_count
+    default_shifted_samples = [
+        {
+            "FirstDescriptorRecordBytes": "aa 04 03 00",
+            "FirstPairRecordBytes": "00 00 00 00 05 00 00 00",
+            "DataStreamUsage": "1",
+            "DataStreamAccess": "19",
+            "TypeName": "NiDataStream\u00011\u000119",
+        },
+        {
+            "FirstDescriptorRecordBytes": "aa 04 03 00",
+            "FirstPairRecordBytes": "00 00 00 00 05 00 00 00",
+            "DataStreamUsage": "1",
+            "DataStreamAccess": "19",
+            "TypeName": "NiDataStream\u00011\u000119",
+        },
+        {
+            "FirstDescriptorRecordBytes": "aa 04 03 00",
+            "FirstPairRecordBytes": "00 00 00 00 06 00 00 00",
+            "DataStreamUsage": "2",
+            "DataStreamAccess": "19",
+            "TypeName": "NiDataStream\u00012\u000119",
+        },
+        {
+            "FirstDescriptorRecordBytes": "bb 02 02 00",
+            "FirstPairRecordBytes": "00 00 00 00 07 00 00 00",
+            "DataStreamUsage": "3",
+            "DataStreamAccess": "19",
+            "TypeName": "NiDataStream\u00013\u000119",
+        },
+        {
+            "FirstDescriptorRecordBytes": "bb 02 02 00",
+            "FirstPairRecordBytes": "00 00 00 00 07 00 00 00",
+            "DataStreamUsage": "3",
+            "DataStreamAccess": "19",
+            "TypeName": "NiDataStream\u00013\u000119",
+        },
+    ]
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "nidatastream-layout-report.json").write_text(
         json.dumps(
@@ -154,7 +192,7 @@ def write_layout_fixture(
                     {"Value": "aa 04 03 00", "Count": 3},
                     {"Value": "bb 02 02 00", "Count": 2},
                 ],
-                "ShiftedSamples": [],
+                "ShiftedSamples": default_shifted_samples if shifted_samples is None else shifted_samples,
                 "Warnings": [],
             }
         ),
@@ -251,6 +289,25 @@ check("record pattern matrix first hex", first_pattern_row["RecordHex"], "aa 04 
 check("record pattern matrix first index", first_pattern_row["CandidateIndexByte"]["ValueHex"], "aa")
 check("record pattern matrix first helper ignored count", len(first_pattern_row["CandidateHelperLookupIgnoredBytes"]), 2)
 check("record pattern matrix first remaining count", len(first_pattern_row["RemainingUnmappedBytes"]), 2)
+sample_context = compare["DescriptorSampleContextCorrelation"]
+check("sample context candidate-only", sample_context["CandidateOnly"], True)
+check("sample context source", sample_context["Source"], "ShiftedSamples")
+check("sample context sample count", sample_context["SampleCount"], 5)
+check("sample context descriptor samples", sample_context["SamplesWithDescriptorRecord"], 5)
+check("sample context pair samples", sample_context["SamplesWithPairRecord"], 5)
+check("sample context ready", sample_context["CorrelationReady"], True)
+check("sample context pattern count", sample_context["DescriptorPatternCount"], 2)
+check(
+    "sample context semantic blocker present",
+    "descriptor-context-correlation-parser-semantics-unmapped" in sample_context["Blockers"],
+    True,
+)
+first_context_row = sample_context["Rows"][0]
+check("sample context first descriptor", first_context_row["DescriptorRecordHex"], "aa 04 03 00")
+check("sample context first sample count", first_context_row["SampleCount"], 3)
+check("sample context first pair pattern count", first_context_row["PairRecordPatternCount"], 2)
+check("sample context first top pair", first_context_row["TopPairRecordBytes"][0]["Value"], "00 00 00 00 05 00 00 00")
+check("sample context first top usage", first_context_row["TopUsageValues"][0]["Value"], "1")
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
@@ -298,6 +355,7 @@ check("descriptor record offset observed", descriptor_record_check["ObservedInte
 check("descriptor byte examples present", compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 04 03 00")
 check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
 check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
+check("sample corpus shifted samples", compare["SampleCorpusStatus"]["ShiftedSampleCount"], 5)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
 check("semantic blocker present", "stream-record-semantics-partial" in compare["Blockers"], True)
@@ -425,6 +483,62 @@ check(
     True,
 )
 
+print("=== NiDataStream descriptor sample-context malformed fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    targets_file = write_descriptor_fixture(temp_path)
+    write_layout_fixture(
+        out_dir,
+        shifted_samples=[
+            {
+                "FirstDescriptorRecordBytes": "not-hex",
+                "FirstPairRecordBytes": "00 00 00 00 05 00 00 00",
+                "DataStreamUsage": "1",
+                "DataStreamAccess": "19",
+                "TypeName": "NiDataStream\u00011\u000119",
+            }
+        ],
+    )
+    malformed_context_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-sample-compare",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(malformed_context_output),
+    ):
+        rift_workflow.main()
+malformed_context = json.loads(malformed_context_output.getvalue())
+jsonschema.validate(malformed_context, schema)
+print("  PASS: malformed descriptor sample-context schema validation")
+malformed_context_status = malformed_context["DescriptorSampleContextCorrelation"]
+check("malformed context sample count", malformed_context_status["SampleCount"], 1)
+check("malformed context ready false", malformed_context_status["CorrelationReady"], False)
+check("malformed context rows absent", malformed_context_status["DescriptorPatternCount"], 0)
+check("malformed context malformed count", malformed_context_status["MalformedDescriptorRecordCount"], 1)
+check(
+    "malformed context blocker present",
+    "descriptor-context-correlation-malformed-descriptor-records" in malformed_context_status["Blockers"],
+    True,
+)
+check(
+    "malformed context compare blocker present",
+    "descriptor-context-correlation-malformed-descriptor-records" in malformed_context["Blockers"],
+    True,
+)
+
 promoted_compare = json.loads(json.dumps(compare))
 promoted_compare["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects parser/export promotion", promoted_compare, schema)
@@ -449,6 +563,12 @@ check_validation_error("schema rejects promoted descriptor byte-role candidates"
 record_pattern_promoted_compare = json.loads(json.dumps(compare))
 record_pattern_promoted_compare["DescriptorRecordPatternMatrix"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor record pattern matrix", record_pattern_promoted_compare, schema)
+sample_context_promoted_compare = json.loads(json.dumps(compare))
+sample_context_promoted_compare["DescriptorSampleContextCorrelation"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor sample context correlation", sample_context_promoted_compare, schema)
+sample_context_string_ready_compare = json.loads(json.dumps(compare))
+sample_context_string_ready_compare["DescriptorSampleContextCorrelation"]["CorrelationReady"] = "true"
+check_validation_error("schema rejects string descriptor sample context ready flag", sample_context_string_ready_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -499,6 +619,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown descriptor padding candidate", markdown, "zero-padding-or-reserved")
     check_contains("markdown descriptor record pattern matrix", markdown, "Descriptor record pattern matrix")
     check_contains("markdown descriptor record pattern row", markdown, "aa 04 03 00")
+    check_contains("markdown descriptor sample context correlation", markdown, "Descriptor/sample context correlation")
+    check_contains("markdown descriptor sample context pair", markdown, "00 00 00 00 05 00 00 00")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
     check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")
