@@ -51,6 +51,28 @@ def registry_target(key: str, report_name: str) -> dict[str, Any]:
     }
 
 
+def run_descriptor_status(temp_path: Path, targets_file: Path) -> dict[str, Any]:
+    status_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-proof-status",
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(status_output),
+    ):
+        rift_workflow.main()
+    return json.loads(status_output.getvalue())
+
+
 print("=== NiDataStream descriptor proof status ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -101,27 +123,8 @@ with TemporaryDirectory() as temp_dir:
         ],
     }
     targets_file.write_text(json.dumps(registry), encoding="utf-8")
+    status = run_descriptor_status(temp_path, targets_file)
 
-    status_output = io.StringIO()
-    with (
-        patch.object(
-            sys,
-            "argv",
-            [
-                "rift_workflow.py",
-                "nidatastream-descriptor-proof-status",
-                "--ghidra-targets-file",
-                str(targets_file),
-                "--list-json",
-            ],
-        ),
-        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
-        patch("scripts.rift_workflow.generated_output_guard"),
-        redirect_stdout(status_output),
-    ):
-        rift_workflow.main()
-
-status = json.loads(status_output.getvalue())
 schema = json.loads(Path("docs/schemas/nidatastream-descriptor-proof-status-v1.schema.json").read_text(encoding="utf-8"))
 jsonschema.validate(status, schema)
 print("  PASS: descriptor status schema validation")
@@ -132,6 +135,53 @@ check("all descriptor evidence ready", status["AllRequiredEvidenceReady"], True)
 check("ready count", status["EvidenceReadyCount"], 4)
 check("target count", status["RequiredTargetCount"], 4)
 check("field map rows", len(status["CandidateFieldMap"]) >= 4, True)
+
+print("=== NiDataStream descriptor proof negative fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    report_root = temp_path / "Exports" / "ghidra-reports"
+    make_report(
+        report_root / "loadbinary.json",
+        "141186980",
+        ["1411821f0", "141181770", "1411817c0"],
+        [],
+        ["LoadBinary descriptor calls"],
+    )
+    make_report(
+        report_root / "descriptor-helper.json",
+        "1411821f0",
+        [],
+        ["143358be0", "143358be4", "143358be8"],
+        ["(&DAT_143358be0)[index * 0xc]"],
+    )
+    make_report(
+        report_root / "descriptor-builder-1770.json",
+        "141181770",
+        [],
+        ["143358be0", "143358be4", "143358b01"],
+        ["(&DAT_143358be4)[index * 0xc]"],
+    )
+    make_report(
+        report_root / "descriptor-builder-17c0.json",
+        "1411817c0",
+        ["141182280"],
+        ["143358be0", "143358be8", "143358b04"],
+        ["(&DAT_143358be8 + index * 0xc)"],
+    )
+    targets_file = temp_path / "targets.json"
+    registry["Targets"] = [
+        registry_target("nidatastream-loadbinary", "loadbinary"),
+        registry_target("nidatastream-descriptor-helper", "descriptor-helper"),
+        registry_target("nidatastream-descriptor-builder-1770", "descriptor-builder-1770"),
+        registry_target("nidatastream-descriptor-builder-17c0", "descriptor-builder-17c0"),
+    ]
+    targets_file.write_text(json.dumps(registry), encoding="utf-8")
+    negative_status = run_descriptor_status(temp_path, targets_file)
+jsonschema.validate(negative_status, schema)
+print("  PASS: negative descriptor status schema validation")
+check("negative descriptor evidence blocks readiness", negative_status["AllRequiredEvidenceReady"], False)
+helper_status = next(target for target in negative_status["Targets"] if target["Key"] == "nidatastream-descriptor-helper")
+check("negative descriptor missing call", helper_status["MissingCalls"], ["141182280"])
 
 print(f"\n{'=' * 50}")
 if failed:

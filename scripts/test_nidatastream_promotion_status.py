@@ -80,6 +80,42 @@ check("layout report all-valid flag is boolean", isinstance(status["LayoutReport
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
 
+print("=== NiDataStream pairing impact negative fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    (temp_path / "ghidra-attribute-candidate-report.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "ghidra-attribute-candidate-report/v1",
+                "CandidateOnly": True,
+                "Summary": {
+                    "GhidraOnlyGroups": 1,
+                    "GhidraOnlyPairingsCovered": 3,
+                    "GroupedSampleMeshes": 1,
+                    "CompletePositionNormalUvCandidateGroups": 1,
+                    "ProbeBackedRanks": 1,
+                    "RejectedNoiseGroups": 0,
+                },
+                "Groups": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    negative_output = io.StringIO()
+    with (
+        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", temp_dir, "--list-json"]),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(negative_output),
+    ):
+        rift_workflow.main()
+negative_status = json.loads(negative_output.getvalue())
+jsonschema.validate(negative_status, status_schema)
+pairing_status = negative_status["PairingImpactStatus"]
+check("negative pairing baseline fails", pairing_status["GuardBaselinePass"], False)
+check("negative pairing complete groups", pairing_status["CompletePositionNormalUvCandidateGroups"], 1)
+pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
+check("negative pairing gate blocked", pairing_gate["State"], "blocked")
+
 print("=== NiDataStream promotion dashboard ===")
 with TemporaryDirectory() as temp_dir:
     dashboard_output = io.StringIO()
