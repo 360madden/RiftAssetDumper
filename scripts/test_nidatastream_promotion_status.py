@@ -218,6 +218,21 @@ check(
     True,
 )
 check(
+    "descriptor record bytes classified flag is boolean",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"], bool),
+    True,
+)
+check(
+    "descriptor record padding count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPaddingByteCount"], int),
+    True,
+)
+check(
+    "descriptor record remaining unmapped count is numeric",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordRemainingUnmappedByteCount"], int),
+    True,
+)
+check(
     "descriptor record pattern count is numeric",
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternCount"], int),
     True,
@@ -238,6 +253,9 @@ check_validation_error("promotion status rejects semantic mapping promotion", se
 string_index_status = json.loads(json.dumps(status))
 string_index_status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"] = "true"
 check_validation_error("promotion status rejects string record index mapped flag", string_index_status, status_schema)
+string_classified_status = json.loads(json.dumps(status))
+string_classified_status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"] = "false"
+check_validation_error("promotion status rejects string record bytes classified flag", string_classified_status, status_schema)
 string_stream_map_status = json.loads(json.dumps(status))
 string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
 check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
@@ -281,6 +299,11 @@ check("missing layout byte-order checks pass count", missing_layout_compare["Byt
 check(
     "missing layout record index mapped flag is boolean",
     isinstance(missing_layout_compare["DescriptorRecordIndexCandidateMapped"], bool),
+    True,
+)
+check(
+    "missing layout record roles classified flag is boolean",
+    isinstance(missing_layout_compare["DescriptorRecordBytesClassified"], bool),
     True,
 )
 check("missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False)
@@ -359,6 +382,8 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
     check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
+    check_contains("dashboard markdown padding byte status", dashboard_markdown, "Descriptor record padding byte candidates")
+    check_contains("dashboard markdown remaining byte status", dashboard_markdown, "Descriptor record remaining unmapped bytes")
     check_contains("dashboard markdown semantic status", dashboard_markdown, "Descriptor semantic mapping ready")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 

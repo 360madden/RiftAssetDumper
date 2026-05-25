@@ -147,7 +147,10 @@ def write_layout_fixture(
                 "TopDescriptorCounts": [{"Value": 1, "Count": block_count}],
                 "TopDescriptorCountOffsets": [{"Value": 20, "Count": block_count}],
                 "TopDescriptorRecordOffsets": [{"Value": descriptor_record_offset, "Count": block_count}],
-                "TopFirstDescriptorRecordBytes": [{"Value": "aa 00 00 00", "Count": block_count}],
+                "TopFirstDescriptorRecordBytes": [
+                    {"Value": "aa 04 03 00", "Count": 3},
+                    {"Value": "bb 02 02 00", "Count": 2},
+                ],
                 "ShiftedSamples": [],
                 "Warnings": [],
             }
@@ -203,22 +206,34 @@ check("byte-order check count", compare["DescriptorByteOrderProof"]["CheckCount"
 check("byte-order passed count", compare["DescriptorByteOrderProof"]["PassedCount"], 7)
 record_byte_summary = compare["DescriptorRecordByteSummary"]
 check("record byte summary candidate-only", record_byte_summary["CandidateOnly"], True)
-check("record byte summary pattern count", record_byte_summary["RecordPatternCount"], 1)
+check("record byte summary pattern count", record_byte_summary["RecordPatternCount"], 2)
 check("record byte summary observed count", record_byte_summary["ObservedRecordCount"], 5)
 check("record byte summary width", record_byte_summary["RecordWidthBytes"], 4)
 check("record byte offset count", len(record_byte_summary["ByteOffsets"]), 4)
 check("record byte offset 0 top value", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["ValueHex"], "aa")
-check("record byte offset 0 top count", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["Count"], 5)
+check("record byte offset 0 top count", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["Count"], 3)
 record_index_proof = compare["DescriptorRecordIndexProof"]
 check("record index proof mapped", record_index_proof["CandidateRecordIndexMapped"], True)
 check("record index proof byte offset", record_index_proof["CandidateIndexByteOffset"], 0)
 check("record index proof passed count", record_index_proof["PassedEvidenceCount"], 5)
 check("record index proof remaining bytes", record_index_proof["RemainingUnmappedByteOffsets"], [1, 2, 3])
+record_byte_roles = compare["DescriptorRecordByteRoleCandidates"]
+check("record byte roles candidate-only", record_byte_roles["CandidateOnly"], True)
+check("record byte roles all classified", record_byte_roles["AllBytesClassified"], True)
+check("record byte roles classified count", record_byte_roles["ClassifiedByteCount"], 4)
+check("record byte roles semantic offsets", record_byte_roles["CandidateSemanticByteOffsets"], [0])
+check("record byte roles padding offsets", record_byte_roles["CandidatePaddingByteOffsets"], [3])
+check("record byte roles remaining offsets", record_byte_roles["RemainingUnmappedByteOffsets"], [1, 2])
+role_by_offset = {row["OffsetBytes"]: row for row in record_byte_roles["Rows"]}
+check("record byte role offset 0", role_by_offset[0]["CandidateRole"], "static-descriptor-table-index")
+check("record byte role offset 1", role_by_offset[1]["CandidateRole"], "unmapped-variable-byte")
+check("record byte role offset 3", role_by_offset[3]["CandidateRole"], "zero-padding-or-reserved")
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
 check("semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True)
 check("semantic feasibility record index mapped", semantic_feasibility["DescriptorRecordIndexCandidateMapped"], True)
+check("semantic feasibility byte roles classified", semantic_feasibility["DescriptorRecordByteRolesClassified"], True)
 check("semantic feasibility mapping blocked", semantic_feasibility["SemanticMappingReady"], False)
 check("semantic feasibility static offsets", semantic_feasibility["StaticFieldMapOffsetCount"], 3)
 check("semantic feasibility record offsets", semantic_feasibility["DescriptorRecordByteOffsetCount"], 4)
@@ -229,6 +244,8 @@ check(
     "stream-record-payload-bytes-unmapped" in semantic_feasibility["Blockers"],
     True,
 )
+check("semantic feasibility padding offsets", semantic_feasibility["CandidatePaddingByteOffsets"], [3])
+check("semantic feasibility remaining offsets", semantic_feasibility["RemainingUnmappedRecordByteOffsets"], [1, 2])
 first_semantic_row = semantic_feasibility["OffsetComparisonRows"][0]
 check("semantic feasibility first field", first_semantic_row["Field"], "descriptor-enable-or-special-flag")
 check("semantic feasibility candidate offsets", first_semantic_row["CandidateRecordByteOffsets"], [0, 1, 2, 3])
@@ -248,7 +265,7 @@ descriptor_record_check = next(
     check for check in compare["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
 )
 check("descriptor record offset observed", descriptor_record_check["ObservedInteger"], 24)
-check("descriptor byte examples present", compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 00 00 00")
+check("descriptor byte examples present", compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 04 03 00")
 check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
 check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
@@ -344,6 +361,9 @@ check_validation_error("schema rejects promoted descriptor record byte summary",
 record_index_promoted_compare = json.loads(json.dumps(compare))
 record_index_promoted_compare["DescriptorRecordIndexProof"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor record index proof", record_index_promoted_compare, schema)
+record_role_promoted_compare = json.loads(json.dumps(compare))
+record_role_promoted_compare["DescriptorRecordByteRoleCandidates"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor byte-role candidates", record_role_promoted_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -386,8 +406,10 @@ with TemporaryDirectory() as temp_dir:
     markdown = markdown_path.read_text(encoding="utf-8")
     check_contains("markdown title", markdown, "# NiDataStream descriptor/sample-byte comparison")
     check_contains("markdown descriptor record byte distribution", markdown, "Descriptor record byte distribution")
-    check_contains("markdown descriptor record byte value", markdown, "aa (5)")
+    check_contains("markdown descriptor record byte value", markdown, "aa (3)")
     check_contains("markdown descriptor record index proof", markdown, "Descriptor record index proof")
+    check_contains("markdown descriptor byte role candidates", markdown, "Descriptor record byte role candidates")
+    check_contains("markdown descriptor padding candidate", markdown, "zero-padding-or-reserved")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
     check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")

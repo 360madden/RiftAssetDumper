@@ -2046,10 +2046,109 @@ def _nidatastream_descriptor_record_byte_summary(byte_order_proof: dict[str, Any
     }
 
 
+def _nidatastream_descriptor_record_byte_role_candidates(
+    record_byte_summary: dict[str, Any],
+    record_index_proof: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Classify observed descriptor-record bytes as candidate roles without promoting parser semantics."""
+    rows_value = record_byte_summary.get("ByteOffsets")
+    byte_rows = [row for row in rows_value if isinstance(row, dict)] if isinstance(rows_value, list) else []
+    observed_record_count = _json_int_or_none(record_byte_summary.get("ObservedRecordCount")) or 0
+    record_width = _json_int_or_none(record_byte_summary.get("RecordWidthBytes")) or 0
+    index_offset = (
+        record_index_proof.get("CandidateIndexByteOffset")
+        if isinstance(record_index_proof, dict)
+        and bool(record_index_proof.get("CandidateRecordIndexMapped"))
+        and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
+        else None
+    )
+
+    role_rows = []
+    semantic_offsets: list[int] = []
+    padding_offsets: list[int] = []
+    remaining_offsets: list[int] = []
+    blockers: list[str] = []
+    for row in byte_rows:
+        offset = _json_int_or_none(row.get("OffsetBytes"))
+        if offset is None:
+            continue
+        unique_value_count = _json_int_or_none(row.get("UniqueValueCount")) or 0
+        top_values_value = row.get("TopValues")
+        top_values = [
+            value for value in top_values_value if isinstance(value, dict)
+        ] if isinstance(top_values_value, list) else []
+        top_value = top_values[0] if top_values else {}
+        top_integer = _json_int_or_none(top_value.get("ValueInteger")) if isinstance(top_value, dict) else None
+        top_count = _json_int_or_none(top_value.get("Count")) if isinstance(top_value, dict) else None
+        is_index = index_offset == offset
+        is_uniform_zero = (
+            unique_value_count == 1
+            and top_integer == 0
+            and observed_record_count > 0
+            and top_count == observed_record_count
+        )
+        if is_index:
+            role = "static-descriptor-table-index"
+            classification = "ghidra-record-index-proof"
+            evidence = (
+                "Ghidra LoadBinary/helper evidence maps descriptor record byte 0 to the static "
+                "descriptor table index."
+            )
+            blocks_semantic_mapping = False
+            semantic_offsets.append(offset)
+        elif is_uniform_zero:
+            role = "zero-padding-or-reserved"
+            classification = "uniform-zero-candidate"
+            evidence = "All observed records carry 0x00 at this byte; keep as padding/reserved candidate only."
+            blocks_semantic_mapping = False
+            padding_offsets.append(offset)
+        else:
+            role = "unmapped-variable-byte"
+            classification = "variable-unmapped"
+            evidence = "Observed values vary and no Ghidra/helper proof assigns this byte a parser/export role."
+            blocks_semantic_mapping = True
+            remaining_offsets.append(offset)
+            blockers.append(f"descriptor-record-byte-{offset}-unmapped")
+        role_rows.append(
+            {
+                "OffsetBytes": offset,
+                "CandidateRole": role,
+                "Classification": classification,
+                "UniqueValueCount": unique_value_count,
+                "ObservedRecordCount": observed_record_count,
+                "TopValues": top_values,
+                "BlocksSemanticMapping": blocks_semantic_mapping,
+                "Evidence": evidence,
+            }
+        )
+
+    return {
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "RecordWidthBytes": record_width,
+        "ObservedRecordCount": observed_record_count,
+        "ClassifiedByteCount": len(role_rows),
+        "CandidateSemanticByteOffsets": semantic_offsets,
+        "CandidatePaddingByteOffsets": padding_offsets,
+        "RemainingUnmappedByteOffsets": remaining_offsets,
+        "AllBytesClassified": bool(role_rows) and len(role_rows) == record_width,
+        "Rows": role_rows,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Descriptor record byte roles are candidate-only. Byte 0 may be used as a static-table "
+            "index candidate when Ghidra proof is present; uniform zero bytes may be padding/reserved "
+            "candidates; variable unmapped bytes still block parser/export promotion."
+        ),
+    }
+
+
 def _nidatastream_descriptor_semantic_feasibility(
     candidate_field_map: list[dict[str, Any]],
     record_byte_summary: dict[str, Any],
     record_index_proof: dict[str, Any] | None,
+    record_byte_roles: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Compare static descriptor-table candidates with stream-record bytes without promoting semantics."""
     field_map = [field for field in candidate_field_map if isinstance(field, dict)]
@@ -2097,6 +2196,22 @@ def _nidatastream_descriptor_semantic_feasibility(
         if isinstance(record_index_proof, dict)
         else byte_offsets
     )
+    if isinstance(record_byte_roles, dict) and isinstance(record_byte_roles.get("RemainingUnmappedByteOffsets"), list):
+        remaining_unmapped_offsets = [
+            int(offset)
+            for offset in record_byte_roles["RemainingUnmappedByteOffsets"]
+            if isinstance(offset, int)
+        ]
+    candidate_padding_offsets = (
+        [
+            int(offset)
+            for offset in record_byte_roles.get("CandidatePaddingByteOffsets", [])
+            if isinstance(offset, int)
+        ]
+        if isinstance(record_byte_roles, dict)
+        else []
+    )
+    byte_roles_classified = bool(isinstance(record_byte_roles, dict) and record_byte_roles.get("AllBytesClassified"))
 
     offset_comparison_rows = []
     for field in static_fields:
@@ -2138,6 +2253,8 @@ def _nidatastream_descriptor_semantic_feasibility(
         blockers.append("stream-record-semantics-partial")
     if remaining_unmapped_offsets:
         blockers.append("stream-record-payload-bytes-unmapped")
+    if isinstance(record_byte_roles, dict) and record_byte_roles.get("Blockers"):
+        blockers.append("descriptor-record-byte-roles-incomplete")
 
     return {
         "CandidateOnly": True,
@@ -2146,7 +2263,9 @@ def _nidatastream_descriptor_semantic_feasibility(
         "StaticFieldMapReady": static_field_map_ready,
         "DescriptorRecordByteDistributionReady": descriptor_record_byte_distribution_ready,
         "DescriptorRecordIndexCandidateMapped": record_index_candidate_mapped,
+        "DescriptorRecordByteRolesClassified": byte_roles_classified,
         "CandidateIndexByteOffset": candidate_index_byte_offset,
+        "CandidatePaddingByteOffsets": candidate_padding_offsets,
         "RemainingUnmappedRecordByteOffsets": remaining_unmapped_offsets,
         "StaticFieldMapOffsetCount": len(static_fields),
         "DescriptorRecordByteOffsetCount": len(byte_offsets),
@@ -2160,7 +2279,8 @@ def _nidatastream_descriptor_semantic_feasibility(
         "Interpretation": (
             "Static descriptor-table offsets and first stream descriptor-record byte distributions are both "
             "available as candidate evidence; Ghidra maps record byte 0 as the candidate static-table index "
-            "when proof is present, but remaining bytes and parser/export semantics are not fully mapped."
+            "when proof is present and uniform zero bytes may be padding/reserved candidates, but remaining "
+            "variable bytes and parser/export semantics are not fully mapped."
         ),
         "NextAction": (
             "Use Ghidra helper/control-flow evidence plus focused sample fixtures to map stream descriptor "
@@ -2232,10 +2352,15 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
     byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
     record_byte_summary = _nidatastream_descriptor_record_byte_summary(byte_order_proof)
+    record_byte_roles = _nidatastream_descriptor_record_byte_role_candidates(
+        record_byte_summary,
+        descriptor_status["DescriptorRecordIndexProof"],
+    )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
+        record_byte_roles,
     )
     descriptor_sample_evidence_ready = (
         bool(descriptor_status["AllRequiredEvidenceReady"])
@@ -2282,6 +2407,7 @@ def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) ->
         "DescriptorByteOrderProof": byte_order_proof,
         "DescriptorRecordByteSummary": record_byte_summary,
         "DescriptorRecordIndexProof": descriptor_status["DescriptorRecordIndexProof"],
+        "DescriptorRecordByteRoleCandidates": record_byte_roles,
         "DescriptorSemanticFeasibility": semantic_feasibility,
         "CandidateFieldMap": descriptor_status["CandidateFieldMap"],
         "PromotionGateBlockers": promotion_status["Blockers"],
@@ -2307,6 +2433,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
     record_index = report["DescriptorRecordIndexProof"]
+    record_roles = report["DescriptorRecordByteRoleCandidates"]
     semantic = report["DescriptorSemanticFeasibility"]
     field_map = report["CandidateFieldMap"]
     lines = [
@@ -2357,6 +2484,11 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         (
             "| Descriptor record index mapped | "
             f"{format_markdown_cell(str(record_index['CandidateRecordIndexMapped']).lower())} |"
+        ),
+        (
+            "| Descriptor record bytes classified | "
+            f"{format_markdown_cell(record_roles['ClassifiedByteCount'])}/"
+            f"{format_markdown_cell(record_roles['RecordWidthBytes'])} |"
         ),
         (
             "| Descriptor semantic mapping ready | "
@@ -2463,6 +2595,36 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Descriptor record byte role candidates",
+            "",
+            f"- All bytes classified: **{str(record_roles['AllBytesClassified']).lower()}**",
+            f"- Remaining unmapped bytes: **{format_markdown_cell(', '.join(str(offset) for offset in record_roles['RemainingUnmappedByteOffsets']))}**",
+            "",
+            "| Byte offset | Candidate role | Classification | Unique values | Blocks semantic mapping | Top values |",
+            "|---:|---|---|---:|---:|---|",
+        ]
+    )
+    for row in record_roles["Rows"]:
+        top_values = ", ".join(
+            f"{value['ValueHex']} ({value['Count']})" for value in row["TopValues"][:8]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(row["OffsetBytes"]),
+                    format_markdown_cell(row["CandidateRole"]),
+                    format_markdown_cell(row["Classification"]),
+                    format_markdown_cell(row["UniqueValueCount"]),
+                    format_markdown_cell(str(row["BlocksSemanticMapping"]).lower()),
+                    format_markdown_cell(top_values),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Descriptor semantic feasibility",
             "",
             f"- Semantic mapping ready: **{str(semantic['SemanticMappingReady']).lower()}**",
@@ -2552,6 +2714,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     byte_order = report["DescriptorByteOrderProof"]
     record_bytes = report["DescriptorRecordByteSummary"]
     record_index = report["DescriptorRecordIndexProof"]
+    record_roles = report["DescriptorRecordByteRoleCandidates"]
     semantic = report["DescriptorSemanticFeasibility"]
     print("--- NiDataStreamDescriptorSampleCompare")
     print(
@@ -2573,6 +2736,11 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor record index proof: "
         f"{record_index['PassedEvidenceCount']}/{record_index['RequiredEvidenceCount']} checks; "
         f"record byte 0 mapped={str(record_index['CandidateRecordIndexMapped']).lower()}"
+    )
+    print(
+        "Descriptor record byte roles: "
+        f"classified={record_roles['ClassifiedByteCount']}/{record_roles['RecordWidthBytes']}; "
+        f"remaining={','.join(str(offset) for offset in record_roles['RemainingUnmappedByteOffsets']) or '-'}"
     )
     print(
         "Descriptor semantic mapping ready: "
@@ -2721,10 +2889,15 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     sample_summary = _nidatastream_sample_byte_uniformity_summary(layout_report, layout_status)
     byte_order_proof = _nidatastream_descriptor_byte_order_proof(layout_report, layout_status)
     record_byte_summary = _nidatastream_descriptor_record_byte_summary(byte_order_proof)
+    record_byte_roles = _nidatastream_descriptor_record_byte_role_candidates(
+        record_byte_summary,
+        descriptor_status["DescriptorRecordIndexProof"],
+    )
     semantic_feasibility = _nidatastream_descriptor_semantic_feasibility(
         descriptor_status["CandidateFieldMap"],
         record_byte_summary,
         descriptor_status["DescriptorRecordIndexProof"],
+        record_byte_roles,
     )
     descriptor_sample_ready = (
         descriptor_ready
@@ -2750,6 +2923,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             f"sample checks {sample_summary['PassedCount']}/{sample_summary['CheckCount']}; "
             f"byte-order checks {byte_order_proof['PassedCount']}/{byte_order_proof['CheckCount']}; "
             f"record byte 0 mapped {str(semantic_feasibility['DescriptorRecordIndexCandidateMapped']).lower()}; "
+            f"remaining bytes {len(record_byte_roles['RemainingUnmappedByteOffsets'])}; "
             f"semantic mapping ready {str(semantic_feasibility['SemanticMappingReady']).lower()}; "
             "still report-only."
         )
@@ -2878,6 +3052,9 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "DescriptorRecordPatternCount": record_byte_summary["RecordPatternCount"],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
+            "DescriptorRecordBytesClassified": record_byte_roles["AllBytesClassified"],
+            "DescriptorRecordPaddingByteCount": len(record_byte_roles["CandidatePaddingByteOffsets"]),
+            "DescriptorRecordRemainingUnmappedByteCount": len(record_byte_roles["RemainingUnmappedByteOffsets"]),
             "DescriptorSemanticMappingReady": semantic_feasibility["SemanticMappingReady"],
             "DescriptorAndSampleEvidenceReady": descriptor_sample_ready,
         },
@@ -2925,6 +3102,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         f"sample checks {compare_status['SampleBytePassedCount']}/{compare_status['SampleByteCheckCount']}; "
         f"byte-order checks {compare_status['ByteOrderPassedCount']}/{compare_status['ByteOrderCheckCount']}; "
         f"record byte 0 mapped={str(compare_status['DescriptorRecordIndexCandidateMapped']).lower()}; "
+        f"remaining bytes={compare_status['DescriptorRecordRemainingUnmappedByteCount']}; "
         f"semantic mapping ready={str(compare_status['DescriptorSemanticMappingReady']).lower()}; "
         f"ready={str(compare_status['DescriptorAndSampleEvidenceReady']).lower()}"
     )
@@ -3026,6 +3204,14 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
         (
             "| Descriptor record byte 0 mapped | "
             f"{format_markdown_cell(str(compare_status['DescriptorRecordIndexCandidateMapped']).lower())} |"
+        ),
+        (
+            "| Descriptor record padding byte candidates | "
+            f"{format_markdown_cell(compare_status['DescriptorRecordPaddingByteCount'])} |"
+        ),
+        (
+            "| Descriptor record remaining unmapped bytes | "
+            f"{format_markdown_cell(compare_status['DescriptorRecordRemainingUnmappedByteCount'])} |"
         ),
         (
             "| Descriptor semantic mapping ready | "

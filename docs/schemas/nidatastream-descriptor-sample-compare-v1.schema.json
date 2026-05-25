@@ -17,6 +17,7 @@
     "DescriptorByteOrderProof",
     "DescriptorRecordByteSummary",
     "DescriptorRecordIndexProof",
+    "DescriptorRecordByteRoleCandidates",
     "DescriptorSemanticFeasibility",
     "CandidateFieldMap",
     "PromotionGateBlockers",
@@ -38,6 +39,7 @@
     "DescriptorByteOrderProof": { "$ref": "#/$defs/descriptorByteOrderProof" },
     "DescriptorRecordByteSummary": { "$ref": "#/$defs/descriptorRecordByteSummary" },
     "DescriptorRecordIndexProof": { "$ref": "#/$defs/descriptorRecordIndexProof" },
+    "DescriptorRecordByteRoleCandidates": { "$ref": "#/$defs/descriptorRecordByteRoleCandidates" },
     "DescriptorSemanticFeasibility": { "$ref": "#/$defs/descriptorSemanticFeasibility" },
     "CandidateFieldMap": {
       "type": "array",
@@ -331,7 +333,9 @@
         "StaticFieldMapReady",
         "DescriptorRecordByteDistributionReady",
         "DescriptorRecordIndexCandidateMapped",
+        "DescriptorRecordByteRolesClassified",
         "CandidateIndexByteOffset",
+        "CandidatePaddingByteOffsets",
         "RemainingUnmappedRecordByteOffsets",
         "StaticFieldMapOffsetCount",
         "DescriptorRecordByteOffsetCount",
@@ -352,8 +356,13 @@
         "StaticFieldMapReady": { "type": "boolean" },
         "DescriptorRecordByteDistributionReady": { "type": "boolean" },
         "DescriptorRecordIndexCandidateMapped": { "type": "boolean" },
+        "DescriptorRecordByteRolesClassified": { "type": "boolean" },
         "CandidateIndexByteOffset": {
           "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "CandidatePaddingByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
         },
         "RemainingUnmappedRecordByteOffsets": {
           "type": "array",
@@ -409,6 +418,96 @@
             "unmapped-static-table-offset-not-stream-byte-offset"
           ]
         }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordByteRoleCandidates": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "RecordWidthBytes",
+        "ObservedRecordCount",
+        "ClassifiedByteCount",
+        "CandidateSemanticByteOffsets",
+        "CandidatePaddingByteOffsets",
+        "RemainingUnmappedByteOffsets",
+        "AllBytesClassified",
+        "Rows",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "RecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "ObservedRecordCount": { "type": "integer", "minimum": 0 },
+        "ClassifiedByteCount": { "type": "integer", "minimum": 0 },
+        "CandidateSemanticByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "CandidatePaddingByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "RemainingUnmappedByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "AllBytesClassified": { "type": "boolean" },
+        "Rows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordByteRoleRow" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordByteRoleRow": {
+      "type": "object",
+      "required": [
+        "OffsetBytes",
+        "CandidateRole",
+        "Classification",
+        "UniqueValueCount",
+        "ObservedRecordCount",
+        "TopValues",
+        "BlocksSemanticMapping",
+        "Evidence"
+      ],
+      "properties": {
+        "OffsetBytes": { "type": "integer", "minimum": 0 },
+        "CandidateRole": {
+          "enum": [
+            "static-descriptor-table-index",
+            "zero-padding-or-reserved",
+            "unmapped-variable-byte"
+          ]
+        },
+        "Classification": {
+          "enum": [
+            "ghidra-record-index-proof",
+            "uniform-zero-candidate",
+            "variable-unmapped"
+          ]
+        },
+        "UniqueValueCount": { "type": "integer", "minimum": 0 },
+        "ObservedRecordCount": { "type": "integer", "minimum": 0 },
+        "TopValues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordByteValue" }
+        },
+        "BlocksSemanticMapping": { "type": "boolean" },
+        "Evidence": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

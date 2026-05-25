@@ -141,6 +141,9 @@
         "DescriptorRecordPatternCount",
         "DescriptorRecordWidthBytes",
         "DescriptorRecordIndexCandidateMapped",
+        "DescriptorRecordBytesClassified",
+        "DescriptorRecordPaddingByteCount",
+        "DescriptorRecordRemainingUnmappedByteCount",
         "DescriptorSemanticMappingReady",
         "DescriptorAndSampleEvidenceReady"
       ],
@@ -158,6 +161,9 @@
         "DescriptorRecordPatternCount": { "type": "integer", "minimum": 0 },
         "DescriptorRecordWidthBytes": { "type": "integer", "minimum": 0 },
         "DescriptorRecordIndexCandidateMapped": { "type": "boolean" },
+        "DescriptorRecordBytesClassified": { "type": "boolean" },
+        "DescriptorRecordPaddingByteCount": { "type": "integer", "minimum": 0 },
+        "DescriptorRecordRemainingUnmappedByteCount": { "type": "integer", "minimum": 0 },
         "DescriptorSemanticMappingReady": { "const": false },
         "DescriptorAndSampleEvidenceReady": { "type": "boolean" }
       },
