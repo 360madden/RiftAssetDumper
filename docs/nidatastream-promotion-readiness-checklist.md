@@ -15,6 +15,8 @@ Current v1 contracts intentionally lock promotion off:
 
 Before changing any promotion-critical schema, follow `docs/nidatastream-ghidra-schema-policy.md`.
 
+Before proposing any parser/export behavior change, copy and fill `docs/nidatastream-parser-export-promotion-decision-template.md` into a dated decision record or handoff.
+
 ## Required commands before any future parser/export patch
 
 ```powershell
