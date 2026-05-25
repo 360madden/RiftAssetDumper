@@ -16,6 +16,7 @@
     "SampleByteSummary",
     "DescriptorByteOrderProof",
     "DescriptorRecordByteSummary",
+    "DescriptorRecordIndexProof",
     "DescriptorSemanticFeasibility",
     "CandidateFieldMap",
     "PromotionGateBlockers",
@@ -36,6 +37,7 @@
     "SampleByteSummary": { "$ref": "#/$defs/sampleByteSummary" },
     "DescriptorByteOrderProof": { "$ref": "#/$defs/descriptorByteOrderProof" },
     "DescriptorRecordByteSummary": { "$ref": "#/$defs/descriptorRecordByteSummary" },
+    "DescriptorRecordIndexProof": { "$ref": "#/$defs/descriptorRecordIndexProof" },
     "DescriptorSemanticFeasibility": { "$ref": "#/$defs/descriptorSemanticFeasibility" },
     "CandidateFieldMap": {
       "type": "array",
@@ -55,6 +57,10 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "counterValue": {
       "anyOf": [
         { "type": "integer" },
@@ -324,6 +330,9 @@
         "ParserExportPromotionAllowed",
         "StaticFieldMapReady",
         "DescriptorRecordByteDistributionReady",
+        "DescriptorRecordIndexCandidateMapped",
+        "CandidateIndexByteOffset",
+        "RemainingUnmappedRecordByteOffsets",
         "StaticFieldMapOffsetCount",
         "DescriptorRecordByteOffsetCount",
         "DescriptorRecordWidthBytes",
@@ -342,6 +351,14 @@
         "ParserExportPromotionAllowed": { "const": false },
         "StaticFieldMapReady": { "type": "boolean" },
         "DescriptorRecordByteDistributionReady": { "type": "boolean" },
+        "DescriptorRecordIndexCandidateMapped": { "type": "boolean" },
+        "CandidateIndexByteOffset": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "RemainingUnmappedRecordByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
         "StaticFieldMapOffsetCount": { "type": "integer", "minimum": 0 },
         "DescriptorRecordByteOffsetCount": { "type": "integer", "minimum": 0 },
         "DescriptorRecordWidthBytes": { "type": "integer", "minimum": 0 },
@@ -388,9 +405,81 @@
         "MappingDecision": {
           "enum": [
             "mapped-candidate",
+            "selected-by-record-byte-0-index-candidate",
             "unmapped-static-table-offset-not-stream-byte-offset"
           ]
         }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordIndexProof": {
+      "type": "object",
+      "required": [
+        "CandidateOnly",
+        "FieldOrderPromoted",
+        "ParserExportPromotionAllowed",
+        "RecordWidthBytes",
+        "CandidateIndexByteOffset",
+        "CandidateRecordIndexMapped",
+        "RemainingUnmappedByteOffsets",
+        "RequiredEvidenceCount",
+        "PassedEvidenceCount",
+        "Checks",
+        "BlockerCount",
+        "Blockers",
+        "Interpretation"
+      ],
+      "properties": {
+        "CandidateOnly": { "const": true },
+        "FieldOrderPromoted": { "const": false },
+        "ParserExportPromotionAllowed": { "const": false },
+        "RecordWidthBytes": { "const": 4 },
+        "CandidateIndexByteOffset": {
+          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }]
+        },
+        "CandidateRecordIndexMapped": { "type": "boolean" },
+        "RemainingUnmappedByteOffsets": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "RequiredEvidenceCount": { "type": "integer", "minimum": 0 },
+        "PassedEvidenceCount": { "type": "integer", "minimum": 0 },
+        "Checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/descriptorRecordIndexCheck" }
+        },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Interpretation": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "descriptorRecordIndexCheck": {
+      "type": "object",
+      "required": [
+        "Key",
+        "TargetKey",
+        "ReportPath",
+        "DecompileCompleted",
+        "RequiredTerms",
+        "MissingTerms",
+        "Evidence",
+        "Passed",
+        "Error"
+      ],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "TargetKey": { "type": "string", "minLength": 1 },
+        "ReportPath": { "type": "string" },
+        "DecompileCompleted": { "type": "boolean" },
+        "RequiredTerms": { "$ref": "#/$defs/stringList" },
+        "MissingTerms": { "$ref": "#/$defs/stringList" },
+        "Evidence": { "type": "string", "minLength": 1 },
+        "Passed": { "type": "boolean" },
+        "Error": { "type": "string" }
       },
       "additionalProperties": false
     },

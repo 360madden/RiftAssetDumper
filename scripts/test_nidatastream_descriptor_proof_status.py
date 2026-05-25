@@ -92,28 +92,33 @@ with TemporaryDirectory() as temp_dir:
         "141186980",
         ["1411821f0", "141181770", "1411817c0"],
         [],
-        ["LoadBinary descriptor calls"],
+        [
+            "LoadBinary descriptor calls",
+            "FUN_1411821f0(uVar6)",
+            "FUN_141181770(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
+            "FUN_1411817c0(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
+        ],
     )
     make_report(
         report_root / "descriptor-helper.json",
         "1411821f0",
         ["141182280"],
         ["143358be0", "143358be4", "143358be8"],
-        ["(&DAT_143358be0)[index * 0xc]"],
+        ["(&DAT_143358be0)[(ulonglong)(param_1 & 0xff) * 0xc]"],
     )
     make_report(
         report_root / "descriptor-builder-1770.json",
         "141181770",
         [],
         ["143358be0", "143358be4", "143358b01"],
-        ["(&DAT_143358be4)[index * 0xc]"],
+        ["(&DAT_143358be4)[(ulonglong)(param_1 & 0xff) * 0xc]"],
     )
     make_report(
         report_root / "descriptor-builder-17c0.json",
         "1411817c0",
         ["141182280"],
         ["143358be0", "143358be8", "143358b04"],
-        ["(&DAT_143358be8 + index * 0xc)"],
+        ["(&DAT_143358be8 + (ulonglong)(param_1 & 0xff) * 0xc)"],
     )
     targets_file = temp_path / "targets.json"
     registry = {
@@ -151,9 +156,18 @@ check("field map promotion status", stride_field["PromotionStatus"], "candidate-
 check("field map static table stride", stride_field["StaticTableStrideBytes"], 12)
 check("field map component offset", component_field["StaticTableOffsetBytes"], 4)
 check("field map stream record status", component_field["StreamDescriptorRecordStatus"], "not-mapped-to-parser-field")
+record_index_proof = status["DescriptorRecordIndexProof"]
+check("record index proof candidate-only", record_index_proof["CandidateOnly"], True)
+check("record index proof mapped", record_index_proof["CandidateRecordIndexMapped"], True)
+check("record index proof byte offset", record_index_proof["CandidateIndexByteOffset"], 0)
+check("record index proof passed count", record_index_proof["PassedEvidenceCount"], 5)
+check("record index remaining bytes", record_index_proof["RemainingUnmappedByteOffsets"], [1, 2, 3])
 promoted_field_status = json.loads(json.dumps(status))
 promoted_field_status["CandidateFieldMap"][0]["PromotionStatus"] = "promoted"
 check_validation_error("schema rejects promoted field-map entry", promoted_field_status, schema)
+promoted_record_index_status = json.loads(json.dumps(status))
+promoted_record_index_status["DescriptorRecordIndexProof"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted record index proof", promoted_record_index_status, schema)
 
 print("=== NiDataStream descriptor proof negative fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -201,6 +215,7 @@ print("  PASS: negative descriptor status schema validation")
 check("negative descriptor evidence blocks readiness", negative_status["AllRequiredEvidenceReady"], False)
 helper_status = next(target for target in negative_status["Targets"] if target["Key"] == "nidatastream-descriptor-helper")
 check("negative descriptor missing call", helper_status["MissingCalls"], ["141182280"])
+check("negative record index proof blocks", negative_status["DescriptorRecordIndexProof"]["CandidateRecordIndexMapped"], False)
 
 print(f"\n{'=' * 50}")
 if failed:

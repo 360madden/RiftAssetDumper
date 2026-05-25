@@ -140,6 +140,7 @@
         "AllByteOrderFieldsUniform",
         "DescriptorRecordPatternCount",
         "DescriptorRecordWidthBytes",
+        "DescriptorRecordIndexCandidateMapped",
         "DescriptorSemanticMappingReady",
         "DescriptorAndSampleEvidenceReady"
       ],
@@ -156,6 +157,7 @@
         "AllByteOrderFieldsUniform": { "type": "boolean" },
         "DescriptorRecordPatternCount": { "type": "integer", "minimum": 0 },
         "DescriptorRecordWidthBytes": { "type": "integer", "minimum": 0 },
+        "DescriptorRecordIndexCandidateMapped": { "type": "boolean" },
         "DescriptorSemanticMappingReady": { "const": false },
         "DescriptorAndSampleEvidenceReady": { "type": "boolean" }
       },

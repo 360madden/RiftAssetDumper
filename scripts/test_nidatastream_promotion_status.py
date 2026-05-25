@@ -213,6 +213,11 @@ check(
     False,
 )
 check(
+    "descriptor record index candidate mapped",
+    isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"], bool),
+    True,
+)
+check(
     "descriptor record pattern count is numeric",
     isinstance(status["DescriptorSampleCompareStatus"]["DescriptorRecordPatternCount"], int),
     True,
@@ -230,6 +235,9 @@ check_validation_error("promotion status rejects string descriptor/sample ready 
 semantic_ready_status = json.loads(json.dumps(status))
 semantic_ready_status["DescriptorSampleCompareStatus"]["DescriptorSemanticMappingReady"] = True
 check_validation_error("promotion status rejects semantic mapping promotion", semantic_ready_status, status_schema)
+string_index_status = json.loads(json.dumps(status))
+string_index_status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"] = "true"
+check_validation_error("promotion status rejects string record index mapped flag", string_index_status, status_schema)
 string_stream_map_status = json.loads(json.dumps(status))
 string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
 check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
@@ -270,6 +278,11 @@ check("negative pairing complete groups", pairing_status["CompletePositionNormal
 missing_layout_compare = negative_status["DescriptorSampleCompareStatus"]
 check("missing layout sample checks pass count", missing_layout_compare["SampleBytePassedCount"], 0)
 check("missing layout byte-order checks pass count", missing_layout_compare["ByteOrderPassedCount"], 0)
+check(
+    "missing layout record index mapped flag is boolean",
+    isinstance(missing_layout_compare["DescriptorRecordIndexCandidateMapped"], bool),
+    True,
+)
 check("missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False)
 check("missing layout descriptor/sample ready false", missing_layout_compare["DescriptorAndSampleEvidenceReady"], False)
 pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
@@ -345,6 +358,7 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown field-map status", dashboard_markdown, "Descriptor candidate field-map entries")
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
+    check_contains("dashboard markdown record index status", dashboard_markdown, "Descriptor record byte 0 mapped")
     check_contains("dashboard markdown semantic status", dashboard_markdown, "Descriptor semantic mapping ready")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 

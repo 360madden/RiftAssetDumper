@@ -54,9 +54,20 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
     report_dir.mkdir(parents=True, exist_ok=True)
     targets: list[dict[str, Any]] = []
     address_base = 0x141180000
+    decompile_extras = {
+        "nidatastream-loadbinary": [
+            "FUN_1411821f0(uVar6)",
+            "FUN_141181770(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
+            "FUN_1411817c0(*(undefined4 *)(lVar12 + 4 + (longlong)puVar11))",
+        ],
+        "nidatastream-descriptor-helper": ["(ulonglong)(param_1 & 0xff) * 0xc"],
+        "nidatastream-descriptor-builder-1770": ["(ulonglong)(param_1 & 0xff) * 0xc"],
+        "nidatastream-descriptor-builder-17c0": ["(ulonglong)(param_1 & 0xff) * 0xc"],
+    }
     for index, (key, requirements) in enumerate(rift_workflow.DESCRIPTOR_PROOF_REQUIREMENTS.items(), start=1):
         report_path = report_dir / f"{key}.json"
         summary_path = report_dir / f"{key}.md"
+        decompile_terms = list(requirements["RequiredTerms"]) + decompile_extras.get(key, [])
         report_path.write_text(
             json.dumps(
                 {
@@ -69,7 +80,7 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
                     ],
                     "decompile": {
                         "completed": True,
-                        "c": " ".join(requirements["RequiredTerms"]) or "return;",
+                        "c": " ".join(decompile_terms) or "return;",
                     },
                 }
             ),
@@ -198,22 +209,33 @@ check("record byte summary width", record_byte_summary["RecordWidthBytes"], 4)
 check("record byte offset count", len(record_byte_summary["ByteOffsets"]), 4)
 check("record byte offset 0 top value", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["ValueHex"], "aa")
 check("record byte offset 0 top count", record_byte_summary["ByteOffsets"][0]["TopValues"][0]["Count"], 5)
+record_index_proof = compare["DescriptorRecordIndexProof"]
+check("record index proof mapped", record_index_proof["CandidateRecordIndexMapped"], True)
+check("record index proof byte offset", record_index_proof["CandidateIndexByteOffset"], 0)
+check("record index proof passed count", record_index_proof["PassedEvidenceCount"], 5)
+check("record index proof remaining bytes", record_index_proof["RemainingUnmappedByteOffsets"], [1, 2, 3])
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
 check("semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True)
+check("semantic feasibility record index mapped", semantic_feasibility["DescriptorRecordIndexCandidateMapped"], True)
 check("semantic feasibility mapping blocked", semantic_feasibility["SemanticMappingReady"], False)
 check("semantic feasibility static offsets", semantic_feasibility["StaticFieldMapOffsetCount"], 3)
 check("semantic feasibility record offsets", semantic_feasibility["DescriptorRecordByteOffsetCount"], 4)
-check("semantic feasibility mapped fields", semantic_feasibility["StreamDescriptorRecordMappedCount"], 0)
-check("semantic feasibility blocker present", "stream-record-semantics-unmapped" in semantic_feasibility["Blockers"], True)
+check("semantic feasibility mapped fields", semantic_feasibility["StreamDescriptorRecordMappedCount"], 1)
+check("semantic feasibility blocker present", "stream-record-semantics-partial" in semantic_feasibility["Blockers"], True)
+check(
+    "semantic feasibility remaining byte blocker",
+    "stream-record-payload-bytes-unmapped" in semantic_feasibility["Blockers"],
+    True,
+)
 first_semantic_row = semantic_feasibility["OffsetComparisonRows"][0]
 check("semantic feasibility first field", first_semantic_row["Field"], "descriptor-enable-or-special-flag")
 check("semantic feasibility candidate offsets", first_semantic_row["CandidateRecordByteOffsets"], [0, 1, 2, 3])
 check(
     "semantic feasibility mapping decision",
     first_semantic_row["MappingDecision"],
-    "unmapped-static-table-offset-not-stream-byte-offset",
+    "selected-by-record-byte-0-index-candidate",
 )
 check("candidate field map count", len(compare["CandidateFieldMap"]), 4)
 stride_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
@@ -231,7 +253,7 @@ check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
 check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
-check("semantic blocker present", "stream-record-semantics-unmapped" in compare["Blockers"], True)
+check("semantic blocker present", "stream-record-semantics-partial" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
 
 print("=== NiDataStream descriptor/sample-byte compare mismatch fixture ===")
@@ -319,6 +341,9 @@ check_validation_error("schema rejects promoted field-map entry", field_map_prom
 record_byte_promoted_compare = json.loads(json.dumps(compare))
 record_byte_promoted_compare["DescriptorRecordByteSummary"]["FieldOrderPromoted"] = True
 check_validation_error("schema rejects promoted descriptor record byte summary", record_byte_promoted_compare, schema)
+record_index_promoted_compare = json.loads(json.dumps(compare))
+record_index_promoted_compare["DescriptorRecordIndexProof"]["ParserExportPromotionAllowed"] = True
+check_validation_error("schema rejects promoted descriptor record index proof", record_index_promoted_compare, schema)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -362,8 +387,9 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown title", markdown, "# NiDataStream descriptor/sample-byte comparison")
     check_contains("markdown descriptor record byte distribution", markdown, "Descriptor record byte distribution")
     check_contains("markdown descriptor record byte value", markdown, "aa (5)")
+    check_contains("markdown descriptor record index proof", markdown, "Descriptor record index proof")
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
-    check_contains("markdown semantic mapping decision", markdown, "unmapped-static-table-offset-not-stream-byte-offset")
+    check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")
     check_contains("markdown format field", markdown, "descriptor-format-size-lookup")
 
