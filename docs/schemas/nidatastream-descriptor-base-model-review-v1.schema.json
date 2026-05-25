@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/nidatastream-descriptor-base-model-review-v1.schema.json",
+  "title": "NiDataStream descriptor base model review",
+  "description": "Candidate-only review of descriptor base/stride hypotheses from Ghidra reference classification evidence.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "FieldOrderPromoted",
+    "ParserExportPromotionAllowed",
+    "ReferenceReport",
+    "ReportPath",
+    "MarkdownPath",
+    "FieldEvidence",
+    "FieldCount",
+    "WritableFieldCount",
+    "AllStaticBytesZero",
+    "IndexedInstructionCount",
+    "InstructionScaleCandidates",
+    "InstructionOffsetCandidates",
+    "DescriptorTableSampleStatus",
+    "CandidateModels",
+    "BlockerCount",
+    "Blockers",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-descriptor-base-model-review/v1" },
+    "CandidateOnly": { "const": true },
+    "FieldOrderPromoted": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "ReferenceReport": { "$ref": "#/$defs/referenceReport" },
+    "ReportPath": { "type": "string" },
+    "MarkdownPath": { "type": "string" },
+    "FieldEvidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fieldEvidence" }
+    },
+    "FieldCount": { "type": "integer", "minimum": 0 },
+    "WritableFieldCount": { "type": "integer", "minimum": 0 },
+    "AllStaticBytesZero": { "type": "boolean" },
+    "IndexedInstructionCount": { "type": "integer", "minimum": 0 },
+    "InstructionScaleCandidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/scaleCount" }
+    },
+    "InstructionOffsetCandidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/offsetCount" }
+    },
+    "DescriptorTableSampleStatus": { "$ref": "#/$defs/tableSampleStatus" },
+    "CandidateModels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateModel" }
+    },
+    "BlockerCount": { "type": "integer", "minimum": 0 },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "referenceReport": {
+      "type": "object",
+      "required": [
+        "Path",
+        "Exists",
+        "SchemaVersion",
+        "Error",
+        "FieldCount",
+        "TotalReferenceCount",
+        "UniqueReferencingFunctionCount"
+      ],
+      "properties": {
+        "Path": { "type": "string" },
+        "Exists": { "type": "boolean" },
+        "SchemaVersion": { "type": "string" },
+        "Error": { "type": "string" },
+        "FieldCount": { "type": "integer", "minimum": 0 },
+        "TotalReferenceCount": { "type": "integer", "minimum": 0 },
+        "UniqueReferencingFunctionCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "fieldEvidence": {
+      "type": "object",
+      "required": [
+        "Field",
+        "Address",
+        "MemoryBlockName",
+        "MemoryBlockInitialized",
+        "MemoryBlockWrite",
+        "StaticBytesAllZero",
+        "ReferenceCount",
+        "ReferenceKindCounts",
+        "ReferenceTypeCounts",
+        "InstructionScaleCandidates",
+        "InstructionOffsetCandidates",
+        "IndexedInstructionCount",
+        "ExampleInstructions"
+      ],
+      "properties": {
+        "Field": { "type": "string" },
+        "Address": { "type": "string" },
+        "MemoryBlockName": { "type": "string" },
+        "MemoryBlockInitialized": { "type": "boolean" },
+        "MemoryBlockWrite": { "type": "boolean" },
+        "StaticBytesAllZero": { "type": "boolean" },
+        "ReferenceCount": { "type": "integer", "minimum": 0 },
+        "ReferenceKindCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/referenceKindCount" }
+        },
+        "ReferenceTypeCounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/referenceTypeCount" }
+        },
+        "InstructionScaleCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scaleCount" }
+        },
+        "InstructionOffsetCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/offsetCount" }
+        },
+        "IndexedInstructionCount": { "type": "integer", "minimum": 0 },
+        "ExampleInstructions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "referenceKindCount": {
+      "type": "object",
+      "required": ["ReferenceKind", "Count"],
+      "properties": {
+        "ReferenceKind": { "type": "string" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "referenceTypeCount": {
+      "type": "object",
+      "required": ["ReferenceType", "Count"],
+      "properties": {
+        "ReferenceType": { "type": "string" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "scaleCount": {
+      "type": "object",
+      "required": ["ScaleBytes", "Count"],
+      "properties": {
+        "ScaleBytes": { "type": "integer", "minimum": 0 },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "offsetCount": {
+      "type": "object",
+      "required": ["OffsetBytes", "Count"],
+      "properties": {
+        "OffsetBytes": { "type": "integer" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "tableSampleStatus": {
+      "type": "object",
+      "required": ["Path", "Exists", "RowCount", "NonzeroRowCount", "AllRowsZero", "StreamSemanticsExplained"],
+      "properties": {
+        "Path": { "type": "string" },
+        "Exists": { "type": "boolean" },
+        "RowCount": { "type": "integer", "minimum": 0 },
+        "NonzeroRowCount": { "type": "integer", "minimum": 0 },
+        "AllRowsZero": { "type": "boolean" },
+        "StreamSemanticsExplained": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "candidateModel": {
+      "type": "object",
+      "required": ["Key", "Status", "Evidence", "Blockers"],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "Status": { "enum": ["candidate", "blocked"] },
+        "StrideBytes": { "type": "integer", "minimum": 1 },
+        "StrideByteCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scaleCount" }
+        },
+        "OffsetByteCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/offsetCount" }
+        },
+        "Evidence": { "type": "string" },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

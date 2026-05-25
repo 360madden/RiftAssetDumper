@@ -57,6 +57,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 python scripts/rift_workflow.py nidatastream-descriptor-table-sample
 python scripts/rift_workflow.py nidatastream-descriptor-neighborhood-scan
 python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
+python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
 ```
 
 Descriptor status is still candidate-only. `FieldOrderPromoted` must remain false until a separate promotion patch proves otherwise.
@@ -64,6 +65,7 @@ The descriptor/sample compare command writes ignored JSON/Markdown under `Export
 The descriptor-table sample command prints a plan by default; use `--list-json` for machine-readable planning and `--ghidra-execute` only when intentionally refreshing ignored `Exports/ghidra-reports/nidatastream_descriptor_table_samples.*` evidence. Use `--descriptor-table-all-byte-indices` for the bounded 3-field x 256-index sweep. Current sampled candidate table rows are readable but zero, so they are blocker evidence rather than promotion proof.
 The descriptor-neighborhood scan command is also dry-run by default; use it after all-zero table samples to look for nearby nonzero static data without broad dumping. Current retained-project neighborhood evidence found 0 nonzero hits in the default bounded window.
 The descriptor-reference classifier is dry-run by default; use it after zero byte scans to classify Ghidra reference kinds, memory-block metadata, and instruction text around candidate descriptor data references. Current retained-project reference evidence found 20 DATA/address-like references across 6 functions, which is useful for the next stride/base-model review but still not parser/export truth.
+The descriptor-base-model review is report-only and does not run Ghidra. Use it after refreshing reference classification to summarize current stride/base hypotheses and blockers before planning any additional table sampling.
 
 ## 5. Refresh local sample-byte evidence only when needed
 

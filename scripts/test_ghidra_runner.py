@@ -319,6 +319,9 @@ descriptor_neighborhood_schema = json.loads(
 descriptor_reference_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-reference-classification-v1.schema.json").read_text(encoding="utf-8")
 )
+descriptor_base_model_schema = json.loads(
+    Path("docs/schemas/nidatastream-descriptor-base-model-review-v1.schema.json").read_text(encoding="utf-8")
+)
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     report_file = temp_path / "reports" / "descriptor-table.json"
@@ -686,7 +689,7 @@ with TemporaryDirectory() as temp_dir:
                                     "fromFunctionSignature": "undefined FUN_1411821f0(void)",
                                     "instructionAddress": "141182242",
                                     "instructionMnemonic": "MOV",
-                                    "instructionText": "MOV EAX,dword ptr [DAT_143358be4]",
+                                    "instructionText": "MOV EAX,dword ptr [RAX + RCX*0x4 + 0x4]",
                                     "instructionBytes": "8b 05 00 00 00 00",
                                 }
                             ],
@@ -723,6 +726,43 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor reference classify byte-count arg", captured_reference["script_args"][1], "8")
     check("descriptor reference classify max refs arg", captured_reference["script_args"][2], "4")
     check("descriptor reference classify markdown written", summary_file.exists(), True)
+
+    base_model_report = temp_path / "reports" / "descriptor-base-model.json"
+    base_model_summary = temp_path / "reports" / "descriptor-base-model.md"
+    base_model_output = io.StringIO()
+    base_model_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-base-model-review",
+        "--out",
+        str(temp_path),
+        "--descriptor-base-model-reference-report",
+        str(report_file),
+        "--descriptor-base-model-report",
+        str(base_model_report),
+        "--descriptor-base-model-summary",
+        str(base_model_summary),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", base_model_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(base_model_output),
+    ):
+        rift_workflow.main()
+    base_model = parse_json_object(base_model_output.getvalue())
+    jsonschema.validate(base_model, descriptor_base_model_schema)
+    print("  PASS: descriptor base model review schema validation")
+    check("descriptor base model schema", base_model["SchemaVersion"], "nidatastream-descriptor-base-model-review/v1")
+    check("descriptor base model scale", base_model["InstructionScaleCandidates"][0]["ScaleBytes"], 4)
+    check("descriptor base model candidate-only", base_model["CandidateOnly"], True)
+
+    with (
+        patch.object(sys, "argv", base_model_argv[:-1]),
+        patch("scripts.rift_workflow.generated_output_guard"),
+    ):
+        rift_workflow.main()
+    check("descriptor base model JSON written", base_model_report.exists(), True)
+    check("descriptor base model markdown written", base_model_summary.exists(), True)
 
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)

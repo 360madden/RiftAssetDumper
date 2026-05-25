@@ -103,6 +103,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 python scripts/rift_workflow.py nidatastream-descriptor-table-sample
 python scripts/rift_workflow.py nidatastream-descriptor-neighborhood-scan
 python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
+python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -130,6 +131,8 @@ For computed descriptor-table entry checks, use `nidatastream-descriptor-table-s
 For nearby static-data triage after an all-zero table sample, use `nidatastream-descriptor-neighborhood-scan`. It scans a bounded nonzero-byte window around the same candidate descriptor data references and writes ignored JSON/Markdown under `Exports/ghidra-reports/`; its report schema is `docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json`. Current retained-project evidence scanned 6915 memory-backed 4-byte rows from 1024 bytes before through 8192 bytes after each candidate reference and found 0 nonzero hits.
 
 For reference-shape triage after zero byte scans, use `nidatastream-descriptor-reference-classify`. It classifies Ghidra references to the descriptor data addresses, records memory-block metadata for those addresses, and writes ignored JSON/Markdown under `Exports/ghidra-reports/`; its report schema is `docs/schemas/ghidra-descriptor-reference-classification-v1.schema.json`. Current retained-project evidence found 20 captured DATA/address-like references across the three fields and 6 functions. The instruction text shows indexed memory operands against the candidate bases, so the next safe task is a separate stride/base-model review before any parser/export promotion.
+
+For a machine-readable summary of descriptor base/stride hypotheses, use `nidatastream-descriptor-base-model-review`. It joins the descriptor reference classifier with the current descriptor-table sample status and writes ignored JSON/Markdown under `Exports/ghidra-reports/`; its report schema is `docs/schemas/nidatastream-descriptor-base-model-review-v1.schema.json`. Current evidence keeps the stride-12 model blocked and treats instruction-derived index scales as candidate-only review leads.
 
 Before any future parser/export patch, read `docs/nidatastream-promotion-readiness-checklist.md` and copy `docs/nidatastream-parser-export-promotion-decision-template.md` into a dated decision record or handoff. Before changing promotion-critical schemas, read `docs/nidatastream-ghidra-schema-policy.md`. The v1 schemas intentionally lock `ParserExportPromotionAllowed=false` and `FieldOrderPromoted=false`.
 
@@ -175,6 +178,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - NiDataStream descriptor-table neighborhood scan wired and run: `docs/handoffs/2026-05-25-nidatastream-descriptor-neighborhood-scan.md`
 - NiDataStream descriptor reference classifier wired and run: `docs/handoffs/2026-05-25-nidatastream-descriptor-reference-classification.md`
 - NiDataStream descriptor reference memory-block metadata wired: `docs/handoffs/2026-05-25-nidatastream-descriptor-reference-memory-block.md`
+- NiDataStream descriptor base-model review wired and run: `docs/handoffs/2026-05-25-nidatastream-descriptor-base-model-review.md`
 - Local FunctionSiteSurvey Markdown summaries refreshed under ignored `Exports/`: `docs/handoffs/2026-05-25-ghidra-function-site-summary-refresh.md`
 - Ghidra NiDataStream descriptor targets registered: `docs/handoffs/2026-05-24-ghidra-nidatastream-descriptor-targets.md`
 - Ghidra NiDataStream parser-field comparison documented: `docs/handoffs/2026-05-24-ghidra-nidatastream-parser-field-comparison.md`

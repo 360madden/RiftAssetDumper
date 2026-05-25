@@ -43,6 +43,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
     "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
     "NiDataStreamDescriptorReferenceClassify": "nidatastream-descriptor-reference-classify",
+    "NiDataStreamDescriptorBaseModelReview": "nidatastream-descriptor-base-model-review",
 }
 
 

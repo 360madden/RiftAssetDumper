@@ -10,6 +10,7 @@ Status: **candidate-only / report-only**. This note compares current repo parser
 | Descriptor/helper anchors | `nidatastream-descriptor-helper`, `nidatastream-descriptor-builder-1770`, `nidatastream-descriptor-builder-17c0` |
 | Descriptor-table sampled entries | `nidatastream-descriptor-table-sample`; schema `docs/schemas/ghidra-descriptor-table-sample-v1.schema.json` |
 | Descriptor reference classification | `nidatastream-descriptor-reference-classify`; schema `docs/schemas/ghidra-descriptor-reference-classification-v1.schema.json` |
+| Descriptor base/stride model review | `nidatastream-descriptor-base-model-review`; schema `docs/schemas/nidatastream-descriptor-base-model-review-v1.schema.json` |
 | Semantic adapter anchor | `ghidra-function-site-survey --ghidra-target nidatastream-semantic-adapter` |
 | Parser-side comparison reports | `nidatastream-layout`, `inventory-nif-stream-bodies`, `inventory-nif-mesh-bindings` |
 
@@ -44,6 +45,7 @@ Do not change decoder/export behavior until every required gate for the target f
 | Descriptor-table indexed samples | Computed candidate static-table entries for observed byte-0 descriptor indices explain stream descriptor bytes or fail closed as blocker evidence | `nidatastream-descriptor-table-sample`; schema `docs/schemas/ghidra-descriptor-table-sample-v1.schema.json` | 🟨 Report-only; command is wired and schema-backed, but current retained-project all-index sample has 768 readable rows and 0 nonzero rows for all byte indices, so it does not justify parser/export promotion |
 | Descriptor-table neighborhood scan | Bounded nonzero-byte scan around candidate descriptor data references can find nearby static-data leads after all-index samples are zero | `nidatastream-descriptor-neighborhood-scan`; schema `docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json` | 🟨 Report-only; current retained-project scan checked 6915 memory-backed rows around the candidate references and found 0 nonzero hits |
 | Descriptor reference classification | Ghidra reference kinds, memory-block metadata, and instruction text distinguish a dead/zero byte region from an indexed base-address hypothesis before more sampling | `nidatastream-descriptor-reference-classify`; schema `docs/schemas/ghidra-descriptor-reference-classification-v1.schema.json` | 🟨 Report-only; current retained-project classifier captured 20 DATA/address-like references across 3 fields and 6 functions, with indexed instruction operands requiring a stride/base-model follow-up |
+| Descriptor base/stride model review | Reference classification and table-sample status are joined into one candidate-only model review before resampling or parser proposals | `nidatastream-descriptor-base-model-review`; schema `docs/schemas/nidatastream-descriptor-base-model-review-v1.schema.json` | 🟨 Report-only; keeps stride/base hypotheses candidate-only and parser/export promotion locked |
 | Pairing impact | A field interpretation change creates complete position+normal+UV evidence without promoting noise/sentinels | `ghidra-attribute-candidate-report`; `ghidra-attribute-candidate-guard`; summarized by `nidatastream-promotion-status --list-json` | 🟨 Local ignored report has 0 complete position+normal+UV Ghidra-only groups across 14 groups; still candidate-only |
 | Export isolation | Ghidra evidence is not consumed by decode/export paths | `ghidra-workflow-guard-suite`; `ghidra-pairing-non-export-guard` | ✅ Guarded |
 | Narrow parser patch | Any future parser change is isolated to the smallest field-read surface and has regression tests before exporter use | Future C#/Python tests | 🟥 Not started |
@@ -57,6 +59,7 @@ python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
 python scripts/rift_workflow.py nidatastream-descriptor-table-sample
 python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
+python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
 ```
 
 ## Current decision

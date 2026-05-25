@@ -55,6 +55,7 @@ Commands (kebab-case):
     nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
     nidatastream-descriptor-neighborhood-scan — scan bounded nonzero neighborhoods around descriptor refs
     nidatastream-descriptor-reference-classify — classify references to descriptor data refs
+    nidatastream-descriptor-base-model-review — summarize descriptor base/stride model candidates
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-evidence-status — list ignored local NiDataStream/Ghidra evidence artifact timestamps
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
@@ -74,6 +75,7 @@ import argparse
 import contextlib
 import io
 import json
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -329,6 +331,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-base-model-review": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-summarize": {
         "dotnet": "",
         "base": "",
@@ -424,6 +430,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
     "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
     "NiDataStreamDescriptorReferenceClassify": "nidatastream-descriptor-reference-classify",
+    "NiDataStreamDescriptorBaseModelReview": "nidatastream-descriptor-base-model-review",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
@@ -5305,6 +5312,305 @@ def _run_nidatastream_descriptor_reference_classify(args: argparse.Namespace) ->
     print("NiDataStreamDescriptorReferenceClassify passed: report remains candidate-only/report-only.")
 
 
+def _descriptor_base_model_review_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
+    """Return reference input plus output paths for descriptor base-model review."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    reference_path = (
+        Path(args.descriptor_base_model_reference_report)
+        if args.descriptor_base_model_reference_report
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_reference_classification.json"
+    )
+    report_path = (
+        Path(args.descriptor_base_model_report)
+        if args.descriptor_base_model_report
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_base_model_review.json"
+    )
+    markdown_path = (
+        Path(args.descriptor_base_model_summary)
+        if args.descriptor_base_model_summary
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_base_model_review.md"
+    )
+    return reference_path, report_path, markdown_path
+
+
+def _counted_rows(counts: dict[int | str, int], key_name: str) -> list[dict[str, Any]]:
+    """Return stable descending count rows for integer/string counters."""
+    return [
+        {key_name: key, "Count": count}
+        for key, count in sorted(counts.items(), key=lambda item: (-item[1], str(item[0])))
+    ]
+
+
+def _increment_count(counts: dict[int | str, int], key: int | str) -> None:
+    counts[key] = counts.get(key, 0) + 1
+
+
+def _hex_pattern_counts(instruction_texts: list[str]) -> tuple[dict[int | str, int], dict[int | str, int]]:
+    """Extract simple index-scale and positive/negative offset candidates from instruction text."""
+    scale_counts: dict[int | str, int] = {}
+    offset_counts: dict[int | str, int] = {}
+    for text in instruction_texts:
+        for match in re.finditer(r"\*0x([0-9a-fA-F]+)", text):
+            _increment_count(scale_counts, int(match.group(1), 16))
+        for match in re.finditer(r"([+-])\s*0x([0-9a-fA-F]+)", text):
+            value = int(match.group(2), 16)
+            if match.group(1) == "-":
+                value *= -1
+            _increment_count(offset_counts, value)
+    return scale_counts, offset_counts
+
+
+def _hex_bytes_all_zero(value: Any) -> bool:
+    """Return true when a Ghidra hex-byte string is non-empty and all bytes are zero."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    return all(part == "00" for part in value.strip().split())
+
+
+def _descriptor_base_model_review_payload(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a candidate-only descriptor base/stride model review from reference classification evidence."""
+    reference_path, report_path, markdown_path = _descriptor_base_model_review_paths(args)
+    blockers: list[str] = []
+    reference_report: dict[str, Any] = {}
+    reference_error = ""
+    if not reference_path.exists():
+        blockers.append("descriptor-reference-classification-missing")
+    else:
+        try:
+            loaded_reference = json.loads(reference_path.read_text(encoding="utf-8"))
+            if isinstance(loaded_reference, dict):
+                reference_report = loaded_reference
+            else:
+                reference_error = "reference report root is not an object"
+        except (OSError, json.JSONDecodeError) as exc:
+            reference_error = f"{type(exc).__name__}: {exc}"
+    if reference_error:
+        blockers.append("descriptor-reference-classification-invalid")
+    if reference_report.get("SchemaVersion") != "ghidra-descriptor-reference-classification/v1":
+        blockers.append("descriptor-reference-classification-schema-mismatch")
+    if not reference_report.get("CandidateOnly") or reference_report.get("ParserExportPromotionAllowed"):
+        blockers.append("descriptor-reference-classification-promoted-or-not-candidate")
+
+    raw_fields = reference_report.get("fields")
+    fields: list[Any] = raw_fields if isinstance(raw_fields, list) else []
+    field_rows: list[dict[str, Any]] = []
+    global_scale_counts: dict[int | str, int] = {}
+    global_offset_counts: dict[int | str, int] = {}
+    all_static_bytes_zero = bool(fields)
+    writable_field_count = 0
+    indexed_instruction_count = 0
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        raw_references = field.get("references")
+        references: list[Any] = raw_references if isinstance(raw_references, list) else []
+        instruction_texts = [
+            str(reference.get("instructionText"))
+            for reference in references
+            if isinstance(reference, dict) and reference.get("instructionText")
+        ]
+        scale_counts, offset_counts = _hex_pattern_counts(instruction_texts)
+        for key, count in scale_counts.items():
+            global_scale_counts[key] = global_scale_counts.get(key, 0) + count
+        for key, count in offset_counts.items():
+            global_offset_counts[key] = global_offset_counts.get(key, 0) + count
+        type_counts: dict[int | str, int] = {}
+        kind_counts: dict[int | str, int] = {}
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            _increment_count(type_counts, str(reference.get("referenceType", "")))
+            _increment_count(kind_counts, str(reference.get("referenceKind", "")))
+        static_zero = _hex_bytes_all_zero(field.get("bytes"))
+        all_static_bytes_zero = all_static_bytes_zero and static_zero
+        writable = bool(field.get("memoryBlockWrite"))
+        if writable:
+            writable_field_count += 1
+        indexed_count = sum(1 for text in instruction_texts if "*0x" in text)
+        indexed_instruction_count += indexed_count
+        field_rows.append(
+            {
+                "Field": field.get("field", ""),
+                "Address": field.get("address", ""),
+                "MemoryBlockName": field.get("memoryBlockName", ""),
+                "MemoryBlockInitialized": bool(field.get("memoryBlockInitialized")),
+                "MemoryBlockWrite": writable,
+                "StaticBytesAllZero": static_zero,
+                "ReferenceCount": int(field.get("referenceCountTo", 0) or 0),
+                "ReferenceKindCounts": _counted_rows(kind_counts, "ReferenceKind"),
+                "ReferenceTypeCounts": _counted_rows(type_counts, "ReferenceType"),
+                "InstructionScaleCandidates": _counted_rows(scale_counts, "ScaleBytes"),
+                "InstructionOffsetCandidates": _counted_rows(offset_counts, "OffsetBytes"),
+                "IndexedInstructionCount": indexed_count,
+                "ExampleInstructions": instruction_texts[:8],
+            }
+        )
+
+    table_sample_status = _nidatastream_descriptor_table_sample_status(args)
+    if all_static_bytes_zero:
+        blockers.append("descriptor-reference-static-bytes-all-zero")
+    if not global_scale_counts:
+        blockers.append("descriptor-reference-index-scale-missing")
+    if table_sample_status["AllRowsZero"]:
+        blockers.append("descriptor-table-sample-current-model-all-zero")
+    blockers.append("descriptor-base-model-not-promoted")
+    blockers.append("parser-export-promotion-locked")
+
+    candidate_models = [
+        {
+            "Key": "current-field-map-stride-12",
+            "Status": "blocked" if table_sample_status["AllRowsZero"] else "candidate",
+            "StrideBytes": 12,
+            "Evidence": (
+                "Existing descriptor-table sampler uses the candidate field map stride. "
+                f"Rows={table_sample_status['RowCount']}; nonzero={table_sample_status['NonzeroRowCount']}; "
+                f"all-zero={str(table_sample_status['AllRowsZero']).lower()}."
+            ),
+            "Blockers": ["descriptor-table-sample-current-model-all-zero"]
+            if table_sample_status["AllRowsZero"]
+            else [],
+        },
+        {
+            "Key": "reference-instruction-index-scale",
+            "Status": "candidate" if global_scale_counts else "blocked",
+            "StrideByteCandidates": _counted_rows(global_scale_counts, "ScaleBytes"),
+            "OffsetByteCandidates": _counted_rows(global_offset_counts, "OffsetBytes"),
+            "Evidence": (
+                "Instruction text in descriptor reference classification contains indexed memory operands. "
+                "This is a review lead, not parser/export truth."
+            ),
+            "Blockers": [] if global_scale_counts else ["descriptor-reference-index-scale-missing"],
+        },
+        {
+            "Key": "static-image-byte-source",
+            "Status": "blocked" if all_static_bytes_zero else "candidate",
+            "Evidence": (
+                "Descriptor addresses are memory-backed but their sampled static image bytes are "
+                f"{'all zero' if all_static_bytes_zero else 'not uniformly zero'}."
+            ),
+            "Blockers": ["descriptor-reference-static-bytes-all-zero"] if all_static_bytes_zero else [],
+        },
+    ]
+    return {
+        "SchemaVersion": "nidatastream-descriptor-base-model-review/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "ReferenceReport": {
+            "Path": _display_path(reference_path),
+            "Exists": reference_path.exists(),
+            "SchemaVersion": reference_report.get("SchemaVersion", ""),
+            "Error": reference_error,
+            "FieldCount": int(reference_report.get("fieldCount", 0) or 0),
+            "TotalReferenceCount": int(reference_report.get("totalReferenceCount", 0) or 0),
+            "UniqueReferencingFunctionCount": int(reference_report.get("uniqueReferencingFunctionCount", 0) or 0),
+        },
+        "ReportPath": _display_path(report_path),
+        "MarkdownPath": _display_path(markdown_path),
+        "FieldEvidence": field_rows,
+        "FieldCount": len(field_rows),
+        "WritableFieldCount": writable_field_count,
+        "AllStaticBytesZero": all_static_bytes_zero,
+        "IndexedInstructionCount": indexed_instruction_count,
+        "InstructionScaleCandidates": _counted_rows(global_scale_counts, "ScaleBytes"),
+        "InstructionOffsetCandidates": _counted_rows(global_offset_counts, "OffsetBytes"),
+        "DescriptorTableSampleStatus": {
+            "Path": table_sample_status["Path"],
+            "Exists": table_sample_status["Exists"],
+            "RowCount": table_sample_status["RowCount"],
+            "NonzeroRowCount": table_sample_status["NonzeroRowCount"],
+            "AllRowsZero": table_sample_status["AllRowsZero"],
+            "StreamSemanticsExplained": table_sample_status["StreamSemanticsExplained"],
+        },
+        "CandidateModels": candidate_models,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Decision": "Descriptor base/stride evidence remains candidate-only; parser/export behavior stays unchanged.",
+        "NextAction": "Review instruction-derived base/stride candidates before any further table sampling or parser-field proposal.",
+    }
+
+
+def _descriptor_base_model_review_markdown(report: dict[str, Any]) -> str:
+    """Build Markdown for candidate-only descriptor base/stride model review."""
+    lines = [
+        "# NiDataStream descriptor base-model review",
+        "",
+        f"- Candidate-only: **{str(report['CandidateOnly']).lower()}**",
+        f"- Parser/export promotion allowed: **{str(report['ParserExportPromotionAllowed']).lower()}**",
+        f"- Fields: **{format_markdown_cell(report['FieldCount'])}**",
+        f"- Writable fields: **{format_markdown_cell(report['WritableFieldCount'])}**",
+        f"- All static bytes zero: **{str(report['AllStaticBytesZero']).lower()}**",
+        f"- Indexed instruction count: **{format_markdown_cell(report['IndexedInstructionCount'])}**",
+        f"- Blocking items: **{format_markdown_cell(report['BlockerCount'])}**",
+        "",
+        "## Field evidence",
+        "",
+        "| Field | Address | Block | W | Static zero | Refs | Scales | Offsets |",
+        "|---|---|---|---:|---:|---:|---|---|",
+    ]
+    for field in report["FieldEvidence"]:
+        scales = ", ".join(
+            f"{row['ScaleBytes']} ({row['Count']})" for row in field["InstructionScaleCandidates"]
+        )
+        offsets = ", ".join(
+            f"{row['OffsetBytes']} ({row['Count']})" for row in field["InstructionOffsetCandidates"]
+        )
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(field["Field"]),
+                    format_markdown_cell(field["Address"]),
+                    format_markdown_cell(field["MemoryBlockName"]),
+                    format_markdown_cell(str(field["MemoryBlockWrite"]).lower()),
+                    format_markdown_cell(str(field["StaticBytesAllZero"]).lower()),
+                    format_markdown_cell(field["ReferenceCount"]),
+                    format_markdown_cell(scales or "-"),
+                    format_markdown_cell(offsets or "-"),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "## Candidate models", "", "| Model | Status | Evidence | Blockers |", "|---|---|---|---|"])
+    for model in report["CandidateModels"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(model["Key"]),
+                    format_markdown_cell(model["Status"]),
+                    format_markdown_cell(model["Evidence"]),
+                    format_markdown_cell(", ".join(model["Blockers"]) or "-"),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", f"Decision: {format_markdown_cell(report['Decision'])}", ""])
+    lines.extend([f"Next action: {format_markdown_cell(report['NextAction'])}", ""])
+    return "\n".join(lines)
+
+
+def _run_nidatastream_descriptor_base_model_review(args: argparse.Namespace) -> None:
+    """Write or list a candidate-only descriptor base/stride model review."""
+    report = _descriptor_base_model_review_payload(args)
+    if args.list_json:
+        print(json.dumps(report, indent=2))
+        return
+    _reference_path, report_path, markdown_path = _descriptor_base_model_review_paths(args)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    markdown_path.write_text(_descriptor_base_model_review_markdown(report), encoding="utf-8")
+    print("--- NiDataStreamDescriptorBaseModelReview")
+    print(f"Reference report: {report['ReferenceReport']['Path']}")
+    print(f"Fields: {report['FieldCount']}; indexed instructions: {report['IndexedInstructionCount']}")
+    print(f"All static bytes zero: {str(report['AllStaticBytesZero']).lower()}")
+    print(f"Blocking items: {report['BlockerCount']}")
+    print(f"NiDataStreamDescriptorBaseModelReview JSON: {report_path}")
+    print(f"NiDataStreamDescriptorBaseModelReview markdown: {markdown_path}")
+    print("NiDataStreamDescriptorBaseModelReview passed: review remains candidate-only/report-only.")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -5428,6 +5734,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-descriptor-reference-classify":
         _run_nidatastream_descriptor_reference_classify(args)
+        return
+
+    if command == "nidatastream-descriptor-base-model-review":
+        _run_nidatastream_descriptor_base_model_review(args)
         return
 
     if command == "ghidra-summarize":
@@ -6803,6 +7113,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
   python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
+  python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
@@ -7131,6 +7442,21 @@ Examples:
         default="",
         help="Optional Markdown output path for nidatastream-descriptor-reference-classify",
     )
+    parser.add_argument(
+        "--descriptor-base-model-reference-report",
+        default="",
+        help="Optional descriptor reference classification JSON input for nidatastream-descriptor-base-model-review",
+    )
+    parser.add_argument(
+        "--descriptor-base-model-report",
+        default="",
+        help="Optional JSON output path for nidatastream-descriptor-base-model-review",
+    )
+    parser.add_argument(
+        "--descriptor-base-model-summary",
+        default="",
+        help="Optional Markdown output path for nidatastream-descriptor-base-model-review",
+    )
 
     args = parser.parse_args()
 
@@ -7148,6 +7474,7 @@ Examples:
         "nidatastream-descriptor-table-sample",
         "nidatastream-descriptor-neighborhood-scan",
         "nidatastream-descriptor-reference-classify",
+        "nidatastream-descriptor-base-model-review",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
@@ -7156,7 +7483,8 @@ Examples:
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
             "nidatastream-descriptor-neighborhood-scan, and "
-            "nidatastream-descriptor-reference-classify.",
+            "nidatastream-descriptor-reference-classify, and "
+            "nidatastream-descriptor-base-model-review.",
             file=sys.stderr,
         )
         sys.exit(1)
