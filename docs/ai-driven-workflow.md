@@ -146,6 +146,7 @@ For Ghidra pairing follow-up, use `ghidra-pairing-review-report` as the durable 
 - Ghidra FunctionSiteSurvey target guard/list/status wired: `docs/handoffs/2026-05-25-ghidra-function-site-target-guard-status.md`
 - Ghidra NiDataStream descriptor targets registered: `docs/handoffs/2026-05-24-ghidra-nidatastream-descriptor-targets.md`
 - Ghidra NiDataStream parser-field comparison documented: `docs/handoffs/2026-05-24-ghidra-nidatastream-parser-field-comparison.md`
+- Ghidra NiDataStream parser-field promotion checklist added: `docs/handoffs/2026-05-25-ghidra-nidatastream-parser-field-checklist.md`
 - TWAD unsupported archive-version warning/test wired: `docs/handoffs/2026-05-24-twad-unsupported-version-warning.md`
 - Plan/status for that proof: `docs/plans/2026-05-24-twad-ghidra-proof-plan.md`
 - `TWAD` is proven as archive file/header magic; `TWAM` remains manifest-layer magic.

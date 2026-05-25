@@ -24,11 +24,25 @@ All Ghidra reports/summaries are ignored local evidence under `Exports/ghidra-re
 | Usage/access metadata | Gamebryo block names encode usage/access variants | `DataStreamUsage`, `DataStreamAccess` | Reported and used for ranking/grouping |
 | Semantic adapter ordering | Ghidra semantic adapter path checks stream-element/semantic ordering | Role/grouping reports preserve stream order and semantic grouping | Reported only |
 
+## Parser-field promotion checklist
+
+Do not change decoder/export behavior until every required gate for the target field is green. A yellow or red row keeps the field report-only.
+
+| Gate | Required proof | Current command/source | Current status |
+|---|---|---|---|
+| Target registry safety | FunctionSiteSurvey targets are candidate-only, unique, and write only repo-relative ignored `Exports/ghidra-reports/` files | `ghidra-function-site-target-guard`; included in `ghidra-workflow-guard-suite` | ✅ Guarded |
+| Ghidra evidence availability | The target has both a local ignored JSON report and Markdown summary before being cited as fresh evidence | `ghidra-function-site-status --list-json` | 🟨 Partial: descriptor targets have reports+summaries locally; older TWAD/load/semantic reports still need summaries if refreshed |
+| Descriptor field order | Descriptor helper/builders prove count/order/format/component fields strongly enough to map bytes, not just names | `ghidra-function-site-survey --ghidra-target nidatastream-descriptor-helper`; descriptor builder targets | 🟨 Candidate-only |
+| Sample-byte agreement | Copied/extracted NIF samples agree with the proposed Ghidra-aligned prefix/payload/trailer interpretation | `nidatastream-layout --root Extracted --full` | 🟨 Report-only |
+| Pairing impact | A field interpretation change creates complete position+normal+UV evidence without promoting noise/sentinels | `ghidra-attribute-candidate-report`; `ghidra-attribute-candidate-guard` | 🟥 Not promoted: guard currently expects zero complete groups |
+| Export isolation | Ghidra evidence is not consumed by decode/export paths | `ghidra-workflow-guard-suite`; `ghidra-pairing-non-export-guard` | ✅ Guarded |
+| Narrow parser patch | Any future parser change is isolated to the smallest field-read surface and has regression tests before exporter use | Future C#/Python tests | 🟥 Not started |
+
 ## Current decision
 
 - Keep `NiDataStream` Ghidra evidence as a sidecar until a narrow parser patch has a proof guard.
 - Do not switch geometry decode/export consumers from legacy body slicing to Ghidra-aligned slicing in this stage.
-- Continue using `nidatastream-layout` and Ghidra target summaries to identify a minimal, guardable parser-field promotion if one becomes necessary.
+- Continue using `nidatastream-layout`, `ghidra-function-site-status --list-json`, and Ghidra target summaries to identify a minimal, guardable parser-field promotion if one becomes necessary.
 
 ## Next safe proof questions
 
