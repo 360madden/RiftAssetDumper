@@ -101,8 +101,9 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
     return targets_file
 
 
-def write_layout_fixture(out_dir: Path) -> None:
+def write_layout_fixture(out_dir: Path, *, payload_prefix: int = 28, payload_prefix_count: int | None = None) -> None:
     block_count = 5
+    prefix_count = block_count if payload_prefix_count is None else payload_prefix_count
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "nidatastream-layout-report.json").write_text(
         json.dumps(
@@ -114,7 +115,7 @@ def write_layout_fixture(out_dir: Path) -> None:
                 "NiDataStreamBlocks": block_count,
                 "GhidraStyleLayoutValidBlocks": block_count,
                 "LegacyOffsetShiftedBlocks": block_count,
-                "TopPayloadPrefixBytes": [{"Value": 28, "Count": block_count}],
+                "TopPayloadPrefixBytes": [{"Value": payload_prefix, "Count": prefix_count}],
                 "TopPayloadTrailerBytes": [{"Value": 1, "Count": block_count}],
                 "TopTrailingFlags": [{"Value": 1, "Count": block_count}],
                 "TopLegacyOffsetMinusGhidraOffset": [{"Value": 1, "Count": block_count}],
@@ -171,6 +172,42 @@ check("sample passed count", compare["SampleByteSummary"]["PassedCount"], 6)
 check("layout block count", compare["LayoutReportStatus"]["NiDataStreamBlocks"], 5)
 check("promotion lock blocker present", "parser-export-promotion-locked" in compare["Blockers"], True)
 check("promotion gate blockers present", "narrow-parser-patch" in compare["PromotionGateBlockers"], True)
+
+print("=== NiDataStream descriptor/sample-byte compare mismatch fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    targets_file = write_descriptor_fixture(temp_path)
+    write_layout_fixture(out_dir, payload_prefix=29)
+    mismatch_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-sample-compare",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(mismatch_output),
+    ):
+        rift_workflow.main()
+mismatch = json.loads(mismatch_output.getvalue())
+jsonschema.validate(mismatch, schema)
+print("  PASS: mismatch comparison schema validation")
+prefix_check = next(check for check in mismatch["SampleByteSummary"]["Checks"] if check["Key"] == "payload-prefix-bytes")
+check("mismatch sample checks fail", mismatch["SampleByteSummary"]["AllExpectedValuesUniform"], False)
+check("mismatch descriptor + sample evidence not ready", mismatch["DescriptorAndSampleEvidenceReady"], False)
+check("mismatch prefix observed", prefix_check["ObservedInteger"], 29)
+check("mismatch prefix does not match", prefix_check["MatchesExpected"], False)
+check("mismatch blocker present", "sample-byte-uniformity-incomplete" in mismatch["Blockers"], True)
 
 promoted_compare = json.loads(json.dumps(compare))
 promoted_compare["ParserExportPromotionAllowed"] = True

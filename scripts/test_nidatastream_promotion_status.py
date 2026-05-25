@@ -239,8 +239,19 @@ with TemporaryDirectory() as temp_dir:
         rift_workflow.main()
     check("preflight dashboard json written", (Path(temp_dir) / "nidatastream-promotion-dashboard.json").exists(), True)
     check("preflight dashboard markdown written", (Path(temp_dir) / "nidatastream-promotion-dashboard.md").exists(), True)
+    check(
+        "preflight descriptor/sample json written",
+        (Path(temp_dir) / "nidatastream-descriptor-sample-compare.json").exists(),
+        True,
+    )
+    check(
+        "preflight descriptor/sample markdown written",
+        (Path(temp_dir) / "nidatastream-descriptor-sample-compare.md").exists(),
+        True,
+    )
     check("preflight runs guard suite", preflight_calls["guard_suite"], True)
     check("preflight runs initial and final generated-output guards", preflight_calls["generated_output_guard"], 2)
+    check_contains("preflight descriptor/sample compare", preflight_output.getvalue(), "Preflight descriptor/sample compare")
     check_contains("preflight evidence status", preflight_output.getvalue(), "NiDataStreamEvidenceStatus")
     check_contains("preflight console", preflight_output.getvalue(), "NiDataStreamPromotionPreflight passed")
 

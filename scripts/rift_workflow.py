@@ -2292,12 +2292,24 @@ def _run_nidatastream_promotion_preflight(args: argparse.Namespace) -> None:
     json_path, markdown_path = _write_nidatastream_promotion_dashboard(status, args)
     print(f"\nPreflight dashboard JSON: {json_path}")
     print(f"Preflight dashboard markdown: {markdown_path}")
+    compare = _nidatastream_descriptor_sample_compare_payload(args)
+    compare_json_path, compare_markdown_path = _write_nidatastream_descriptor_sample_compare(compare, args)
+    print(f"Preflight descriptor/sample compare JSON: {compare_json_path}")
+    print(f"Preflight descriptor/sample compare markdown: {compare_markdown_path}")
+    print(
+        "Preflight descriptor/sample compare: "
+        f"descriptor+sample-ready={str(compare['DescriptorAndSampleEvidenceReady']).lower()} "
+        f"blockers={compare['BlockerCount']}"
+    )
     print()
     _print_nidatastream_evidence_status(_nidatastream_evidence_status_payload(args))
     _run_ghidra_workflow_guard_suite(args)
     print("\n--- Final GeneratedOutputGuard")
     generated_output_guard()
-    print("NiDataStreamPromotionPreflight passed: dashboard, promotion brakes, Ghidra guard suite, and output safety passed.")
+    print(
+        "NiDataStreamPromotionPreflight passed: dashboard, descriptor/sample compare, "
+        "promotion brakes, Ghidra guard suite, and output safety passed."
+    )
 
 
 def _run_nidatastream_parser_field_proof_guard(args: argparse.Namespace) -> None:
