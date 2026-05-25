@@ -54,6 +54,7 @@ Commands (kebab-case):
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
     nidatastream-descriptor-neighborhood-scan — scan bounded nonzero neighborhoods around descriptor refs
+    nidatastream-descriptor-reference-classify — classify references to descriptor data refs
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-evidence-status — list ignored local NiDataStream/Ghidra evidence artifact timestamps
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
@@ -324,6 +325,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-reference-classify": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-summarize": {
         "dotnet": "",
         "base": "",
@@ -418,6 +423,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
     "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
+    "NiDataStreamDescriptorReferenceClassify": "nidatastream-descriptor-reference-classify",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
@@ -5074,6 +5080,230 @@ def _run_nidatastream_descriptor_neighborhood_scan(args: argparse.Namespace) -> 
     print("NiDataStreamDescriptorNeighborhoodScan passed: report remains candidate-only/report-only.")
 
 
+def _descriptor_reference_classify_paths(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Return default/overridden descriptor reference classification report paths."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = (
+        Path(args.descriptor_reference_report)
+        if args.descriptor_reference_report
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_reference_classification.json"
+    )
+    markdown_path = (
+        Path(args.descriptor_reference_summary)
+        if args.descriptor_reference_summary
+        else out_dir / "ghidra-reports" / "nidatastream_descriptor_reference_classification.md"
+    )
+    return report_path, markdown_path
+
+
+def _descriptor_reference_classify_plan(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a candidate-only descriptor reference classification plan."""
+    fields = _descriptor_table_field_specs()
+    report_path, markdown_path = _descriptor_reference_classify_paths(args)
+    byte_count = int(args.descriptor_reference_byte_count)
+    max_refs = int(args.descriptor_reference_max_refs)
+    blockers = []
+    if not fields:
+        blockers.append("descriptor-reference-fields-missing")
+    if byte_count <= 0 or byte_count > 64:
+        blockers.append("descriptor-reference-byte-count-invalid")
+    if max_refs <= 0 or max_refs > 512:
+        blockers.append("descriptor-reference-max-refs-invalid")
+    field_args = [f"{field['Field']}:{field['DataAddress']}" for field in fields]
+    script = args.ghidra_script or "scripts/ghidra/DescriptorReferenceClassifier.java"
+    project_name = args.ghidra_project_name if args.ghidra_project_name != "TempProject" else "RiftAnchorSurvey"
+    process_path = args.ghidra_process or "rift_x64.exe"
+    return {
+        "SchemaVersion": "nidatastream-descriptor-reference-classify-plan/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "ReportPath": str(report_path),
+        "MarkdownPath": str(markdown_path),
+        "Script": script,
+        "ProjectName": project_name,
+        "Process": process_path,
+        "ByteCountRequested": byte_count,
+        "MaxRefsPerField": max_refs,
+        "FieldCount": len(fields),
+        "Fields": fields,
+        "ScriptArgs": [
+            str(report_path),
+            str(byte_count),
+            str(max_refs),
+            *field_args,
+        ],
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Interpretation": (
+            "Candidate-only dry-run plan for classifying references to descriptor data addresses. "
+            "Reference kinds are triage leads only."
+        ),
+    }
+
+
+def _descriptor_reference_classify_markdown(report: dict[str, Any]) -> str:
+    """Render a compact Markdown summary for descriptor reference classification."""
+    raw_fields = report.get("fields")
+    fields: list[Any] = raw_fields if isinstance(raw_fields, list) else []
+    lines = [
+        "# Ghidra descriptor reference classification",
+        "",
+        f"- Candidate-only: **{str(report.get('CandidateOnly')).lower()}**",
+        f"- Parser/export promotion allowed: **{str(report.get('ParserExportPromotionAllowed')).lower()}**",
+        f"- Program: **{format_markdown_cell(report.get('programName'))}**",
+        f"- Fields: **{format_markdown_cell(report.get('fieldCount'))}**",
+        f"- Total references: **{format_markdown_cell(report.get('totalReferenceCount'))}**",
+        f"- Captured references: **{format_markdown_cell(report.get('totalCapturedReferenceCount'))}**",
+        f"- Read/write/data/address-like refs: **{format_markdown_cell(report.get('readReferenceCount'))}/"
+        f"{format_markdown_cell(report.get('writeReferenceCount'))}/"
+        f"{format_markdown_cell(report.get('dataReferenceCount'))}/"
+        f"{format_markdown_cell(report.get('addressLikeReferenceCount'))}**",
+        "",
+        "| Field | Address | Bytes | Refs | Read | Write | Data | Address-like | Functions |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(field.get("field")),
+                    format_markdown_cell(field.get("address")),
+                    format_markdown_cell(field.get("bytes")),
+                    format_markdown_cell(field.get("referenceCountTo")),
+                    format_markdown_cell(field.get("readReferenceCount")),
+                    format_markdown_cell(field.get("writeReferenceCount")),
+                    format_markdown_cell(field.get("dataReferenceCount")),
+                    format_markdown_cell(field.get("addressLikeReferenceCount")),
+                    format_markdown_cell(field.get("referencingFunctionCount")),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Captured references",
+            "",
+            "| Field | From | Kind | Type | Function | Instruction |",
+            "|---|---|---|---|---|---|",
+        ]
+    )
+    emitted = 0
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        raw_references = field.get("references")
+        references: list[Any] = raw_references if isinstance(raw_references, list) else []
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        format_markdown_cell(field.get("field")),
+                        format_markdown_cell(reference.get("fromAddress")),
+                        format_markdown_cell(reference.get("referenceKind")),
+                        format_markdown_cell(reference.get("referenceType")),
+                        format_markdown_cell(reference.get("fromFunction")),
+                        format_markdown_cell(reference.get("instructionText")),
+                    ]
+                )
+                + " |"
+            )
+            emitted += 1
+            if emitted >= 80:
+                break
+        if emitted >= 80:
+            break
+    lines.extend(["", "## Interpretation guard", "", format_markdown_cell(report.get("interpretation")), ""])
+    return "\n".join(lines)
+
+
+def _print_descriptor_reference_classify_plan(plan: dict[str, Any]) -> None:
+    """Print a human-readable descriptor reference classification dry-run."""
+    print("--- NiDataStreamDescriptorReferenceClassify")
+    print(f"Report: {plan['ReportPath']}")
+    print(f"Markdown: {plan['MarkdownPath']}")
+    print(f"Script: {plan['Script']}")
+    print(f"Fields: {plan['FieldCount']}")
+    print(f"Byte count: {plan['ByteCountRequested']}; max refs/field: {plan['MaxRefsPerField']}")
+    if plan["Blockers"]:
+        print(f"Blockers: {', '.join(plan['Blockers'])}")
+    run_command = [
+        "python",
+        "scripts/rift_workflow.py",
+        "ghidra-run",
+        "--ghidra-project-name",
+        str(plan["ProjectName"]),
+        "--ghidra-process",
+        str(plan["Process"]),
+        "--ghidra-timeout",
+        "900",
+        "--ghidra-script",
+        str(plan["Script"]),
+    ]
+    for value in plan["ScriptArgs"]:
+        run_command += ["--ghidra-script-arg", str(value)]
+    run_command += ["--ghidra-no-analysis", "--ghidra-keep-project"]
+    print("\nRun command:")
+    print(" ".join(run_command))
+
+
+def _run_nidatastream_descriptor_reference_classify(args: argparse.Namespace) -> None:
+    """Run or print a candidate-only descriptor reference classification workflow."""
+    plan = _descriptor_reference_classify_plan(args)
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    _print_descriptor_reference_classify_plan(plan)
+    if plan["Blockers"]:
+        print("NiDataStreamDescriptorReferenceClassify blocked before Ghidra execution.")
+        if args.ghidra_execute:
+            sys.exit(1)
+        print("Dry-run only. Resolve blockers before adding --ghidra-execute.")
+        return
+    if not args.ghidra_execute:
+        print("\nDry-run only. Add --ghidra-execute to run this reference classification.")
+        return
+
+    from scripts.ghidra_runner import run_ghidra_headless
+
+    report_path = Path(plan["ReportPath"])
+    markdown_path = Path(plan["MarkdownPath"])
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    result = run_ghidra_headless(
+        project_dir=_ghidra_project_dir_arg(args),
+        project_name=str(plan["ProjectName"]),
+        process_path=str(plan["Process"]),
+        script=str(plan["Script"]),
+        script_args=[str(value) for value in plan["ScriptArgs"]],
+        analyze=False,
+        delete_project=False,
+        timeout_seconds=args.ghidra_timeout,
+    )
+    _print_ghidra_result(result)
+    report = load_json_report(str(report_path))
+    if not report.get("CandidateOnly") or report.get("ParserExportPromotionAllowed"):
+        print("ERROR: descriptor reference classification report is not candidate-only/promoted-false.", file=sys.stderr)
+        sys.exit(1)
+    markdown_path.write_text(_descriptor_reference_classify_markdown(report), encoding="utf-8")
+    print(
+        "NiDataStreamDescriptorReferenceClassify refs: "
+        f"{report.get('totalReferenceCount')}; captured: {report.get('totalCapturedReferenceCount')}; "
+        f"functions: {report.get('uniqueReferencingFunctionCount')}"
+    )
+    print(f"NiDataStreamDescriptorReferenceClassify JSON: {report_path}")
+    print(f"NiDataStreamDescriptorReferenceClassify markdown: {markdown_path}")
+    print("NiDataStreamDescriptorReferenceClassify passed: report remains candidate-only/report-only.")
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -5193,6 +5423,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-descriptor-neighborhood-scan":
         _run_nidatastream_descriptor_neighborhood_scan(args)
+        return
+
+    if command == "nidatastream-descriptor-reference-classify":
+        _run_nidatastream_descriptor_reference_classify(args)
         return
 
     if command == "ghidra-summarize":
@@ -6567,6 +6801,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
+  python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick
   python scripts/rift_workflow.py ghidra-attribute-candidate-report
@@ -6873,6 +7108,28 @@ Examples:
         default="",
         help="Optional Markdown output path for nidatastream-descriptor-neighborhood-scan",
     )
+    parser.add_argument(
+        "--descriptor-reference-byte-count",
+        type=int,
+        default=16,
+        help="Bytes to sample at each descriptor data reference for reference classification (default: 16)",
+    )
+    parser.add_argument(
+        "--descriptor-reference-max-refs",
+        type=int,
+        default=128,
+        help="Maximum references to capture per descriptor data reference (default: 128)",
+    )
+    parser.add_argument(
+        "--descriptor-reference-report",
+        default="",
+        help="Optional JSON output path for nidatastream-descriptor-reference-classify",
+    )
+    parser.add_argument(
+        "--descriptor-reference-summary",
+        default="",
+        help="Optional Markdown output path for nidatastream-descriptor-reference-classify",
+    )
 
     args = parser.parse_args()
 
@@ -6889,6 +7146,7 @@ Examples:
         "nidatastream-descriptor-sample-compare",
         "nidatastream-descriptor-table-sample",
         "nidatastream-descriptor-neighborhood-scan",
+        "nidatastream-descriptor-reference-classify",
     }
     if args.list_json and args.command not in list_json_commands:
         print(
@@ -6896,7 +7154,8 @@ Examples:
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
-            "and nidatastream-descriptor-neighborhood-scan.",
+            "nidatastream-descriptor-neighborhood-scan, and "
+            "nidatastream-descriptor-reference-classify.",
             file=sys.stderr,
         )
         sys.exit(1)

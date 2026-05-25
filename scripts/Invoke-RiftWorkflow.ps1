@@ -63,6 +63,7 @@ $PSModeToKebab = @{
     'NiDataStreamDescriptorSampleCompare' = 'nidatastream-descriptor-sample-compare'
     'NiDataStreamDescriptorTableSample' = 'nidatastream-descriptor-table-sample'
     'NiDataStreamDescriptorNeighborhoodScan' = 'nidatastream-descriptor-neighborhood-scan'
+    'NiDataStreamDescriptorReferenceClassify' = 'nidatastream-descriptor-reference-classify'
     'GhidraPairingNonExportGuard' = 'ghidra-pairing-non-export-guard'
     'GhidraPairingReviewReport' = 'ghidra-pairing-review-report'
     'GhidraAttributeCandidateReport' = 'ghidra-attribute-candidate-report'

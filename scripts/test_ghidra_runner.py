@@ -316,6 +316,9 @@ descriptor_sample_schema = json.loads(
 descriptor_neighborhood_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json").read_text(encoding="utf-8")
 )
+descriptor_reference_schema = json.loads(
+    Path("docs/schemas/ghidra-descriptor-reference-classification-v1.schema.json").read_text(encoding="utf-8")
+)
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     report_file = temp_path / "reports" / "descriptor-table.json"
@@ -559,6 +562,154 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor neighborhood scan before arg", captured_scan["script_args"][1], "16")
     check("descriptor neighborhood scan after arg", captured_scan["script_args"][2], "32")
     check("descriptor neighborhood scan markdown written", summary_file.exists(), True)
+
+print("=== rift_workflow NiDataStream descriptor reference classification routing ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    report_file = temp_path / "reports" / "descriptor-reference.json"
+    summary_file = temp_path / "reports" / "descriptor-reference.md"
+    project_dir = temp_path / "projects"
+    list_output = io.StringIO()
+    list_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-reference-classify",
+        "--descriptor-reference-byte-count",
+        "8",
+        "--descriptor-reference-max-refs",
+        "4",
+        "--descriptor-reference-report",
+        str(report_file),
+        "--descriptor-reference-summary",
+        str(summary_file),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", list_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(list_output),
+    ):
+        rift_workflow.main()
+    reference_plan = parse_json_object(list_output.getvalue())
+    check(
+        "descriptor reference classify plan schema",
+        reference_plan["SchemaVersion"],
+        "nidatastream-descriptor-reference-classify-plan/v1",
+    )
+    check("descriptor reference classify plan field count", reference_plan["FieldCount"], 3)
+    check("descriptor reference classify plan byte count", reference_plan["ByteCountRequested"], 8)
+    check("descriptor reference classify max refs", reference_plan["MaxRefsPerField"], 4)
+    check("descriptor reference classify candidate-only", reference_plan["CandidateOnly"], True)
+
+    captured_reference: dict[str, Any] = {}
+
+    def fake_descriptor_reference_run(**kwargs: Any) -> subprocess.CompletedProcess[str]:
+        captured_reference.update(kwargs)
+        output_path = Path(kwargs["script_args"][0])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "ghidra-descriptor-reference-classification/v1",
+                    "CandidateOnly": True,
+                    "FieldOrderPromoted": False,
+                    "ParserExportPromotionAllowed": False,
+                    "programName": "rift_x64.exe",
+                    "imageBase": "140000000",
+                    "byteCountRequested": 8,
+                    "maxRefsPerField": 4,
+                    "fieldCount": 1,
+                    "fields": [
+                        {
+                            "field": "descriptor-component-class",
+                            "address": "143358be4",
+                            "addressValid": True,
+                            "memoryBacked": True,
+                            "byteCountRead": 8,
+                            "bytes": "00 00 00 00 00 00 00 00",
+                            "symbolCount": 1,
+                            "symbols": [
+                                {
+                                    "name": "DAT_143358be4",
+                                    "type": "LABEL",
+                                    "source": "DEFAULT",
+                                    "primary": True,
+                                    "dynamic": True,
+                                }
+                            ],
+                            "referenceCountTo": 1,
+                            "capturedReferenceCount": 1,
+                            "referencesTruncated": False,
+                            "readReferenceCount": 1,
+                            "writeReferenceCount": 0,
+                            "dataReferenceCount": 1,
+                            "addressLikeReferenceCount": 0,
+                            "flowReferenceCount": 0,
+                            "referencingFunctionCount": 1,
+                            "references": [
+                                {
+                                    "fromAddress": "141182242",
+                                    "toAddress": "143358be4",
+                                    "operandIndex": 1,
+                                    "referenceType": "READ",
+                                    "referenceKind": "read",
+                                    "source": "ANALYSIS",
+                                    "primary": True,
+                                    "data": True,
+                                    "read": True,
+                                    "write": False,
+                                    "flow": False,
+                                    "call": False,
+                                    "jump": False,
+                                    "computed": False,
+                                    "indirect": False,
+                                    "memoryReference": True,
+                                    "offsetReference": False,
+                                    "shiftedReference": False,
+                                    "externalReference": False,
+                                    "operandReference": True,
+                                    "mnemonicReference": False,
+                                    "fromFunction": "FUN_1411821f0",
+                                    "fromFunctionEntry": "1411821f0",
+                                    "fromFunctionSignature": "undefined FUN_1411821f0(void)",
+                                    "instructionAddress": "141182242",
+                                    "instructionMnemonic": "MOV",
+                                    "instructionText": "MOV EAX,dword ptr [DAT_143358be4]",
+                                    "instructionBytes": "8b 05 00 00 00 00",
+                                }
+                            ],
+                        }
+                    ],
+                    "totalReferenceCount": 1,
+                    "totalCapturedReferenceCount": 1,
+                    "fieldWithReferencesCount": 1,
+                    "readReferenceCount": 1,
+                    "writeReferenceCount": 0,
+                    "dataReferenceCount": 1,
+                    "addressLikeReferenceCount": 0,
+                    "uniqueReferencingFunctionCount": 1,
+                    "interpretation": "candidate-only test fixture",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["ghidra"], 0, "ok", "")
+
+    execute_argv = list_argv[:-1] + ["--ghidra-project-dir", str(project_dir), "--ghidra-execute"]
+    with (
+        patch.object(sys, "argv", execute_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        patch("scripts.ghidra_runner.run_ghidra_headless", side_effect=fake_descriptor_reference_run),
+    ):
+        rift_workflow.main()
+
+    reference_report = json.loads(report_file.read_text(encoding="utf-8"))
+    jsonschema.validate(reference_report, descriptor_reference_schema)
+    print("  PASS: descriptor reference classification report schema validation")
+    check("descriptor reference classify script", captured_reference["script"], "scripts/ghidra/DescriptorReferenceClassifier.java")
+    check("descriptor reference classify args report", captured_reference["script_args"][0], str(report_file))
+    check("descriptor reference classify byte-count arg", captured_reference["script_args"][1], "8")
+    check("descriptor reference classify max refs arg", captured_reference["script_args"][2], "4")
+    check("descriptor reference classify markdown written", summary_file.exists(), True)
 
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
