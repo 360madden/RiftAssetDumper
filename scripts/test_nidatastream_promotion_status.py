@@ -7,6 +7,7 @@ import json
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
@@ -78,6 +79,25 @@ check("layout report status present", "LayoutReportStatus" in status, True)
 check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
 check("pairing impact status present", "PairingImpactStatus" in status, True)
 check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
+
+print("=== NiDataStream promotion dashboard ===")
+with TemporaryDirectory() as temp_dir:
+    dashboard_output = io.StringIO()
+    with (
+        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-dashboard", "--out", temp_dir]),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(dashboard_output),
+    ):
+        rift_workflow.main()
+    dashboard_json = Path(temp_dir) / "nidatastream-promotion-dashboard.json"
+    dashboard_md = Path(temp_dir) / "nidatastream-promotion-dashboard.md"
+    check("dashboard json written", dashboard_json.exists(), True)
+    check("dashboard markdown written", dashboard_md.exists(), True)
+    dashboard_status = json.loads(dashboard_json.read_text(encoding="utf-8"))
+    jsonschema.validate(dashboard_status, status_schema)
+    print("  PASS: dashboard JSON schema validation")
+    check_contains("dashboard markdown title", dashboard_md.read_text(encoding="utf-8"), "# NiDataStream promotion dashboard")
+    check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
 print("=== NiDataStream parser-field proof guard ===")
 guard_output = io.StringIO()

@@ -54,6 +54,7 @@ $PSModeToKebab = @{
     'GhidraFunctionSiteSurvey' = 'ghidra-function-site-survey'
     'GhidraSummarize' = 'ghidra-summarize'
     'NiDataStreamPromotionStatus' = 'nidatastream-promotion-status'
+    'NiDataStreamPromotionDashboard' = 'nidatastream-promotion-dashboard'
     'NiDataStreamParserFieldProofGuard' = 'nidatastream-parser-field-proof-guard'
     'NiDataStreamDescriptorProofStatus' = 'nidatastream-descriptor-proof-status'
     'GhidraPairingNonExportGuard' = 'ghidra-pairing-non-export-guard'

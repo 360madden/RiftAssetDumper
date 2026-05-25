@@ -74,6 +74,7 @@ python scripts/rift_workflow.py ghidra-function-site-survey --list-json
 python scripts/rift_workflow.py ghidra-function-site-status --list-json
 python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
+python scripts/rift_workflow.py nidatastream-promotion-dashboard
 python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full

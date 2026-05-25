@@ -16,6 +16,7 @@ Current v1 contracts intentionally lock promotion off:
 
 ```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
+python scripts/rift_workflow.py nidatastream-promotion-dashboard
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-attribute-candidate-report

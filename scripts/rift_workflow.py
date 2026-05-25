@@ -54,6 +54,7 @@ Commands (kebab-case):
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     ghidra-summarize             — summarize FunctionSiteSurvey JSON from ignored Ghidra reports
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
+    nidatastream-promotion-dashboard — write compact Markdown dashboard for promotion gates
     nidatastream-parser-field-proof-guard — fail closed on premature NiDataStream parser/export promotion
     nidatastream-descriptor-proof-status — candidate-only descriptor helper evidence status
     nidatastream-layout          — read-only NiDataStream layout report/validator
@@ -116,6 +117,7 @@ from scripts.rift_workflow_reports import (  # noqa: E402
 )
 from scripts.rift_workflow_utils import (  # noqa: E402
     checked_run,
+    format_markdown_cell,
     generated_output_guard,
     load_json_report,
     load_tools_config,
@@ -315,6 +317,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-promotion-dashboard": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-parser-field-proof-guard": {
         "dotnet": "",
         "base": "",
@@ -381,6 +387,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "GhidraSummarize": "ghidra-summarize",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
+    "NiDataStreamPromotionDashboard": "nidatastream-promotion-dashboard",
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
     "NiDataStreamLayout": "nidatastream-layout",
@@ -1702,6 +1709,104 @@ def _run_nidatastream_promotion_status(args: argparse.Namespace) -> None:
     _print_nidatastream_promotion_status(status)
 
 
+def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
+    """Build a compact Markdown dashboard for current NiDataStream promotion gates."""
+    function_status = status["FunctionSiteTargetStatus"]
+    descriptor_status = status["DescriptorReportStatus"]
+    layout_status = status["LayoutReportStatus"]
+    pairing_status = status["PairingImpactStatus"]
+    lines = [
+        "# NiDataStream promotion dashboard",
+        "",
+        f"- Historical stage: **{format_markdown_cell(status['HistoricalStage'])}**",
+        f"- Current lane: **{format_markdown_cell(status['CurrentLane'])}**",
+        f"- Candidate-only: **{str(status['CandidateOnly']).lower()}**",
+        f"- Parser/export promotion allowed: **{str(status['ParserExportPromotionAllowed']).lower()}**",
+        f"- Blocking gates: **{format_markdown_cell(status['BlockerCount'])}**",
+        "",
+        "## Evidence snapshot",
+        "",
+        "| Evidence lane | Status |",
+        "|---|---:|",
+        (
+            "| FunctionSite evidence-ready targets | "
+            f"{format_markdown_cell(function_status['EvidenceReadyCount'])}/"
+            f"{format_markdown_cell(function_status['TargetCount'])} |"
+        ),
+        (
+            "| Descriptor helper evidence-ready targets | "
+            f"{format_markdown_cell(descriptor_status['EvidenceReadyCount'])}/"
+            f"{format_markdown_cell(descriptor_status['RequiredTargetCount'])} |"
+        ),
+        (
+            "| Descriptor field order promoted | "
+            f"{format_markdown_cell(str(descriptor_status['FieldOrderPromoted']).lower())} |"
+        ),
+        (
+            "| Layout Ghidra-style-valid blocks | "
+            f"{format_markdown_cell(layout_status['GhidraStyleLayoutValidBlocks'])}/"
+            f"{format_markdown_cell(layout_status['NiDataStreamBlocks'])} |"
+        ),
+        (
+            "| Complete Ghidra-only P+N+UV groups | "
+            f"{format_markdown_cell(pairing_status['CompletePositionNormalUvCandidateGroups'])} |"
+        ),
+        (
+            "| Ghidra-only candidate groups | "
+            f"{format_markdown_cell(pairing_status['GhidraOnlyGroups'])} |"
+        ),
+        "",
+        "## Gate table",
+        "",
+        "| Gate | State | Blocks promotion | Evidence | Command |",
+        "|---|---|---:|---|---|",
+    ]
+    for gate in status["Gates"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(gate.get("Key")),
+                    format_markdown_cell(gate.get("State")),
+                    format_markdown_cell(str(gate.get("BlocksPromotion")).lower()),
+                    format_markdown_cell(gate.get("Evidence")),
+                    format_markdown_cell(gate.get("Command")),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Current decision",
+            "",
+            (
+                "Parser/export behavior remains unchanged. Ghidra evidence is useful candidate evidence, "
+                "but v1 promotion remains locked off until descriptor, sample-byte, pairing-impact, and "
+                "narrow parser-patch proof all pass together."
+            ),
+            "",
+            f"Next action: {status['NextAction']}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _run_nidatastream_promotion_dashboard(args: argparse.Namespace) -> None:
+    """Write a compact ignored Markdown/JSON dashboard for NiDataStream promotion gates."""
+    status = _nidatastream_promotion_status_payload(args)
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "nidatastream-promotion-dashboard.json"
+    markdown_path = out_dir / "nidatastream-promotion-dashboard.md"
+    json_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    markdown_path.write_text(_nidatastream_promotion_dashboard_markdown(status), encoding="utf-8")
+    print(f"NiDataStreamPromotionDashboard JSON: {json_path}")
+    print(f"NiDataStreamPromotionDashboard markdown: {markdown_path}")
+    print("NiDataStreamPromotionDashboard passed: dashboard remains candidate-only/report-only.")
+
+
 def _run_nidatastream_parser_field_proof_guard(args: argparse.Namespace) -> None:
     """Fail closed on premature NiDataStream parser/export promotion."""
     print("--- NiDataStreamParserFieldProofGuard")
@@ -1978,6 +2083,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "nidatastream-promotion-status":
         _run_nidatastream_promotion_status(args)
+        return
+
+    if command == "nidatastream-promotion-dashboard":
+        _run_nidatastream_promotion_dashboard(args)
         return
 
     if command == "nidatastream-parser-field-proof-guard":
@@ -3305,6 +3414,7 @@ Examples:
   python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nidatastream-loadbinary
   python scripts/rift_workflow.py ghidra-summarize --ghidra-report Exports/ghidra-reports/twad_site_survey.json --ghidra-summary-term TWAD
   python scripts/rift_workflow.py nidatastream-promotion-status --list-json
+  python scripts/rift_workflow.py nidatastream-promotion-dashboard
   python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
