@@ -1477,6 +1477,47 @@ def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, An
     return status
 
 
+def _ghidra_attribute_candidate_report_status(args: argparse.Namespace) -> dict[str, Any]:
+    """Return status for the ignored Ghidra attribute candidate report, if present."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = out_dir / "ghidra-attribute-candidate-report.json"
+    status = {
+        "Path": _display_path(report_path),
+        "Exists": report_path.exists(),
+        "SchemaVersion": "",
+        "GhidraOnlyGroups": 0,
+        "GhidraOnlyPairingsCovered": 0,
+        "GroupedSampleMeshes": 0,
+        "CompletePositionNormalUvCandidateGroups": 0,
+        "ProbeBackedRanks": 0,
+        "RejectedNoiseGroups": 0,
+        "GuardBaselinePass": False,
+        "Error": "",
+    }
+    if not report_path.exists():
+        return status
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        status["Error"] = str(exc)
+        return status
+    summary = report.get("Summary") if isinstance(report.get("Summary"), dict) else {}
+    complete_groups = _json_int_or_none(summary.get("CompletePositionNormalUvCandidateGroups")) or 0
+    status.update(
+        {
+            "SchemaVersion": str(report.get("SchemaVersion", "")),
+            "GhidraOnlyGroups": _json_int_or_none(summary.get("GhidraOnlyGroups")) or 0,
+            "GhidraOnlyPairingsCovered": _json_int_or_none(summary.get("GhidraOnlyPairingsCovered")) or 0,
+            "GroupedSampleMeshes": _json_int_or_none(summary.get("GroupedSampleMeshes")) or 0,
+            "CompletePositionNormalUvCandidateGroups": complete_groups,
+            "ProbeBackedRanks": _json_int_or_none(summary.get("ProbeBackedRanks")) or 0,
+            "RejectedNoiseGroups": _json_int_or_none(summary.get("RejectedNoiseGroups")) or 0,
+            "GuardBaselinePass": complete_groups == 0,
+        }
+    )
+    return status
+
+
 def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return the current post-Stage-18 NiDataStream parser/export promotion gate state."""
     registry_path = _ghidra_function_site_targets_path(args)
@@ -1510,6 +1551,20 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     else:
         sample_state = "blocked"
         sample_evidence = "No ignored local nidatastream-layout-report.json exists yet."
+    pairing_status = _ghidra_attribute_candidate_report_status(args)
+    if pairing_status["Error"]:
+        pairing_state = "blocked"
+        pairing_evidence = f"Local Ghidra attribute candidate report could not be parsed: {pairing_status['Error']}"
+    elif pairing_status["Exists"]:
+        pairing_state = "candidate" if pairing_status["GuardBaselinePass"] else "blocked"
+        pairing_evidence = (
+            f"Local attribute candidate report has {pairing_status['CompletePositionNormalUvCandidateGroups']} "
+            "complete position+normal+UV Ghidra-only groups "
+            f"across {pairing_status['GhidraOnlyGroups']} Ghidra-only group(s); still candidate-only."
+        )
+    else:
+        pairing_state = "blocked"
+        pairing_evidence = "No ignored local ghidra-attribute-candidate-report.json exists yet."
 
     gates = [
         _nidatastream_gate(
@@ -1546,10 +1601,10 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         ),
         _nidatastream_gate(
             "pairing-impact-proof",
-            "blocked",
+            pairing_state,
             True,
             "A field interpretation change must not promote noise/sentinel rows and must be reviewed by grouped candidate guards.",
-            "ghidra-attribute-candidate-guard currently expects zero complete Ghidra-only position+normal+UV groups.",
+            pairing_evidence,
             "python scripts/rift_workflow.py ghidra-attribute-candidate-guard",
         ),
         _nidatastream_gate(
@@ -1588,6 +1643,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "FieldOrderPromoted": descriptor_status["FieldOrderPromoted"],
         },
         "LayoutReportStatus": layout_status,
+        "PairingImpactStatus": pairing_status,
         "ParserExportPromotionAllowed": False,
         "BlockerCount": len(blockers),
         "Blockers": blockers,
@@ -1601,6 +1657,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     target_status = status["FunctionSiteTargetStatus"]
     descriptor_status = status["DescriptorReportStatus"]
     layout_status = status["LayoutReportStatus"]
+    pairing_status = status["PairingImpactStatus"]
     print("--- NiDataStreamPromotionStatus")
     print(f"Historical stage: {status['HistoricalStage']}")
     print(f"Current lane: {status['CurrentLane']}")
@@ -1617,6 +1674,12 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
         "NiDataStream layout report: "
         f"{layout_mark}; Ghidra-style-valid blocks "
         f"{layout_status['GhidraStyleLayoutValidBlocks']}/{layout_status['NiDataStreamBlocks']}"
+    )
+    pairing_mark = "yes" if pairing_status["Exists"] else "no"
+    print(
+        "Ghidra attribute candidate report: "
+        f"{pairing_mark}; complete P+N+UV groups "
+        f"{pairing_status['CompletePositionNormalUvCandidateGroups']}"
     )
     print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
     print(f"Blocking gates: {status['BlockerCount']}")

@@ -12,6 +12,7 @@
     "FunctionSiteTargetStatus",
     "DescriptorReportStatus",
     "LayoutReportStatus",
+    "PairingImpactStatus",
     "ParserExportPromotionAllowed",
     "BlockerCount",
     "Blockers",
@@ -26,6 +27,7 @@
     "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
     "DescriptorReportStatus": { "$ref": "#/$defs/descriptorReportStatus" },
     "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
+    "PairingImpactStatus": { "$ref": "#/$defs/pairingImpactStatus" },
     "ParserExportPromotionAllowed": { "const": false },
     "BlockerCount": { "type": "integer", "minimum": 0 },
     "Blockers": {
@@ -94,6 +96,36 @@
         "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
         "AllRequiredEvidenceReady": { "type": "boolean" },
         "FieldOrderPromoted": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "pairingImpactStatus": {
+      "type": "object",
+      "required": [
+        "Path",
+        "Exists",
+        "SchemaVersion",
+        "GhidraOnlyGroups",
+        "GhidraOnlyPairingsCovered",
+        "GroupedSampleMeshes",
+        "CompletePositionNormalUvCandidateGroups",
+        "ProbeBackedRanks",
+        "RejectedNoiseGroups",
+        "GuardBaselinePass",
+        "Error"
+      ],
+      "properties": {
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "SchemaVersion": { "type": "string" },
+        "GhidraOnlyGroups": { "type": "integer", "minimum": 0 },
+        "GhidraOnlyPairingsCovered": { "type": "integer", "minimum": 0 },
+        "GroupedSampleMeshes": { "type": "integer", "minimum": 0 },
+        "CompletePositionNormalUvCandidateGroups": { "type": "integer", "minimum": 0 },
+        "ProbeBackedRanks": { "type": "integer", "minimum": 0 },
+        "RejectedNoiseGroups": { "type": "integer", "minimum": 0 },
+        "GuardBaselinePass": { "type": "boolean" },
+        "Error": { "type": "string" }
       },
       "additionalProperties": false
     },

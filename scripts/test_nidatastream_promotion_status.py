@@ -76,6 +76,8 @@ check("descriptor report status present", "DescriptorReportStatus" in status, Tr
 check("descriptor field order not promoted", status["DescriptorReportStatus"]["FieldOrderPromoted"], False)
 check("layout report status present", "LayoutReportStatus" in status, True)
 check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
+check("pairing impact status present", "PairingImpactStatus" in status, True)
+check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
 
 print("=== NiDataStream parser-field proof guard ===")
 guard_output = io.StringIO()
