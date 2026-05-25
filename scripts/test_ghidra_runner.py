@@ -316,6 +316,9 @@ descriptor_sample_schema = json.loads(
 descriptor_sample_status_schema = json.loads(
     Path("docs/schemas/nidatastream-descriptor-table-sample-status-v1.schema.json").read_text(encoding="utf-8")
 )
+descriptor_sample_compare_schema = json.loads(
+    Path("docs/schemas/nidatastream-descriptor-table-sample-compare-v1.schema.json").read_text(encoding="utf-8")
+)
 descriptor_neighborhood_schema = json.loads(
     Path("docs/schemas/ghidra-descriptor-table-neighborhood-scan-v1.schema.json").read_text(encoding="utf-8")
 )
@@ -536,6 +539,46 @@ with TemporaryDirectory() as temp_dir:
     check("descriptor table sample status explicit path", sample_status["Status"]["Path"], rift_workflow._display_path(report_file))
     check("descriptor table sample status rows", sample_status["Status"]["RowCount"], 1)
     check("descriptor table sample status nonzero rows", sample_status["Status"]["NonzeroRowCount"], 1)
+
+    compare_out_dir = temp_path / "compare-out"
+    compare_report_dir = compare_out_dir / "ghidra-reports"
+    compare_report_dir.mkdir(parents=True, exist_ok=True)
+    (compare_report_dir / "nidatastream_descriptor_table_all_indices.json").write_text(
+        json.dumps(descriptor_report),
+        encoding="utf-8",
+    )
+    zero_descriptor_report = json.loads(json.dumps(descriptor_report))
+    zero_descriptor_report["rows"][0]["bytes"] = "00 00 00 00"
+    (compare_report_dir / "nidatastream_descriptor_table_all_indices_stride4.json").write_text(
+        json.dumps(zero_descriptor_report),
+        encoding="utf-8",
+    )
+    sample_compare_output = io.StringIO()
+    sample_compare_argv = [
+        "rift_workflow.py",
+        "nidatastream-descriptor-table-sample-compare",
+        "--out",
+        str(compare_out_dir),
+        "--list-json",
+    ]
+    with (
+        patch.object(sys, "argv", sample_compare_argv),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(sample_compare_output),
+    ):
+        rift_workflow.main()
+    sample_compare = parse_json_object(sample_compare_output.getvalue())
+    jsonschema.validate(sample_compare, descriptor_sample_compare_schema)
+    print("  PASS: descriptor table sample compare schema validation")
+    check(
+        "descriptor table sample compare schema",
+        sample_compare["SchemaVersion"],
+        "nidatastream-descriptor-table-sample-compare/v1",
+    )
+    check("descriptor table sample compare reports", sample_compare["ReportCount"], 3)
+    check("descriptor table sample compare existing reports", sample_compare["ExistingReportCount"], 2)
+    check("descriptor table sample compare nonzero reports", sample_compare["NonzeroReportCount"], 1)
+    check("descriptor table sample compare all existing zero", sample_compare["AllExistingReportsAllZero"], False)
 
 print("=== rift_workflow NiDataStream descriptor neighborhood scan routing ===")
 with TemporaryDirectory() as temp_dir:

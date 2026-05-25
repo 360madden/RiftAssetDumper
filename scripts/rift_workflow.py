@@ -54,6 +54,7 @@ Commands (kebab-case):
     ghidra-function-site-survey  — run/list serialized FunctionSiteSurvey targets
     nidatastream-descriptor-table-sample — sample indexed static descriptor table entries
     nidatastream-descriptor-table-sample-status — summarize ignored descriptor table sample evidence
+    nidatastream-descriptor-table-sample-compare — compare known descriptor table sample reports
     nidatastream-descriptor-neighborhood-scan — scan bounded nonzero neighborhoods around descriptor refs
     nidatastream-descriptor-reference-classify — classify references to descriptor data refs
     nidatastream-descriptor-base-model-review — summarize descriptor base/stride model candidates
@@ -328,6 +329,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-descriptor-table-sample-compare": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-descriptor-neighborhood-scan": {
         "dotnet": "",
         "base": "",
@@ -434,6 +439,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "GhidraFunctionSiteSurvey": "ghidra-function-site-survey",
     "NiDataStreamDescriptorTableSample": "nidatastream-descriptor-table-sample",
     "NiDataStreamDescriptorTableSampleStatus": "nidatastream-descriptor-table-sample-status",
+    "NiDataStreamDescriptorTableSampleCompare": "nidatastream-descriptor-table-sample-compare",
     "NiDataStreamDescriptorNeighborhoodScan": "nidatastream-descriptor-neighborhood-scan",
     "NiDataStreamDescriptorReferenceClassify": "nidatastream-descriptor-reference-classify",
     "NiDataStreamDescriptorBaseModelReview": "nidatastream-descriptor-base-model-review",
@@ -3114,6 +3120,133 @@ def _run_nidatastream_descriptor_table_sample_status(args: argparse.Namespace) -
     _print_nidatastream_descriptor_table_sample_status(packet)
 
 
+def _descriptor_table_sample_compare_targets(args: argparse.Namespace) -> list[tuple[str, Path]]:
+    """Return known descriptor-table sample reports for compact comparison."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    targets: list[tuple[str, Path]] = []
+    explicit_report = getattr(args, "descriptor_table_report", "")
+    if explicit_report:
+        targets.append(("explicit", Path(explicit_report)))
+    targets.extend(
+        [
+            ("all-indices-stride12", out_dir / "ghidra-reports" / "nidatastream_descriptor_table_all_indices.json"),
+            ("observed-indices-default", out_dir / "ghidra-reports" / "nidatastream_descriptor_table_samples.json"),
+            (
+                "all-indices-stride4",
+                out_dir / "ghidra-reports" / "nidatastream_descriptor_table_all_indices_stride4.json",
+            ),
+        ]
+    )
+    deduped: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for label, path in targets:
+        key = str(path.resolve()).lower() if path.exists() else str(path.absolute()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((label, path))
+    return deduped
+
+
+def _descriptor_table_sample_compare_status_for_path(
+    args: argparse.Namespace,
+    report_path: Path,
+) -> dict[str, Any]:
+    """Return descriptor-table sample status for a specific report path."""
+    path_args = argparse.Namespace(**vars(args))
+    path_args.descriptor_table_report = str(report_path)
+    return _nidatastream_descriptor_table_sample_status(path_args)
+
+
+def _nidatastream_descriptor_table_sample_compare_packet(args: argparse.Namespace) -> dict[str, Any]:
+    """Build a candidate-only comparison packet for known descriptor-table sample reports."""
+    reports = []
+    for label, path in _descriptor_table_sample_compare_targets(args):
+        status = _descriptor_table_sample_compare_status_for_path(args, path)
+        reports.append(
+            {
+                "Label": label,
+                "Path": status["Path"],
+                "Exists": status["Exists"],
+                "SampleReportReady": status["SampleReportReady"],
+                "SchemaVersion": status["SchemaVersion"],
+                "IndexCount": status["IndexCount"],
+                "FieldCount": status["FieldCount"],
+                "RowCount": status["RowCount"],
+                "NonzeroRowCount": status["NonzeroRowCount"],
+                "ErrorRowCount": status["ErrorRowCount"],
+                "AllRowsZero": status["AllRowsZero"],
+                "StreamSemanticsExplained": status["StreamSemanticsExplained"],
+                "BlockerCount": status["BlockerCount"],
+                "Blockers": status["Blockers"],
+            }
+        )
+    existing_reports = [report for report in reports if report["Exists"]]
+    ready_reports = [report for report in reports if report["SampleReportReady"]]
+    nonzero_reports = [report for report in reports if int(report["NonzeroRowCount"]) > 0]
+    all_existing_reports_all_zero = bool(existing_reports) and all(
+        bool(report["AllRowsZero"]) for report in existing_reports
+    )
+    blockers = []
+    if not existing_reports:
+        blockers.append("descriptor-table-sample-compare-no-reports")
+    if not ready_reports:
+        blockers.append("descriptor-table-sample-compare-no-ready-reports")
+    if all_existing_reports_all_zero:
+        blockers.append("descriptor-table-sample-compare-all-existing-reports-zero")
+    if not nonzero_reports:
+        blockers.append("descriptor-table-sample-compare-no-nonzero-reports")
+    blockers.append("descriptor-table-sample-compare-semantics-unmapped")
+    return {
+        "SchemaVersion": "nidatastream-descriptor-table-sample-compare/v1",
+        "CandidateOnly": True,
+        "FieldOrderPromoted": False,
+        "ParserExportPromotionAllowed": False,
+        "ReportCount": len(reports),
+        "ExistingReportCount": len(existing_reports),
+        "ReadyReportCount": len(ready_reports),
+        "NonzeroReportCount": len(nonzero_reports),
+        "AllExistingReportsAllZero": all_existing_reports_all_zero,
+        "Reports": reports,
+        "BlockerCount": len(blockers),
+        "Blockers": blockers,
+        "Decision": "Descriptor table sample reports remain candidate-only; parser/export behavior stays unchanged.",
+        "NextAction": (
+            "Use nonzero table evidence only if it is sample-correlated; otherwise derive the next bounded "
+            "Ghidra query from instruction operand scale/offset candidates."
+        ),
+    }
+
+
+def _print_nidatastream_descriptor_table_sample_compare(packet: dict[str, Any]) -> None:
+    """Print a concise descriptor-table sample comparison summary."""
+    print("--- NiDataStreamDescriptorTableSampleCompare")
+    print(
+        "Reports: "
+        f"{packet['ExistingReportCount']}/{packet['ReportCount']} existing; "
+        f"ready={packet['ReadyReportCount']}; nonzero={packet['NonzeroReportCount']}; "
+        f"all existing zero={str(packet['AllExistingReportsAllZero']).lower()}"
+    )
+    for report in packet["Reports"]:
+        print(
+            f"- {report['Label']}: exists={str(report['Exists']).lower()}, rows={report['RowCount']}, "
+            f"nonzero={report['NonzeroRowCount']}, all-zero={str(report['AllRowsZero']).lower()}"
+        )
+    print("Blockers:")
+    for blocker in packet["Blockers"]:
+        print(f"- {blocker}")
+    print(packet["Decision"])
+
+
+def _run_nidatastream_descriptor_table_sample_compare(args: argparse.Namespace) -> None:
+    """Run the descriptor-table sample comparison command."""
+    packet = _nidatastream_descriptor_table_sample_compare_packet(args)
+    if args.list_json:
+        print(json.dumps(packet, indent=2))
+        return
+    _print_nidatastream_descriptor_table_sample_compare(packet)
+
+
 def _nidatastream_descriptor_sample_compare_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return a candidate-only descriptor/static-proof vs sample-byte comparison report."""
     descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
@@ -5791,6 +5924,10 @@ def _run_command(args: argparse.Namespace) -> None:
         _run_nidatastream_descriptor_table_sample_status(args)
         return
 
+    if command == "nidatastream-descriptor-table-sample-compare":
+        _run_nidatastream_descriptor_table_sample_compare(args)
+        return
+
     if command == "nidatastream-descriptor-neighborhood-scan":
         _run_nidatastream_descriptor_neighborhood_scan(args)
         return
@@ -7176,6 +7313,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-sample-compare
   python scripts/rift_workflow.py nidatastream-descriptor-table-sample-status --list-json
+  python scripts/rift_workflow.py nidatastream-descriptor-table-sample-compare --list-json
   python scripts/rift_workflow.py nidatastream-descriptor-reference-classify
   python scripts/rift_workflow.py nidatastream-descriptor-base-model-review
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
@@ -7543,6 +7681,7 @@ Examples:
         "nidatastream-descriptor-sample-compare",
         "nidatastream-descriptor-table-sample",
         "nidatastream-descriptor-table-sample-status",
+        "nidatastream-descriptor-table-sample-compare",
         "nidatastream-descriptor-neighborhood-scan",
         "nidatastream-descriptor-reference-classify",
         "nidatastream-descriptor-base-model-review",
@@ -7553,7 +7692,7 @@ Examples:
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
-            "nidatastream-descriptor-table-sample-status, "
+            "nidatastream-descriptor-table-sample-status, nidatastream-descriptor-table-sample-compare, "
             "nidatastream-descriptor-neighborhood-scan, "
             "nidatastream-descriptor-reference-classify, and "
             "nidatastream-descriptor-base-model-review.",

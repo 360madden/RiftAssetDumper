@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/nidatastream-descriptor-table-sample-compare-v1.schema.json",
+  "title": "NiDataStream descriptor table sample comparison",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "FieldOrderPromoted",
+    "ParserExportPromotionAllowed",
+    "ReportCount",
+    "ExistingReportCount",
+    "ReadyReportCount",
+    "NonzeroReportCount",
+    "AllExistingReportsAllZero",
+    "Reports",
+    "BlockerCount",
+    "Blockers",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "nidatastream-descriptor-table-sample-compare/v1" },
+    "CandidateOnly": { "const": true },
+    "FieldOrderPromoted": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "ReportCount": { "type": "integer", "minimum": 0 },
+    "ExistingReportCount": { "type": "integer", "minimum": 0 },
+    "ReadyReportCount": { "type": "integer", "minimum": 0 },
+    "NonzeroReportCount": { "type": "integer", "minimum": 0 },
+    "AllExistingReportsAllZero": { "type": "boolean" },
+    "Reports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reportSummary" }
+    },
+    "BlockerCount": { "type": "integer", "minimum": 0 },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "reportSummary": {
+      "type": "object",
+      "required": [
+        "Label",
+        "Path",
+        "Exists",
+        "SampleReportReady",
+        "SchemaVersion",
+        "IndexCount",
+        "FieldCount",
+        "RowCount",
+        "NonzeroRowCount",
+        "ErrorRowCount",
+        "AllRowsZero",
+        "StreamSemanticsExplained",
+        "BlockerCount",
+        "Blockers"
+      ],
+      "properties": {
+        "Label": { "type": "string", "minLength": 1 },
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "SampleReportReady": { "type": "boolean" },
+        "SchemaVersion": { "type": "string" },
+        "IndexCount": { "type": "integer", "minimum": 0 },
+        "FieldCount": { "type": "integer", "minimum": 0 },
+        "RowCount": { "type": "integer", "minimum": 0 },
+        "NonzeroRowCount": { "type": "integer", "minimum": 0 },
+        "ErrorRowCount": { "type": "integer", "minimum": 0 },
+        "AllRowsZero": { "type": "boolean" },
+        "StreamSemanticsExplained": { "const": false },
+        "BlockerCount": { "type": "integer", "minimum": 0 },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

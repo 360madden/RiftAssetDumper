@@ -63,6 +63,7 @@ $PSModeToKebab = @{
     'NiDataStreamDescriptorSampleCompare' = 'nidatastream-descriptor-sample-compare'
     'NiDataStreamDescriptorTableSample' = 'nidatastream-descriptor-table-sample'
     'NiDataStreamDescriptorTableSampleStatus' = 'nidatastream-descriptor-table-sample-status'
+    'NiDataStreamDescriptorTableSampleCompare' = 'nidatastream-descriptor-table-sample-compare'
     'NiDataStreamDescriptorNeighborhoodScan' = 'nidatastream-descriptor-neighborhood-scan'
     'NiDataStreamDescriptorReferenceClassify' = 'nidatastream-descriptor-reference-classify'
     'NiDataStreamDescriptorBaseModelReview' = 'nidatastream-descriptor-base-model-review'
