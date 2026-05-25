@@ -1977,6 +1977,8 @@ def _run_nidatastream_promotion_preflight(args: argparse.Namespace) -> None:
     json_path, markdown_path = _write_nidatastream_promotion_dashboard(status, args)
     print(f"\nPreflight dashboard JSON: {json_path}")
     print(f"Preflight dashboard markdown: {markdown_path}")
+    print()
+    _print_nidatastream_evidence_status(_nidatastream_evidence_status_payload(args))
     _run_ghidra_workflow_guard_suite(args)
     print("\n--- Final GeneratedOutputGuard")
     generated_output_guard()

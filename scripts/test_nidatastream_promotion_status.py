@@ -241,6 +241,7 @@ with TemporaryDirectory() as temp_dir:
     check("preflight dashboard markdown written", (Path(temp_dir) / "nidatastream-promotion-dashboard.md").exists(), True)
     check("preflight runs guard suite", preflight_calls["guard_suite"], True)
     check("preflight runs initial and final generated-output guards", preflight_calls["generated_output_guard"], 2)
+    check_contains("preflight evidence status", preflight_output.getvalue(), "NiDataStreamEvidenceStatus")
     check_contains("preflight console", preflight_output.getvalue(), "NiDataStreamPromotionPreflight passed")
 
 print("=== NiDataStream parser-field proof guard ===")

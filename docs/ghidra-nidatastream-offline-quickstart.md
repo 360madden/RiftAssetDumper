@@ -81,7 +81,7 @@ Current guard baseline expects zero complete Ghidra-only position+normal+UV cand
 python scripts/rift_workflow.py nidatastream-promotion-preflight
 ```
 
-The preflight writes the ignored dashboard, runs the current Ghidra/NiDataStream promotion guard suite, and reruns generated-output safety at the end. Expanded equivalent checks:
+The preflight writes the ignored dashboard, prints ignored evidence artifact timestamp/status, runs the current Ghidra/NiDataStream promotion guard suite, and reruns generated-output safety at the end. Expanded equivalent checks:
 
 ```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
