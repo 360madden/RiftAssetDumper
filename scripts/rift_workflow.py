@@ -1283,6 +1283,9 @@ DESCRIPTOR_PROOF_REQUIREMENTS: dict[str, dict[str, Any]] = {
 DESCRIPTOR_CANDIDATE_FIELD_MAP = [
     {
         "Field": "descriptor-table-stride",
+        "PromotionStatus": "candidate-only",
+        "StaticTableStrideBytes": 12,
+        "StreamDescriptorRecordStatus": "not-mapped-to-parser-field",
         "Evidence": "Descriptor helpers index the candidate table with a 0xc-byte stride.",
         "EvidenceTargets": [
             "nidatastream-descriptor-helper",
@@ -1293,6 +1296,10 @@ DESCRIPTOR_CANDIDATE_FIELD_MAP = [
     {
         "Field": "descriptor-enable-or-special-flag",
         "DataAddress": "143358be0",
+        "PromotionStatus": "candidate-only",
+        "StaticTableOffsetBytes": 0,
+        "StaticTableStrideBytes": 12,
+        "StreamDescriptorRecordStatus": "not-mapped-to-parser-field",
         "Evidence": "Helpers branch on DAT_143358be0 before choosing special/default handling.",
         "EvidenceTargets": [
             "nidatastream-descriptor-helper",
@@ -1303,6 +1310,10 @@ DESCRIPTOR_CANDIDATE_FIELD_MAP = [
     {
         "Field": "descriptor-component-class",
         "DataAddress": "143358be4",
+        "PromotionStatus": "candidate-only",
+        "StaticTableOffsetBytes": 4,
+        "StaticTableStrideBytes": 12,
+        "StreamDescriptorRecordStatus": "not-mapped-to-parser-field",
         "Evidence": "Helpers use DAT_143358be4 to derive component/class count candidates.",
         "EvidenceTargets": [
             "nidatastream-descriptor-helper",
@@ -1312,6 +1323,10 @@ DESCRIPTOR_CANDIDATE_FIELD_MAP = [
     {
         "Field": "descriptor-format-size-lookup",
         "DataAddress": "143358be8",
+        "PromotionStatus": "candidate-only",
+        "StaticTableOffsetBytes": 8,
+        "StaticTableStrideBytes": 12,
+        "StreamDescriptorRecordStatus": "not-mapped-to-parser-field",
         "Evidence": "Helpers pass DAT_143358be8 values to FUN_141182280 for size/format mapping.",
         "EvidenceTargets": [
             "nidatastream-descriptor-helper",
@@ -1960,6 +1975,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     corpus = report["SampleCorpusStatus"]
     sample = report["SampleByteSummary"]
     byte_order = report["DescriptorByteOrderProof"]
+    field_map = report["CandidateFieldMap"]
     lines = [
         "# NiDataStream descriptor/sample-byte comparison",
         "",
@@ -2051,6 +2067,30 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     lines.extend(
         [
             "",
+            "## Candidate descriptor field map",
+            "",
+            "| Field | Data address | Static table offset | Static table stride | Promotion | Evidence |",
+            "|---|---|---:|---:|---|---|",
+        ]
+    )
+    for field in field_map:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    format_markdown_cell(field.get("Field")),
+                    format_markdown_cell(field.get("DataAddress", "-")),
+                    format_markdown_cell(field.get("StaticTableOffsetBytes", "-")),
+                    format_markdown_cell(field.get("StaticTableStrideBytes", "-")),
+                    format_markdown_cell(field.get("PromotionStatus", "-")),
+                    format_markdown_cell(field.get("Evidence")),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(
+        [
+            "",
             "## Current decision",
             "",
             report["Decision"],
@@ -2098,6 +2138,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
     print(f"Sample corpus files parsed: {corpus['FilesParsed']}/{corpus['FilesScanned']}")
     print(f"Uniform sample-byte checks: {sample['PassedCount']}/{sample['CheckCount']}")
     print(f"Descriptor byte-order checks: {byte_order['PassedCount']}/{byte_order['CheckCount']}")
+    print(f"Candidate field-map entries: {len(report['CandidateFieldMap'])}")
     print(f"Descriptor + sample evidence ready: {str(report['DescriptorAndSampleEvidenceReady']).lower()}")
     print(f"Parser/export promotion allowed: {str(report['ParserExportPromotionAllowed']).lower()}")
     print(f"Blocking items: {report['BlockerCount']}")

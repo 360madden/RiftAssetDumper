@@ -190,6 +190,13 @@ check("sample check count", compare["SampleByteSummary"]["CheckCount"], 6)
 check("sample passed count", compare["SampleByteSummary"]["PassedCount"], 6)
 check("byte-order check count", compare["DescriptorByteOrderProof"]["CheckCount"], 7)
 check("byte-order passed count", compare["DescriptorByteOrderProof"]["PassedCount"], 7)
+check("candidate field map count", len(compare["CandidateFieldMap"]), 4)
+stride_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
+format_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-format-size-lookup")
+check("field map promotion status", stride_field["PromotionStatus"], "candidate-only")
+check("field map table stride", stride_field["StaticTableStrideBytes"], 12)
+check("field map format offset", format_field["StaticTableOffsetBytes"], 8)
+check("field map stream record not promoted", format_field["StreamDescriptorRecordStatus"], "not-mapped-to-parser-field")
 descriptor_record_check = next(
     check for check in compare["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
 )
@@ -280,6 +287,9 @@ check_validation_error("schema rejects parser/export promotion", promoted_compar
 field_promoted_compare = json.loads(json.dumps(compare))
 field_promoted_compare["FieldOrderPromoted"] = True
 check_validation_error("schema rejects field order promotion", field_promoted_compare, schema)
+field_map_promoted_compare = json.loads(json.dumps(compare))
+field_map_promoted_compare["CandidateFieldMap"][0]["PromotionStatus"] = "promoted"
+check_validation_error("schema rejects promoted field-map entry", field_map_promoted_compare, schema)
 
 print("=== NiDataStream descriptor/sample-byte compare writes ignored reports ===")
 with TemporaryDirectory() as temp_dir:
@@ -313,7 +323,10 @@ with TemporaryDirectory() as temp_dir:
     jsonschema.validate(json.loads(json_path.read_text(encoding="utf-8")), schema)
     print("  PASS: written comparison JSON schema validation")
     check_contains("console reports candidate-only", console.getvalue(), "candidate-only/report-only")
-    check_contains("markdown title", markdown_path.read_text(encoding="utf-8"), "# NiDataStream descriptor/sample-byte comparison")
+    markdown = markdown_path.read_text(encoding="utf-8")
+    check_contains("markdown title", markdown, "# NiDataStream descriptor/sample-byte comparison")
+    check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")
+    check_contains("markdown format field", markdown, "descriptor-format-size-lookup")
 
 print(f"\n{'=' * 50}")
 if failed:

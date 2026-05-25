@@ -43,7 +43,7 @@ python scripts/rift_workflow.py generated-output-guard
 
 | Gate | Required future proof | Current v1 status |
 |---|---|---|
-| Descriptor field order | Exact byte-level descriptor field map, including count/order/format/component semantics, backed by Ghidra report status and sample bytes | Candidate-only; `FieldOrderPromoted=false` |
+| Descriptor field order | Exact byte-level descriptor field map, including count/order/format/component semantics, backed by Ghidra report status and sample bytes | Candidate-only; static table offsets are machine-readable, but stream record semantics remain unmapped and `FieldOrderPromoted=false` |
 | Sample-byte agreement | Copied/extracted samples agree across all selected `NiDataStream` blocks and a documented sample corpus | Candidate-only; ignored local report may show agreement but remains sidecar evidence |
 | Descriptor/sample comparison | One machine-readable report joins descriptor-helper readiness, sample corpus metadata, copied-sample byte-counter uniformity, and candidate byte-order offsets before any parser patch | Guarded/report-only by `nidatastream-descriptor-sample-compare`; summarized by `nidatastream-promotion-status` and `nidatastream-promotion-dashboard`; still blocks promotion |
 | Pairing impact | A parser interpretation change improves complete position+normal+UV evidence without promoting noise/sentinel groups | Candidate-only; zero complete Ghidra-only groups is a brake, not promotion proof |

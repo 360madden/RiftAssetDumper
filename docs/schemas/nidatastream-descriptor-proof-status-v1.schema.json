@@ -80,6 +80,10 @@
       "properties": {
         "Field": { "type": "string", "minLength": 1 },
         "DataAddress": { "type": "string" },
+        "PromotionStatus": { "enum": ["candidate-only"] },
+        "StaticTableOffsetBytes": { "type": "integer", "minimum": 0 },
+        "StaticTableStrideBytes": { "type": "integer", "minimum": 1 },
+        "StreamDescriptorRecordStatus": { "type": "string", "minLength": 1 },
         "Evidence": { "type": "string", "minLength": 1 },
         "EvidenceTargets": {
           "type": "array",

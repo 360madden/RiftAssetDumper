@@ -29,6 +29,16 @@ def check(desc: str, actual: Any, expected: Any) -> None:
         failed += 1
 
 
+def check_validation_error(desc: str, payload: dict[str, Any], schema: dict[str, Any]) -> None:
+    global failed
+    try:
+        jsonschema.validate(payload, schema)
+        print(f"  FAIL: {desc} no validation error")
+        failed += 1
+    except jsonschema.ValidationError:
+        print(f"  PASS: {desc}")
+
+
 def make_report(path: Path, entry: str, calls: list[str], data_refs: list[str], decompile_terms: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     report = {
@@ -135,6 +145,15 @@ check("all descriptor evidence ready", status["AllRequiredEvidenceReady"], True)
 check("ready count", status["EvidenceReadyCount"], 4)
 check("target count", status["RequiredTargetCount"], 4)
 check("field map rows", len(status["CandidateFieldMap"]) >= 4, True)
+stride_field = next(field for field in status["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
+component_field = next(field for field in status["CandidateFieldMap"] if field["Field"] == "descriptor-component-class")
+check("field map promotion status", stride_field["PromotionStatus"], "candidate-only")
+check("field map static table stride", stride_field["StaticTableStrideBytes"], 12)
+check("field map component offset", component_field["StaticTableOffsetBytes"], 4)
+check("field map stream record status", component_field["StreamDescriptorRecordStatus"], "not-mapped-to-parser-field")
+promoted_field_status = json.loads(json.dumps(status))
+promoted_field_status["CandidateFieldMap"][0]["PromotionStatus"] = "promoted"
+check_validation_error("schema rejects promoted field-map entry", promoted_field_status, schema)
 
 print("=== NiDataStream descriptor proof negative fixture ===")
 with TemporaryDirectory() as temp_dir:
