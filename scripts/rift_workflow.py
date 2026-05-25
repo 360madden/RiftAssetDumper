@@ -56,6 +56,7 @@ Commands (kebab-case):
     nidatastream-promotion-status — show post-Stage-18 NiDataStream promotion gates
     nidatastream-promotion-dashboard — write compact Markdown dashboard for promotion gates
     nidatastream-parser-field-proof-guard — fail closed on premature NiDataStream parser/export promotion
+    nidatastream-parser-export-non-consumption-guard — ensure candidate NiDataStream/Ghidra evidence stays report-only
     nidatastream-descriptor-proof-status — candidate-only descriptor helper evidence status
     nidatastream-layout          — read-only NiDataStream layout report/validator
     all                          — run mesh-bindings, mesh-streams, index-candidates, stream-endianness, stream-bodies
@@ -96,6 +97,7 @@ from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_sibling_proof_guard,
     ghidra_attribute_candidate_guard,
     ghidra_pairing_non_export_guard,
+    nidatastream_parser_export_non_consumption_guard,
     position_source_sibling_lead_guard,
     residual_lead_guard,
     usage_access_correlation_guard,
@@ -325,6 +327,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "nidatastream-parser-export-non-consumption-guard": {
+        "dotnet": "",
+        "base": "",
+    },
     "nidatastream-descriptor-proof-status": {
         "dotnet": "",
         "base": "",
@@ -389,6 +395,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",
     "NiDataStreamPromotionDashboard": "nidatastream-promotion-dashboard",
     "NiDataStreamParserFieldProofGuard": "nidatastream-parser-field-proof-guard",
+    "NiDataStreamParserExportNonConsumptionGuard": "nidatastream-parser-export-non-consumption-guard",
     "NiDataStreamDescriptorProofStatus": "nidatastream-descriptor-proof-status",
     "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
@@ -1619,7 +1626,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "pass",
             False,
             "Ghidra evidence is not consumed by decode/export paths.",
-            "nidatastream-parser-field-proof-guard is part of ghidra-workflow-guard-suite and invokes ghidra-pairing-non-export-guard.",
+            "nidatastream-parser-field-proof-guard is part of ghidra-workflow-guard-suite and invokes pairing plus NiDataStream parser/export non-consumption guards.",
             "python scripts/rift_workflow.py ghidra-workflow-guard-suite --skip-build",
         ),
         _nidatastream_gate(
@@ -1812,6 +1819,7 @@ def _run_nidatastream_parser_field_proof_guard(args: argparse.Namespace) -> None
     print("--- NiDataStreamParserFieldProofGuard")
     status = _nidatastream_promotion_status_payload(args)
     ghidra_pairing_non_export_guard()
+    nidatastream_parser_export_non_consumption_guard()
     if status["ParserExportPromotionAllowed"]:
         print(
             "ERROR: NiDataStream parser/export promotion is marked allowed before this guard has a "
@@ -1967,6 +1975,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "ghidra-pairing-non-export-guard":
         ghidra_pairing_non_export_guard()
+        return
+
+    if command == "nidatastream-parser-export-non-consumption-guard":
+        nidatastream_parser_export_non_consumption_guard()
         return
 
     if command == "ghidra-attribute-candidate-report":
@@ -3416,6 +3428,7 @@ Examples:
   python scripts/rift_workflow.py nidatastream-promotion-status --list-json
   python scripts/rift_workflow.py nidatastream-promotion-dashboard
   python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
+  python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
   python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
   python scripts/rift_workflow.py ghidra-pairing-non-export-guard
   python scripts/rift_workflow.py ghidra-pairing-review-report --quick

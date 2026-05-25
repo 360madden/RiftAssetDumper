@@ -15,6 +15,7 @@ from scripts import rift_workflow
 from scripts.rift_workflow_guards import (
     ghidra_attribute_candidate_guard,
     ghidra_pairing_non_export_guard,
+    nidatastream_parser_export_non_consumption_guard,
 )
 
 failed = 0
@@ -39,7 +40,7 @@ def check_raises(desc: str, fn: Any, exc_type: type[Exception] = ValueError) -> 
         print(f"  PASS: {desc}")
 
 
-def minimal_program(extra_decode_line: str = "") -> str:
+def minimal_program(extra_decode_line: str = "", extra_pairing_line: str = "") -> str:
     guarded_methods = "\n".join(
         [
             "  private static int DecodeNifGeometry(AppOptions options)\n"
@@ -66,6 +67,25 @@ def minimal_program(extra_decode_line: str = "") -> str:
             "  private static List<NifAttributeVertexSample> BuildNifAttributeUInt16VertexSamples()\n"
             "  {\n"
             "    return new List<NifAttributeVertexSample>();\n"
+            "  }\n",
+            "  private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries()\n"
+            "  {\n"
+            "    streamSummaries.Add(new NifMeshBoundStreamSummary(\n"
+            "        RoleStats: roleStats,\n"
+            "        GhidraRoleStats: ghidraRoleStats));\n"
+            "    return streamSummaries;\n"
+            "  }\n",
+            "  private static List<NifMeshProbePairing> FindNifMeshProbePairings(\n"
+            "      List<NifMeshBoundStreamSummary> streams)\n"
+            "  {\n"
+            f"    {extra_pairing_line}\n"
+            "    var indexStreams = streams\n"
+            "        .Where(static s => s.RoleStats.PrimaryRole.StartsWith(\"index-\", StringComparison.OrdinalIgnoreCase) && s.RoleStats.IndexMax is not null)\n"
+            "        .ToList();\n"
+            "    var vertexStreams = streams\n"
+            "        .Where(static s => !s.RoleStats.PrimaryRole.StartsWith(\"index-\", StringComparison.OrdinalIgnoreCase) && s.RoleStats.VertexCountCandidates.Count > 0)\n"
+            "        .ToList();\n"
+            "    return new List<NifMeshProbePairing>();\n"
             "  }\n",
         ]
     )
@@ -133,6 +153,37 @@ with TemporaryDirectory() as temp_dir:
 check("actual Program.cs guard", True, True)
 ghidra_pairing_non_export_guard()
 
+print("=== NiDataStream parser/export non-consumption guard ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    safe_program = temp_path / "Program.nidatastream.safe.cs"
+    safe_program.write_text(minimal_program(), encoding="utf-8")
+    nidatastream_parser_export_non_consumption_guard(safe_program)
+    print("  PASS: safe NiDataStream candidate-only program")
+
+    unsafe_decode_program = temp_path / "Program.nidatastream.unsafe.decode.cs"
+    unsafe_decode_program.write_text(
+        minimal_program("var promoted = SliceNifDataStreamGhidraBody(payload, layout);"),
+        encoding="utf-8",
+    )
+    check_raises(
+        "decode/export NiDataStream Ghidra body use fails closed",
+        lambda: nidatastream_parser_export_non_consumption_guard(unsafe_decode_program),
+    )
+
+    unsafe_pairing_program = temp_path / "Program.nidatastream.unsafe.pairing.cs"
+    unsafe_pairing_program.write_text(
+        minimal_program(extra_pairing_line="var promoted = streams.Where(static s => s.GhidraRoleStats != null);"),
+        encoding="utf-8",
+    )
+    check_raises(
+        "pairing helper GhidraRoleStats use fails closed",
+        lambda: nidatastream_parser_export_non_consumption_guard(unsafe_pairing_program),
+    )
+
+check("actual Program.cs NiDataStream parser/export guard", True, True)
+nidatastream_parser_export_non_consumption_guard()
+
 print("=== Ghidra attribute candidate guard ===")
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -161,6 +212,9 @@ with TemporaryDirectory() as temp_dir:
     def fake_non_export_guard() -> None:
         suite_calls["non_export"] = True
 
+    def fake_nidatastream_non_consumption_guard() -> None:
+        suite_calls["nidatastream_non_consumption"] = True
+
     suite_argv = [
         "rift_workflow.py",
         "ghidra-workflow-guard-suite",
@@ -171,10 +225,19 @@ with TemporaryDirectory() as temp_dir:
         patch.object(sys, "argv", suite_argv),
         patch("scripts.rift_workflow.generated_output_guard"),
         patch("scripts.rift_workflow.ghidra_pairing_non_export_guard", side_effect=fake_non_export_guard),
+        patch(
+            "scripts.rift_workflow.nidatastream_parser_export_non_consumption_guard",
+            side_effect=fake_nidatastream_non_consumption_guard,
+        ),
     ):
         rift_workflow.main()
 
     check("workflow suite ran non-export guard", suite_calls.get("non_export"), True)
+    check(
+        "workflow suite ran NiDataStream non-consumption guard",
+        suite_calls.get("nidatastream_non_consumption"),
+        True,
+    )
 
 with TemporaryDirectory() as temp_dir:
     try:

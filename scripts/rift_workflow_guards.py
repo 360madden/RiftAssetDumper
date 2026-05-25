@@ -6,6 +6,9 @@ Contains:
 - attribute_extra_sibling_proof_guard() — deep per-asset @264 stream shape guard
 - ghidra_pairing_non_export_guard() — fail-closed static guard that keeps
   Ghidra pairings out of decode/export paths until explicitly promoted
+- nidatastream_parser_export_non_consumption_guard() — fail-closed static
+  guard that keeps candidate NiDataStream layout/Ghidra-body evidence out of
+  parser/export consumers until explicitly promoted
 - ghidra_attribute_candidate_guard() — fail-closed guard for grouped
   Ghidra-only candidate report baseline
 
@@ -89,6 +92,33 @@ GHIDRA_NON_EXPORT_GUARDED_MEMBERS: tuple[str, ...] = (
     "BuildNifAttributeUInt16VertexSamples",
 )
 
+NIDATASTREAM_NON_CONSUMPTION_GUARDED_MEMBERS: tuple[str, ...] = GHIDRA_NON_EXPORT_GUARDED_MEMBERS + (
+    "FindNifMeshProbePairings",
+)
+
+NIDATASTREAM_NON_CONSUMPTION_FORBIDDEN_TOKENS: tuple[str, ...] = (
+    "AnalyzeNifDataStreamLayout",
+    "SliceNifDataStreamGhidraBody",
+    "GhidraStyleLayoutValid",
+    "PayloadPrefixBytes",
+    "PayloadTrailerBytes",
+    "TrailingFlag",
+    "LegacyOffsetMinusPayloadPrefixBytes",
+    "GhidraBodyFirst16",
+    "GhidraPayloadFirst16",
+    "GhidraRoleStats",
+    "GhidraClassificationDelta",
+    "GhidraRoleDelta",
+    "FieldOrderPromoted",
+    "ParserExportPromotionAllowed",
+)
+
+NIDATASTREAM_NON_CONSUMPTION_MEMBER_ALLOWED_TOKENS: dict[str, tuple[str, ...]] = {
+    # FindNifMeshProbePairings copies the sidecar first-16 bytes into report records,
+    # but its pairing decisions must remain based on legacy RoleStats.
+    "FindNifMeshProbePairings": ("GhidraBodyFirst16",),
+}
+
 
 def _extract_csharp_static_member(source: str, member_name: str) -> str:
     """Return a top-level static C# member body by line range.
@@ -165,6 +195,87 @@ def ghidra_pairing_non_export_guard(program_path: str | Path | None = None) -> N
         hit_count = len(item["ForbiddenHits"])
         print(f"  {member}: forbidden Ghidra token hits={hit_count}")
     print("GhidraPairingNonExportGuard passed: Ghidra pairing evidence remains candidate-only/non-export-consuming.")
+
+
+def nidatastream_parser_export_non_consumption_guard(program_path: str | Path | None = None) -> None:
+    """Assert candidate NiDataStream layout evidence is not consumed by parser/export paths.
+
+    BuildNifMeshBoundStreamSummaries intentionally carries report-only Ghidra/body-layout
+    diagnostics today, and reports may read those diagnostics.  Decode/export-sensitive
+    consumers must keep reading the legacy RoleStats/stream-body interpretation until a
+    separate positive promotion proof updates this guard.
+    """
+    path = (
+        Path(program_path)
+        if program_path is not None
+        else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
+    )
+    source = path.read_text(encoding="utf-8-sig")
+
+    failures: list[str] = []
+    guarded_members: list[dict[str, Any]] = []
+    for member_name in NIDATASTREAM_NON_CONSUMPTION_GUARDED_MEMBERS:
+        body = _extract_csharp_static_member(source, member_name)
+        allowed_tokens = NIDATASTREAM_NON_CONSUMPTION_MEMBER_ALLOWED_TOKENS.get(member_name, ())
+        hits = [
+            token
+            for token in NIDATASTREAM_NON_CONSUMPTION_FORBIDDEN_TOKENS
+            if token in body and token not in allowed_tokens
+        ]
+        guarded_members.append({"Member": member_name, "ForbiddenHits": hits})
+        if hits:
+            failures.append(f"{member_name}: {', '.join(hits)}")
+
+    stream_summary_body = _extract_csharp_static_member(source, "BuildNifMeshBoundStreamSummaries")
+    required_summary_markers = (
+        "RoleStats: roleStats",
+        "GhidraRoleStats: ghidraRoleStats",
+    )
+    missing_summary_markers = [
+        marker for marker in required_summary_markers if marker not in stream_summary_body
+    ]
+    if missing_summary_markers:
+        failures.append(
+            "BuildNifMeshBoundStreamSummaries: missing canonical legacy/Ghidra role separation markers: "
+            + ", ".join(missing_summary_markers)
+        )
+
+    pairing_body = _extract_csharp_static_member(source, "FindNifMeshProbePairings")
+    required_pairing_markers = (
+        "s.RoleStats.PrimaryRole.StartsWith",
+        "s.RoleStats.IndexMax is not null",
+        "s.RoleStats.VertexCountCandidates.Count > 0",
+    )
+    missing_pairing_markers = [
+        marker for marker in required_pairing_markers if marker not in pairing_body
+    ]
+    if missing_pairing_markers:
+        failures.append(
+            "FindNifMeshProbePairings: missing legacy RoleStats pairing markers: "
+            + ", ".join(missing_pairing_markers)
+        )
+    if "s.GhidraRoleStats" in pairing_body or ".GhidraRoleStats" in pairing_body:
+        failures.append("FindNifMeshProbePairings: must not consume GhidraRoleStats for default pairings.")
+
+    assert_proof_guard(
+        not failures,
+        "NiDataStream candidate layout/Ghidra evidence is wired into parser/export consumers: "
+        + "; ".join(failures),
+    )
+
+    print("\n--- NiDataStreamParserExportNonConsumptionGuard parser/export isolation guard")
+    print(f"Program: {path}")
+    print(f"Guarded members: {len(guarded_members)}")
+    for item in guarded_members:
+        member = item["Member"]
+        hit_count = len(item["ForbiddenHits"])
+        print(f"  {member}: forbidden candidate-layout token hits={hit_count}")
+    print("  BuildNifMeshBoundStreamSummaries: legacy RoleStats/GhidraRoleStats separation markers present")
+    print("  FindNifMeshProbePairings: default pairings remain legacy RoleStats-based")
+    print(
+        "NiDataStreamParserExportNonConsumptionGuard passed: candidate NiDataStream/Ghidra layout evidence "
+        "remains report-only."
+    )
 
 
 def ghidra_attribute_candidate_guard(report_path: str | Path) -> None:

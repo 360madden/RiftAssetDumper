@@ -11,12 +11,14 @@ Current v1 contracts intentionally lock promotion off:
 - `docs/schemas/nidatastream-promotion-status-v1.schema.json` requires `ParserExportPromotionAllowed: false`.
 - `docs/schemas/nidatastream-descriptor-proof-status-v1.schema.json` requires `FieldOrderPromoted: false`.
 - `nidatastream-parser-field-proof-guard` passes only while promotion remains blocked.
+- `nidatastream-parser-export-non-consumption-guard` verifies decode/export-sensitive C# consumers do not read candidate NiDataStream/Ghidra body-layout fields.
 
 ## Required commands before any future parser/export patch
 
 ```powershell
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-promotion-dashboard
+python scripts/rift_workflow.py nidatastream-parser-export-non-consumption-guard
 python scripts/rift_workflow.py nidatastream-descriptor-proof-status --list-json
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
 python scripts/rift_workflow.py ghidra-attribute-candidate-report
@@ -33,7 +35,7 @@ python scripts/rift_workflow.py generated-output-guard
 | Sample-byte agreement | Copied/extracted samples agree across all selected `NiDataStream` blocks and a documented sample corpus | Candidate-only; ignored local report may show agreement but remains sidecar evidence |
 | Pairing impact | A parser interpretation change improves complete position+normal+UV evidence without promoting noise/sentinel groups | Candidate-only; zero complete Ghidra-only groups is a brake, not promotion proof |
 | Narrow parser patch | Smallest parser field-read change, covered by regression tests before exporter use | Not started |
-| Export isolation | Ghidra evidence remains out of decode/export paths until promotion gates are all green | Guarded |
+| Export isolation | Ghidra evidence and candidate NiDataStream body-layout fields remain out of decode/export paths until promotion gates are all green | Guarded |
 | Generated-output safety | No copied RIFT assets or generated reports are staged/committed | Guarded |
 
 ## Allowed next work
