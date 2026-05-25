@@ -118,6 +118,7 @@ def write_layout_fixture(
     payload_prefix: int = 28,
     payload_prefix_count: int | None = None,
     descriptor_record_offset: int = 24,
+    descriptor_records: list[dict[str, Any]] | None = None,
 ) -> None:
     block_count = 5
     prefix_count = block_count if payload_prefix_count is None else payload_prefix_count
@@ -147,7 +148,9 @@ def write_layout_fixture(
                 "TopDescriptorCounts": [{"Value": 1, "Count": block_count}],
                 "TopDescriptorCountOffsets": [{"Value": 20, "Count": block_count}],
                 "TopDescriptorRecordOffsets": [{"Value": descriptor_record_offset, "Count": block_count}],
-                "TopFirstDescriptorRecordBytes": [
+                "TopFirstDescriptorRecordBytes": descriptor_records
+                if descriptor_records is not None
+                else [
                     {"Value": "aa 04 03 00", "Count": 3},
                     {"Value": "bb 02 02 00", "Count": 2},
                 ],
@@ -372,6 +375,55 @@ check("byte-order mismatch checks fail", byte_order_mismatch["DescriptorByteOrde
 check("byte-order mismatch descriptor + sample evidence not ready", byte_order_mismatch["DescriptorAndSampleEvidenceReady"], False)
 check("byte-order mismatch observed", descriptor_offset_check["ObservedInteger"], 25)
 check("byte-order mismatch blocker present", "descriptor-byte-order-incomplete" in byte_order_mismatch["Blockers"], True)
+
+print("=== NiDataStream descriptor malformed record fixture ===")
+with TemporaryDirectory() as temp_dir:
+    temp_path = Path(temp_dir)
+    out_dir = temp_path / "Exports"
+    targets_file = write_descriptor_fixture(temp_path)
+    write_layout_fixture(
+        out_dir,
+        descriptor_records=[
+            {"Value": "aa 04 03 00", "Count": 3},
+            {"Value": "not-hex", "Count": 2},
+        ],
+    )
+    malformed_output = io.StringIO()
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "rift_workflow.py",
+                "nidatastream-descriptor-sample-compare",
+                "--out",
+                str(out_dir),
+                "--ghidra-targets-file",
+                str(targets_file),
+                "--list-json",
+            ],
+        ),
+        patch("scripts.rift_workflow.REPO_ROOT", temp_path),
+        patch("scripts.rift_workflow.generated_output_guard"),
+        redirect_stdout(malformed_output),
+    ):
+        rift_workflow.main()
+malformed = json.loads(malformed_output.getvalue())
+jsonschema.validate(malformed, schema)
+print("  PASS: malformed descriptor record schema validation")
+malformed_matrix = malformed["DescriptorRecordPatternMatrix"]
+check("malformed matrix rows", malformed_matrix["RecordPatternCount"], 1)
+check("malformed matrix malformed count", malformed_matrix["MalformedRecordCount"], 2)
+check(
+    "malformed matrix blocker present",
+    "descriptor-record-pattern-malformed" in malformed_matrix["Blockers"],
+    True,
+)
+check(
+    "malformed compare blocker present",
+    "descriptor-record-pattern-malformed" in malformed["Blockers"],
+    True,
+)
 
 promoted_compare = json.loads(json.dumps(compare))
 promoted_compare["ParserExportPromotionAllowed"] = True
