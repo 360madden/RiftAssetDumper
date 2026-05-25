@@ -10,6 +10,7 @@
     "HistoricalStage",
     "CurrentLane",
     "FunctionSiteTargetStatus",
+    "LayoutReportStatus",
     "ParserExportPromotionAllowed",
     "BlockerCount",
     "Blockers",
@@ -22,6 +23,7 @@
     "HistoricalStage": { "const": "Stage 18 complete" },
     "CurrentLane": { "type": "string", "minLength": 1 },
     "FunctionSiteTargetStatus": { "$ref": "#/$defs/functionSiteTargetStatus" },
+    "LayoutReportStatus": { "$ref": "#/$defs/layoutReportStatus" },
     "ParserExportPromotionAllowed": { "const": false },
     "BlockerCount": { "type": "integer", "minimum": 0 },
     "Blockers": {
@@ -44,6 +46,34 @@
         "TargetCount": { "type": "integer", "minimum": 0 },
         "EvidenceReadyCount": { "type": "integer", "minimum": 0 },
         "EvidenceReady": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "layoutReportStatus": {
+      "type": "object",
+      "required": [
+        "Path",
+        "Exists",
+        "Schema",
+        "FilesScanned",
+        "FilesParsed",
+        "NiDataStreamBlocks",
+        "GhidraStyleLayoutValidBlocks",
+        "LegacyOffsetShiftedBlocks",
+        "AllBlocksGhidraStyleValid",
+        "Error"
+      ],
+      "properties": {
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "Schema": { "type": "string" },
+        "FilesScanned": { "type": "integer", "minimum": 0 },
+        "FilesParsed": { "type": "integer", "minimum": 0 },
+        "NiDataStreamBlocks": { "type": "integer", "minimum": 0 },
+        "GhidraStyleLayoutValidBlocks": { "type": "integer", "minimum": 0 },
+        "LegacyOffsetShiftedBlocks": { "type": "integer", "minimum": 0 },
+        "AllBlocksGhidraStyleValid": { "type": "boolean" },
+        "Error": { "type": "string" }
       },
       "additionalProperties": false
     },

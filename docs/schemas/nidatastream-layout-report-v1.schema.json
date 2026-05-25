@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/nidatastream-layout-report-v1.schema.json",
+  "title": "NiDataStream layout report v1",
+  "description": "Candidate-only copied/extracted NIF sample-byte agreement report emitted by `python scripts/rift_workflow.py nidatastream-layout`.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "Interpretation",
+    "Root",
+    "MaxFiles",
+    "FilesScanned",
+    "FilesParsed",
+    "FilesWithNiDataStreamBlocks",
+    "ParseErrorCount",
+    "NiDataStreamBlocks",
+    "ValidDeclaredPayloadBlocks",
+    "GhidraStyleLayoutValidBlocks",
+    "LegacyOffsetShiftedBlocks",
+    "TopPayloadPrefixBytes",
+    "TopPayloadTrailerBytes",
+    "TopTrailingFlags",
+    "TopLegacyOffsetMinusGhidraOffset",
+    "TopPairCounts",
+    "TopDescriptorCounts",
+    "ShiftedSamples",
+    "Warnings"
+  ],
+  "properties": {
+    "Schema": { "const": "nidatastream-layout-report/v1" },
+    "CandidateOnly": { "const": true },
+    "Interpretation": { "type": "string", "minLength": 1 },
+    "Root": { "type": "string", "minLength": 1 },
+    "MaxFiles": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+    "FilesScanned": { "type": "integer", "minimum": 0 },
+    "FilesParsed": { "type": "integer", "minimum": 0 },
+    "FilesWithNiDataStreamBlocks": { "type": "integer", "minimum": 0 },
+    "ParseErrorCount": { "type": "integer", "minimum": 0 },
+    "NiDataStreamBlocks": { "type": "integer", "minimum": 0 },
+    "ValidDeclaredPayloadBlocks": { "type": "integer", "minimum": 0 },
+    "GhidraStyleLayoutValidBlocks": { "type": "integer", "minimum": 0 },
+    "LegacyOffsetShiftedBlocks": { "type": "integer", "minimum": 0 },
+    "TopPayloadPrefixBytes": { "$ref": "#/$defs/counterRows" },
+    "TopPayloadTrailerBytes": { "$ref": "#/$defs/counterRows" },
+    "TopTrailingFlags": { "$ref": "#/$defs/counterRows" },
+    "TopLegacyOffsetMinusGhidraOffset": { "$ref": "#/$defs/counterRows" },
+    "TopPairCounts": { "$ref": "#/$defs/counterRows" },
+    "TopDescriptorCounts": { "$ref": "#/$defs/counterRows" },
+    "ShiftedSamples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nidatastreamBlock" }
+    },
+    "Warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parseWarning" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "counterValue": {
+      "anyOf": [
+        { "type": "integer" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "boolean" },
+        { "type": "null" }
+      ]
+    },
+    "counterRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/counterRow" }
+    },
+    "counterRow": {
+      "type": "object",
+      "required": ["Value", "Count"],
+      "properties": {
+        "Value": { "$ref": "#/$defs/counterValue" },
+        "Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "nullableString": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "nullableInteger": {
+      "anyOf": [{ "type": "integer" }, { "type": "null" }]
+    },
+    "nidatastreamBlock": {
+      "type": "object",
+      "required": [
+        "File",
+        "BlockIndex",
+        "TypeIndex",
+        "TypeName",
+        "DataStreamUsage",
+        "DataStreamAccess",
+        "BlockSize",
+        "BlockDataOffset",
+        "DeclaredPayloadBytes",
+        "ValidDeclaredPayload",
+        "SecondUInt32",
+        "PairCount",
+        "DescriptorCount",
+        "LegacyPayloadOffset",
+        "PayloadPrefixBytes",
+        "PayloadTrailerBytes",
+        "TrailingFlag",
+        "GhidraStyleLayoutValid",
+        "LegacyOffsetMinusGhidraOffset",
+        "LegacyBodyFirst16",
+        "GhidraBodyFirst16",
+        "Warning"
+      ],
+      "properties": {
+        "File": { "type": "string", "minLength": 1 },
+        "BlockIndex": { "type": "integer", "minimum": 0 },
+        "TypeIndex": { "type": "integer", "minimum": 0 },
+        "TypeName": { "type": "string", "minLength": 1 },
+        "DataStreamUsage": { "$ref": "#/$defs/nullableString" },
+        "DataStreamAccess": { "$ref": "#/$defs/nullableString" },
+        "BlockSize": { "type": "integer", "minimum": 0 },
+        "BlockDataOffset": { "type": "integer", "minimum": 0 },
+        "DeclaredPayloadBytes": { "type": "integer", "minimum": 0 },
+        "ValidDeclaredPayload": { "type": "boolean" },
+        "SecondUInt32": { "$ref": "#/$defs/nullableInteger" },
+        "PairCount": { "$ref": "#/$defs/nullableInteger" },
+        "DescriptorCount": { "$ref": "#/$defs/nullableInteger" },
+        "LegacyPayloadOffset": { "$ref": "#/$defs/nullableInteger" },
+        "PayloadPrefixBytes": { "$ref": "#/$defs/nullableInteger" },
+        "PayloadTrailerBytes": { "$ref": "#/$defs/nullableInteger" },
+        "TrailingFlag": { "$ref": "#/$defs/nullableInteger" },
+        "GhidraStyleLayoutValid": { "type": "boolean" },
+        "LegacyOffsetMinusGhidraOffset": { "$ref": "#/$defs/nullableInteger" },
+        "LegacyBodyFirst16": { "type": "string" },
+        "GhidraBodyFirst16": { "type": "string" },
+        "Warning": { "$ref": "#/$defs/nullableString" }
+      },
+      "additionalProperties": false
+    },
+    "parseWarning": {
+      "type": "object",
+      "required": ["Path", "Error"],
+      "properties": {
+        "Path": { "type": "string", "minLength": 1 },
+        "Error": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

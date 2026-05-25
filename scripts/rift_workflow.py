@@ -1111,6 +1111,19 @@ def _file_status_payload(path_text: str) -> dict[str, Any]:
     }
 
 
+def _display_path(path: Path) -> str:
+    """Return a repo-relative path when possible, redacting user-profile paths otherwise."""
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        text = str(resolved)
+        home = str(Path.home())
+        if text.lower().startswith(home.lower()):
+            return "%USERPROFILE%" + text[len(home) :]
+        return text
+
+
 def _ghidra_function_site_status_payload(registry_path: Path) -> dict[str, Any]:
     """Return report/summary existence status for all safe FunctionSiteSurvey targets."""
     registry = _guard_ghidra_function_site_targets(registry_path, quiet=True)
@@ -1182,6 +1195,46 @@ def _nidatastream_gate(
     }
 
 
+def _nidatastream_layout_report_status(args: argparse.Namespace) -> dict[str, Any]:
+    """Return status for the ignored local NiDataStream layout report, if present."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    report_path = out_dir / "nidatastream-layout-report.json"
+    status = {
+        "Path": _display_path(report_path),
+        "Exists": report_path.exists(),
+        "Schema": "",
+        "FilesScanned": 0,
+        "FilesParsed": 0,
+        "NiDataStreamBlocks": 0,
+        "GhidraStyleLayoutValidBlocks": 0,
+        "LegacyOffsetShiftedBlocks": 0,
+        "AllBlocksGhidraStyleValid": False,
+        "Error": "",
+    }
+    if not report_path.exists():
+        return status
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        status["Error"] = str(exc)
+        return status
+
+    blocks = _json_int_or_none(report.get("NiDataStreamBlocks")) or 0
+    valid_blocks = _json_int_or_none(report.get("GhidraStyleLayoutValidBlocks")) or 0
+    status.update(
+        {
+            "Schema": str(report.get("Schema", "")),
+            "FilesScanned": _json_int_or_none(report.get("FilesScanned")) or 0,
+            "FilesParsed": _json_int_or_none(report.get("FilesParsed")) or 0,
+            "NiDataStreamBlocks": blocks,
+            "GhidraStyleLayoutValidBlocks": valid_blocks,
+            "LegacyOffsetShiftedBlocks": _json_int_or_none(report.get("LegacyOffsetShiftedBlocks")) or 0,
+            "AllBlocksGhidraStyleValid": blocks > 0 and blocks == valid_blocks,
+        }
+    )
+    return status
+
+
 def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str, Any]:
     """Return the current post-Stage-18 NiDataStream parser/export promotion gate state."""
     registry_path = _ghidra_function_site_targets_path(args)
@@ -1193,6 +1246,21 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     evidence_text = (
         f"{ready_count}/{target_count} FunctionSiteSurvey targets have ignored local JSON reports and Markdown summaries."
     )
+    layout_status = _nidatastream_layout_report_status(args)
+    layout_blocks = int(layout_status["NiDataStreamBlocks"])
+    layout_valid_blocks = int(layout_status["GhidraStyleLayoutValidBlocks"])
+    if layout_status["Error"]:
+        sample_state = "blocked"
+        sample_evidence = f"Local NiDataStream layout report could not be parsed: {layout_status['Error']}"
+    elif layout_status["Exists"]:
+        sample_state = "candidate" if layout_status["AllBlocksGhidraStyleValid"] else "blocked"
+        sample_evidence = (
+            f"Local layout report {layout_status['Path']} has {layout_valid_blocks}/{layout_blocks} "
+            "Ghidra-style-valid NiDataStream blocks; still report-only."
+        )
+    else:
+        sample_state = "blocked"
+        sample_evidence = "No ignored local nidatastream-layout-report.json exists yet."
 
     gates = [
         _nidatastream_gate(
@@ -1221,10 +1289,10 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
         ),
         _nidatastream_gate(
             "sample-byte-agreement",
-            "candidate",
+            sample_state,
             True,
             "Copied/extracted NIF samples agree with the proposed Ghidra-aligned prefix/payload/trailer interpretation.",
-            "nidatastream-layout is report-only; no parser/export consumer uses Ghidra-aligned slicing.",
+            sample_evidence,
             "python scripts/rift_workflow.py nidatastream-layout --root Extracted --full",
         ),
         _nidatastream_gate(
@@ -1263,6 +1331,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             "EvidenceReadyCount": ready_count,
             "EvidenceReady": evidence_ready,
         },
+        "LayoutReportStatus": layout_status,
         "ParserExportPromotionAllowed": False,
         "BlockerCount": len(blockers),
         "Blockers": blockers,
@@ -1274,12 +1343,19 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
 def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     """Print a human-readable NiDataStream parser-field promotion status."""
     target_status = status["FunctionSiteTargetStatus"]
+    layout_status = status["LayoutReportStatus"]
     print("--- NiDataStreamPromotionStatus")
     print(f"Historical stage: {status['HistoricalStage']}")
     print(f"Current lane: {status['CurrentLane']}")
     print(
         "FunctionSite evidence-ready targets: "
         f"{target_status['EvidenceReadyCount']}/{target_status['TargetCount']}"
+    )
+    layout_mark = "yes" if layout_status["Exists"] else "no"
+    print(
+        "NiDataStream layout report: "
+        f"{layout_mark}; Ghidra-style-valid blocks "
+        f"{layout_status['GhidraStyleLayoutValidBlocks']}/{layout_status['NiDataStreamBlocks']}"
     )
     print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
     print(f"Blocking gates: {status['BlockerCount']}")

@@ -72,6 +72,8 @@ check("historical stage", status["HistoricalStage"], "Stage 18 complete")
 check("promotion blocked", status["ParserExportPromotionAllowed"], False)
 check("has blocking gates", status["BlockerCount"] > 0, True)
 check_contains("promotion lane", status["CurrentLane"], "post-Stage-18")
+check("layout report status present", "LayoutReportStatus" in status, True)
+check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
 
 print("=== NiDataStream parser-field proof guard ===")
 guard_output = io.StringIO()

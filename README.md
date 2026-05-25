@@ -74,6 +74,7 @@ python scripts/rift_workflow.py ghidra-function-site-survey --ghidra-target nida
 python scripts/rift_workflow.py nidatastream-promotion-status --list-json
 python scripts/rift_workflow.py nidatastream-parser-field-proof-guard
 python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
+# layout report schema: docs/schemas/nidatastream-layout-report-v1.schema.json
 python scripts/rift_workflow.py ghidra-pairing-review-report --quick --limit 10
 python scripts/rift_workflow.py ghidra-pairing-non-export-guard
 python scripts/rift_workflow.py mesh-probe --review-rank 2 --skip-build

@@ -24,7 +24,7 @@ Current gate truth:
 - FunctionSite target registry safety: guarded.
 - FunctionSite local evidence availability: 7/7 evidence-ready after the 2026-05-25 local summary refresh.
 - Descriptor field-order proof: candidate-only, not promoted.
-- Sample-byte agreement: report-only, not promoted.
+- Sample-byte agreement: local ignored `nidatastream-layout-report.json` currently shows 184/184 Ghidra-style-valid `NiDataStream` blocks; schema-backed but still report-only, not promoted.
 - Pairing impact proof: blocked; grouped Ghidra attribute guard still expects zero complete Ghidra-only position+normal+UV groups.
 - Export isolation: guarded by `ghidra-workflow-guard-suite` / `nidatastream-parser-field-proof-guard` / `ghidra-pairing-non-export-guard`.
 - Narrow parser patch: not started.

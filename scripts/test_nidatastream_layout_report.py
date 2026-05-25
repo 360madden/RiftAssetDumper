@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import struct
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
+
+import jsonschema
 
 sys.path.insert(0, ".")
 
@@ -61,6 +64,7 @@ def make_test_nif(path: Path) -> None:
 
 
 print("=== NiDataStream layout report ===")
+layout_schema = json.loads(Path("docs/schemas/nidatastream-layout-report-v1.schema.json").read_text(encoding="utf-8"))
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
     nif_path = temp_path / "sample.nif"
@@ -79,6 +83,8 @@ with TemporaryDirectory() as temp_dir:
     check("ghidra valid", block["GhidraStyleLayoutValid"], True)
 
     report = build_report(temp_path, max_files=None)
+    jsonschema.validate(report, layout_schema)
+    print("  PASS: layout report schema validation")
     check("report block count", report["NiDataStreamBlocks"], 1)
     check("report valid count", report["GhidraStyleLayoutValidBlocks"], 1)
     check("report shifted count", report["LegacyOffsetShiftedBlocks"], 1)
@@ -106,6 +112,8 @@ with TemporaryDirectory() as temp_dir:
         rift_workflow.main()
     workflow_report = workflow_out / "nidatastream-layout-report.json"
     check("workflow report created", workflow_report.exists(), True)
+    jsonschema.validate(json.loads(workflow_report.read_text(encoding="utf-8")), layout_schema)
+    print("  PASS: workflow report schema validation")
 
 print(f"\n{'=' * 50}")
 if failed:
