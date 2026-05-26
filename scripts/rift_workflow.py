@@ -49,8 +49,10 @@ Commands (kebab-case):
     tools-status                 — show configured third-party reverse-engineering tools
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
     post50-position-source-status — rank the next offline proof lane from ignored post-50 reports
+    post50-mesh34-negative-binding-status — show mesh#34 @304/#57 non-promotion gates
     post50-mesh329-family-proof  — prove top meshSize=329 stream@212 family from inventory rows
     post50-mesh329-source-binding-compare — compare meshSize=329 @212/#28 and mesh#34 @304/#57 evidence
+    post50-promotion-readiness-status — summarize post-50 parser/export promotion gates
     scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
@@ -316,11 +318,19 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-mesh34-negative-binding-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "post50-mesh329-family-proof": {
         "dotnet": "",
         "base": "",
     },
     "post50-mesh329-source-binding-compare": {
+        "dotnet": "",
+        "base": "",
+    },
+    "post50-promotion-readiness-status": {
         "dotnet": "",
         "base": "",
     },
@@ -461,8 +471,10 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ToolsStatus": "tools-status",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
     "Post50PositionSourceStatus": "post50-position-source-status",
+    "Post50Mesh34NegativeBindingStatus": "post50-mesh34-negative-binding-status",
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
+    "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
     "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
@@ -6614,6 +6626,261 @@ def _run_post50_position_source_status(args: argparse.Namespace) -> None:
     _print_post50_position_source_status(status)
 
 
+def _report_status_by_key(status: dict[str, Any], key: str) -> dict[str, Any]:
+    """Return one report-status row by key from a post-50 status payload."""
+    rows = status.get("ReportStatuses")
+    if not isinstance(rows, list):
+        return {}
+    return next((row for row in rows if isinstance(row, dict) and row.get("Key") == key), {})
+
+
+def _post50_mesh34_negative_binding_status_payload(out_dir: Path) -> dict[str, Any]:
+    """Summarize mesh#34 @304/#57 negative-binding evidence."""
+    post50_status = _post50_position_source_status_payload(out_dir)
+    compare_report, compare_status = _optional_report_payload(
+        "Post50Mesh329SourceBindingCompare",
+        out_dir / "post50-mesh329-source-binding-compare.json",
+    )
+    extra_status = _report_status_by_key(post50_status, "PositionSourceSiblingExtraPosition")
+    family_status = _report_status_by_key(post50_status, "Post50Mesh329FamilyProof")
+
+    comparison_rows = _dict_rows(compare_report, "ComparisonRows")
+    aggregate_raw = compare_report.get("Aggregate", {}) if compare_report else {}
+    aggregate = aggregate_raw if isinstance(aggregate_raw, dict) else {}
+
+    example_rows: list[dict[str, Any]] = []
+    for row in comparison_rows:
+        example_rows.append(
+            {
+                "Id": str(row.get("Id", "")),
+                "PrimaryStream": str(row.get("PrimaryStream", "")),
+                "PrimaryVectorCount": _as_rank_int(row.get("PrimaryVectorCount")),
+                "ExtraStream": str(row.get("ExtraStream", "")),
+                "ExtraVectorCount": _as_rank_int(row.get("ExtraVectorCount")),
+                "ExtraPayloadRemainder": _as_rank_int(row.get("ExtraPayloadRemainder")),
+                "Mesh34AttributeSetCount": _as_rank_int(row.get("Mesh34AttributeSetCount")),
+                "Mesh34UvStreamCount": _as_rank_int(row.get("Mesh34UvStreamCount")),
+                "ExportReady": bool(row.get("ExportReady")) if isinstance(row.get("ExportReady"), bool) else False,
+                "Decision": str(row.get("Decision", "")),
+            }
+        )
+
+    example_count = _as_rank_int(aggregate.get("ExampleCount")) or len(example_rows)
+    all_lacks_attribute_set = (
+        bool(aggregate.get("AllMesh34LacksCompleteAttributeSet"))
+        if isinstance(aggregate.get("AllMesh34LacksCompleteAttributeSet"), bool)
+        else all(row["Mesh34AttributeSetCount"] == 0 for row in example_rows)
+    )
+    all_lacks_uv = (
+        bool(aggregate.get("AllMesh34LacksUvStreams"))
+        if isinstance(aggregate.get("AllMesh34LacksUvStreams"), bool)
+        else all(row["Mesh34UvStreamCount"] == 0 for row in example_rows)
+    )
+    parser_export_allowed = False
+    negative_binding_proven = example_count > 0 and all_lacks_attribute_set and all_lacks_uv and not parser_export_allowed
+    blockers = [
+        "mesh34-complete-geometry-binding-not-proven",
+        "mesh34-uv-stream-missing",
+        "mesh329-extra-position-like-stream-candidate-only",
+        "parser-export-promotion-not-allowed",
+    ]
+
+    return {
+        "SchemaVersion": "post50-mesh34-negative-binding-status/v1",
+        "CandidateOnly": True,
+        "ReportRoot": _display_path(out_dir),
+        "RequiredReports": [
+            {
+                "Key": "Post50Mesh329SourceBindingCompare",
+                "Exists": bool(compare_status.get("Exists")),
+                "EvidenceLevel": str(compare_status.get("EvidenceLevel", "")),
+                "Schema": str(compare_status.get("Schema", "")),
+            },
+            {
+                "Key": "PositionSourceSiblingExtraPosition",
+                "Exists": bool(extra_status.get("Exists")),
+                "EvidenceLevel": str(extra_status.get("EvidenceLevel", "")),
+                "Schema": str(extra_status.get("Schema", "")),
+            },
+            {
+                "Key": "Post50Mesh329FamilyProof",
+                "Exists": bool(family_status.get("Exists")),
+                "EvidenceLevel": str(family_status.get("EvidenceLevel", "")),
+                "Schema": str(family_status.get("Schema", "")),
+            },
+        ],
+        "MeshSize": 329,
+        "MeshBlock": 34,
+        "PrimaryStream": "@212/#28",
+        "ExtraStream": "@304/#57",
+        "ExampleRows": example_rows,
+        "Aggregate": {
+            "ExampleCount": example_count,
+            "AllMesh34LacksCompleteAttributeSet": all_lacks_attribute_set,
+            "AllMesh34LacksUvStreams": all_lacks_uv,
+            "Mesh34CompleteAttributeSetCount": _as_rank_int(aggregate.get("Mesh34CompleteAttributeSetCount")),
+            "Mesh34UvStreamTotal": _as_rank_int(aggregate.get("Mesh34UvStreamTotal")),
+            "ExportReady": False,
+            "NegativeBindingProven": negative_binding_proven,
+        },
+        "ParserExportPromotionAllowed": parser_export_allowed,
+        "Blockers": blockers,
+        "Decision": (
+            "mesh#34 @304/#57 is repeatable source-binding evidence but remains "
+            "negative-binding evidence for parser/export because mesh#34 lacks complete "
+            "attribute-set and UV binding"
+        ),
+        "NextAction": (
+            "Keep mesh#34 @304/#57 candidate-only until a future schema-backed proof "
+            "shows complete position/normal/UV binding across the current examples."
+        ),
+    }
+
+
+def _print_post50_mesh34_negative_binding_status(status: dict[str, Any]) -> None:
+    """Print mesh#34 negative-binding status."""
+    aggregate = status["Aggregate"]
+    print("--- Post50Mesh34NegativeBindingStatus")
+    print(f"Report root: {status['ReportRoot']}")
+    print(f"Examples: {aggregate['ExampleCount']}")
+    print(f"Negative binding proven: {str(aggregate['NegativeBindingProven']).lower()}")
+    print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
+    print("Blockers:")
+    for blocker in status["Blockers"]:
+        print(f"  - {blocker}")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_post50_mesh34_negative_binding_status(args: argparse.Namespace) -> None:
+    """Run mesh#34 @304/#57 negative-binding status."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    status = _post50_mesh34_negative_binding_status_payload(out_dir)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_post50_mesh34_negative_binding_status(status)
+
+
+def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
+    """Summarize post-50 parser/export promotion readiness gates."""
+    post50_status = _post50_position_source_status_payload(out_dir)
+    mesh34_status = _post50_mesh34_negative_binding_status_payload(out_dir)
+    report_statuses = post50_status.get("ReportStatuses")
+    report_rows = [row for row in report_statuses if isinstance(row, dict)] if isinstance(report_statuses, list) else []
+    schema_backed_count = sum(1 for row in report_rows if row.get("EvidenceLevel") == "schema-backed-candidate")
+    all_reports_schema_backed = bool(report_rows) and schema_backed_count == len(report_rows)
+
+    lanes = post50_status.get("CandidateLanes")
+    lane_rows = [row for row in lanes if isinstance(row, dict)] if isinstance(lanes, list) else []
+    family_lane = next((row for row in lane_rows if row.get("Lane") == "source-binding-family"), {})
+    extra_lane = next((row for row in lane_rows if row.get("Lane") == "source-binding-extra-position"), {})
+    residual_lane = next((row for row in lane_rows if row.get("Lane") == "residual-packed-position"), {})
+    cluster_lane = next((row for row in lane_rows if row.get("Lane") == "residual-cluster-structure"), {})
+    mesh34_aggregate = mesh34_status.get("Aggregate") if isinstance(mesh34_status.get("Aggregate"), dict) else {}
+
+    gate_rows = [
+        {
+            "Gate": "all-post50-reports-schema-backed",
+            "RequiredForPromotion": True,
+            "Pass": all_reports_schema_backed,
+            "Evidence": f"{schema_backed_count}/{len(report_rows)} reports schema-backed",
+            "CurrentValue": "schema-backed-candidate" if all_reports_schema_backed else "incomplete",
+        },
+        {
+            "Gate": "mesh329-family-proof-present",
+            "RequiredForPromotion": True,
+            "Pass": bool(family_lane),
+            "Evidence": f"evidenceGroups={family_lane.get('EvidenceGroups', 0)} totalLinks={family_lane.get('TotalStreamLinks', 0)}",
+            "CurrentValue": str(family_lane.get("Lane", "")),
+        },
+        {
+            "Gate": "mesh34-complete-geometry-binding",
+            "RequiredForPromotion": True,
+            "Pass": False,
+            "Evidence": (
+                f"attributeSets={mesh34_aggregate.get('Mesh34CompleteAttributeSetCount', 0)} "
+                f"uvStreams={mesh34_aggregate.get('Mesh34UvStreamTotal', 0)}"
+            ),
+            "CurrentValue": "missing",
+        },
+        {
+            "Gate": "mesh34-extra-position-classified",
+            "RequiredForPromotion": True,
+            "Pass": False,
+            "Evidence": str(extra_lane.get("Rationale", "")),
+            "CurrentValue": "candidate-only",
+        },
+        {
+            "Gate": "residual-strict-threshold",
+            "RequiredForPromotion": True,
+            "Pass": bool(residual_lane.get("StrictPass")) if residual_lane else False,
+            "Evidence": f"plausible={residual_lane.get('Plausible', None)}",
+            "CurrentValue": str(residual_lane.get("StrictPass", False)),
+        },
+        {
+            "Gate": "residual-complete-geometry-binding",
+            "RequiredForPromotion": True,
+            "Pass": bool(cluster_lane.get("ExportReady")) if cluster_lane else False,
+            "Evidence": str(cluster_lane.get("Decision", "")),
+            "CurrentValue": str(cluster_lane.get("ExportReady", False)),
+        },
+        {
+            "Gate": "parser-export-promotion-allowed",
+            "RequiredForPromotion": True,
+            "Pass": bool(post50_status.get("ParserExportPromotionAllowed")),
+            "Evidence": "v1 status keeps parser/export promotion locked false",
+            "CurrentValue": str(post50_status.get("ParserExportPromotionAllowed")),
+        },
+    ]
+    blockers = list(post50_status.get("Blockers", [])) if isinstance(post50_status.get("Blockers"), list) else []
+    if "mesh34-complete-geometry-binding-not-proven" not in blockers:
+        blockers.append("mesh34-complete-geometry-binding-not-proven")
+
+    return {
+        "SchemaVersion": "post50-promotion-readiness-status/v1",
+        "CandidateOnly": True,
+        "ReportRoot": _display_path(out_dir),
+        "OverallReady": False,
+        "ParserExportPromotionAllowed": False,
+        "SchemaBackedReportCount": schema_backed_count,
+        "TotalReportCount": len(report_rows),
+        "RecommendedLane": str(post50_status.get("RecommendedLane", "")),
+        "GateRows": gate_rows,
+        "Blockers": blockers,
+        "Decision": "not-ready; current evidence is schema-backed candidate proof, not parser/export truth",
+        "NextAction": (
+            "Do not change parser/export behavior. Continue proof work on mesh#34 "
+            "complete binding or residual strict-threshold/geometry binding."
+        ),
+    }
+
+
+def _print_post50_promotion_readiness_status(status: dict[str, Any]) -> None:
+    """Print post-50 promotion readiness status."""
+    print("--- Post50PromotionReadinessStatus")
+    print(f"Report root: {status['ReportRoot']}")
+    print(f"Overall ready: {str(status['OverallReady']).lower()}")
+    print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
+    print(f"Schema-backed reports: {status['SchemaBackedReportCount']}/{status['TotalReportCount']}")
+    print("Gates:")
+    for gate in status["GateRows"]:
+        print(f"  - {gate['Gate']}: pass={str(gate['Pass']).lower()} evidence={gate['Evidence']}")
+    print("Blockers:")
+    for blocker in status["Blockers"]:
+        print(f"  - {blocker}")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_post50_promotion_readiness_status(args: argparse.Namespace) -> None:
+    """Run post-50 parser/export promotion readiness status."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    status = _post50_promotion_readiness_status_payload(out_dir)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_post50_promotion_readiness_status(status)
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -6688,6 +6955,10 @@ def _run_command(args: argparse.Namespace) -> None:
         _run_post50_position_source_status(args)
         return
 
+    if command == "post50-mesh34-negative-binding-status":
+        _run_post50_mesh34_negative_binding_status(args)
+        return
+
     if command == "post50-mesh329-family-proof":
         out_dir = Path(args.out) if args.out else DEFAULT_OUT
         inventory_path = out_dir / "nif-mesh-binding-inventory.json"
@@ -6707,6 +6978,10 @@ def _run_command(args: argparse.Namespace) -> None:
         except (FileNotFoundError, ValueError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             sys.exit(1)
+        return
+
+    if command == "post50-promotion-readiness-status":
+        _run_post50_promotion_readiness_status(args)
         return
 
     if command == "scan-live-memory":
@@ -8582,6 +8857,8 @@ Examples:
     list_json_commands = {
         "fifty-step-plan-status",
         "post50-position-source-status",
+        "post50-mesh34-negative-binding-status",
+        "post50-promotion-readiness-status",
         "scan-live-memory",
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
@@ -8600,6 +8877,8 @@ Examples:
         print(
             "ERROR: --list-json is only supported with fifty-step-plan-status, scan-live-memory, "
             "post50-position-source-status, "
+            "post50-mesh34-negative-binding-status, "
+            "post50-promotion-readiness-status, "
             "ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "

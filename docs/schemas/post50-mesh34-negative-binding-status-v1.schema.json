@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-mesh34-negative-binding-status-v1.schema.json",
+  "title": "Post-50 mesh34 negative-binding status v1",
+  "description": "Machine-readable candidate-only status for meshSize=329 mesh#34 @304/#57 negative-binding evidence. This status proves non-promotion, not export readiness.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "ReportRoot",
+    "RequiredReports",
+    "MeshSize",
+    "MeshBlock",
+    "PrimaryStream",
+    "ExtraStream",
+    "ExampleRows",
+    "Aggregate",
+    "ParserExportPromotionAllowed",
+    "Blockers",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-mesh34-negative-binding-status/v1" },
+    "CandidateOnly": { "const": true },
+    "ReportRoot": { "type": "string", "minLength": 1 },
+    "RequiredReports": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/requiredReport" }
+    },
+    "MeshSize": { "const": 329 },
+    "MeshBlock": { "const": 34 },
+    "PrimaryStream": { "const": "@212/#28" },
+    "ExtraStream": { "const": "@304/#57" },
+    "ExampleRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exampleRow" }
+    },
+    "Aggregate": { "$ref": "#/$defs/aggregate" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "requiredReport": {
+      "type": "object",
+      "required": ["Key", "Exists", "EvidenceLevel", "Schema"],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "EvidenceLevel": {
+          "enum": ["schema-backed-candidate", "raw-candidate", "missing-or-unreadable", ""]
+        },
+        "Schema": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "exampleRow": {
+      "type": "object",
+      "required": [
+        "Id",
+        "PrimaryStream",
+        "PrimaryVectorCount",
+        "ExtraStream",
+        "ExtraVectorCount",
+        "ExtraPayloadRemainder",
+        "Mesh34AttributeSetCount",
+        "Mesh34UvStreamCount",
+        "ExportReady",
+        "Decision"
+      ],
+      "properties": {
+        "Id": { "type": "string", "minLength": 1 },
+        "PrimaryStream": { "type": "string" },
+        "PrimaryVectorCount": { "type": "integer", "minimum": 0 },
+        "ExtraStream": { "type": "string" },
+        "ExtraVectorCount": { "type": "integer", "minimum": 0 },
+        "ExtraPayloadRemainder": { "type": "integer", "minimum": 0 },
+        "Mesh34AttributeSetCount": { "type": "integer", "minimum": 0 },
+        "Mesh34UvStreamCount": { "type": "integer", "minimum": 0 },
+        "ExportReady": { "const": false },
+        "Decision": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "ExampleCount",
+        "AllMesh34LacksCompleteAttributeSet",
+        "AllMesh34LacksUvStreams",
+        "Mesh34CompleteAttributeSetCount",
+        "Mesh34UvStreamTotal",
+        "ExportReady",
+        "NegativeBindingProven"
+      ],
+      "properties": {
+        "ExampleCount": { "type": "integer", "minimum": 0 },
+        "AllMesh34LacksCompleteAttributeSet": { "type": "boolean" },
+        "AllMesh34LacksUvStreams": { "type": "boolean" },
+        "Mesh34CompleteAttributeSetCount": { "type": "integer", "minimum": 0 },
+        "Mesh34UvStreamTotal": { "type": "integer", "minimum": 0 },
+        "ExportReady": { "const": false },
+        "NegativeBindingProven": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

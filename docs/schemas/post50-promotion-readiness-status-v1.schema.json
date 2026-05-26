@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-promotion-readiness-status-v1.schema.json",
+  "title": "Post-50 promotion readiness status v1",
+  "description": "Machine-readable post-50 parser/export promotion readiness gate summary. V1 is intentionally locked not-ready.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "ReportRoot",
+    "OverallReady",
+    "ParserExportPromotionAllowed",
+    "SchemaBackedReportCount",
+    "TotalReportCount",
+    "RecommendedLane",
+    "GateRows",
+    "Blockers",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-promotion-readiness-status/v1" },
+    "CandidateOnly": { "const": true },
+    "ReportRoot": { "type": "string", "minLength": 1 },
+    "OverallReady": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "SchemaBackedReportCount": { "type": "integer", "minimum": 0 },
+    "TotalReportCount": { "type": "integer", "minimum": 0 },
+    "RecommendedLane": { "type": "string" },
+    "GateRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gateRow" }
+    },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "gateRow": {
+      "type": "object",
+      "required": ["Gate", "RequiredForPromotion", "Pass", "Evidence", "CurrentValue"],
+      "properties": {
+        "Gate": { "type": "string", "minLength": 1 },
+        "RequiredForPromotion": { "type": "boolean" },
+        "Pass": { "type": "boolean" },
+        "Evidence": { "type": "string" },
+        "CurrentValue": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
