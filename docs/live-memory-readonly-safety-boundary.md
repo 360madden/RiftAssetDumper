@@ -87,12 +87,12 @@ Disallowed output:
 
 Step 47 may start only after this boundary is present and tests are designed around a non-live process-reader abstraction.
 
-Step 47 implementation must initially deliver:
+Step 47 implementation delivered a gated Python workflow command; future refinements must preserve:
 
 1. A dry-run/list mode.
-2. Parser/validator for hex patterns.
+2. Parser/validator for `label=hex` patterns.
 3. A process-reader interface with fixture-backed tests.
-4. Generated-output guard coverage.
+4. Generated-output guard coverage before actual execution.
 5. No live process attach in tests or CI.
 
 ## Actual live-read execution gate

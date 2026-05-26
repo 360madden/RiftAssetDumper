@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/live-memory-scan-plan-v1.schema.json",
+  "title": "Live memory scan plan/result",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "TargetProcessName",
+    "Pid",
+    "ExecuteLiveRead",
+    "ExperimentalLive",
+    "ConfirmLiveRead",
+    "LiveProcessReadExecuted",
+    "ExecutionAllowed",
+    "RefusalReasons",
+    "OutputDirectory",
+    "OutputJsonPath",
+    "OutputMarkdownPath",
+    "Limits",
+    "Patterns",
+    "Safety",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "live-memory-scan-plan/v1" },
+    "TargetProcessName": { "const": "rift_x64.exe" },
+    "Pid": { "type": ["integer", "null"], "minimum": 1 },
+    "ExecuteLiveRead": { "type": "boolean" },
+    "ExperimentalLive": { "type": "boolean" },
+    "ConfirmLiveRead": { "type": "boolean" },
+    "LiveProcessReadExecuted": { "type": "boolean" },
+    "ExecutionAllowed": { "type": "boolean" },
+    "RefusalReasons": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "OutputDirectory": {
+      "type": "string",
+      "pattern": "^Exports/discovery-plan/stage5-live(/.*)?$"
+    },
+    "OutputJsonPath": {
+      "type": "string",
+      "pattern": "^Exports/discovery-plan/stage5-live/.*\\.json$"
+    },
+    "OutputMarkdownPath": {
+      "type": "string",
+      "pattern": "^Exports/discovery-plan/stage5-live/.*\\.md$"
+    },
+    "Limits": {
+      "type": "object",
+      "required": ["MaxScanBytes", "MaxMatchesPerPattern", "MaxRegions", "TimeoutSeconds", "ChunkBytes"],
+      "properties": {
+        "MaxScanBytes": { "type": "integer", "minimum": 1 },
+        "MaxMatchesPerPattern": { "type": "integer", "minimum": 1 },
+        "MaxRegions": { "type": "integer", "minimum": 1 },
+        "TimeoutSeconds": { "type": "integer", "minimum": 1 },
+        "ChunkBytes": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "Patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "Safety": {
+      "type": "object",
+      "required": [
+        "ReadOnly",
+        "NoWrites",
+        "NoHooks",
+        "NoDllInjection",
+        "NoRemoteThreads",
+        "NoFullDump",
+        "OutputIgnoredGenerated",
+        "RequiresSeparateLiveExecutionGate"
+      ],
+      "properties": {
+        "ReadOnly": { "const": true },
+        "NoWrites": { "const": true },
+        "NoHooks": { "const": true },
+        "NoDllInjection": { "const": true },
+        "NoRemoteThreads": { "const": true },
+        "NoFullDump": { "const": true },
+        "OutputIgnoredGenerated": { "const": true },
+        "RequiresSeparateLiveExecutionGate": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "NextAction": { "type": "string", "minLength": 1 },
+    "ScanResult": { "$ref": "#/$defs/scanResult" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "pattern": {
+      "type": "object",
+      "required": ["Label", "Hex", "ByteLength"],
+      "properties": {
+        "Label": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,80}$" },
+        "Hex": { "type": "string", "pattern": "^[0-9A-F]+$" },
+        "ByteLength": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "scanResult": {
+      "type": "object",
+      "required": ["BytesScanned", "RegionsScanned", "TimedOut", "PatternResults"],
+      "properties": {
+        "BytesScanned": { "type": "integer", "minimum": 0 },
+        "RegionsScanned": { "type": "integer", "minimum": 0 },
+        "TimedOut": { "type": "boolean" },
+        "PatternResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/patternResult" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "patternResult": {
+      "type": "object",
+      "required": ["Label", "MatchCount", "Matches"],
+      "properties": {
+        "Label": { "type": "string", "minLength": 1 },
+        "MatchCount": { "type": "integer", "minimum": 0 },
+        "Matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/match" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "match": {
+      "type": "object",
+      "required": ["Address", "RegionBase", "OffsetInRegion", "SnippetHex"],
+      "properties": {
+        "Address": { "type": "string", "pattern": "^0x[0-9A-F]+$" },
+        "RegionBase": { "type": "string", "pattern": "^0x[0-9A-F]+$" },
+        "OffsetInRegion": { "type": "integer", "minimum": 0 },
+        "SnippetHex": { "type": "string", "pattern": "^[0-9A-F]+$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

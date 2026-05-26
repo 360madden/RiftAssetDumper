@@ -1,14 +1,14 @@
 # 50-Step Autonomous Discovery Plan
 
 **Created:** 2026-05-20
-**Status:** 🟡 Revived tracker — Stage 5 active, Step 47 next
+**Status:** 🟡 Revived tracker — Stage 5 active, Step 48 next
 **Game state:** RIFT client at character selection screen (live process available)
 **Conflict rule:** All outputs under ignored `Exports/discovery-plan/` — never touch shared state
 
 > Current position note (2026-05-26): this original 50-step plan was later superseded by
 > `docs/current-status.md` and staged handoffs for offline geometry/export work. Steps 1-45
 > are now treated as complete/superseded by that later evidence. Step 46 is complete via
-> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is the next original-plan step.
+> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 is the next original-plan step.
 
 ---
 
@@ -354,20 +354,20 @@
 **⚠️ HIGH RISK per task-routing-safety-policy.md — extra-high reasoning required.**
 
 ### Step 46 — Design live memory scan safety boundary
-- [ ] Document: what we will read, what we will NOT touch
-- [ ] Define pattern scan targets: known NIF asset IDs, index buffer prefixes, float3 vertex clusters
-- [ ] Define safety: no writes, no hooks, no DLL injection, no handle duplication
-- [ ] Define output: under ignored `Exports/discovery-plan/stage5-live/`
-- [ ] Define non-conflict: use unique scan signatures, don't interfere with other discoverers
-- **Exit:** Approved safety boundary document
+- [x] Document: what we will read, what we will NOT touch
+- [x] Define pattern scan targets: known NIF asset IDs, index buffer prefixes, float3 vertex clusters
+- [x] Define safety: no writes, no hooks, no DLL injection, no handle duplication
+- [x] Define output: under ignored `Exports/discovery-plan/stage5-live/`
+- [x] Define non-conflict: use unique scan signatures, don't interfere with other discoverers
+- **Exit:** Approved safety boundary document: `docs/live-memory-readonly-safety-boundary.md`
 
 ### Step 47 — Implement read-only process memory scanner
-- [ ] New C# command: `scan-live-memory --pattern <hex> [--pid <n>]`
-- [ ] Finds RIFT process by name if no PID
-- [ ] `ReadProcessMemory` only — no writes
-- [ ] Scans for byte patterns: known asset IDs, index buffer prefixes, position clusters
-- [ ] Behind `--experimental-live` gate
-- **Exit:** Read-only memory scanner
+- [x] New workflow command: `scan-live-memory --live-pattern <label=hex> [--pid <n>]`
+- [x] Automatic process selection fails closed; actual reads require explicit `--pid`
+- [x] `ReadProcessMemory` only — no writes
+- [x] Scans for byte patterns: known asset IDs, index buffer prefixes, position clusters
+- [x] Behind `--experimental-live` plus `--confirm-live-read` and `--execute-live-read` gates
+- **Exit:** Read-only memory scanner scaffold: `scripts/live_memory_scanner.py`
 
 ### Step 48 — Scan for @264/#15 index buffer pattern in live memory
 - [ ] Pattern: `00010002000200010003000400050006...` (big-endian strip prefix)
@@ -435,4 +435,4 @@ Stage 5 (steps 46-50) ─── Live-game validation (read-only)
 | 2 — Position Discovery | 16-25 | ✅ Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | 3 — Guard Migration | 26-35 | ✅ Complete/superseded | Python guards/workflow tests |
 | 4 — Automation Suite | 36-45 | ✅ Complete/superseded | `discovery-suite` and Stage 14+ handoffs |
-| 5 — Live Validation | 46-50 | 🟡 Active: Step 47 next | `docs/live-memory-readonly-safety-boundary.md` |
+| 5 — Live Validation | 46-50 | 🟡 Active: Step 48 next | `docs/live-memory-readonly-safety-boundary.md`; `scripts/live_memory_scanner.py` |

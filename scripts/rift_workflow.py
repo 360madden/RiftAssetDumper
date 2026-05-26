@@ -48,6 +48,7 @@ Commands (kebab-case):
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
     tools-status                 — show configured third-party reverse-engineering tools
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
+    scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
     ghidra-function-site-target-guard — validate tracked FunctionSiteSurvey target safety
@@ -306,6 +307,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "scan-live-memory": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-dry-run": {
         "dotnet": "",
         "base": "",
@@ -438,6 +443,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "BatchExport264": "batch-export-264",
     "ToolsStatus": "tools-status",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
+    "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
     "GhidraFunctionSiteTargetGuard": "ghidra-function-site-target-guard",
@@ -5820,31 +5826,117 @@ def _run_nidatastream_descriptor_base_model_review(args: argparse.Namespace) -> 
     print("NiDataStreamDescriptorBaseModelReview passed: review remains candidate-only/report-only.")
 
 
+def _print_scan_live_memory_plan(plan: dict[str, Any]) -> None:
+    """Print a concise live-memory scanner plan."""
+    print("--- ScanLiveMemory")
+    print(f"Schema: {plan['SchemaVersion']}")
+    print(f"Target process: {plan['TargetProcessName']}")
+    print(f"PID: {plan['Pid'] if plan['Pid'] is not None else '(not set; live execution blocked)'}")
+    print(f"Execute live read: {str(plan['ExecuteLiveRead']).lower()}")
+    print(f"Execution allowed: {str(plan['ExecutionAllowed']).lower()}")
+    print(f"Output JSON: {plan['OutputJsonPath']}")
+    print(f"Output Markdown: {plan['OutputMarkdownPath']}")
+    print("Patterns:")
+    for pattern in plan["Patterns"]:
+        print(f"- {pattern['Label']}: {pattern['ByteLength']} bytes ({pattern['Hex']})")
+    print("Limits:")
+    for key, value in plan["Limits"].items():
+        print(f"- {key}: {value}")
+    if plan["RefusalReasons"]:
+        print("Refusal / dry-run reasons:")
+        for reason in plan["RefusalReasons"]:
+            print(f"- {reason}")
+    print(f"Next action: {plan['NextAction']}")
+
+
+def _run_scan_live_memory(args: argparse.Namespace) -> None:
+    """Plan or execute a gated read-only live memory scan."""
+    from scripts.live_memory_scanner import (
+        build_live_memory_scan_plan,
+        parse_hex_patterns,
+        run_windows_live_scan,
+        write_live_scan_reports,
+    )
+
+    try:
+        plan = build_live_memory_scan_plan(
+            repo_root=REPO_ROOT,
+            out=args.out,
+            process_name=args.process_name,
+            pid=args.pid,
+            pattern_specs=args.live_pattern,
+            execute_live_read=args.execute_live_read,
+            experimental_live=args.experimental_live,
+            confirm_live_read=args.confirm_live_read,
+            max_scan_bytes=args.max_scan_bytes,
+            max_matches=args.max_scan_matches,
+            max_regions=args.max_scan_regions,
+            timeout_seconds=args.live_timeout_seconds,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    _print_scan_live_memory_plan(plan)
+    if not args.execute_live_read:
+        print("scan-live-memory dry-run passed: no process was opened and no live memory was read.")
+        return
+    if not plan["ExecutionAllowed"]:
+        print("ERROR: live memory read refused by safety gates.", file=sys.stderr)
+        sys.exit(1)
+
+    generated_output_guard()
+    patterns = parse_hex_patterns(args.live_pattern)
+    try:
+        result = run_windows_live_scan(plan, patterns)
+    except Exception as exc:  # noqa: BLE001 - live gate reports exact runtime failure
+        print(f"ERROR: live memory scan failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    json_path, markdown_path = write_live_scan_reports(result, REPO_ROOT)
+    print(f"scan-live-memory wrote JSON: {json_path}")
+    print(f"scan-live-memory wrote Markdown: {markdown_path}")
+
+
 def _fifty_step_plan_status_payload() -> dict[str, Any]:
     """Return the current repo position in the original 50-step discovery plan."""
     plan_path = REPO_ROOT / "docs" / "discovery-plan-50.md"
     current_position_path = REPO_ROOT / "docs" / "50-step-plan-current-position.md"
     safety_boundary_path = REPO_ROOT / "docs" / "live-memory-readonly-safety-boundary.md"
+    scanner_path = REPO_ROOT / "scripts" / "live_memory_scanner.py"
+    scanner_schema_path = REPO_ROOT / "docs" / "schemas" / "live-memory-scan-plan-v1.schema.json"
     step_46_complete = safety_boundary_path.exists()
-    current_step = 47 if step_46_complete else 46
-    current_step_name = (
-        "Implement read-only process memory scanner"
-        if step_46_complete
-        else "Design live memory scan safety boundary"
-    )
+    step_47_complete = scanner_path.exists() and scanner_schema_path.exists() and "scan-live-memory" in COMMAND_MAP
+    current_step = 46
+    current_step_name = "Design live memory scan safety boundary"
+    completed_step_count = 45
+    if step_46_complete:
+        current_step = 47
+        current_step_name = "Implement read-only process memory scanner"
+        completed_step_count = 46
+    if step_47_complete:
+        current_step = 48
+        current_step_name = "Scan for @264/#15 index buffer pattern in live memory"
+        completed_step_count = 47
     return {
         "SchemaVersion": "fifty-step-plan-status/v1",
         "PlanPath": _display_path(plan_path),
         "CurrentPositionPath": _display_path(current_position_path),
         "SafetyBoundaryPath": _display_path(safety_boundary_path),
+        "ScannerPath": _display_path(scanner_path),
+        "LiveScanSchemaPath": _display_path(scanner_schema_path),
         "TotalSteps": 50,
-        "CompletedStepCount": 46 if step_46_complete else 45,
+        "CompletedStepCount": completed_step_count,
         "CurrentStageNumber": 5,
         "CurrentStageName": "Live-Game Safe Read-Only Validation",
         "CurrentStepNumber": current_step,
         "CurrentStepName": current_step_name,
         "CurrentStepStatus": "next" if step_46_complete else "in-progress",
         "Step46SafetyBoundaryComplete": step_46_complete,
+        "Step47ScannerImplemented": step_47_complete,
         "LiveProcessReadExecuted": False,
         "LiveProcessReadApprovedForThisRun": False,
         "ParserExportPromotionAllowed": False,
@@ -5888,17 +5980,26 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 "StageNumber": 5,
                 "Name": "Live-Game Safe Read-Only Validation",
                 "StepRange": "46-50",
-                "Status": "step-47-next" if step_46_complete else "step-46-in-progress",
-                "Evidence": "docs/live-memory-readonly-safety-boundary.md" if step_46_complete else "",
+                "Status": "step-48-next" if step_47_complete else "step-47-next" if step_46_complete else "step-46-in-progress",
+                "Evidence": (
+                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py"
+                    if step_47_complete
+                    else "docs/live-memory-readonly-safety-boundary.md"
+                    if step_46_complete
+                    else ""
+                ),
             },
         ],
         "Blockers": [
             "live-process-read-not-executed",
-            "step-47-implementation-not-complete",
+            "step-48-live-index-pattern-scan-not-executed",
             "steps-48-through-50-not-complete",
         ],
         "NextAction": (
-            "Implement scan-live-memory behind explicit --experimental-live and dry-run/list modes; "
+            "Run scan-live-memory dry-run for the @264/#15 big-endian strip prefix and review exact PID/pattern/limits "
+            "before any separately approved live read."
+            if step_47_complete
+            else "Implement scan-live-memory behind explicit --experimental-live and dry-run/list modes; "
             "do not attach to a live process until a separate live-read execution approval is present."
         )
         if step_46_complete
@@ -5915,6 +6016,7 @@ def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
     print(f"Current step: Step {status['CurrentStepNumber']} - {status['CurrentStepName']}")
     print(f"Current step status: {status['CurrentStepStatus']}")
     print(f"Step 46 safety boundary complete: {str(status['Step46SafetyBoundaryComplete']).lower()}")
+    print(f"Step 47 scanner implemented: {str(status['Step47ScannerImplemented']).lower()}")
     print(f"Live process read executed: {str(status['LiveProcessReadExecuted']).lower()}")
     print("Blockers:")
     for blocker in status["Blockers"]:
@@ -5999,6 +6101,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "fifty-step-plan-status":
         _run_fifty_step_plan_status(args)
+        return
+
+    if command == "scan-live-memory":
+        _run_scan_live_memory(args)
         return
 
     if command == "ghidra-dry-run":
@@ -7431,6 +7537,7 @@ Examples:
   python scripts/rift_workflow.py triage-fallback-candidates --full
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py fifty-step-plan-status --list-json
+  python scripts/rift_workflow.py scan-live-memory --live-pattern twad_magic=54574144 --list-json
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
   python scripts/rift_workflow.py ghidra-function-site-target-guard
@@ -7592,6 +7699,62 @@ Examples:
         "--list-json",
         action="store_true",
         help="Print machine-readable JSON for supported listing/status commands",
+    )
+    parser.add_argument(
+        "--live-pattern",
+        action="append",
+        default=[],
+        help="Exact live-memory scan pattern as label=hex; repeatable (scan-live-memory)",
+    )
+    parser.add_argument(
+        "--process-name",
+        default="rift_x64.exe",
+        help="Live scan process name gate (default: rift_x64.exe)",
+    )
+    parser.add_argument(
+        "--pid",
+        type=int,
+        default=0,
+        help="Explicit target PID for actual live memory reads; dry-runs may omit it",
+    )
+    parser.add_argument(
+        "--execute-live-read",
+        action="store_true",
+        help="Actually open/read the target process for scan-live-memory; requires explicit live safety flags",
+    )
+    parser.add_argument(
+        "--experimental-live",
+        action="store_true",
+        help="Required safety gate for actual scan-live-memory process reads",
+    )
+    parser.add_argument(
+        "--confirm-live-read",
+        action="store_true",
+        help="Second explicit safety confirmation required for actual scan-live-memory process reads",
+    )
+    parser.add_argument(
+        "--max-scan-bytes",
+        type=int,
+        default=16 * 1024 * 1024,
+        help="Maximum bytes to read in scan-live-memory (default: 16 MiB)",
+    )
+    parser.add_argument(
+        "--max-scan-matches",
+        type=int,
+        default=32,
+        help="Maximum matches per pattern in scan-live-memory (default: 32)",
+    )
+    parser.add_argument(
+        "--max-scan-regions",
+        type=int,
+        default=256,
+        help="Maximum memory regions to scan in scan-live-memory (default: 256)",
+    )
+    parser.add_argument(
+        "--live-timeout-seconds",
+        type=int,
+        default=10,
+        help="Maximum scan-live-memory wall time in seconds (default: 10)",
     )
     parser.add_argument(
         "--ghidra-project-dir",
@@ -7807,6 +7970,7 @@ Examples:
 
     list_json_commands = {
         "fifty-step-plan-status",
+        "scan-live-memory",
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
         "nidatastream-evidence-status",
@@ -7822,7 +7986,8 @@ Examples:
     }
     if args.list_json and args.command not in list_json_commands:
         print(
-            "ERROR: --list-json is only supported with fifty-step-plan-status, ghidra-function-site-survey, "
+            "ERROR: --list-json is only supported with fifty-step-plan-status, scan-live-memory, "
+            "ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
