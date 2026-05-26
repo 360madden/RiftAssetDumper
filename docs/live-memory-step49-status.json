@@ -9,9 +9,12 @@
   "LiveReadExecuted": true,
   "HitCount": 16,
   "MaxHitsReached": true,
+  "RiftReaderGenericTripletScanAvailable": true,
+  "RiftReaderGenericTripletScanCommand": "--scan-float-triplet <x,y,z>",
+  "RiftReaderGenericTripletScanCommit": "97a38d6",
   "ClusterConfirmed": false,
   "Step49Complete": false,
   "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
   "ParserExportPromotionAllowed": false,
-  "NextAction": "Derive a multi-float cluster target or add/use a RiftReader byte-pattern process scan before treating Step 49 as confirmed."
+  "NextAction": "Use RiftReader --scan-float-triplet with bounded max-hit/context limits for the next Step 49 candidate-only cluster probe before treating Step 49 as confirmed."
 }
