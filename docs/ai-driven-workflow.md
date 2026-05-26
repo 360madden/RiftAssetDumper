@@ -6,7 +6,7 @@ Canonical stage label: the historical geometry/export pipeline is **Stage 18 com
 
 Original 50-step plan position: `docs/discovery-plan-50.md` is revived as a historical-to-current checklist. Use `fifty-step-plan-status --list-json` for the machine-readable position. As of the RiftReader Step 49 initial-probe refresh, the original plan is on **Stage 5, Step 49 in progress**. Step 48 and Step 49 live evidence are candidate-only, the Step 49 single-float probe is not cluster confirmation, and parser/export promotion remains blocked until a separate guard-backed promotion patch.
 
-For live-memory discovery, prefer the RiftReader scanner over Assets-local fallback code. Use RiftReader's generic `--scan-float-triplet <x,y,z>` command for Step 49 candidate float3 probes, with bounded `--scan-context` and `--max-hits` values.
+For live-memory discovery, prefer the RiftReader scanner over Assets-local fallback code. Use RiftReader's bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command for Step 49 candidate float3 probes, with bounded `--scan-context` and `--max-hits` values.
 
 ## Default loop
 

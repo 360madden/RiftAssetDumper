@@ -10,11 +10,16 @@
   "HitCount": 16,
   "MaxHitsReached": true,
   "RiftReaderGenericTripletScanAvailable": true,
-  "RiftReaderGenericTripletScanCommand": "--scan-float-triplet <x,y,z>",
-  "RiftReaderGenericTripletScanCommit": "97a38d6",
+  "RiftReaderGenericTripletScanCommand": "--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>",
+  "RiftReaderGenericTripletScanCommit": "994ead8",
+  "BoundedTripletProbeExecuted": true,
+  "BoundedTripletProbeRegionBase": "0x1C90E752000",
+  "BoundedTripletProbeRegionSize": 8192,
+  "BoundedTripletPositiveControlHitCount": 2,
+  "BoundedExpectedStaticV0HitCount": 0,
   "ClusterConfirmed": false,
   "Step49Complete": false,
   "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
   "ParserExportPromotionAllowed": false,
-  "NextAction": "Use RiftReader --scan-float-triplet with bounded max-hit/context limits for the next Step 49 candidate-only cluster probe before treating Step 49 as confirmed."
+  "NextAction": "Run additional bounded RiftReader --scan-float-triplet probes across candidate regions/static samples; Step 49 is not confirmed until expected static float3 samples share one live stream."
 }

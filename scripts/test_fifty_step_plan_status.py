@@ -48,7 +48,14 @@ print("  PASS: Step 48 live scan status schema validation")
 jsonschema.validate(step49_status, step49_schema)
 print("  PASS: Step 49 live scan status schema validation")
 check("step 49 generic RiftReader triplet command available", step49_status["RiftReaderGenericTripletScanAvailable"], True)
-check("step 49 generic RiftReader triplet command", step49_status["RiftReaderGenericTripletScanCommand"], "--scan-float-triplet <x,y,z>")
+check(
+    "step 49 generic RiftReader triplet command",
+    step49_status["RiftReaderGenericTripletScanCommand"],
+    "--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>",
+)
+check("step 49 bounded triplet probe executed", step49_status["BoundedTripletProbeExecuted"], True)
+check("step 49 bounded positive control hits", step49_status["BoundedTripletPositiveControlHitCount"], 2)
+check("step 49 bounded expected static v0 hits", step49_status["BoundedExpectedStaticV0HitCount"], 0)
 output = StringIO()
 with patch.object(sys, "argv", ["rift_workflow.py", "fifty-step-plan-status", "--list-json"]), redirect_stdout(output):
     rift_workflow.main()

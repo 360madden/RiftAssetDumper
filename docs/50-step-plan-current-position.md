@@ -14,7 +14,7 @@ Current step: Step 49 — Scan for position float3 clusters matching mesh bounds
 Status: in progress; initial RiftReader single-float probe executed, cluster not confirmed
 ```
 
-Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider. Step 49 has candidate-only initial live evidence in `docs/live-memory-step49-status.json`, but it is not complete because the current probe is a noisy single-float search, not a confirmed position float3 cluster. RiftReader now exposes a generic `--scan-float-triplet <x,y,z>` command for the next bounded triplet/cluster probe.
+Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider. Step 49 has candidate-only live evidence in `docs/live-memory-step49-status.json`, but it is not complete because the static mesh `v0` triplet did not match the first bounded live candidate region. RiftReader now exposes a bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command for focused triplet/cluster probes.
 
 ## Why this is Step 49
 
@@ -41,6 +41,8 @@ Current boundary:
 - Step 48 dry-run target manifest ready: **true**
 - Step 48 live pattern found by RiftReader: **true**
 - Step 49 initial single-float probe by RiftReader: **true**
+- Step 49 bounded float-triplet positive-control hits: **2**
+- Step 49 expected static `v0` hits in that bounded region: **0**
 - Step 49 position float3 cluster confirmed: **false**
 - Parser/export promotion allowed: **false**
 
@@ -49,7 +51,7 @@ Current boundary:
 Continue Step 49 as a candidate-only position-cluster confirmation lane:
 
 1. Derive bounded float3 cluster byte patterns from guarded static decode/bounds evidence.
-2. Prefer the existing RiftReader memory scanner/provider for live reads; use `--scan-float-triplet <x,y,z>` for candidate float3 checks.
+2. Prefer the existing RiftReader memory scanner/provider for live reads; use bounded `--scan-float-triplet <x,y,z>` for candidate float3 checks.
 3. Treat the existing single-float probe as noise-prone evidence only.
 4. Write any live evidence only under ignored `Exports/discovery-plan/stage5-live/`.
 5. Do not promote parser/export behavior from live evidence without a later guard-backed patch.

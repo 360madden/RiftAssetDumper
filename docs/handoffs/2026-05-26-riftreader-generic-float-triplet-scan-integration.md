@@ -8,13 +8,16 @@ Keep the Assets live-memory workflow aligned with the existing RiftReader scanne
 
 ## What changed
 
-- Updated Step 49 status to note that RiftReader now exposes `--scan-float-triplet <x,y,z>`.
+- Updated Step 49 status to note that RiftReader now exposes bounded `--scan-float-triplet <x,y,z>` probes.
 - Updated the 50-step tracker and AI workflow docs to prefer RiftReader for candidate float3 live probes.
 - Kept the existing Step 49 evidence candidate-only; the prior single-float probe remains noisy and not cluster-confirmed.
 
 ## Evidence / validation
 
-- RiftReader commit: `97a38d6` (`feat: expose generic float triplet scan`).
+- RiftReader commits:
+  - `97a38d6` (`feat: expose generic float triplet scan`)
+  - `36ea28d` (`feat: add bounded float triplet scans`)
+  - `994ead8` (`fix: route float triplet scans`)
 - RiftReader validation before push:
   - `dotnet test reader/RiftReader.Reader.Tests/RiftReader.Reader.Tests.csproj --no-restore`
   - `dotnet build RiftReader.slnx --no-restore`
@@ -31,7 +34,7 @@ Any Step 49 live scan reports must stay under ignored `Exports/discovery-plan/st
 
 ## Next recommended actions
 
-1. Run a bounded `--scan-float-triplet <x,y,z>` probe for guarded static vertex samples.
+1. Run bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` probes for guarded static vertex samples.
 2. Compare returned hit regions/offsets across multiple vertices for one shared stream.
 3. Keep all detailed live reports ignored.
 4. Update `docs/live-memory-step49-status.json` only after the cluster result is clear.
