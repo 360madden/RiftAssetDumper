@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/fifty-step-plan-status-v1.schema.json",
+  "title": "50-step discovery plan status",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "PlanPath",
+    "CurrentPositionPath",
+    "SafetyBoundaryPath",
+    "TotalSteps",
+    "CompletedStepCount",
+    "CurrentStageNumber",
+    "CurrentStageName",
+    "CurrentStepNumber",
+    "CurrentStepName",
+    "CurrentStepStatus",
+    "Step46SafetyBoundaryComplete",
+    "LiveProcessReadExecuted",
+    "LiveProcessReadApprovedForThisRun",
+    "ParserExportPromotionAllowed",
+    "Stages",
+    "Blockers",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "fifty-step-plan-status/v1" },
+    "PlanPath": { "type": "string", "minLength": 1 },
+    "CurrentPositionPath": { "type": "string", "minLength": 1 },
+    "SafetyBoundaryPath": { "type": "string", "minLength": 1 },
+    "TotalSteps": { "const": 50 },
+    "CompletedStepCount": { "type": "integer", "minimum": 0, "maximum": 50 },
+    "CurrentStageNumber": { "type": "integer", "minimum": 0 },
+    "CurrentStageName": { "type": "string", "minLength": 1 },
+    "CurrentStepNumber": { "type": "integer", "minimum": 1, "maximum": 50 },
+    "CurrentStepName": { "type": "string", "minLength": 1 },
+    "CurrentStepStatus": { "enum": ["in-progress", "next", "complete", "blocked"] },
+    "Step46SafetyBoundaryComplete": { "type": "boolean" },
+    "LiveProcessReadExecuted": { "const": false },
+    "LiveProcessReadApprovedForThisRun": { "const": false },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Stages": {
+      "type": "array",
+      "minItems": 6,
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "required": ["StageNumber", "Name", "StepRange", "Status", "Evidence"],
+      "properties": {
+        "StageNumber": { "type": "integer", "minimum": 0 },
+        "Name": { "type": "string", "minLength": 1 },
+        "StepRange": { "type": "string", "minLength": 1 },
+        "Status": { "type": "string", "minLength": 1 },
+        "Evidence": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

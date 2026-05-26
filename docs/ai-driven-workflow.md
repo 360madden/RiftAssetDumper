@@ -4,6 +4,8 @@ This repo uses a Codex-first autonomous milestone loop for safe asset-discovery 
 
 Canonical stage label: the historical geometry/export pipeline is **Stage 18 complete**. Current active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**; do not renumber this as a new Stage 4. Treat dated stage tables in older status docs as historical unless refreshed by current git state, CI, and latest handoffs.
 
+Original 50-step plan position: `docs/discovery-plan-50.md` is revived as a historical-to-current checklist. Use `fifty-step-plan-status --list-json` for the machine-readable position. As of the Step 46 safety-boundary refresh, the original plan is on **Stage 5, Step 47 next**; actual live process reads remain unexecuted and require a separate explicit live-read execution gate.
+
 ## Default loop
 
 1. Read `AGENTS.md`, `knowledge.md`, `docs/current-status.md`, and the newest handoff before changing direction.

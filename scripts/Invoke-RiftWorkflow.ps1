@@ -47,6 +47,7 @@ $PSModeToKebab = @{
     'StreamEndianness' = 'stream-endianness'
     'StreamBodies' = 'stream-bodies'
     'ToolsStatus' = 'tools-status'
+    'FiftyStepPlanStatus' = 'fifty-step-plan-status'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'
     'GhidraFunctionSiteTargetGuard' = 'ghidra-function-site-target-guard'

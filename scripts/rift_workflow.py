@@ -47,6 +47,7 @@ Commands (kebab-case):
     decode-geometry              — decode-nif-geometry + summary (needs --id --mesh-block; supports --experimental-position-source)
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
     tools-status                 — show configured third-party reverse-engineering tools
+    fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
     ghidra-function-site-target-guard — validate tracked FunctionSiteSurvey target safety
@@ -301,6 +302,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "fifty-step-plan-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-dry-run": {
         "dotnet": "",
         "base": "",
@@ -432,6 +437,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "DecodeGeometry": "decode-geometry",
     "BatchExport264": "batch-export-264",
     "ToolsStatus": "tools-status",
+    "FiftyStepPlanStatus": "fifty-step-plan-status",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
     "GhidraFunctionSiteTargetGuard": "ghidra-function-site-target-guard",
@@ -5814,6 +5820,117 @@ def _run_nidatastream_descriptor_base_model_review(args: argparse.Namespace) -> 
     print("NiDataStreamDescriptorBaseModelReview passed: review remains candidate-only/report-only.")
 
 
+def _fifty_step_plan_status_payload() -> dict[str, Any]:
+    """Return the current repo position in the original 50-step discovery plan."""
+    plan_path = REPO_ROOT / "docs" / "discovery-plan-50.md"
+    current_position_path = REPO_ROOT / "docs" / "50-step-plan-current-position.md"
+    safety_boundary_path = REPO_ROOT / "docs" / "live-memory-readonly-safety-boundary.md"
+    step_46_complete = safety_boundary_path.exists()
+    current_step = 47 if step_46_complete else 46
+    current_step_name = (
+        "Implement read-only process memory scanner"
+        if step_46_complete
+        else "Design live memory scan safety boundary"
+    )
+    return {
+        "SchemaVersion": "fifty-step-plan-status/v1",
+        "PlanPath": _display_path(plan_path),
+        "CurrentPositionPath": _display_path(current_position_path),
+        "SafetyBoundaryPath": _display_path(safety_boundary_path),
+        "TotalSteps": 50,
+        "CompletedStepCount": 46 if step_46_complete else 45,
+        "CurrentStageNumber": 5,
+        "CurrentStageName": "Live-Game Safe Read-Only Validation",
+        "CurrentStepNumber": current_step,
+        "CurrentStepName": current_step_name,
+        "CurrentStepStatus": "next" if step_46_complete else "in-progress",
+        "Step46SafetyBoundaryComplete": step_46_complete,
+        "LiveProcessReadExecuted": False,
+        "LiveProcessReadApprovedForThisRun": False,
+        "ParserExportPromotionAllowed": False,
+        "Stages": [
+            {
+                "StageNumber": 0,
+                "Name": "Foundation & Baseline Validation",
+                "StepRange": "1-5",
+                "Status": "complete/superseded",
+                "Evidence": "docs/handoffs/2026-05-20-stage0-baseline.md",
+            },
+            {
+                "StageNumber": 1,
+                "Name": "Safe Geometry Decode",
+                "StepRange": "6-15",
+                "Status": "complete/superseded",
+                "Evidence": "docs/handoffs/2026-05-21-stage1-geometry-decode.md",
+            },
+            {
+                "StageNumber": 2,
+                "Name": "Position Source Discovery",
+                "StepRange": "16-25",
+                "Status": "complete/superseded",
+                "Evidence": "docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md",
+            },
+            {
+                "StageNumber": 3,
+                "Name": "Proof Guard Migration",
+                "StepRange": "26-35",
+                "Status": "complete/superseded",
+                "Evidence": "scripts/rift_workflow_guards.py and Python guard tests",
+            },
+            {
+                "StageNumber": 4,
+                "Name": "Discovery Automation Suite",
+                "StepRange": "36-45",
+                "Status": "complete/superseded",
+                "Evidence": "discovery-suite command and stage 14+ handoffs",
+            },
+            {
+                "StageNumber": 5,
+                "Name": "Live-Game Safe Read-Only Validation",
+                "StepRange": "46-50",
+                "Status": "step-47-next" if step_46_complete else "step-46-in-progress",
+                "Evidence": "docs/live-memory-readonly-safety-boundary.md" if step_46_complete else "",
+            },
+        ],
+        "Blockers": [
+            "live-process-read-not-executed",
+            "step-47-implementation-not-complete",
+            "steps-48-through-50-not-complete",
+        ],
+        "NextAction": (
+            "Implement scan-live-memory behind explicit --experimental-live and dry-run/list modes; "
+            "do not attach to a live process until a separate live-read execution approval is present."
+        )
+        if step_46_complete
+        else "Complete docs/live-memory-readonly-safety-boundary.md before implementing live-read code.",
+    }
+
+
+def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
+    """Print a concise 50-step discovery-plan position summary."""
+    print("--- FiftyStepPlanStatus")
+    print(f"Plan: {status['PlanPath']}")
+    print(f"Completed steps: {status['CompletedStepCount']}/{status['TotalSteps']}")
+    print(f"Current stage: Stage {status['CurrentStageNumber']} - {status['CurrentStageName']}")
+    print(f"Current step: Step {status['CurrentStepNumber']} - {status['CurrentStepName']}")
+    print(f"Current step status: {status['CurrentStepStatus']}")
+    print(f"Step 46 safety boundary complete: {str(status['Step46SafetyBoundaryComplete']).lower()}")
+    print(f"Live process read executed: {str(status['LiveProcessReadExecuted']).lower()}")
+    print("Blockers:")
+    for blocker in status["Blockers"]:
+        print(f"- {blocker}")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_fifty_step_plan_status(args: argparse.Namespace) -> None:
+    """Run the 50-step discovery-plan status command."""
+    status = _fifty_step_plan_status_payload()
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_fifty_step_plan_status(status)
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -5878,6 +5995,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "tools-status":
         show_tools_status(load_tools_config())
+        return
+
+    if command == "fifty-step-plan-status":
+        _run_fifty_step_plan_status(args)
         return
 
     if command == "ghidra-dry-run":
@@ -7309,6 +7430,7 @@ Examples:
   python scripts/rift_workflow.py decode-geometry --id c841eb9a0ed1c95e --mesh-block 6 --experimental-position-source --full
   python scripts/rift_workflow.py triage-fallback-candidates --full
   python scripts/rift_workflow.py tools-status
+  python scripts/rift_workflow.py fifty-step-plan-status --list-json
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
   python scripts/rift_workflow.py ghidra-function-site-target-guard
@@ -7684,6 +7806,7 @@ Examples:
         args.full = True
 
     list_json_commands = {
+        "fifty-step-plan-status",
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
         "nidatastream-evidence-status",
@@ -7699,7 +7822,7 @@ Examples:
     }
     if args.list_json and args.command not in list_json_commands:
         print(
-            "ERROR: --list-json is only supported with ghidra-function-site-survey, "
+            "ERROR: --list-json is only supported with fifty-step-plan-status, ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
             "nidatastream-descriptor-sample-compare, nidatastream-descriptor-table-sample, "
