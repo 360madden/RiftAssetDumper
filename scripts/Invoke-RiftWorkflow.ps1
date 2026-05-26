@@ -49,6 +49,7 @@ $PSModeToKebab = @{
     'ToolsStatus' = 'tools-status'
     'FiftyStepPlanStatus' = 'fifty-step-plan-status'
     'Post50PositionSourceStatus' = 'post50-position-source-status'
+    'Post50Mesh329SourceBindingCompare' = 'post50-mesh329-source-binding-compare'
     'ScanLiveMemory' = 'scan-live-memory'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'

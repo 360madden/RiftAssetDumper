@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-mesh329-source-binding-compare-v1.schema.json",
+  "title": "Post-50 meshSize 329 source-binding compare report v1",
+  "description": "Candidate-only proof report comparing meshSize=329 shared primary @212/#28 evidence with mesh#34 extra @304/#57 position-like evidence. This report must not promote parser, geometry, or export behavior.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "SourceReport",
+    "MeshSize",
+    "PrimaryStream",
+    "ExtraStream",
+    "ComparisonRows",
+    "Aggregate",
+    "ParserExportPromotionAllowed",
+    "Interpretation"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-mesh329-source-binding-compare/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReport": { "$ref": "#/$defs/nonEmptyString" },
+    "MeshSize": { "const": 329 },
+    "PrimaryStream": { "$ref": "#/$defs/streamRef" },
+    "ExtraStream": { "$ref": "#/$defs/streamRef" },
+    "ComparisonRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/comparisonRow" }
+    },
+    "Aggregate": { "$ref": "#/$defs/aggregate" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hex16": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "streamRef": {
+      "type": "object",
+      "required": ["MeshPayloadOffset", "TargetBlockIndex", "Role"],
+      "properties": {
+        "MeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TargetBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Role": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "integerArray": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonNegativeInteger" }
+    },
+    "comparisonRow": {
+      "type": "object",
+      "required": [
+        "Pair",
+        "PairLabel",
+        "Id",
+        "Mesh7AttributeSetCount",
+        "Mesh34AttributeSetCount",
+        "PrimaryStream",
+        "PrimaryPayload",
+        "PrimaryVectorCount",
+        "PrimaryPayloadRemainder",
+        "Mesh34PrimaryPayload",
+        "Mesh34PrimaryVectorCount",
+        "SharedPrimaryStream",
+        "ExtraStream",
+        "ExtraPayload",
+        "ExtraVectorCount",
+        "ExtraPayloadRemainder",
+        "ExtraToPrimaryVectorRatio",
+        "Mesh34NormalStream",
+        "Mesh34NormalPayload",
+        "Mesh34NormalVectorCount",
+        "Mesh34UvStreamCount",
+        "CandidateOnly",
+        "ExportReady",
+        "Decision"
+      ],
+      "properties": {
+        "Pair": { "$ref": "#/$defs/nonEmptyString" },
+        "PairLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "Id": { "$ref": "#/$defs/hex16" },
+        "Mesh7AttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34AttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryStream": { "const": "@212/#28" },
+        "PrimaryPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryVectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryPayloadRemainder": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34PrimaryPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34PrimaryVectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "SharedPrimaryStream": { "type": "boolean" },
+        "ExtraStream": { "const": "@304/#57" },
+        "ExtraPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExtraVectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExtraPayloadRemainder": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExtraToPrimaryVectorRatio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "Mesh34NormalStream": { "const": "@220/#53" },
+        "Mesh34NormalPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34NormalVectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34UvStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "CandidateOnly": { "const": true },
+        "ExportReady": { "const": false },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "ExampleCount",
+        "SharedPrimaryStreamCount",
+        "ExtraStreamCount",
+        "Mesh7CompleteAttributeSetCount",
+        "Mesh34CompleteAttributeSetCount",
+        "Mesh34UvStreamTotal",
+        "PrimaryPayloads",
+        "ExtraPayloads",
+        "Mesh34NormalPayloads",
+        "ExtraPayloadRemainders",
+        "AllPrimarySharedAt212Block28",
+        "AllExtraAt304Block57",
+        "AllMesh7CompleteAttributeSet",
+        "AllMesh34LacksCompleteAttributeSet",
+        "AllMesh34LacksUvStreams",
+        "ParserExportPromotionAllowed",
+        "ExportReady",
+        "Decision",
+        "Blockers",
+        "NextAction"
+      ],
+      "properties": {
+        "ExampleCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "SharedPrimaryStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExtraStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh7CompleteAttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34CompleteAttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34UvStreamTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryPayloads": { "$ref": "#/$defs/integerArray" },
+        "ExtraPayloads": { "$ref": "#/$defs/integerArray" },
+        "Mesh34NormalPayloads": { "$ref": "#/$defs/integerArray" },
+        "ExtraPayloadRemainders": { "$ref": "#/$defs/integerArray" },
+        "AllPrimarySharedAt212Block28": { "type": "boolean" },
+        "AllExtraAt304Block57": { "type": "boolean" },
+        "AllMesh7CompleteAttributeSet": { "type": "boolean" },
+        "AllMesh34LacksCompleteAttributeSet": { "type": "boolean" },
+        "AllMesh34LacksUvStreams": { "type": "boolean" },
+        "ParserExportPromotionAllowed": { "const": false },
+        "ExportReady": { "const": false },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" },
+        "Blockers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "NextAction": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

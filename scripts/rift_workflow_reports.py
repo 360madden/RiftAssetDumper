@@ -4432,6 +4432,339 @@ def position_source_sibling_extra_position_report(probe_specs):
         "position-like stream stayed candidate-only."
     )
 
+
+# ============================================================================
+# Post50Mesh329SourceBindingCompare  (schema-backed post-50 source-binding proof)
+# ============================================================================
+
+
+def _repo_relative_report_path(path: str | Path) -> str:
+    """Return repo-relative report paths when possible."""
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _stream_dicts(raw: object) -> list[dict[str, Any]]:
+    """Return stream dictionaries from a report stream-list field."""
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _find_stream(
+    streams: list[dict[str, Any]],
+    *,
+    mesh_payload_offset: int,
+    target_block_index: int,
+    role: str | None = None,
+) -> dict[str, Any] | None:
+    """Find one stream by mesh payload offset, target block, and optional role."""
+    for stream in streams:
+        if safe_int(stream.get("MeshPayloadOffset")) != mesh_payload_offset:
+            continue
+        if safe_int(stream.get("TargetBlockIndex")) != target_block_index:
+            continue
+        if role is not None and str(stream.get("Role", "")) != role:
+            continue
+        return stream
+    return None
+
+
+def _payload_vector_count(payload: int, stride: int) -> int:
+    """Return the integer vector count implied by payload/stride."""
+    if stride <= 0:
+        return 0
+    return payload // stride
+
+
+def post50_mesh329_source_binding_compare(
+    source_report_path: str | Path,
+    report_dir: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Write a candidate-only compare report for meshSize=329 source-binding evidence.
+
+    The report compares the shared primary position stream `@212/#28` with
+    mesh#34's extra position-like stream `@304/#57` across the current sibling
+    examples emitted by `position-source-sibling-extra-position-report`.
+    """
+    source_path = Path(source_report_path)
+    if not source_path.exists():
+        raise FileNotFoundError(
+            "Post50Mesh329SourceBindingCompare requires "
+            f"{source_path}. Run position-source-sibling-extra-position-report first."
+        )
+
+    source_report = load_json_report(source_path)
+    if not isinstance(source_report, dict):
+        raise ValueError("Post50Mesh329SourceBindingCompare source report is not a JSON object.")
+    if source_report.get("Schema") != "position-source-sibling-extra-position-report/v1":
+        raise ValueError(
+            "Post50Mesh329SourceBindingCompare expected "
+            "position-source-sibling-extra-position-report/v1 source evidence."
+        )
+    if source_report.get("CandidateOnly") is not True:
+        raise ValueError("Post50Mesh329SourceBindingCompare source evidence must be candidate-only.")
+
+    pair_summaries_raw = source_report.get("PairSummaries")
+    probe_rows_raw = source_report.get("ProbeRows")
+    if not isinstance(pair_summaries_raw, list) or not isinstance(probe_rows_raw, list):
+        raise ValueError("Post50Mesh329SourceBindingCompare source report is missing rows.")
+
+    pair_summaries = [row for row in pair_summaries_raw if isinstance(row, dict)]
+    probe_rows = [row for row in probe_rows_raw if isinstance(row, dict)]
+    if not pair_summaries or not probe_rows:
+        raise ValueError("Post50Mesh329SourceBindingCompare source report has no usable rows.")
+
+    summary_by_pair = {str(row.get("Pair", "")): row for row in pair_summaries}
+    rows_by_pair: dict[str, list[dict[str, Any]]] = {}
+    for row in probe_rows:
+        rows_by_pair.setdefault(str(row.get("Pair", "")), []).append(row)
+
+    compare_rows: list[dict[str, Any]] = []
+    for pair_key in sorted(summary_by_pair):
+        pair_rows = rows_by_pair.get(pair_key, [])
+        mesh7_rows = [row for row in pair_rows if safe_int(row.get("MeshBlock")) == 7]
+        mesh34_rows = [row for row in pair_rows if safe_int(row.get("MeshBlock")) == 34]
+        if len(mesh7_rows) != 1 or len(mesh34_rows) != 1:
+            raise ValueError(
+                "Post50Mesh329SourceBindingCompare expected exactly one mesh#7 "
+                f"and one mesh#34 probe row for pair {pair_key}."
+            )
+
+        mesh7 = mesh7_rows[0]
+        mesh34 = mesh34_rows[0]
+        if safe_int(mesh7.get("MeshSize")) != 329 or safe_int(mesh34.get("MeshSize")) != 329:
+            raise ValueError(
+                "Post50Mesh329SourceBindingCompare expected meshSize=329 for "
+                f"pair {pair_key}."
+            )
+
+        mesh7_pos_streams = _stream_dicts(mesh7.get("PositionStreams"))
+        mesh34_pos_streams = _stream_dicts(mesh34.get("PositionStreams"))
+        mesh34_normal_streams = _stream_dicts(mesh34.get("NormalStreams"))
+        mesh34_uv_streams = _stream_dicts(mesh34.get("UvStreams"))
+
+        mesh7_primary = _find_stream(
+            mesh7_pos_streams,
+            mesh_payload_offset=212,
+            target_block_index=28,
+            role="position-float3-ror1-lead",
+        )
+        mesh34_primary = _find_stream(
+            mesh34_pos_streams,
+            mesh_payload_offset=212,
+            target_block_index=28,
+            role="position-float3-ror1-lead",
+        )
+        mesh34_extra = _find_stream(
+            mesh34_pos_streams,
+            mesh_payload_offset=304,
+            target_block_index=57,
+            role="position-float3-ror1-lead",
+        )
+        mesh34_normal = _find_stream(
+            mesh34_normal_streams,
+            mesh_payload_offset=220,
+            target_block_index=53,
+            role="normal-float3-ror1-lead",
+        )
+        if mesh7_primary is None or mesh34_primary is None or mesh34_extra is None or mesh34_normal is None:
+            raise ValueError(
+                "Post50Mesh329SourceBindingCompare source evidence changed for "
+                f"pair {pair_key}; expected @212/#28 primary, @304/#57 extra, "
+                "and mesh#34 @220/#53 normal streams."
+            )
+
+        primary_payload = safe_int(mesh7_primary.get("Payload"))
+        mesh34_primary_payload = safe_int(mesh34_primary.get("Payload"))
+        extra_payload = safe_int(mesh34_extra.get("Payload"))
+        normal_payload = safe_int(mesh34_normal.get("Payload"))
+        primary_vector_count = _payload_vector_count(primary_payload, 12)
+        extra_vector_count = _payload_vector_count(extra_payload, 12)
+        normal_vector_count = _payload_vector_count(normal_payload, 12)
+        primary_shared = primary_payload == mesh34_primary_payload
+        extra_to_primary_ratio = (
+            round(extra_vector_count / primary_vector_count, 4)
+            if primary_vector_count
+            else 0.0
+        )
+
+        compare_rows.append(
+            {
+                "Pair": pair_key,
+                "PairLabel": str(mesh7.get("PairLabel", "")),
+                "Id": str(mesh7.get("Id", "")),
+                "Mesh7AttributeSetCount": safe_int(mesh7.get("AttributeSetCount")),
+                "Mesh34AttributeSetCount": safe_int(mesh34.get("AttributeSetCount")),
+                "PrimaryStream": "@212/#28",
+                "PrimaryPayload": primary_payload,
+                "PrimaryVectorCount": primary_vector_count,
+                "PrimaryPayloadRemainder": primary_payload % 12,
+                "Mesh34PrimaryPayload": mesh34_primary_payload,
+                "Mesh34PrimaryVectorCount": _payload_vector_count(mesh34_primary_payload, 12),
+                "SharedPrimaryStream": primary_shared,
+                "ExtraStream": "@304/#57",
+                "ExtraPayload": extra_payload,
+                "ExtraVectorCount": extra_vector_count,
+                "ExtraPayloadRemainder": extra_payload % 12,
+                "ExtraToPrimaryVectorRatio": extra_to_primary_ratio,
+                "Mesh34NormalStream": "@220/#53",
+                "Mesh34NormalPayload": normal_payload,
+                "Mesh34NormalVectorCount": normal_vector_count,
+                "Mesh34UvStreamCount": len(mesh34_uv_streams),
+                "CandidateOnly": True,
+                "ExportReady": False,
+                "Decision": (
+                    "candidate-only source-binding proof row; mesh#34 shares "
+                    "the primary @212/#28 stream but also carries an extra "
+                    "@304/#57 position-like stream without complete attribute "
+                    "binding or UV evidence"
+                ),
+            }
+        )
+
+    primary_payloads = sorted({safe_int(row["PrimaryPayload"]) for row in compare_rows})
+    extra_payloads = sorted({safe_int(row["ExtraPayload"]) for row in compare_rows})
+    normal_payloads = sorted({safe_int(row["Mesh34NormalPayload"]) for row in compare_rows})
+    extra_remainders = sorted({safe_int(row["ExtraPayloadRemainder"]) for row in compare_rows})
+    blockers = [
+        "mesh329-extra-position-like-stream-candidate-only",
+        "mesh34-missing-complete-attribute-set",
+        "mesh34-uv-stream-missing",
+        "parser-export-promotion-not-allowed",
+    ]
+
+    aggregate = {
+        "ExampleCount": len(compare_rows),
+        "SharedPrimaryStreamCount": sum(1 for row in compare_rows if row["SharedPrimaryStream"] is True),
+        "ExtraStreamCount": len(compare_rows),
+        "Mesh7CompleteAttributeSetCount": sum(
+            1 for row in compare_rows if safe_int(row["Mesh7AttributeSetCount"]) == 1
+        ),
+        "Mesh34CompleteAttributeSetCount": sum(
+            1 for row in compare_rows if safe_int(row["Mesh34AttributeSetCount"]) > 0
+        ),
+        "Mesh34UvStreamTotal": sum(safe_int(row["Mesh34UvStreamCount"]) for row in compare_rows),
+        "PrimaryPayloads": primary_payloads,
+        "ExtraPayloads": extra_payloads,
+        "Mesh34NormalPayloads": normal_payloads,
+        "ExtraPayloadRemainders": extra_remainders,
+        "AllPrimarySharedAt212Block28": all(row["SharedPrimaryStream"] is True for row in compare_rows),
+        "AllExtraAt304Block57": len(compare_rows) == len(pair_summaries),
+        "AllMesh7CompleteAttributeSet": all(
+            safe_int(row["Mesh7AttributeSetCount"]) == 1 for row in compare_rows
+        ),
+        "AllMesh34LacksCompleteAttributeSet": all(
+            safe_int(row["Mesh34AttributeSetCount"]) == 0 for row in compare_rows
+        ),
+        "AllMesh34LacksUvStreams": all(safe_int(row["Mesh34UvStreamCount"]) == 0 for row in compare_rows),
+        "ParserExportPromotionAllowed": False,
+        "ExportReady": False,
+        "Decision": (
+            "meshSize=329 source-binding evidence is repeatable but remains "
+            "candidate-only; @304/#57 is not promoted to geometry truth"
+        ),
+        "Blockers": blockers,
+        "NextAction": (
+            "Use this schema-backed comparison as a checklist input for a "
+            "future guarded parser/export promotion decision; do not consume "
+            "mesh#34 @304/#57 in decode/export code yet."
+        ),
+    }
+
+    out_dir = Path(report_dir) if report_dir is not None else source_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "post50-mesh329-source-binding-compare.json"
+    md_path = out_dir / "post50-mesh329-source-binding-compare.md"
+
+    report = {
+        "SchemaVersion": "post50-mesh329-source-binding-compare/v1",
+        "CandidateOnly": True,
+        "SourceReport": _repo_relative_report_path(source_path),
+        "MeshSize": 329,
+        "PrimaryStream": {
+            "MeshPayloadOffset": 212,
+            "TargetBlockIndex": 28,
+            "Role": "position-float3-ror1-lead",
+        },
+        "ExtraStream": {
+            "MeshPayloadOffset": 304,
+            "TargetBlockIndex": 57,
+            "Role": "position-float3-ror1-lead",
+        },
+        "ComparisonRows": compare_rows,
+        "Aggregate": aggregate,
+        "ParserExportPromotionAllowed": False,
+        "Interpretation": (
+            "Post-50 meshSize=329 source-binding compare report. The shared "
+            "primary stream @212/#28 is repeatable across the sibling examples, "
+            "and mesh#34's @304/#57 position-like stream is repeatable evidence. "
+            "Because mesh#34 still lacks complete attribute-set and UV binding, "
+            "all findings remain candidate-only and cannot drive parser/export behavior."
+        ),
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Post-50 meshSize 329 source-binding compare",
+        "",
+        "Candidate-only comparison of shared primary stream `@212/#28` and "
+        "mesh#34 extra position-like stream `@304/#57` across current sibling examples.",
+        "",
+        f"Source report: `{_repo_relative_report_path(source_path)}`",
+        "",
+        "| ID | Primary @212/#28 vectors | Extra @304/#57 vectors | "
+        "Extra remainder | mesh#34 normal vectors | mesh#34 UV streams | Decision |",
+        "|---|---:|---:|---:|---:|---:|---|",
+    ]
+    for row in compare_rows:
+        md_lines.append(
+            f"| {format_markdown_cell(row['Id'])} "
+            f"| {row['PrimaryVectorCount']} "
+            f"| {row['ExtraVectorCount']} "
+            f"| {row['ExtraPayloadRemainder']} "
+            f"| {row['Mesh34NormalVectorCount']} "
+            f"| {row['Mesh34UvStreamCount']} "
+            f"| {format_markdown_cell(row['Decision'])} |"
+        )
+    md_lines += [
+        "",
+        "## Aggregate",
+        "",
+        f"- Examples: `{aggregate['ExampleCount']}`",
+        f"- Primary payloads: `{', '.join(str(item) for item in primary_payloads)}`",
+        f"- Extra payloads: `{', '.join(str(item) for item in extra_payloads)}`",
+        f"- Mesh#34 normal payloads: `{', '.join(str(item) for item in normal_payloads)}`",
+        f"- Extra payload remainders mod 12: `{', '.join(str(item) for item in extra_remainders)}`",
+        "- Parser/export promotion: `false`",
+        "",
+        "## Blockers",
+        "",
+    ]
+    md_lines.extend(f"- `{blocker}`" for blocker in blockers)
+    md_lines += [
+        "",
+        "Interpretation: repeatable source-binding evidence, not promoted geometry truth.",
+    ]
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    print("\n--- Post50Mesh329SourceBindingCompare candidate-only source-binding compare")
+    print(f"{'Id':<18} {'PrimaryVectors':<15} {'ExtraVectors':<13} {'ExtraRem':<9} {'NormalVectors'}")
+    print("-" * 80)
+    for row in compare_rows:
+        print(
+            f"{row['Id']:<18} {row['PrimaryVectorCount']:<15} "
+            f"{row['ExtraVectorCount']:<13} {row['ExtraPayloadRemainder']:<9} "
+            f"{row['Mesh34NormalVectorCount']}"
+        )
+    print(f"Post50Mesh329SourceBindingCompare JSON: {_repo_relative_report_path(json_path)}")
+    print(f"Post50Mesh329SourceBindingCompare markdown: {_repo_relative_report_path(md_path)}")
+    print("Post50Mesh329SourceBindingCompare passed: findings remain candidate-only.")
+    return json_path, md_path
+
 # ============================================================================
 # ResidualPositionClusterProbeReport  (focused cluster probes)
 # ============================================================================
