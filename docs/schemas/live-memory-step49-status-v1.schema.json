@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/live-memory-step49-status-v1.schema.json",
+  "title": "50-step plan Step 49 live float-cluster scan status",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "Step",
+    "Provider",
+    "ProbeLabel",
+    "ProbeKind",
+    "LiveReadApproved",
+    "LiveReadExecuted",
+    "HitCount",
+    "MaxHitsReached",
+    "ClusterConfirmed",
+    "Step49Complete",
+    "GeneratedReportPolicy",
+    "ParserExportPromotionAllowed",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "live-memory-step49-status/v1" },
+    "CandidateOnly": { "const": true },
+    "Step": { "const": 49 },
+    "Provider": { "const": "RiftReader.Reader" },
+    "ProbeLabel": { "const": "stage5_step49_mesh297_v0_x_float32" },
+    "ProbeKind": { "const": "single-float-probe" },
+    "LiveReadApproved": { "type": "boolean" },
+    "LiveReadExecuted": { "type": "boolean" },
+    "HitCount": { "type": "integer", "minimum": 0 },
+    "MaxHitsReached": { "type": "boolean" },
+    "ClusterConfirmed": { "const": false },
+    "Step49Complete": { "const": false },
+    "GeneratedReportPolicy": { "const": "ignored under Exports/discovery-plan/stage5-live" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

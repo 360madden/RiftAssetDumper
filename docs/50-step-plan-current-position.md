@@ -10,12 +10,13 @@ Current position in that plan:
 
 ```text
 Stage 5 — Live-Game Safe Read-Only Validation
-Current/next step: Step 49 — Scan for position float3 clusters matching mesh bounds
+Current step: Step 49 — Scan for position float3 clusters matching mesh bounds
+Status: in progress; initial RiftReader single-float probe executed, cluster not confirmed
 ```
 
-Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider.
+Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider. Step 49 has candidate-only initial live evidence in `docs/live-memory-step49-status.json`, but it is not complete because the current probe is a noisy single-float search, not a confirmed position float3 cluster.
 
-## Why this is Step 48
+## Why this is Step 49
 
 The repo later completed or superseded the original offline steps through Stage 4:
 
@@ -26,7 +27,7 @@ The repo later completed or superseded the original offline steps through Stage 
 | Stage 2 — Position Source Discovery | 16-25 | Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | Stage 3 — Proof Guard Migration | 26-35 | Complete/superseded | Python guards and workflow tests |
 | Stage 4 — Discovery Automation Suite | 36-45 | Complete/superseded | `discovery-suite` command and Stage 14+ handoffs |
-| Stage 5 — Live Read-Only Validation | 46-50 | Active | Steps 46-48 complete; Step 49 next |
+| Stage 5 — Live Read-Only Validation | 46-50 | Active | Steps 46-48 complete; Step 49 in progress |
 
 ## Active safety boundary
 
@@ -39,14 +40,16 @@ Current boundary:
 - Live process scanner implemented: **true**
 - Step 48 dry-run target manifest ready: **true**
 - Step 48 live pattern found by RiftReader: **true**
+- Step 49 initial single-float probe by RiftReader: **true**
+- Step 49 position float3 cluster confirmed: **false**
 - Parser/export promotion allowed: **false**
 
 ## Next action
 
-Implement Step 49 as a manifest-backed position-cluster scan plan first:
+Continue Step 49 as a candidate-only position-cluster confirmation lane:
 
 1. Derive bounded float3 cluster byte patterns from guarded static decode/bounds evidence.
-2. Put Step 49 targets in a candidate-only manifest before any scan.
-3. Prefer the RiftReader memory scanner/provider for live reads.
+2. Prefer the existing RiftReader memory scanner/provider for live reads.
+3. Treat the existing single-float probe as noise-prone evidence only.
 4. Write any live evidence only under ignored `Exports/discovery-plan/stage5-live/`.
 5. Do not promote parser/export behavior from live evidence without a later guard-backed patch.

@@ -1,14 +1,14 @@
 # 50-Step Autonomous Discovery Plan
 
 **Created:** 2026-05-20
-**Status:** 🟡 Revived tracker — Stage 5 active, Step 49 next
+**Status:** 🟡 Revived tracker — Stage 5 active, Step 49 in progress
 **Game state:** RIFT client at character selection screen (live process available)
 **Conflict rule:** All outputs under ignored `Exports/discovery-plan/` — never touch shared state
 
 > Current position note (2026-05-26): this original 50-step plan was later superseded by
 > `docs/current-status.md` and staged handoffs for offline geometry/export work. Steps 1-45
 > are now treated as complete/superseded by that later evidence. Step 46 is complete via
-> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 live read completed through RiftReader and remains candidate-only.
+> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 live read completed through RiftReader and remains candidate-only. Step 49 has an initial RiftReader single-float probe, but no confirmed float3 cluster yet.
 
 ---
 
@@ -376,10 +376,12 @@
 - **Exit:** Live confirmation or contradiction of static index buffer hypothesis: `docs/live-memory-step48-status.json`
 
 ### Step 49 — Scan for position float3 clusters matching mesh bounds
+- [x] Run initial RiftReader single-float probe for the `meshSize=297 v=128` sample
+- [ ] Convert the noisy single-float hit set into a confirmed multi-float/float3-cluster check
 - [ ] For `meshSize=297 v=128`, scan for 128×float3 clusters
 - [ ] For `meshSize=325 v=24`, scan for 24×float3 clusters
 - [ ] Use known bounding boxes from static decode to filter matches
-- **Exit:** Live position stream confirmation
+- **Exit:** Live position stream confirmation; current candidate-only status: `docs/live-memory-step49-status.json`
 
 ### Step 50 — Final comprehensive session handoff
 - [ ] Write `docs/handoffs/2026-05-20-final-50-step-session.md`
@@ -435,4 +437,4 @@ Stage 5 (steps 46-50) ─── Live-game validation (read-only)
 | 2 — Position Discovery | 16-25 | ✅ Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | 3 — Guard Migration | 26-35 | ✅ Complete/superseded | Python guards/workflow tests |
 | 4 — Automation Suite | 36-45 | ✅ Complete/superseded | `discovery-suite` and Stage 14+ handoffs |
-| 5 — Live Validation | 46-50 | 🟡 Active: Step 49 next | `docs/live-memory-step48-status.json` |
+| 5 — Live Validation | 46-50 | 🟡 Active: Step 49 in progress | `docs/live-memory-step48-status.json`; `docs/live-memory-step49-status.json` |

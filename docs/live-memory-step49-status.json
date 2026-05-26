@@ -1,0 +1,17 @@
+{
+  "SchemaVersion": "live-memory-step49-status/v1",
+  "CandidateOnly": true,
+  "Step": 49,
+  "Provider": "RiftReader.Reader",
+  "ProbeLabel": "stage5_step49_mesh297_v0_x_float32",
+  "ProbeKind": "single-float-probe",
+  "LiveReadApproved": true,
+  "LiveReadExecuted": true,
+  "HitCount": 16,
+  "MaxHitsReached": true,
+  "ClusterConfirmed": false,
+  "Step49Complete": false,
+  "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
+  "ParserExportPromotionAllowed": false,
+  "NextAction": "Derive a multi-float cluster target or add/use a RiftReader byte-pattern process scan before treating Step 49 as confirmed."
+}
