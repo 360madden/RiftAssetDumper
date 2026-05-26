@@ -37,5 +37,5 @@
   "Step49Complete": true,
   "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
   "ParserExportPromotionAllowed": false,
-  "NextAction": "Write the Step 50 final handoff: Step 49 is closed as negative current-live-state evidence, not as a confirmed position stream. Keep parser/export promotion blocked and resume offline position-source discovery before any export behavior change."
+  "NextAction": "Step 50 final handoff is written. Resume offline position-source discovery before any parser/export behavior change; do not repeat broad live scans for the same static triplets until target asset/load evidence and representation are proven."
 }
