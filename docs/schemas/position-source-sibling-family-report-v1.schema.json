@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/position-source-sibling-family-report-v1.schema.json",
+  "title": "Position source sibling family report v1",
+  "description": "Candidate-only report emitted by `position-source-sibling-family-report`. Sibling-family source-binding evidence ranks probe lanes but must not promote parser, geometry, or export truth.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "SourceReport",
+    "Families",
+    "GuardedFamilies",
+    "Interpretation"
+  ],
+  "properties": {
+    "Schema": { "const": "position-source-sibling-family-report/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReport": { "$ref": "#/$defs/nonEmptyString" },
+    "Families": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/family" }
+    },
+    "GuardedFamilies": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/guardedFamily" }
+    },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "family": {
+      "type": "object",
+      "required": [
+        "MeshSize",
+        "MeshBlocks",
+        "MeshPayloadOffsets",
+        "EvidenceGroups",
+        "TotalStreamLinks",
+        "DistinctIds",
+        "TargetBlocks",
+        "PayloadBytes",
+        "RepresentativeIds",
+        "UsageAccess",
+        "Roles",
+        "Decision"
+      ],
+      "properties": {
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshBlocks": { "$ref": "#/$defs/nonEmptyString" },
+        "MeshPayloadOffsets": { "$ref": "#/$defs/nonEmptyString" },
+        "EvidenceGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TotalStreamLinks": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DistinctIds": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TargetBlocks": { "$ref": "#/$defs/nonEmptyString" },
+        "PayloadBytes": { "$ref": "#/$defs/nonEmptyString" },
+        "RepresentativeIds": { "$ref": "#/$defs/nonEmptyString" },
+        "UsageAccess": { "$ref": "#/$defs/nonEmptyString" },
+        "Roles": { "$ref": "#/$defs/nonEmptyString" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "guardedFamily": {
+      "type": "object",
+      "required": [
+        "MeshSize",
+        "MeshBlocks",
+        "MeshPayloadOffsets",
+        "MinimumEvidenceGroups",
+        "ExpectedTargetBlocks"
+      ],
+      "properties": {
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshBlocks": { "$ref": "#/$defs/nonEmptyString" },
+        "MeshPayloadOffsets": { "$ref": "#/$defs/nonEmptyString" },
+        "MinimumEvidenceGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExpectedTargetBlocks": { "$ref": "#/$defs/nonEmptyString" },
+        "ExpectedIdPrefix": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
