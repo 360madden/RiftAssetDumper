@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/position-source-sibling-extra-position-report-v1.schema.json",
+  "title": "Position source sibling extra-position report v1",
+  "description": "Candidate-only report emitted by `python scripts/rift_workflow.py position-source-sibling-extra-position-report`. The mesh#34 @304/#57 position-like stream is discovery evidence only and must not promote parser, geometry, or export truth.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "PairSummaries",
+    "ProbeRows",
+    "Interpretation"
+  ],
+  "properties": {
+    "Schema": { "const": "position-source-sibling-extra-position-report/v1" },
+    "CandidateOnly": { "const": true },
+    "PairSummaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/pairSummary" }
+    },
+    "ProbeRows": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/probeRow" }
+    },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hex16": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "streamSummary": {
+      "type": "object",
+      "required": ["MeshPayloadOffset", "TargetBlockIndex", "Payload", "Role"],
+      "properties": {
+        "MeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TargetBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Role": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "pairSummary": {
+      "type": "object",
+      "required": [
+        "Pair",
+        "PairLabel",
+        "Id",
+        "SharedPrimaryPosition",
+        "Mesh34ExtraPosition",
+        "Mesh7Summary",
+        "Mesh34Summary",
+        "Decision"
+      ],
+      "properties": {
+        "Pair": { "$ref": "#/$defs/nonEmptyString" },
+        "PairLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "Id": { "$ref": "#/$defs/hex16" },
+        "SharedPrimaryPosition": { "$ref": "#/$defs/nonEmptyString" },
+        "Mesh34ExtraPosition": { "$ref": "#/$defs/nonEmptyString" },
+        "Mesh7Summary": { "$ref": "#/$defs/nonEmptyString" },
+        "Mesh34Summary": { "$ref": "#/$defs/nonEmptyString" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "probeRow": {
+      "type": "object",
+      "required": [
+        "Pair",
+        "PairLabel",
+        "Id",
+        "MeshBlock",
+        "MeshSize",
+        "PositionStreams",
+        "NormalStreams",
+        "UvStreams",
+        "SideStreams",
+        "AttributeSetCount",
+        "AttributeSummary",
+        "ProbePath"
+      ],
+      "properties": {
+        "Pair": { "$ref": "#/$defs/nonEmptyString" },
+        "PairLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "Id": { "$ref": "#/$defs/hex16" },
+        "MeshBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionStreams": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/streamSummary" }
+        },
+        "NormalStreams": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/streamSummary" }
+        },
+        "UvStreams": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/streamSummary" }
+        },
+        "SideStreams": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/streamSummary" }
+        },
+        "AttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttributeSummary": { "$ref": "#/$defs/nonEmptyString" },
+        "ProbePath": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

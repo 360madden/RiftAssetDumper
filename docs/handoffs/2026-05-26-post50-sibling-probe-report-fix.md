@@ -51,6 +51,10 @@ post-50 reports. The status payload now surfaces a ranked
 `@304/#57`, keeping it explicitly candidate-only and blocked from parser/export
 promotion.
 
+Added `docs/schemas/position-source-sibling-extra-position-report-v1.schema.json`
+with fixture validation so the extra-position report consumed by post-50 status
+has a tracked shape guard.
+
 ## Known blockers / uncertainty
 
 - The report remains candidate-only. Shared position-stream evidence is a

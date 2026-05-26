@@ -126,6 +126,8 @@ with tempfile.TemporaryDirectory() as tmp:
                         "Id": "0364ea142bc00ce7",
                         "SharedPrimaryPosition": "block#28 payload=576 offsets=@212/@212",
                         "Mesh34ExtraPosition": "@304/#57 payload=240 position-float3-ror1-lead",
+                        "Mesh7Summary": "mesh#7 attr=v=48 p@212/#28 n@220/#29 uv@304/#33",
+                        "Mesh34Summary": "mesh#34 attr=none; pos=@212/#28 | @304/#57",
                         "Decision": "mesh#34 extra @304/#57 position-like stream repeats",
                     },
                     {
@@ -134,15 +136,76 @@ with tempfile.TemporaryDirectory() as tmp:
                         "Id": "04de901531a091ab",
                         "SharedPrimaryPosition": "block#28 payload=444 offsets=@212/@212",
                         "Mesh34ExtraPosition": "@304/#57 payload=280 position-float3-ror1-lead",
+                        "Mesh7Summary": "mesh#7 attr=v=37 p@212/#28 n@220/#29 uv@304/#33",
+                        "Mesh34Summary": "mesh#34 attr=none; pos=@212/#28 | @304/#57",
                         "Decision": "mesh#34 extra @304/#57 position-like stream repeats",
                     },
                 ],
-                "ProbeRows": [],
+                "ProbeRows": [
+                    {
+                        "Pair": "mesh329extra0364",
+                        "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                        "Id": "0364ea142bc00ce7",
+                        "MeshBlock": 7,
+                        "MeshSize": 329,
+                        "PositionStreams": [
+                            {
+                                "MeshPayloadOffset": 212,
+                                "TargetBlockIndex": 28,
+                                "Payload": 576,
+                                "Role": "position-float3-ror1-lead",
+                            }
+                        ],
+                        "NormalStreams": [],
+                        "UvStreams": [],
+                        "SideStreams": [],
+                        "AttributeSetCount": 1,
+                        "AttributeSummary": "v=48 p@212/#28 n@220/#29 uv@304/#33",
+                        "ProbePath": "Exports/probe-nif-mesh-0364ea142bc00ce7-mesh7.json",
+                    },
+                    {
+                        "Pair": "mesh329extra0364",
+                        "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                        "Id": "0364ea142bc00ce7",
+                        "MeshBlock": 34,
+                        "MeshSize": 329,
+                        "PositionStreams": [
+                            {
+                                "MeshPayloadOffset": 212,
+                                "TargetBlockIndex": 28,
+                                "Payload": 576,
+                                "Role": "position-float3-ror1-lead",
+                            },
+                            {
+                                "MeshPayloadOffset": 304,
+                                "TargetBlockIndex": 57,
+                                "Payload": 240,
+                                "Role": "position-float3-ror1-lead",
+                            },
+                        ],
+                        "NormalStreams": [],
+                        "UvStreams": [],
+                        "SideStreams": [],
+                        "AttributeSetCount": 0,
+                        "AttributeSummary": "none",
+                        "ProbePath": "Exports/probe-nif-mesh-0364ea142bc00ce7-mesh34.json",
+                    },
+                ],
                 "Interpretation": "candidate-only",
             }
         ),
         encoding="utf-8",
     )
+    extra_schema = json.loads(
+        Path("docs/schemas/position-source-sibling-extra-position-report-v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    extra_report = json.loads(
+        (out_dir / "position-source-sibling-extra-position-report.json").read_text(encoding="utf-8")
+    )
+    jsonschema.validate(extra_report, extra_schema)
+    print("  PASS: extra-position report schema validation")
     (out_dir / "residual-position-classifier-report.json").write_text(
         json.dumps(
             {
