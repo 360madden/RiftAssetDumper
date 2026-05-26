@@ -18,6 +18,7 @@ from scripts.live_memory_scanner import (
     SCAN_CHUNK_SIZE,
     FixtureProcessReader,
     build_live_memory_scan_plan,
+    load_pattern_specs_from_file,
     parse_hex_pattern,
     parse_hex_patterns,
     scan_process_reader,
@@ -25,6 +26,7 @@ from scripts.live_memory_scanner import (
 
 failed = 0
 schema = json.loads(Path("docs/schemas/live-memory-scan-plan-v1.schema.json").read_text(encoding="utf-8"))
+target_schema = json.loads(Path("docs/schemas/live-memory-scan-targets-v1.schema.json").read_text(encoding="utf-8"))
 
 
 def check(desc: str, actual: object, expected: object) -> None:
@@ -62,6 +64,15 @@ check("pattern label", pattern.label, "twad_magic")
 check("pattern hex", pattern.normalized_hex, "54574144")
 check_raises("pattern requires label", lambda: parse_hex_pattern("54574144"))
 check_raises("duplicate labels rejected", lambda: parse_hex_patterns(["a=00", "a=01"]))
+
+print("=== target manifest ===")
+target_manifest = json.loads(Path("docs/live-memory-scan-targets.json").read_text(encoding="utf-8"))
+jsonschema.validate(target_manifest, target_schema)
+manifest_specs = load_pattern_specs_from_file(Path("docs/live-memory-scan-targets.json"))
+check("manifest target count", len(manifest_specs), 1)
+check("manifest first pattern", manifest_specs[0], "stage5_step48_at264_index_strip_prefix=00010002000200010003000400050006")
+check("manifest candidate-only", target_manifest["CandidateOnly"], True)
+check("manifest live read not executed", target_manifest["LiveReadExecuted"], False)
 
 print("=== dry-run plan schema ===")
 plan = build_live_memory_scan_plan(
@@ -106,13 +117,20 @@ output = StringIO()
 with patch.object(
     sys,
     "argv",
-    ["rift_workflow.py", "scan-live-memory", "--live-pattern", "twad_magic=54574144", "--list-json"],
+    [
+        "rift_workflow.py",
+        "scan-live-memory",
+        "--live-pattern-file",
+        "docs/live-memory-scan-targets.json",
+        "--list-json",
+    ],
 ), redirect_stdout(output):
     rift_workflow.main()
 cli_plan = json.loads(output.getvalue())
 jsonschema.validate(cli_plan, schema)
 check("CLI schema version", cli_plan["SchemaVersion"], "live-memory-scan-plan/v1")
 check("CLI list-json does not execute", cli_plan["LiveProcessReadExecuted"], False)
+check("CLI loaded manifest pattern", cli_plan["Patterns"][0]["Label"], "stage5_step48_at264_index_strip_prefix")
 
 print("=== fixture scan core ===")
 fixture = FixtureProcessReader([(0x1000, (b"A" * (SCAN_CHUNK_SIZE - 2)) + b"\xDE\xAD\xBE\xEF" + b"B" * 16, "fixture")])

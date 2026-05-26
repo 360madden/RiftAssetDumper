@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": "live-memory-scan-targets/v1",
+  "CandidateOnly": true,
+  "LiveReadExecuted": false,
+  "Targets": [
+    {
+      "Label": "stage5_step48_at264_index_strip_prefix",
+      "Step": 48,
+      "Purpose": "Dry-run target for the @264/#15 UInt16BE degenerate-bridge index strip prefix from the original 50-step plan.",
+      "Hex": "00010002000200010003000400050006",
+      "ByteLength": 16,
+      "SourceEvidence": [
+        "docs/discovery-plan-50.md Step 48",
+        "docs/current-status.md @264/#15 raw-zero-based degenerate-bridge strip evidence",
+        "docs/live-memory-readonly-safety-boundary.md"
+      ],
+      "PromotionStatus": "candidate-only",
+      "RecommendedDryRunCommand": "python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json"
+    }
+  ]
+}

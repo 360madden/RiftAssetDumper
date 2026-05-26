@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/live-memory-scan-targets-v1.schema.json",
+  "title": "Live memory scan target manifest",
+  "type": "object",
+  "required": ["SchemaVersion", "CandidateOnly", "LiveReadExecuted", "Targets"],
+  "properties": {
+    "SchemaVersion": { "const": "live-memory-scan-targets/v1" },
+    "CandidateOnly": { "const": true },
+    "LiveReadExecuted": { "const": false },
+    "Targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/target" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "target": {
+      "type": "object",
+      "required": [
+        "Label",
+        "Step",
+        "Purpose",
+        "Hex",
+        "ByteLength",
+        "SourceEvidence",
+        "PromotionStatus",
+        "RecommendedDryRunCommand"
+      ],
+      "properties": {
+        "Label": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,80}$" },
+        "Step": { "type": "integer", "minimum": 48, "maximum": 50 },
+        "Purpose": { "type": "string", "minLength": 1 },
+        "Hex": { "type": "string", "pattern": "^[0-9A-F]+$" },
+        "ByteLength": { "type": "integer", "minimum": 1 },
+        "SourceEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "PromotionStatus": { "const": "candidate-only" },
+        "RecommendedDryRunCommand": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

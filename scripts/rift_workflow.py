@@ -5853,18 +5853,22 @@ def _run_scan_live_memory(args: argparse.Namespace) -> None:
     """Plan or execute a gated read-only live memory scan."""
     from scripts.live_memory_scanner import (
         build_live_memory_scan_plan,
+        load_pattern_specs_from_file,
         parse_hex_patterns,
         run_windows_live_scan,
         write_live_scan_reports,
     )
 
     try:
+        pattern_specs = list(args.live_pattern)
+        if args.live_pattern_file:
+            pattern_specs.extend(load_pattern_specs_from_file(Path(args.live_pattern_file)))
         plan = build_live_memory_scan_plan(
             repo_root=REPO_ROOT,
             out=args.out,
             process_name=args.process_name,
             pid=args.pid,
-            pattern_specs=args.live_pattern,
+            pattern_specs=pattern_specs,
             execute_live_read=args.execute_live_read,
             experimental_live=args.experimental_live,
             confirm_live_read=args.confirm_live_read,
@@ -5890,7 +5894,7 @@ def _run_scan_live_memory(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     generated_output_guard()
-    patterns = parse_hex_patterns(args.live_pattern)
+    patterns = parse_hex_patterns(pattern_specs)
     try:
         result = run_windows_live_scan(plan, patterns)
     except Exception as exc:  # noqa: BLE001 - live gate reports exact runtime failure
@@ -5908,8 +5912,10 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
     safety_boundary_path = REPO_ROOT / "docs" / "live-memory-readonly-safety-boundary.md"
     scanner_path = REPO_ROOT / "scripts" / "live_memory_scanner.py"
     scanner_schema_path = REPO_ROOT / "docs" / "schemas" / "live-memory-scan-plan-v1.schema.json"
+    step48_targets_path = REPO_ROOT / "docs" / "live-memory-scan-targets.json"
     step_46_complete = safety_boundary_path.exists()
     step_47_complete = scanner_path.exists() and scanner_schema_path.exists() and "scan-live-memory" in COMMAND_MAP
+    step_48_manifest_ready = step48_targets_path.exists()
     current_step = 46
     current_step_name = "Design live memory scan safety boundary"
     completed_step_count = 45
@@ -5928,15 +5934,17 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         "SafetyBoundaryPath": _display_path(safety_boundary_path),
         "ScannerPath": _display_path(scanner_path),
         "LiveScanSchemaPath": _display_path(scanner_schema_path),
+        "Step48TargetsPath": _display_path(step48_targets_path),
         "TotalSteps": 50,
         "CompletedStepCount": completed_step_count,
         "CurrentStageNumber": 5,
         "CurrentStageName": "Live-Game Safe Read-Only Validation",
         "CurrentStepNumber": current_step,
         "CurrentStepName": current_step_name,
-        "CurrentStepStatus": "next" if step_46_complete else "in-progress",
+        "CurrentStepStatus": "in-progress" if step_48_manifest_ready else "next" if step_46_complete else "in-progress",
         "Step46SafetyBoundaryComplete": step_46_complete,
         "Step47ScannerImplemented": step_47_complete,
+        "Step48DryRunManifestReady": step_48_manifest_ready,
         "LiveProcessReadExecuted": False,
         "LiveProcessReadApprovedForThisRun": False,
         "ParserExportPromotionAllowed": False,
@@ -5980,9 +5988,20 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 "StageNumber": 5,
                 "Name": "Live-Game Safe Read-Only Validation",
                 "StepRange": "46-50",
-                "Status": "step-48-next" if step_47_complete else "step-47-next" if step_46_complete else "step-46-in-progress",
+                "Status": (
+                    "step-48-in-progress"
+                    if step_48_manifest_ready
+                    else "step-48-next"
+                    if step_47_complete
+                    else "step-47-next"
+                    if step_46_complete
+                    else "step-46-in-progress"
+                ),
                 "Evidence": (
-                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py"
+                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    "docs/live-memory-scan-targets.json"
+                    if step_48_manifest_ready
+                    else "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py"
                     if step_47_complete
                     else "docs/live-memory-readonly-safety-boundary.md"
                     if step_46_complete
@@ -6017,6 +6036,7 @@ def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
     print(f"Current step status: {status['CurrentStepStatus']}")
     print(f"Step 46 safety boundary complete: {str(status['Step46SafetyBoundaryComplete']).lower()}")
     print(f"Step 47 scanner implemented: {str(status['Step47ScannerImplemented']).lower()}")
+    print(f"Step 48 dry-run manifest ready: {str(status['Step48DryRunManifestReady']).lower()}")
     print(f"Live process read executed: {str(status['LiveProcessReadExecuted']).lower()}")
     print("Blockers:")
     for blocker in status["Blockers"]:
@@ -7537,7 +7557,7 @@ Examples:
   python scripts/rift_workflow.py triage-fallback-candidates --full
   python scripts/rift_workflow.py tools-status
   python scripts/rift_workflow.py fifty-step-plan-status --list-json
-  python scripts/rift_workflow.py scan-live-memory --live-pattern twad_magic=54574144 --list-json
+  python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json
   python scripts/rift_workflow.py ghidra-dry-run
   python scripts/rift_workflow.py ghidra-run --ghidra-process rift_x64.exe --ghidra-no-analysis --ghidra-keep-project
   python scripts/rift_workflow.py ghidra-function-site-target-guard
@@ -7705,6 +7725,11 @@ Examples:
         action="append",
         default=[],
         help="Exact live-memory scan pattern as label=hex; repeatable (scan-live-memory)",
+    )
+    parser.add_argument(
+        "--live-pattern-file",
+        default="",
+        help="Candidate-only JSON target manifest containing live-memory scan patterns",
     )
     parser.add_argument(
         "--process-name",

@@ -122,6 +122,32 @@ def parse_hex_patterns(specs: Iterable[str]) -> list[HexPattern]:
     return patterns
 
 
+def load_pattern_specs_from_file(path: Path) -> list[str]:
+    """Load ``label=hex`` specs from a tracked candidate-only target manifest."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("SchemaVersion") != "live-memory-scan-targets/v1":
+        raise ValueError("live pattern manifest must use SchemaVersion live-memory-scan-targets/v1")
+    if data.get("CandidateOnly") is not True:
+        raise ValueError("live pattern manifest must be CandidateOnly=true")
+    targets = data.get("Targets")
+    if not isinstance(targets, list) or not targets:
+        raise ValueError("live pattern manifest must contain at least one target")
+    specs: list[str] = []
+    for index, target in enumerate(targets):
+        if not isinstance(target, dict):
+            raise ValueError(f"target {index} must be an object")
+        label = target.get("Label")
+        hex_text = target.get("Hex")
+        byte_length = target.get("ByteLength")
+        if not isinstance(label, str) or not isinstance(hex_text, str):
+            raise ValueError(f"target {index} requires string Label and Hex")
+        pattern = parse_hex_pattern(f"{label}={hex_text}")
+        if byte_length is not None and byte_length != len(pattern.data):
+            raise ValueError(f"target {label!r} ByteLength does not match Hex")
+        specs.append(f"{pattern.label}={pattern.normalized_hex}")
+    return specs
+
+
 def _positive_limit(name: str, value: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be positive")
