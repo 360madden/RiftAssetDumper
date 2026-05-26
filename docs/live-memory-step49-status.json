@@ -17,9 +17,15 @@
   "BoundedTripletProbeRegionSize": 8192,
   "BoundedTripletPositiveControlHitCount": 2,
   "BoundedExpectedStaticV0HitCount": 0,
+  "BoundedExpectedStaticBatchExecuted": true,
+  "BoundedExpectedStaticBatchRegionCount": 4,
+  "BoundedExpectedStaticBatchVertexCount": 4,
+  "BoundedExpectedStaticBatchScanCount": 16,
+  "BoundedExpectedStaticBatchTimedOutCount": 0,
+  "BoundedExpectedStaticBatchHitCount": 0,
   "ClusterConfirmed": false,
   "Step49Complete": false,
   "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
   "ParserExportPromotionAllowed": false,
-  "NextAction": "Run additional bounded RiftReader --scan-float-triplet probes across candidate regions/static samples; Step 49 is not confirmed until expected static float3 samples share one live stream."
+  "NextAction": "No expected static mesh297 v0-v3 triplets matched the first four bounded single-float hit regions; derive better region seeds for bounded RiftReader --scan-float-triplet probes or confirm whether the target asset is loaded before treating Step 49 as confirmed."
 }

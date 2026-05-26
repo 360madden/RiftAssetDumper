@@ -56,6 +56,11 @@ check(
 check("step 49 bounded triplet probe executed", step49_status["BoundedTripletProbeExecuted"], True)
 check("step 49 bounded positive control hits", step49_status["BoundedTripletPositiveControlHitCount"], 2)
 check("step 49 bounded expected static v0 hits", step49_status["BoundedExpectedStaticV0HitCount"], 0)
+check("step 49 bounded expected batch executed", step49_status["BoundedExpectedStaticBatchExecuted"], True)
+check("step 49 bounded expected batch regions", step49_status["BoundedExpectedStaticBatchRegionCount"], 4)
+check("step 49 bounded expected batch vertices", step49_status["BoundedExpectedStaticBatchVertexCount"], 4)
+check("step 49 bounded expected batch scans", step49_status["BoundedExpectedStaticBatchScanCount"], 16)
+check("step 49 bounded expected batch hits", step49_status["BoundedExpectedStaticBatchHitCount"], 0)
 output = StringIO()
 with patch.object(sys, "argv", ["rift_workflow.py", "fifty-step-plan-status", "--list-json"]), redirect_stdout(output):
     rift_workflow.main()

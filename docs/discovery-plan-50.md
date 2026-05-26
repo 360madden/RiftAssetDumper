@@ -379,6 +379,7 @@
 - [x] Run initial RiftReader single-float probe for the `meshSize=297 v=128` sample
 - [x] Expose bounded RiftReader `--scan-float-triplet <x,y,z>` command for candidate float3 probes
 - [x] Run first bounded triplet positive-control/expected-static-v0 probe; positive control found 2 hits, expected static `v0` found 0 in that region
+- [x] Run bounded expected-static batch for `v0-v3` across four single-float hit regions; 16 scans completed with 0 expected-static hits
 - [ ] Convert the noisy single-float hit set into a confirmed multi-float/float3-cluster check
 - [ ] For `meshSize=297 v=128`, scan for 128×float3 clusters
 - [ ] For `meshSize=325 v=24`, scan for 24×float3 clusters

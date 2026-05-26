@@ -14,7 +14,7 @@ Current step: Step 49 — Scan for position float3 clusters matching mesh bounds
 Status: in progress; initial RiftReader single-float probe executed, cluster not confirmed
 ```
 
-Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider. Step 49 has candidate-only live evidence in `docs/live-memory-step49-status.json`, but it is not complete because the static mesh `v0` triplet did not match the first bounded live candidate region. RiftReader now exposes a bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command for focused triplet/cluster probes.
+Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider. Step 49 has candidate-only live evidence in `docs/live-memory-step49-status.json`, but it is not complete because static mesh `v0-v3` triplets did not match the first four bounded live candidate regions. RiftReader now exposes a bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command for focused triplet/cluster probes.
 
 ## Why this is Step 49
 
@@ -43,6 +43,7 @@ Current boundary:
 - Step 49 initial single-float probe by RiftReader: **true**
 - Step 49 bounded float-triplet positive-control hits: **2**
 - Step 49 expected static `v0` hits in that bounded region: **0**
+- Step 49 expected static `v0-v3` hits across four bounded regions: **0**
 - Step 49 position float3 cluster confirmed: **false**
 - Parser/export promotion allowed: **false**
 
