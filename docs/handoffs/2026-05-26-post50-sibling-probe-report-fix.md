@@ -55,6 +55,10 @@ Added `docs/schemas/position-source-sibling-extra-position-report-v1.schema.json
 with fixture validation so the extra-position report consumed by post-50 status
 has a tracked shape guard.
 
+Documented `docs/post50-source-binding-extra-position-checklist.md` so the
+meshSize `329` mesh `#34` `@304/#57` lane has explicit candidate-only
+promotion gates and non-goals before any parser/export work.
+
 ## Known blockers / uncertainty
 
 - The report remains candidate-only. Shared position-stream evidence is a
@@ -67,7 +71,7 @@ has a tracked shape guard.
 
 1. Use the repaired/schema-validated report to keep the post-50 source-binding lane focused on
    meshSize `329` stream `@212`.
-2. Build a narrow classification/checklist for meshSize `329` mesh `#34`
-   extra `@304/#57` before any parser/export behavior changes.
+2. Build the focused, ignored byte-level comparison report requested by
+   `docs/post50-source-binding-extra-position-checklist.md`.
 3. Keep residual payload `288` evidence separate from sibling source-binding
    reports until a strict parser/export promotion gate exists.
