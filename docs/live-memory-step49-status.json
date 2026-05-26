@@ -23,9 +23,19 @@
   "BoundedExpectedStaticBatchScanCount": 16,
   "BoundedExpectedStaticBatchTimedOutCount": 0,
   "BoundedExpectedStaticBatchHitCount": 0,
+  "FullProcessExpectedStaticBatchExecuted": true,
+  "FullProcessExpectedStaticBatchVertexCount": 4,
+  "FullProcessExpectedStaticBatchScanCount": 4,
+  "FullProcessExpectedStaticBatchHitCount": 0,
+  "FullProcessExpectedStaticBatchTolerance": 0.001,
+  "FullProcessExpectedStaticBatchMaxHits": 16,
+  "LivePlayerCurrentReadValidated": true,
+  "TargetAssetLoadEvidence": "not-established",
+  "Step49ClosureMode": "closed-negative-current-live-state",
+  "Step49ClosureDecision": "Closed as candidate-only negative evidence for the current live state: RiftReader validated live player memory access, but mesh297 v0-v3 expected static position triplets produced 0 hits in both bounded candidate regions and a full-process triplet batch.",
   "ClusterConfirmed": false,
-  "Step49Complete": false,
+  "Step49Complete": true,
   "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
   "ParserExportPromotionAllowed": false,
-  "NextAction": "No expected static mesh297 v0-v3 triplets matched the first four bounded single-float hit regions; derive better region seeds for bounded RiftReader --scan-float-triplet probes or confirm whether the target asset is loaded before treating Step 49 as confirmed."
+  "NextAction": "Write the Step 50 final handoff: Step 49 is closed as negative current-live-state evidence, not as a confirmed position stream. Keep parser/export promotion blocked and resume offline position-source discovery before any export behavior change."
 }

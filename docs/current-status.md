@@ -2,6 +2,14 @@
 Date: 2026-06-07 (updated 2026-06-07)
 Date: 2026-06-03 (updated 2026-05-22)
 
+## 2026-05-26 — 50-step live-validation closure
+
+| Area | Status | Notes |
+|---|---|---|
+| 50-step discovery plan | ✅ complete as a documented discovery cycle | `docs/50-step-plan-current-position.md` now reports Step 50/50 complete with final handoff `docs/handoffs/2026-05-26-final-50-step-session.md`. |
+| Step 49 live position-cluster check | ⚠️ closed negative for current live state | RiftReader live memory access was validated, but expected static `mesh297 v0-v3` triplets produced 0 hits in bounded candidate regions and 0 hits in a full-process triplet batch. |
+| Parser/export promotion | 🚫 blocked | The live evidence did not confirm a position stream and must not drive decoder/export behavior changes. |
+
 ## 🐍 Python migration status (PS→Py phase 1)
 
 | Component | Status | Notes |

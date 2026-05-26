@@ -5915,6 +5915,8 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
     step48_targets_path = REPO_ROOT / "docs" / "live-memory-scan-targets.json"
     step48_status_path = REPO_ROOT / "docs" / "live-memory-step48-status.json"
     step49_status_path = REPO_ROOT / "docs" / "live-memory-step49-status.json"
+    step50_handoff_paths = sorted((REPO_ROOT / "docs" / "handoffs").glob("*final-50-step-session.md"))
+    step50_handoff_path = step50_handoff_paths[-1] if step50_handoff_paths else None
     step_46_complete = safety_boundary_path.exists()
     step_47_complete = scanner_path.exists() and scanner_schema_path.exists() and "scan-live-memory" in COMMAND_MAP
     step_48_manifest_ready = step48_targets_path.exists()
@@ -5944,10 +5946,18 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         step_49_initial_probe_executed
         and step_49_status.get("ClusterConfirmed") is True
     )
+    step_49_closure_mode = str(step_49_status.get("Step49ClosureMode", ""))
+    step_49_closed_negative = (
+        step_49_initial_probe_executed
+        and step_49_status.get("Step49Complete") is True
+        and step_49_status.get("ParserExportPromotionAllowed") is False
+        and step_49_closure_mode == "closed-negative-current-live-state"
+    )
     step_49_complete = (
-        step_49_cluster_confirmed
+        (step_49_cluster_confirmed or step_49_closed_negative)
         and step_49_status.get("Step49Complete") is True
     )
+    step_50_final_handoff_complete = step50_handoff_path is not None
     current_step = 46
     current_step_name = "Design live memory scan safety boundary"
     completed_step_count = 45
@@ -5967,8 +5977,14 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         current_step = 50
         current_step_name = "Final comprehensive session handoff"
         completed_step_count = 49
+    if step_50_final_handoff_complete and step_49_complete:
+        current_step = 50
+        current_step_name = "Final comprehensive session handoff"
+        completed_step_count = 50
     current_step_status = (
         "complete"
+        if step_50_final_handoff_complete and step_49_complete
+        else "next"
         if step_49_complete
         else "in-progress"
         if step_49_initial_probe_executed
@@ -6005,8 +6021,22 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         "Step48Provider": step_48_status.get("Provider", "") if step_48_live_read_executed else "",
         "Step49InitialProbeExecuted": step_49_initial_probe_executed,
         "Step49ClusterConfirmed": step_49_cluster_confirmed,
+        "Step49ClosureMode": step_49_closure_mode if step_49_initial_probe_executed else "",
+        "Step49ClosedWithoutClusterConfirmation": step_49_closed_negative and not step_49_cluster_confirmed,
+        "Step49FullProcessExpectedStaticBatchExecuted": (
+            step_49_status.get("FullProcessExpectedStaticBatchExecuted") is True
+        )
+        if step_49_initial_probe_executed
+        else False,
+        "Step49FullProcessExpectedStaticBatchHitCount": (
+            step_49_status.get("FullProcessExpectedStaticBatchHitCount")
+        )
+        if step_49_initial_probe_executed
+        else None,
         "Step49Complete": step_49_complete,
         "Step49Provider": step_49_status.get("Provider", "") if step_49_initial_probe_executed else "",
+        "Step50FinalHandoffPath": _display_path(step50_handoff_path) if step50_handoff_path else "",
+        "Step50FinalHandoffComplete": step_50_final_handoff_complete and step_49_complete,
         "LiveProcessReadExecuted": step_48_live_read_executed,
         "LiveProcessReadApprovedForThisRun": bool(step_48_status.get("LiveReadApproved")) if step_48_live_read_executed else False,
         "ParserExportPromotionAllowed": False,
@@ -6051,7 +6081,9 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 "Name": "Live-Game Safe Read-Only Validation",
                 "StepRange": "46-50",
                 "Status": (
-                    "step-50-next"
+                    "complete"
+                    if step_50_final_handoff_complete and step_49_complete
+                    else "step-50-next"
                     if step_49_complete
                     else "step-49-in-progress"
                     if step_49_initial_probe_executed
@@ -6067,6 +6099,12 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                     else "step-46-in-progress"
                 ),
                 "Evidence": (
+                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    "docs/live-memory-scan-targets.json; docs/live-memory-step48-status.json; "
+                    "docs/live-memory-step49-status.json; "
+                    f"{_display_path(step50_handoff_path)}"
+                    if step_50_final_handoff_complete and step_49_complete
+                    else
                     "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
                     "docs/live-memory-scan-targets.json; docs/live-memory-step48-status.json; "
                     "docs/live-memory-step49-status.json"
@@ -6089,14 +6127,24 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         ],
         "Blockers": (
             [
-                "step-49-position-float3-cluster-not-confirmed",
-                "step-50-final-handoff-not-complete",
+                "parser-export-promotion-not-allowed-step-49-negative-evidence",
             ]
-            if step_49_initial_probe_executed and not step_49_complete
+            if step_50_final_handoff_complete and step_49_closed_negative
+            else [
+                "step-50-final-handoff-not-complete",
+                "parser-export-promotion-not-allowed-step-49-negative-evidence",
+            ]
+            if step_49_closed_negative
             else [
                 "step-50-final-handoff-not-complete",
             ]
             if step_49_complete
+            else
+            [
+                "step-49-position-float3-cluster-not-confirmed",
+                "step-50-final-handoff-not-complete",
+            ]
+            if step_49_initial_probe_executed and not step_49_complete
             else
             [
                 "step-49-position-float3-cluster-scan-not-executed",
@@ -6110,6 +6158,13 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
             ]
         ),
         "NextAction": (
+            "Resume offline position-source discovery before any parser/export behavior change; "
+            "Step 49 closed negative for the current live state and the final 50-step handoff is complete."
+            if step_50_final_handoff_complete and step_49_closed_negative
+            else "Write the Step 50 final comprehensive handoff; keep Step 49 negative evidence candidate-only "
+            "and parser/export promotion blocked."
+            if step_49_closed_negative
+            else
             step_49_status.get("NextAction", "")
             if step_49_initial_probe_executed and step_49_status.get("NextAction")
             else "Write the Step 50 final comprehensive handoff after Step 49 is cluster-confirmed."
@@ -6144,8 +6199,21 @@ def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
         print(f"Step 48 provider: {status['Step48Provider']}")
     print(f"Step 49 initial probe executed: {str(status['Step49InitialProbeExecuted']).lower()}")
     print(f"Step 49 cluster confirmed: {str(status['Step49ClusterConfirmed']).lower()}")
+    if status["Step49ClosureMode"]:
+        print(f"Step 49 closure mode: {status['Step49ClosureMode']}")
+        print(
+            "Step 49 closed without cluster confirmation: "
+            f"{str(status['Step49ClosedWithoutClusterConfirmation']).lower()}"
+        )
+    print(
+        "Step 49 full-process expected-static hits: "
+        f"{status['Step49FullProcessExpectedStaticBatchHitCount']}"
+    )
     if status["Step49Provider"]:
         print(f"Step 49 provider: {status['Step49Provider']}")
+    print(f"Step 50 final handoff complete: {str(status['Step50FinalHandoffComplete']).lower()}")
+    if status["Step50FinalHandoffPath"]:
+        print(f"Step 50 final handoff: {status['Step50FinalHandoffPath']}")
     print(f"Live process read executed: {str(status['LiveProcessReadExecuted']).lower()}")
     print("Blockers:")
     for blocker in status["Blockers"]:

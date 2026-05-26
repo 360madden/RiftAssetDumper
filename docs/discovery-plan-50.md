@@ -380,18 +380,20 @@
 - [x] Expose bounded RiftReader `--scan-float-triplet <x,y,z>` command for candidate float3 probes
 - [x] Run first bounded triplet positive-control/expected-static-v0 probe; positive control found 2 hits, expected static `v0` found 0 in that region
 - [x] Run bounded expected-static batch for `v0-v3` across four single-float hit regions; 16 scans completed with 0 expected-static hits
-- [ ] Convert the noisy single-float hit set into a confirmed multi-float/float3-cluster check
+- [x] Run full-process expected-static batch for `v0-v3`; 4 scans completed with 0 expected-static hits
+- [x] Close Step 49 as `closed-negative-current-live-state`; cluster not confirmed and parser/export promotion remains blocked
+- [ ] Convert the noisy single-float hit set into a confirmed multi-float/float3-cluster check (not achieved; superseded by negative closure for the current live state)
 - [ ] For `meshSize=297 v=128`, scan for 128×float3 clusters
 - [ ] For `meshSize=325 v=24`, scan for 24×float3 clusters
 - [ ] Use known bounding boxes from static decode to filter matches
-- **Exit:** Live position stream confirmation; current candidate-only status: `docs/live-memory-step49-status.json`
+- **Exit:** Candidate-only live validation closure; current status: `docs/live-memory-step49-status.json`. The current session did **not** confirm a live position stream.
 
 ### Step 50 — Final comprehensive session handoff
-- [ ] Write `docs/handoffs/2026-05-20-final-50-step-session.md`
-- [ ] Aggregate all stage results
-- [ ] Update `docs/current-status.md`
+- [x] Write `docs/handoffs/2026-05-26-final-50-step-session.md`
+- [x] Aggregate all stage results
+- [x] Update `docs/current-status.md`
 - [ ] Commit: "Complete: 50-step autonomous discovery plan — all stages"
-- **Exit:** Final clean commit, full documentation
+- **Exit:** Final clean commit, full documentation; parser/export promotion remains blocked by Step 49 negative evidence.
 
 ---
 
@@ -440,4 +442,4 @@ Stage 5 (steps 46-50) ─── Live-game validation (read-only)
 | 2 — Position Discovery | 16-25 | ✅ Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | 3 — Guard Migration | 26-35 | ✅ Complete/superseded | Python guards/workflow tests |
 | 4 — Automation Suite | 36-45 | ✅ Complete/superseded | `discovery-suite` and Stage 14+ handoffs |
-| 5 — Live Validation | 46-50 | 🟡 Active: Step 49 in progress | `docs/live-memory-step48-status.json`; `docs/live-memory-step49-status.json` |
+| 5 — Live Validation | 46-50 | ✅ Complete: Step 49 closed negative, Step 50 handoff written | `docs/live-memory-step48-status.json`; `docs/live-memory-step49-status.json`; `docs/handoffs/2026-05-26-final-50-step-session.md` |
