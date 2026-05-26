@@ -291,6 +291,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
     check("report status count", len(status["ReportStatuses"]), 8)
+    check(
+        "schema-backed report statuses",
+        {report_status["EvidenceLevel"] for report_status in status["ReportStatuses"]},
+        {"schema-backed-candidate"},
+    )
     check("recommended lane", status["RecommendedLane"], "source-binding-family")
     check("lane count", len(status["CandidateLanes"]), 4)
     check("top lane mesh", status["CandidateLanes"][0]["MeshSize"], 329)
@@ -321,6 +326,11 @@ with tempfile.TemporaryDirectory() as tmp:
     jsonschema.validate(missing_status, schema)
     print("  PASS: missing-report status schema validation")
     check("missing report lanes", missing_status["CandidateLanes"], [])
+    check(
+        "missing report evidence levels",
+        {report_status["EvidenceLevel"] for report_status in missing_status["ReportStatuses"]},
+        {"missing-or-unreadable"},
+    )
     check_contains("missing report blocker", "\n".join(missing_status["Blockers"]), "missing-or-unreadable-report")
 
 print(f"\n{'=' * 50}")

@@ -41,7 +41,7 @@
   "$defs": {
     "reportStatus": {
       "type": "object",
-      "required": ["Key", "Path", "Exists", "Bytes", "MtimeUtc", "Schema", "CandidateOnly", "ParseError"],
+      "required": ["Key", "Path", "Exists", "Bytes", "MtimeUtc", "Schema", "CandidateOnly", "ParseError", "EvidenceLevel"],
       "properties": {
         "Key": { "type": "string", "minLength": 1 },
         "Path": { "type": "string", "minLength": 1 },
@@ -50,7 +50,10 @@
         "MtimeUtc": { "type": "string" },
         "Schema": { "type": "string" },
         "CandidateOnly": { "type": ["boolean", "null"] },
-        "ParseError": { "type": "string" }
+        "ParseError": { "type": "string" },
+        "EvidenceLevel": {
+          "enum": ["schema-backed-candidate", "raw-candidate", "missing-or-unreadable"]
+        }
       },
       "additionalProperties": false
     },

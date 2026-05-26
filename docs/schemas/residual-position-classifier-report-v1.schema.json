@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/residual-position-classifier-report-v1.schema.json",
+  "title": "Residual position classifier report v1",
+  "description": "Candidate-only strict-classifier miss report for residual meshSize=305 stream@188 POSITION evidence. Strict-pass and parser/export promotion remain blocked.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "Target",
+    "SourceReport",
+    "StrictClassifierRole",
+    "StrictClassifierThresholds",
+    "Summary",
+    "Rows",
+    "CandidateGuardRows",
+    "Interpretation"
+  ],
+  "properties": {
+    "Schema": { "const": "residual-position-classifier-report/v1" },
+    "CandidateOnly": { "const": true },
+    "Target": { "$ref": "#/$defs/nonEmptyString" },
+    "SourceReport": { "$ref": "#/$defs/nonEmptyString" },
+    "StrictClassifierRole": { "const": "position-float3-ror1-lead" },
+    "StrictClassifierThresholds": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "Summary": { "$ref": "#/$defs/summary" },
+    "Rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "CandidateGuardRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "ratio": { "type": ["number", "null"], "minimum": 0 },
+    "summary": {
+      "type": "object",
+      "required": [
+        "TargetRows",
+        "StrictPassRows",
+        "CandidateGuardRows",
+        "MinCandidatePlausible",
+        "MaxCandidatePlausible"
+      ],
+      "properties": {
+        "TargetRows": { "$ref": "#/$defs/nonNegativeInteger" },
+        "StrictPassRows": { "const": 0 },
+        "CandidateGuardRows": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MinCandidatePlausible": { "$ref": "#/$defs/ratio" },
+        "MaxCandidatePlausible": { "$ref": "#/$defs/ratio" }
+      },
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "required": [
+        "MeshSize",
+        "Stream",
+        "Payload",
+        "Count",
+        "SampleCount",
+        "ArchiveCount",
+        "SampleMeshes",
+        "SampleIds",
+        "VectorCount",
+        "Finite",
+        "Plausible",
+        "NonZero",
+        "Extent",
+        "StrictPass",
+        "MaxPlausibleThresholdForSample",
+        "MissReasons"
+      ],
+      "properties": {
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Stream": { "$ref": "#/$defs/nonEmptyString" },
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Count": { "$ref": "#/$defs/nonNegativeInteger" },
+        "SampleCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ArchiveCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "SampleMeshes": { "type": "string" },
+        "SampleIds": { "type": "string" },
+        "VectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Finite": { "$ref": "#/$defs/ratio" },
+        "Plausible": { "$ref": "#/$defs/ratio" },
+        "NonZero": { "$ref": "#/$defs/ratio" },
+        "Extent": { "$ref": "#/$defs/ratio" },
+        "StrictPass": { "const": false },
+        "MaxPlausibleThresholdForSample": { "$ref": "#/$defs/ratio" },
+        "MissReasons": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -6261,6 +6261,8 @@ POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
     "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
 }
 
+POST50_SCHEMA_BACKED_REPORT_KEYS: set[str] = set(POST50_POSITION_SOURCE_REPORTS)
+
 
 def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     """Load an optional ignored report and return repo-safe status metadata."""
@@ -6278,6 +6280,7 @@ def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict
         "Schema": "",
         "CandidateOnly": None,
         "ParseError": "",
+        "EvidenceLevel": "missing-or-unreadable",
     }
     if not path.exists():
         return {}, status
@@ -6291,6 +6294,10 @@ def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict
         return {}, status
     status["Schema"] = str(report.get("Schema") or report.get("SchemaVersion") or "")
     status["CandidateOnly"] = report.get("CandidateOnly") if isinstance(report.get("CandidateOnly"), bool) else None
+    if key in POST50_SCHEMA_BACKED_REPORT_KEYS and status["CandidateOnly"] is True:
+        status["EvidenceLevel"] = "schema-backed-candidate"
+    elif status["CandidateOnly"] is True:
+        status["EvidenceLevel"] = "raw-candidate"
     return report, status
 
 

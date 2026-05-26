@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/residual-position-cluster-probe-report-v1.schema.json",
+  "title": "Residual position cluster probe report v1",
+  "description": "Candidate-only focused residual cluster probe report. Export readiness and promoted geometry truth are blocked for all rows.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "Target",
+    "StrictClassifierThresholdUnchanged",
+    "ExportPromotion",
+    "ExportReadinessAssertion",
+    "SourceReports",
+    "SourceReportStatuses",
+    "MissingSourceReports",
+    "BoundaryNotes",
+    "Mesh305SiblingFamily",
+    "PayloadRows",
+    "BodyComparisonRows",
+    "FocusedAttributeBindingSearchRows",
+    "StreamRows",
+    "MeshRows",
+    "UInt16TriplesStructureSummary",
+    "Interpretation"
+  ],
+  "properties": {
+    "Schema": { "const": "residual-position-cluster-probe-report/v1" },
+    "CandidateOnly": { "const": true },
+    "Target": { "$ref": "#/$defs/nonEmptyString" },
+    "StrictClassifierThresholdUnchanged": { "const": true },
+    "ExportPromotion": { "const": "blocked" },
+    "ExportReadinessAssertion": { "const": "blocked-for-all-rows" },
+    "SourceReports": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "SourceReportStatuses": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "MissingSourceReports": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "BoundaryNotes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "Mesh305SiblingFamily": { "type": ["object", "null"] },
+    "PayloadRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/payloadRow" }
+    },
+    "BodyComparisonRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bodyComparisonRow" }
+    },
+    "FocusedAttributeBindingSearchRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/focusedBindingRow" }
+    },
+    "StreamRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/streamRow" }
+    },
+    "MeshRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/meshRow" }
+    },
+    "UInt16TriplesStructureSummary": { "type": "object" },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "ratio": { "type": ["number", "null"], "minimum": 0 },
+    "payloadRow": {
+      "type": "object",
+      "required": [
+        "Payload",
+        "Id",
+        "StreamBlock",
+        "StreamClassification",
+        "ClassifierPlausible",
+        "ClassifierStrictPass",
+        "ResidualFamilyCandidateGuard",
+        "AttributeSetTotal",
+        "PairingTotal",
+        "ReviewRequired",
+        "ExportReady",
+        "GeometryTruthPromoted",
+        "Decision"
+      ],
+      "properties": {
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Id": { "$ref": "#/$defs/nonEmptyString" },
+        "StreamBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "StreamClassification": { "$ref": "#/$defs/nonEmptyString" },
+        "ClassifierPlausible": { "$ref": "#/$defs/ratio" },
+        "ClassifierStrictPass": { "const": false },
+        "ResidualFamilyCandidateGuard": { "type": "boolean" },
+        "AttributeSetTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PairingTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ReviewRequired": { "type": "boolean" },
+        "ExportReady": { "const": false },
+        "GeometryTruthPromoted": { "const": false },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "bodyComparisonRow": {
+      "type": "object",
+      "required": ["Payload", "BaselinePayload", "ComparedBytes", "DiffBytes", "Decision"],
+      "properties": {
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "BaselinePayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ComparedBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DiffBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "focusedBindingRow": {
+      "type": "object",
+      "required": ["Payload", "AttributeSetTotal", "PairingTotal", "CompleteBindingFound", "Decision"],
+      "properties": {
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttributeSetTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PairingTotal": { "$ref": "#/$defs/nonNegativeInteger" },
+        "CompleteBindingFound": { "type": "boolean" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    },
+    "streamRow": {
+      "type": "object",
+      "required": ["Payload", "Id", "StreamBlock", "DeclaredPayloadBytes", "Classification", "ByteLength"],
+      "properties": {
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Id": { "$ref": "#/$defs/nonEmptyString" },
+        "StreamBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Classification": { "$ref": "#/$defs/nonEmptyString" },
+        "ByteLength": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": true
+    },
+    "meshRow": {
+      "type": "object",
+      "required": [
+        "Payload",
+        "Id",
+        "MeshBlock",
+        "MeshSize",
+        "MeshPayloadOffset",
+        "TargetBlock",
+        "StreamPayload",
+        "AttributeSetCount",
+        "PairingCount",
+        "ReviewRequired",
+        "Decision"
+      ],
+      "properties": {
+        "Payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Id": { "$ref": "#/$defs/nonEmptyString" },
+        "MeshBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TargetBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "StreamPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PairingCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ReviewRequired": { "type": "boolean" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

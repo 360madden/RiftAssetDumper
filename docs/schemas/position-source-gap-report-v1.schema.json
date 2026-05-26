@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/position-source-gap-report-v1.schema.json",
+  "title": "Position source gap report v1",
+  "description": "Candidate-only ranking report for position-source search gaps. It ranks offline proof lanes and must not promote geometry or export truth.",
+  "type": "object",
+  "required": ["Schema", "CandidateOnly", "SourceReport", "TargetMeshSizes", "Rows", "Interpretation"],
+  "properties": {
+    "Schema": { "const": "position-source-gap-report/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReport": { "$ref": "#/$defs/nonEmptyString" },
+    "TargetMeshSizes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/nonNegativeInteger" }
+    },
+    "Rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "nonNegativeNumber": { "type": "number", "minimum": 0 },
+    "row": {
+      "type": "object",
+      "required": [
+        "MeshSize",
+        "PositionLeadCount",
+        "TopPairingRows",
+        "TopologyPairingCount",
+        "NormalPairingCount",
+        "UvPairingCount",
+        "PositionPairingCount",
+        "AttributeSetRows",
+        "ResidualStreamCount",
+        "ResidualPositionCandidateRows",
+        "Decision",
+        "PositionSamples",
+        "TopologyHints",
+        "ResidualHints"
+      ],
+      "properties": {
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionLeadCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TopPairingRows": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TopologyPairingCount": { "$ref": "#/$defs/nonNegativeNumber" },
+        "NormalPairingCount": { "$ref": "#/$defs/nonNegativeNumber" },
+        "UvPairingCount": { "$ref": "#/$defs/nonNegativeNumber" },
+        "PositionPairingCount": { "$ref": "#/$defs/nonNegativeNumber" },
+        "AttributeSetRows": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ResidualStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ResidualPositionCandidateRows": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" },
+        "PositionSamples": { "type": "string" },
+        "TopologyHints": { "type": "string" },
+        "ResidualHints": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
