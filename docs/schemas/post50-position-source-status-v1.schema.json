@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-position-source-status-v1.schema.json",
+  "title": "Post-50 offline position-source status",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "ReportRoot",
+    "ReportStatuses",
+    "RecommendedLane",
+    "CandidateLanes",
+    "Mesh325Disposition",
+    "ParserExportPromotionAllowed",
+    "Blockers",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-position-source-status/v1" },
+    "CandidateOnly": { "const": true },
+    "ReportRoot": { "type": "string", "minLength": 1 },
+    "ReportStatuses": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/reportStatus" }
+    },
+    "RecommendedLane": { "type": "string", "minLength": 1 },
+    "CandidateLanes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateLane" }
+    },
+    "Mesh325Disposition": { "$ref": "#/$defs/mesh325Disposition" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "reportStatus": {
+      "type": "object",
+      "required": ["Key", "Path", "Exists", "Bytes", "MtimeUtc", "Schema", "CandidateOnly", "ParseError"],
+      "properties": {
+        "Key": { "type": "string", "minLength": 1 },
+        "Path": { "type": "string", "minLength": 1 },
+        "Exists": { "type": "boolean" },
+        "Bytes": { "type": "integer", "minimum": 0 },
+        "MtimeUtc": { "type": "string" },
+        "Schema": { "type": "string" },
+        "CandidateOnly": { "type": ["boolean", "null"] },
+        "ParseError": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "candidateLane": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "Lane",
+        "MeshSize",
+        "Stream",
+        "Payload",
+        "EvidenceGroups",
+        "TotalStreamLinks",
+        "Plausible",
+        "StrictPass",
+        "ExportReady",
+        "Rationale",
+        "Decision"
+      ],
+      "properties": {
+        "Rank": { "type": "integer", "minimum": 1 },
+        "Lane": { "type": "string", "minLength": 1 },
+        "MeshSize": { "type": "integer", "minimum": 0 },
+        "Stream": { "type": "string" },
+        "Payload": { "type": ["integer", "null"], "minimum": 0 },
+        "EvidenceGroups": { "type": ["integer", "null"], "minimum": 0 },
+        "TotalStreamLinks": { "type": ["integer", "null"], "minimum": 0 },
+        "Plausible": { "type": ["number", "null"], "minimum": 0 },
+        "StrictPass": { "type": ["boolean", "null"] },
+        "ExportReady": { "type": "boolean" },
+        "Rationale": { "type": "string" },
+        "Decision": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "mesh325Disposition": {
+      "type": "object",
+      "required": ["MeshSize", "ResidualStreamCount", "Decision"],
+      "properties": {
+        "MeshSize": { "type": "integer", "minimum": 0 },
+        "ResidualStreamCount": { "type": "integer", "minimum": 0 },
+        "Decision": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -48,6 +48,7 @@ $PSModeToKebab = @{
     'StreamBodies' = 'stream-bodies'
     'ToolsStatus' = 'tools-status'
     'FiftyStepPlanStatus' = 'fifty-step-plan-status'
+    'Post50PositionSourceStatus' = 'post50-position-source-status'
     'ScanLiveMemory' = 'scan-live-memory'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'

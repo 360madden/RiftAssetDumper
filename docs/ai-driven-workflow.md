@@ -8,6 +8,8 @@ Original 50-step plan position: `docs/discovery-plan-50.md` is revived as a hist
 
 For live-memory discovery, prefer the RiftReader scanner over Assets-local fallback code. Use RiftReader's bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command only for asset-load-backed candidate float3 probes, with bounded `--scan-context` and `--max-hits` values. Do not repeat broad live scans for the same static triplets unless the target asset/load condition and representation hypothesis are newly proven.
 
+Post-50 offline position-source routing: refresh `position-source-gap-report`, `position-source-sibling-family-report`, `residual-position-classifier-report`, and `residual-position-cluster-probe-report`, then run `post50-position-source-status --list-json` to rank the next safe proof lane. Current routing should prefer `meshSize=329 stream@212` sibling-family source-binding proof before revisiting `meshSize=305 stream@188` residual packed-position candidates or any more broad live-memory scans.
+
 ## Default loop
 
 1. Read `AGENTS.md`, `knowledge.md`, `docs/current-status.md`, and the newest handoff before changing direction.

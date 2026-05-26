@@ -48,6 +48,7 @@ Commands (kebab-case):
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
     tools-status                 — show configured third-party reverse-engineering tools
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
+    post50-position-source-status — rank the next offline proof lane from ignored post-50 reports
     scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
@@ -307,6 +308,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-position-source-status": {
+        "dotnet": "",
+        "base": "",
+    },
     "scan-live-memory": {
         "dotnet": "",
         "base": "",
@@ -443,6 +448,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "BatchExport264": "batch-export-264",
     "ToolsStatus": "tools-status",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
+    "Post50PositionSourceStatus": "post50-position-source-status",
     "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
@@ -6230,6 +6236,274 @@ def _run_fifty_step_plan_status(args: argparse.Namespace) -> None:
     _print_fifty_step_plan_status(status)
 
 
+POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
+    "PositionSourceGap": "position-source-gap-report.json",
+    "PositionSourceSiblingFamily": "position-source-sibling-family-report.json",
+    "ResidualPositionClassifier": "residual-position-classifier-report.json",
+    "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
+}
+
+
+def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Load an optional ignored report and return repo-safe status metadata."""
+    status: dict[str, Any] = {
+        "Key": key,
+        "Path": _display_path(path),
+        "Exists": path.exists(),
+        "Bytes": path.stat().st_size if path.exists() else 0,
+        "MtimeUtc": (
+            datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).replace(microsecond=0).isoformat()
+            .replace("+00:00", "Z")
+            if path.exists()
+            else ""
+        ),
+        "Schema": "",
+        "CandidateOnly": None,
+        "ParseError": "",
+    }
+    if not path.exists():
+        return {}, status
+    try:
+        report = load_json_report(path)
+    except (FileNotFoundError, ValueError) as exc:
+        status["ParseError"] = str(exc)
+        return {}, status
+    if not isinstance(report, dict):
+        status["ParseError"] = "report-is-not-object"
+        return {}, status
+    status["Schema"] = str(report.get("Schema") or report.get("SchemaVersion") or "")
+    status["CandidateOnly"] = report.get("CandidateOnly") if isinstance(report.get("CandidateOnly"), bool) else None
+    return report, status
+
+
+def _dict_rows(report: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Return a report list field filtered to object rows."""
+    rows = report.get(key)
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def _as_rank_int(value: Any) -> int:
+    """Convert report ranking values to int, treating missing/non-numeric as zero."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except ValueError:
+            return 0
+    return 0
+
+
+def _as_rank_float(value: Any) -> float:
+    """Convert report ranking values to float, treating missing/non-numeric as zero."""
+    if isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _post50_lane_from_sibling_family(row: dict[str, Any], rank: int) -> dict[str, Any]:
+    """Create a ranked post-50 lane from a sibling-family report row."""
+    return {
+        "Rank": rank,
+        "Lane": "source-binding-family",
+        "MeshSize": _as_rank_int(row.get("MeshSize")),
+        "Stream": str(row.get("MeshPayloadOffsets", "")),
+        "Payload": None,
+        "EvidenceGroups": _as_rank_int(row.get("EvidenceGroups")),
+        "TotalStreamLinks": _as_rank_int(row.get("TotalStreamLinks")),
+        "Plausible": None,
+        "StrictPass": None,
+        "ExportReady": False,
+        "Rationale": "highest repeated sibling-family evidence; prove source binding before export changes",
+        "Decision": str(row.get("Decision", "")),
+    }
+
+
+def _post50_lane_from_residual(row: dict[str, Any], rank: int) -> dict[str, Any]:
+    """Create a ranked post-50 lane from a residual-position classifier row."""
+    return {
+        "Rank": rank,
+        "Lane": "residual-packed-position",
+        "MeshSize": _as_rank_int(row.get("MeshSize")),
+        "Stream": str(row.get("Stream", "")),
+        "Payload": _as_rank_int(row.get("Payload")),
+        "EvidenceGroups": _as_rank_int(row.get("Count")),
+        "TotalStreamLinks": None,
+        "Plausible": _as_rank_float(row.get("Plausible")),
+        "StrictPass": bool(row.get("StrictPass")) if isinstance(row.get("StrictPass"), bool) else False,
+        "ExportReady": False,
+        "Rationale": "strongest residual plausible ratio; candidate-only until strict thresholds and bindings pass",
+        "Decision": str(row.get("MissReasons", "")),
+    }
+
+
+def _post50_lane_from_cluster(row: dict[str, Any], rank: int) -> dict[str, Any]:
+    """Create a ranked post-50 lane from a residual-cluster probe row."""
+    return {
+        "Rank": rank,
+        "Lane": "residual-cluster-structure",
+        "MeshSize": 305,
+        "Stream": f"stream@{row.get('StreamBlock', '')}",
+        "Payload": _as_rank_int(row.get("Payload")),
+        "EvidenceGroups": _as_rank_int(row.get("ResidualFamilyIdCount")),
+        "TotalStreamLinks": _as_rank_int(row.get("SiblingFamilyTotalStreamLinks")),
+        "Plausible": _as_rank_float(row.get("ClassifierPlausible")),
+        "StrictPass": bool(row.get("ClassifierStrictPass"))
+        if isinstance(row.get("ClassifierStrictPass"), bool)
+        else False,
+        "ExportReady": bool(row.get("ExportReady")) if isinstance(row.get("ExportReady"), bool) else False,
+        "Rationale": str(row.get("UInt16TriplesStructureFamily", "")),
+        "Decision": str(row.get("Decision", "")),
+    }
+
+
+def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
+    """Summarize the current post-50 offline position-source proof priorities."""
+    reports: dict[str, dict[str, Any]] = {}
+    report_statuses: list[dict[str, Any]] = []
+    for key, file_name in POST50_POSITION_SOURCE_REPORTS.items():
+        report, status = _optional_report_payload(key, out_dir / file_name)
+        reports[key] = report
+        report_statuses.append(status)
+
+    missing_reports = [
+        str(status["Key"])
+        for status in report_statuses
+        if not status["Exists"] or status["ParseError"]
+    ]
+
+    sibling_rows = _dict_rows(reports["PositionSourceSiblingFamily"], "Families")
+    top_sibling = (
+        max(
+            sibling_rows,
+            key=lambda row: (
+                _as_rank_int(row.get("EvidenceGroups")),
+                _as_rank_int(row.get("TotalStreamLinks")),
+                _as_rank_int(row.get("DistinctIds")),
+            ),
+        )
+        if sibling_rows
+        else {}
+    )
+
+    residual_rows = _dict_rows(reports["ResidualPositionClassifier"], "CandidateGuardRows")
+    top_residual = (
+        max(
+            residual_rows,
+            key=lambda row: (
+                _as_rank_float(row.get("Plausible")),
+                _as_rank_int(row.get("Count")),
+                _as_rank_int(row.get("Payload")),
+            ),
+        )
+        if residual_rows
+        else {}
+    )
+
+    cluster_rows = _dict_rows(reports["ResidualPositionClusterProbe"], "PayloadRows")
+    top_cluster = (
+        max(
+            cluster_rows,
+            key=lambda row: (
+                _as_rank_float(row.get("ClassifierPlausible")),
+                _as_rank_int(row.get("ResidualFamilyIdCount")),
+                _as_rank_int(row.get("Payload")),
+            ),
+        )
+        if cluster_rows
+        else {}
+    )
+
+    gap_rows = _dict_rows(reports["PositionSourceGap"], "Rows")
+    mesh325_gap = next((row for row in gap_rows if _as_rank_int(row.get("MeshSize")) == 325), {})
+
+    lanes: list[dict[str, Any]] = []
+    if top_sibling:
+        lanes.append(_post50_lane_from_sibling_family(top_sibling, len(lanes) + 1))
+    if top_residual:
+        lanes.append(_post50_lane_from_residual(top_residual, len(lanes) + 1))
+    if top_cluster:
+        lanes.append(_post50_lane_from_cluster(top_cluster, len(lanes) + 1))
+
+    blockers: list[str] = []
+    blockers.extend(f"missing-or-unreadable-report:{key}" for key in missing_reports)
+    if top_residual and top_residual.get("StrictPass") is not True:
+        blockers.append("residual-position-strict-threshold-not-met")
+    if top_cluster and top_cluster.get("ExportReady") is not True:
+        blockers.append("residual-cluster-no-complete-geometry-binding")
+    if mesh325_gap and _as_rank_int(mesh325_gap.get("ResidualStreamCount")) == 0:
+        blockers.append("mesh325-position-source-sparse-no-residuals")
+    blockers.append("parser-export-promotion-not-allowed")
+
+    recommended_lane = lanes[0]["Lane"] if lanes else "refresh-post50-position-source-reports"
+    next_action = (
+        "Run the post-50 offline report refresh commands before choosing a proof lane."
+        if missing_reports
+        else "Start a focused meshSize=329 stream@212 source-binding proof slice; keep residual "
+        "meshSize=305 payload 288 candidate-only until strict thresholds and geometry bindings pass."
+    )
+
+    return {
+        "SchemaVersion": "post50-position-source-status/v1",
+        "CandidateOnly": True,
+        "ReportRoot": _display_path(out_dir),
+        "ReportStatuses": report_statuses,
+        "RecommendedLane": recommended_lane,
+        "CandidateLanes": lanes,
+        "Mesh325Disposition": {
+            "MeshSize": _as_rank_int(mesh325_gap.get("MeshSize")) if mesh325_gap else 0,
+            "ResidualStreamCount": _as_rank_int(mesh325_gap.get("ResidualStreamCount")) if mesh325_gap else 0,
+            "Decision": str(mesh325_gap.get("Decision", "")) if mesh325_gap else "",
+        },
+        "ParserExportPromotionAllowed": False,
+        "Blockers": blockers,
+        "NextAction": next_action,
+    }
+
+
+def _print_post50_position_source_status(status: dict[str, Any]) -> None:
+    """Print a concise post-50 position-source status summary."""
+    print("--- Post50PositionSourceStatus")
+    print(f"Report root: {status['ReportRoot']}")
+    print(f"Recommended lane: {status['RecommendedLane']}")
+    print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
+    print("Candidate lanes:")
+    for lane in status["CandidateLanes"]:
+        print(
+            f"  {lane['Rank']}. {lane['Lane']} meshSize={lane['MeshSize']} "
+            f"stream={lane['Stream']} payload={lane['Payload']} "
+            f"evidenceGroups={lane['EvidenceGroups']} plausible={lane['Plausible']} "
+            f"exportReady={str(lane['ExportReady']).lower()}"
+        )
+    print("Blockers:")
+    for blocker in status["Blockers"]:
+        print(f"  - {blocker}")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_post50_position_source_status(args: argparse.Namespace) -> None:
+    """Run the post-50 offline position-source status command."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    status = _post50_position_source_status_payload(out_dir)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+        return
+    _print_post50_position_source_status(status)
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -6298,6 +6572,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "fifty-step-plan-status":
         _run_fifty_step_plan_status(args)
+        return
+
+    if command == "post50-position-source-status":
+        _run_post50_position_source_status(args)
         return
 
     if command == "scan-live-memory":
@@ -8172,6 +8450,7 @@ Examples:
 
     list_json_commands = {
         "fifty-step-plan-status",
+        "post50-position-source-status",
         "scan-live-memory",
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
@@ -8189,6 +8468,7 @@ Examples:
     if args.list_json and args.command not in list_json_commands:
         print(
             "ERROR: --list-json is only supported with fifty-step-plan-status, scan-live-memory, "
+            "post50-position-source-status, "
             "ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "
