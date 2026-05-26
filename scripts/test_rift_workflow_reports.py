@@ -16,6 +16,7 @@ sys.path.insert(0, ".")
 from scripts.rift_workflow_reports import (
     ghidra_attribute_candidate_report,
     ghidra_pairing_review_report,
+    position_source_sibling_probe_report,
     show_report_summary,
 )
 
@@ -29,6 +30,63 @@ def check_contains(desc: str, text: str, expected: str) -> None:
     else:
         print(f"  FAIL: {desc}  missing={expected!r}")
         failed += 1
+
+
+def write_sibling_probe_fixture(
+    temp_dir: Path,
+    asset_id: str,
+    mesh_block: int,
+    *,
+    mesh_size: int,
+    vertex_count: int,
+    topology: str,
+    position_offset: int,
+    position_block: int,
+    position_payload: int,
+    normal_offset: int,
+    normal_block: int,
+    normal_payload: int,
+    uv_offset: int,
+    uv_block: int,
+    uv_payload: int,
+) -> Path:
+    path = temp_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
+    attr = {
+        "MeshSize": mesh_size,
+        "VertexCount": vertex_count,
+        "Topology": {
+            "PrimaryTopology": topology,
+            "Confidence": 75,
+        },
+        "PositionMeshPayloadOffset": position_offset,
+        "PositionBlockIndex": position_block,
+        "PositionDeclaredPayloadBytes": position_payload,
+        "PositionDataStreamUsage": 1,
+        "PositionDataStreamAccess": 19,
+        "PositionRole": "position-float3-ror1-lead",
+        "NormalMeshPayloadOffset": normal_offset,
+        "NormalBlockIndex": normal_block,
+        "NormalDeclaredPayloadBytes": normal_payload,
+        "UvMeshPayloadOffset": uv_offset,
+        "UvBlockIndex": uv_block,
+        "UvDeclaredPayloadBytes": uv_payload,
+        "ExtraStreams": [],
+    }
+    path.write_text(
+        json.dumps(
+            {
+                "Meshes": [
+                    {
+                        "MeshBlockIndex": mesh_block,
+                        "AttributeSets": [attr],
+                        "Pairings": [],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 print("=== MeshBindings summary ===")
@@ -286,6 +344,146 @@ with TemporaryDirectory() as temp_dir:
     check_contains("ghidra attribute schema completion marker", json.dumps(attr_schema), "CompletePositionNormalUvCandidate")
     jsonschema.validate(attr_report, attr_schema)
     print("  PASS: ghidra attribute schema validation")
+
+print("=== PositionSourceSiblingProbeReport ===")
+with TemporaryDirectory() as temp_dir_name:
+    temp_dir = Path(temp_dir_name)
+    shifted_id = "e3de1077a37d0337"
+    repeated_id = "8e01613d7ce9e297"
+    shifted_left = write_sibling_probe_fixture(
+        temp_dir,
+        shifted_id,
+        6,
+        mesh_size=325,
+        vertex_count=71,
+        topology="implicit-triangle-strip-or-fan-candidate",
+        position_offset=292,
+        position_block=24,
+        position_payload=852,
+        normal_offset=216,
+        normal_block=25,
+        normal_payload=852,
+        uv_offset=300,
+        uv_block=29,
+        uv_payload=568,
+    )
+    shifted_right = write_sibling_probe_fixture(
+        temp_dir,
+        shifted_id,
+        30,
+        mesh_size=329,
+        vertex_count=71,
+        topology="implicit-triangle-strip-or-fan-candidate",
+        position_offset=296,
+        position_block=24,
+        position_payload=852,
+        normal_offset=220,
+        normal_block=44,
+        normal_payload=852,
+        uv_offset=304,
+        uv_block=48,
+        uv_payload=568,
+    )
+    repeated_left = write_sibling_probe_fixture(
+        temp_dir,
+        repeated_id,
+        6,
+        mesh_size=329,
+        vertex_count=93,
+        topology="implicit-triangle-list-candidate",
+        position_offset=296,
+        position_block=25,
+        position_payload=1116,
+        normal_offset=220,
+        normal_block=26,
+        normal_payload=1116,
+        uv_offset=304,
+        uv_block=30,
+        uv_payload=744,
+    )
+    repeated_right = write_sibling_probe_fixture(
+        temp_dir,
+        repeated_id,
+        31,
+        mesh_size=329,
+        vertex_count=93,
+        topology="implicit-triangle-list-candidate",
+        position_offset=296,
+        position_block=25,
+        position_payload=1116,
+        normal_offset=220,
+        normal_block=45,
+        normal_payload=1116,
+        uv_offset=304,
+        uv_block=49,
+        uv_payload=744,
+    )
+    probe_specs = [
+        {
+            "Pair": "e3de325329",
+            "PairLabel": "meshSize 325/329 shifted-position sibling",
+            "Id": shifted_id,
+            "MeshBlock": 6,
+            "Path": str(shifted_left),
+        },
+        {
+            "Pair": "e3de325329",
+            "PairLabel": "meshSize 325/329 shifted-position sibling",
+            "Id": shifted_id,
+            "MeshBlock": 30,
+            "Path": str(shifted_right),
+        },
+        {
+            "Pair": "8e016329",
+            "PairLabel": "meshSize 329 repeated-position sibling",
+            "Id": repeated_id,
+            "MeshBlock": 6,
+            "Path": str(repeated_left),
+        },
+        {
+            "Pair": "8e016329",
+            "PairLabel": "meshSize 329 repeated-position sibling",
+            "Id": repeated_id,
+            "MeshBlock": 31,
+            "Path": str(repeated_right),
+        },
+    ]
+    sibling_buffer = io.StringIO()
+    with redirect_stdout(sibling_buffer):
+        position_source_sibling_probe_report(probe_specs)
+    sibling_json = temp_dir / "position-source-sibling-probe-report.json"
+    sibling_md = temp_dir / "position-source-sibling-probe-report.md"
+    sibling_report = json.loads(sibling_json.read_text(encoding="utf-8"))
+    check_contains(
+        "sibling probe console",
+        sibling_buffer.getvalue(),
+        "PositionSourceSiblingProbeReport passed",
+    )
+    check_contains(
+        "sibling probe candidate-only",
+        str(sibling_report.get("CandidateOnly")),
+        "True",
+    )
+    check_contains(
+        "sibling probe source paths",
+        str(len(sibling_report.get("SourceProbes", []))),
+        "4",
+    )
+    check_contains(
+        "sibling shifted offset pattern",
+        json.dumps(sibling_report),
+        "mesh payload offset shifts with mesh-size delta (4)",
+    )
+    check_contains(
+        "sibling repeated offset pattern",
+        json.dumps(sibling_report),
+        "same mesh payload offset",
+    )
+    check_contains(
+        "sibling markdown probe rows",
+        sibling_md.read_text(encoding="utf-8"),
+        "## Probe rows",
+    )
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:

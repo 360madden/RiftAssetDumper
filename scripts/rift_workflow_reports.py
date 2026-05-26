@@ -3475,9 +3475,9 @@ def _new_position_source_representative_probe_row(spec):
 def position_source_sibling_probe_report(probe_specs):
     """Build candidate-only probe comparison from position-source sibling probes.
 
-    Loads probe JSON for each spec, groups by Pair, validates sibling
-    mesh has no attribute-set binding, computes uniqueness metrics, and
-    writes JSON + MD reports.
+    Loads probe JSON for each spec, groups by Pair, validates that each
+    focused pair still shares the same position stream evidence, computes
+    the offset pattern, and writes JSON + MD reports.
 
     Mirrors: Invoke-PositionSourceSiblingProbeReport
     """
@@ -3495,6 +3495,12 @@ def position_source_sibling_probe_report(probe_specs):
         pair_key = str(row["Pair"])
         pair_groups.setdefault(pair_key, []).append(row)
 
+    if len(pair_groups) < 2:
+        raise ValueError(
+            "PositionSourceSiblingProbeReport failed: expected at least two "
+            f"sibling pairs, found {len(pair_groups)}."
+        )
+
     # Validate and build pair summaries
     pair_summaries = []
     for pair_key, pair_rows in sorted(pair_groups.items()):
@@ -3510,30 +3516,62 @@ def position_source_sibling_probe_report(probe_specs):
         primary = pair_rows_sorted[0]
         sibling = pair_rows_sorted[1]
 
-        if int(primary["AttributeSetCount"]) < 1:
+        position_shared = (
+            _get_position_source_sibling_unique_count(
+                pair_rows_sorted, "PositionBlockIndex"
+            ) == 1
+            and _get_position_source_sibling_unique_count(
+                pair_rows_sorted, "PositionDeclaredPayloadBytes"
+            ) == 1
+            and _get_position_source_sibling_unique_count(
+                pair_rows_sorted, "PositionDataStreamUsage"
+            ) == 1
+            and _get_position_source_sibling_unique_count(
+                pair_rows_sorted, "PositionDataStreamAccess"
+            ) == 1
+            and _get_position_source_sibling_unique_count(
+                pair_rows_sorted, "PositionRole"
+            ) == 1
+        )
+        if not position_shared:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
-                f"primary mesh no longer has a complete attribute set."
+                "no longer has shared position stream block/payload/"
+                "usage/access/role evidence."
             )
 
-        if int(sibling["AttributeSetCount"]) != 0:
+        if _get_position_source_sibling_unique_count(
+            pair_rows_sorted, "VertexCount"
+        ) != 1:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
-                f"sibling mesh unexpectedly gained a complete attribute set; "
-                f"review before keeping the old interpretation."
+                "no longer has matching vertex-count evidence."
             )
 
-        # Check shared position stream
-        if int(primary["PositionBlockIndex"]) != int(sibling["PositionBlockIndex"]):
+        if _get_position_source_sibling_unique_count(
+            pair_rows_sorted, "PrimaryTopology"
+        ) != 1:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
-                f"position stream block mismatch."
+                "no longer has matching primary topology evidence."
             )
 
-        if int(primary["PositionDeclaredPayloadBytes"]) != int(sibling["PositionDeclaredPayloadBytes"]):
-            raise ValueError(
-                f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
-                f"position payload size mismatch."
+        mesh_size_delta = int(sibling["MeshSize"]) - int(primary["MeshSize"])
+        position_offset_delta = (
+            int(sibling["PositionMeshPayloadOffset"])
+            - int(primary["PositionMeshPayloadOffset"])
+        )
+        if position_offset_delta == 0:
+            position_offset_pattern = "same mesh payload offset"
+        elif position_offset_delta == mesh_size_delta:
+            position_offset_pattern = (
+                "mesh payload offset shifts with mesh-size delta "
+                f"({position_offset_delta})"
+            )
+        else:
+            position_offset_pattern = (
+                f"mesh payload offset delta {position_offset_delta}; "
+                f"mesh-size delta {mesh_size_delta}"
             )
 
         pair_summaries.append({
@@ -3542,28 +3580,31 @@ def position_source_sibling_probe_report(probe_specs):
             "Id": str(primary["Id"]),
             "MeshBlocks": f"mesh#{primary['MeshBlock']}, mesh#{sibling['MeshBlock']}",
             "MeshSizes": f"{primary['MeshSize']}, {sibling['MeshSize']}",
-            "VertexCounts": f"{primary['VertexCount']}, {sibling['VertexCount']}",
-            "SharedPositionBlock": (
+            "VertexCount": int(primary["VertexCount"]),
+            "PrimaryTopology": str(primary["PrimaryTopology"]),
+            "SharedPositionStream": (
                 f"block#{primary['PositionBlockIndex']} "
                 f"payload={primary['PositionDeclaredPayloadBytes']} "
-                f"offsets=@{primary['PositionMeshPayloadOffset']}/"
-                f"@{sibling['PositionMeshPayloadOffset']}"
+                f"usage={primary['PositionDataStreamUsage']} "
+                f"access={primary['PositionDataStreamAccess']} "
+                f"role={primary['PositionRole']}"
             ),
-            "PositionUsageAccess": (
-                f"{primary['PositionDataStreamUsage']}/"
-                f"{primary['PositionDataStreamAccess']}"
+            "PositionOffsetPattern": position_offset_pattern,
+            "NormalStreams": (
+                f"mesh#{primary['MeshBlock']}:block#{primary['NormalBlockIndex']} "
+                f"payload={primary['NormalDeclaredPayloadBytes']} | "
+                f"mesh#{sibling['MeshBlock']}:block#{sibling['NormalBlockIndex']} "
+                f"payload={sibling['NormalDeclaredPayloadBytes']}"
             ),
-            "PrimaryTopology": str(primary["PrimaryTopology"]),
-            "SiblingTopology": str(sibling["PrimaryTopology"]),
-            "UniqueVertexCounts": _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "VertexCount"
-            ),
-            "UniqueMeshSizes": _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "MeshSize"
+            "UvStreams": (
+                f"mesh#{primary['MeshBlock']}:block#{primary['UvBlockIndex']} "
+                f"payload={primary['UvDeclaredPayloadBytes']} | "
+                f"mesh#{sibling['MeshBlock']}:block#{sibling['UvBlockIndex']} "
+                f"payload={sibling['UvDeclaredPayloadBytes']}"
             ),
             "Decision": (
-                "shared position source repeats, but sibling lacks complete "
-                "attribute-set binding; candidate-only follow-up"
+                "shared-position-stream sibling evidence; candidate-only "
+                "source ranking, not geometry/export truth"
             ),
         })
 
@@ -3580,16 +3621,15 @@ def position_source_sibling_probe_report(probe_specs):
     summary = {
         "Schema": "position-source-sibling-probe-report/v1",
         "CandidateOnly": True,
+        "SourceProbes": [str(spec["Path"]) for spec in probe_specs],
         "PairSummaries": pair_summaries,
         "ProbeRows": sorted(
             rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))
         ),
         "Interpretation": (
-            "Candidate-only comparison of parser-derived position-source "
-            "sibling leads for shifted-position (meshSize 325/329) and "
-            "repeated-position (meshSize 329) families. Shared position "
-            "sources are search evidence only; missing sibling attribute "
-            "sets keep these below geometry/export truth."
+            "Shared position stream blocks across sibling mesh blocks are "
+            "parser-search evidence only. This report does not promote "
+            "geometry truth, topology truth, or export readiness."
         ),
     }
     json_path.write_text(
@@ -3605,9 +3645,11 @@ def position_source_sibling_probe_report(probe_specs):
         "",
         "Generated under ignored `Exports/`; do not stage generated discovery output.",
         "",
-        "| Family | ID | Meshes | Mesh sizes | Vertex counts | "
-        "Shared position | Usage/access | Primary topology | Sibling topology | Decision |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "## Pair summary",
+        "",
+        "| Pair | ID | Meshes | Mesh sizes | Vertex count | Topology | "
+        "Shared position stream | Offset pattern | Decision |",
+        "|---|---|---|---|---:|---|---|---|---|",
     ]
     for ps_item in pair_summaries:
         md_lines.append(
@@ -3615,39 +3657,72 @@ def position_source_sibling_probe_report(probe_specs):
             f"| {format_markdown_cell(ps_item['Id'])} "
             f"| {format_markdown_cell(ps_item['MeshBlocks'])} "
             f"| {format_markdown_cell(ps_item['MeshSizes'])} "
-            f"| {format_markdown_cell(ps_item['VertexCounts'])} "
-            f"| {format_markdown_cell(ps_item['SharedPositionBlock'])} "
-            f"| {format_markdown_cell(ps_item['PositionUsageAccess'])} "
+            f"| {format_markdown_cell(ps_item['VertexCount'])} "
             f"| {format_markdown_cell(ps_item['PrimaryTopology'])} "
-            f"| {format_markdown_cell(ps_item['SiblingTopology'])} "
+            f"| {format_markdown_cell(ps_item['SharedPositionStream'])} "
+            f"| {format_markdown_cell(ps_item['PositionOffsetPattern'])} "
             f"| {format_markdown_cell(ps_item['Decision'])} |"
         )
     md_lines += [
         "",
-        "Interpretation: these probes support source-binding search priorities only. "
-        "Mesh siblings repeat the same position stream, but the sibling mesh "
-        "lacks a full position+normal+UV attribute-set binding, so no role, "
-        "topology, geometry, or OBJ/export truth is promoted.",
+        "## Probe rows",
+        "",
+        "| Pair | Mesh | Mesh size | Position | Normal | UV | Pairings | Extra streams |",
+        "|---|---:|---:|---|---|---|---:|---:|",
+    ]
+    for row in sorted(rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))):
+        position_text = (
+            f"stream@{row['PositionMeshPayloadOffset']}/"
+            f"#{row['PositionBlockIndex']} "
+            f"payload={row['PositionDeclaredPayloadBytes']} "
+            f"usage={row['PositionDataStreamUsage']} "
+            f"access={row['PositionDataStreamAccess']}"
+        )
+        normal_text = (
+            f"stream@{row['NormalMeshPayloadOffset']}/"
+            f"#{row['NormalBlockIndex']} "
+            f"payload={row['NormalDeclaredPayloadBytes']}"
+        )
+        uv_text = (
+            f"stream@{row['UvMeshPayloadOffset']}/"
+            f"#{row['UvBlockIndex']} "
+            f"payload={row['UvDeclaredPayloadBytes']}"
+        )
+        md_lines.append(
+            f"| {format_markdown_cell(row['PairLabel'])} "
+            f"| {format_markdown_cell(row['MeshBlock'])} "
+            f"| {format_markdown_cell(row['MeshSize'])} "
+            f"| {format_markdown_cell(position_text)} "
+            f"| {format_markdown_cell(normal_text)} "
+            f"| {format_markdown_cell(uv_text)} "
+            f"| {format_markdown_cell(row['PairingCount'])} "
+            f"| {format_markdown_cell(row['ExtraStreamCount'])} |"
+        )
+    md_lines += [
+        "",
+        "Interpretation: shared position stream blocks across sibling meshes are "
+        "a narrow parser-search clue. Normal/UV streams remain separate "
+        "sibling-local blocks, and no OBJ/export gate is changed.",
     ]
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
-    print("\n--- PositionSourceSiblingProbeReport candidate-only sibling probes")
+    print("\n--- PositionSourceSiblingProbeReport candidate-only sibling position-source comparison")
     print(
         f"{'PairLabel':<45} {'Id':<18} {'MeshBlocks':<22} "
-        f"{'MeshSizes':<12} {'SharedPosition'}"
+        f"{'MeshSizes':<12} {'VertexCount':<11} {'SharedPositionStream'}"
     )
     print("-" * 140)
     for ps_item in pair_summaries:
         print(
             f"{str(ps_item['PairLabel']):<45} {str(ps_item['Id']):<18} "
             f"{str(ps_item['MeshBlocks']):<22} {str(ps_item['MeshSizes']):<12} "
-            f"{ps_item['SharedPositionBlock']}"
+            f"{str(ps_item['VertexCount']):<11} {ps_item['SharedPositionStream']}"
         )
     print(f"PositionSourceSiblingProbeReport JSON: {json_path}")
     print(f"PositionSourceSiblingProbeReport markdown: {md_path}")
     print(
-        "PositionSourceSiblingProbeReport passed: sibling source leads "
-        "stayed candidate-only."
+        "PositionSourceSiblingProbeReport passed: sibling position-source "
+        "evidence stayed candidate-only and no geometry/export truth was promoted."
     )
 
 # ============================================================================
