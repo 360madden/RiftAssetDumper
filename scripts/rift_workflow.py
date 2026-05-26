@@ -5913,9 +5913,21 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
     scanner_path = REPO_ROOT / "scripts" / "live_memory_scanner.py"
     scanner_schema_path = REPO_ROOT / "docs" / "schemas" / "live-memory-scan-plan-v1.schema.json"
     step48_targets_path = REPO_ROOT / "docs" / "live-memory-scan-targets.json"
+    step48_status_path = REPO_ROOT / "docs" / "live-memory-step48-status.json"
     step_46_complete = safety_boundary_path.exists()
     step_47_complete = scanner_path.exists() and scanner_schema_path.exists() and "scan-live-memory" in COMMAND_MAP
     step_48_manifest_ready = step48_targets_path.exists()
+    step_48_status: dict[str, Any] = {}
+    if step48_status_path.exists():
+        try:
+            step_48_status = json.loads(step48_status_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            step_48_status = {}
+    step_48_live_read_executed = (
+        step_48_status.get("SchemaVersion") == "live-memory-step48-status/v1"
+        and step_48_status.get("CandidateOnly") is True
+        and step_48_status.get("LiveReadExecuted") is True
+    )
     current_step = 46
     current_step_name = "Design live memory scan safety boundary"
     completed_step_count = 45
@@ -5927,6 +5939,10 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         current_step = 48
         current_step_name = "Scan for @264/#15 index buffer pattern in live memory"
         completed_step_count = 47
+    if step_48_live_read_executed:
+        current_step = 49
+        current_step_name = "Scan for position float3 clusters matching mesh bounds"
+        completed_step_count = 48
     return {
         "SchemaVersion": "fifty-step-plan-status/v1",
         "PlanPath": _display_path(plan_path),
@@ -5935,18 +5951,24 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         "ScannerPath": _display_path(scanner_path),
         "LiveScanSchemaPath": _display_path(scanner_schema_path),
         "Step48TargetsPath": _display_path(step48_targets_path),
+        "Step48StatusPath": _display_path(step48_status_path),
         "TotalSteps": 50,
         "CompletedStepCount": completed_step_count,
         "CurrentStageNumber": 5,
         "CurrentStageName": "Live-Game Safe Read-Only Validation",
         "CurrentStepNumber": current_step,
         "CurrentStepName": current_step_name,
-        "CurrentStepStatus": "in-progress" if step_48_manifest_ready else "next" if step_46_complete else "in-progress",
+        "CurrentStepStatus": (
+            "next" if step_48_live_read_executed else "in-progress" if step_48_manifest_ready else "next" if step_46_complete else "in-progress"
+        ),
         "Step46SafetyBoundaryComplete": step_46_complete,
         "Step47ScannerImplemented": step_47_complete,
         "Step48DryRunManifestReady": step_48_manifest_ready,
-        "LiveProcessReadExecuted": False,
-        "LiveProcessReadApprovedForThisRun": False,
+        "Step48LiveReadExecuted": step_48_live_read_executed,
+        "Step48PatternFound": step_48_status.get("Found") if step_48_live_read_executed else None,
+        "Step48Provider": step_48_status.get("Provider", "") if step_48_live_read_executed else "",
+        "LiveProcessReadExecuted": step_48_live_read_executed,
+        "LiveProcessReadApprovedForThisRun": bool(step_48_status.get("LiveReadApproved")) if step_48_live_read_executed else False,
         "ParserExportPromotionAllowed": False,
         "Stages": [
             {
@@ -5989,6 +6011,9 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 "Name": "Live-Game Safe Read-Only Validation",
                 "StepRange": "46-50",
                 "Status": (
+                    "step-49-next"
+                    if step_48_live_read_executed
+                    else
                     "step-48-in-progress"
                     if step_48_manifest_ready
                     else "step-48-next"
@@ -5998,6 +6023,10 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                     else "step-46-in-progress"
                 ),
                 "Evidence": (
+                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    "docs/live-memory-scan-targets.json; docs/live-memory-step48-status.json"
+                    if step_48_live_read_executed
+                    else
                     "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
                     "docs/live-memory-scan-targets.json"
                     if step_48_manifest_ready
@@ -6009,13 +6038,22 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 ),
             },
         ],
-        "Blockers": [
-            "live-process-read-not-executed",
-            "step-48-live-index-pattern-scan-not-executed",
-            "steps-48-through-50-not-complete",
-        ],
+        "Blockers": (
+            [
+                "step-49-position-float3-cluster-scan-not-executed",
+                "step-50-final-handoff-not-complete",
+            ]
+            if step_48_live_read_executed
+            else [
+                "live-process-read-not-executed",
+                "step-48-live-index-pattern-scan-not-executed",
+                "steps-48-through-50-not-complete",
+            ]
+        ),
         "NextAction": (
-            "Run scan-live-memory dry-run for the @264/#15 big-endian strip prefix and review exact PID/pattern/limits "
+            "Define Step 49 position float3 cluster scan targets from guarded static bounds before running another live read."
+            if step_48_live_read_executed
+            else "Run scan-live-memory dry-run for the @264/#15 big-endian strip prefix and review exact PID/pattern/limits "
             "before any separately approved live read."
             if step_47_complete
             else "Implement scan-live-memory behind explicit --experimental-live and dry-run/list modes; "
@@ -6037,6 +6075,10 @@ def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
     print(f"Step 46 safety boundary complete: {str(status['Step46SafetyBoundaryComplete']).lower()}")
     print(f"Step 47 scanner implemented: {str(status['Step47ScannerImplemented']).lower()}")
     print(f"Step 48 dry-run manifest ready: {str(status['Step48DryRunManifestReady']).lower()}")
+    print(f"Step 48 live read executed: {str(status['Step48LiveReadExecuted']).lower()}")
+    print(f"Step 48 pattern found: {status['Step48PatternFound']}")
+    if status["Step48Provider"]:
+        print(f"Step 48 provider: {status['Step48Provider']}")
     print(f"Live process read executed: {str(status['LiveProcessReadExecuted']).lower()}")
     print("Blockers:")
     for blocker in status["Blockers"]:

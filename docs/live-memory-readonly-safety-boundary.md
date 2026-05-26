@@ -12,6 +12,11 @@ Allowed target:
 
 - `rift_x64.exe` only.
 
+Preferred scanner provider:
+
+- Use RiftReader.Reader (`C:/RIFT MODDING/RiftReader/scripts/run-reader.cmd`) for live reads when it already exposes the needed scan mode.
+- Assets-local scanner code is a dry-run contract/fallback lane, not the preferred live-read provider.
+
 Allowed access intent:
 
 - Read-only pattern validation for known static discoveries:

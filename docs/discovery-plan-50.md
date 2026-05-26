@@ -1,14 +1,14 @@
 # 50-Step Autonomous Discovery Plan
 
 **Created:** 2026-05-20
-**Status:** 🟡 Revived tracker — Stage 5 active, Step 48 in progress
+**Status:** 🟡 Revived tracker — Stage 5 active, Step 49 next
 **Game state:** RIFT client at character selection screen (live process available)
 **Conflict rule:** All outputs under ignored `Exports/discovery-plan/` — never touch shared state
 
 > Current position note (2026-05-26): this original 50-step plan was later superseded by
 > `docs/current-status.md` and staged handoffs for offline geometry/export work. Steps 1-45
 > are now treated as complete/superseded by that later evidence. Step 46 is complete via
-> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 dry-run targets are wired and the actual live read remains gated.
+> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 live read completed through RiftReader and remains candidate-only.
 
 ---
 
@@ -371,9 +371,9 @@
 
 ### Step 48 — Scan for @264/#15 index buffer pattern in live memory
 - [x] Pattern target manifest: `00010002000200010003000400050006...` (big-endian strip prefix)
-- [ ] Cross-reference found addresses against known mesh vertex counts
-- [ ] Report: found/not-found, addresses, match confidence
-- **Exit:** Live confirmation or contradiction of static index buffer hypothesis
+- [x] Cross-reference found addresses against known mesh vertex counts
+- [x] Report: found/not-found, addresses, match confidence
+- **Exit:** Live confirmation or contradiction of static index buffer hypothesis: `docs/live-memory-step48-status.json`
 
 ### Step 49 — Scan for position float3 clusters matching mesh bounds
 - [ ] For `meshSize=297 v=128`, scan for 128×float3 clusters
@@ -435,4 +435,4 @@ Stage 5 (steps 46-50) ─── Live-game validation (read-only)
 | 2 — Position Discovery | 16-25 | ✅ Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | 3 — Guard Migration | 26-35 | ✅ Complete/superseded | Python guards/workflow tests |
 | 4 — Automation Suite | 36-45 | ✅ Complete/superseded | `discovery-suite` and Stage 14+ handoffs |
-| 5 — Live Validation | 46-50 | 🟡 Active: Step 48 in progress | `docs/live-memory-readonly-safety-boundary.md`; `scripts/live_memory_scanner.py`; `docs/live-memory-scan-targets.json` |
+| 5 — Live Validation | 46-50 | 🟡 Active: Step 49 next | `docs/live-memory-step48-status.json` |

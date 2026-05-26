@@ -1,0 +1,22 @@
+{
+  "SchemaVersion": "live-memory-step48-status/v1",
+  "CandidateOnly": true,
+  "Step": 48,
+  "Provider": "RiftReader.Reader",
+  "PatternLabel": "stage5_step48_at264_index_strip_prefix",
+  "PatternHex": "00010002000200010003000400050006",
+  "LiveReadApproved": true,
+  "LiveReadExecuted": true,
+  "Found": true,
+  "ProcessName": "rift_x64",
+  "OutputKind": "module-pattern-scan",
+  "ExitCode": 0,
+  "ModuleName": "rift_x64.exe",
+  "ModuleFileName": "%RIFT_LIVE%\\rift_x64.exe",
+  "RelativeOffsetHex": "0x2719751",
+  "Address": "0x7FF78F239751",
+  "ContextBytesHex": "00010002000200010003000400050006",
+  "GeneratedReportPolicy": "ignored under Exports/discovery-plan/stage5-live",
+  "ParserExportPromotionAllowed": false,
+  "NextStep": "Step 49 - scan for position float3 clusters matching mesh bounds"
+}

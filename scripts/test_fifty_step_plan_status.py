@@ -37,8 +37,12 @@ def check_contains(desc: str, text: str, expected: str) -> None:
 
 
 schema = json.loads(Path("docs/schemas/fifty-step-plan-status-v1.schema.json").read_text(encoding="utf-8"))
+step48_schema = json.loads(Path("docs/schemas/live-memory-step48-status-v1.schema.json").read_text(encoding="utf-8"))
+step48_status = json.loads(Path("docs/live-memory-step48-status.json").read_text(encoding="utf-8"))
 
 print("=== 50-step plan status JSON ===")
+jsonschema.validate(step48_status, step48_schema)
+print("  PASS: Step 48 live scan status schema validation")
 output = StringIO()
 with patch.object(sys, "argv", ["rift_workflow.py", "fifty-step-plan-status", "--list-json"]), redirect_stdout(output):
     rift_workflow.main()
@@ -47,17 +51,20 @@ jsonschema.validate(status, schema)
 print("  PASS: 50-step plan status schema validation")
 check("schema version", status["SchemaVersion"], "fifty-step-plan-status/v1")
 check("total steps", status["TotalSteps"], 50)
-check("completed step count", status["CompletedStepCount"], 47)
+check("completed step count", status["CompletedStepCount"], 48)
 check("current stage", status["CurrentStageNumber"], 5)
-check("current step", status["CurrentStepNumber"], 48)
-check("current step status", status["CurrentStepStatus"], "in-progress")
+check("current step", status["CurrentStepNumber"], 49)
+check("current step status", status["CurrentStepStatus"], "next")
 check("step 46 boundary complete", status["Step46SafetyBoundaryComplete"], True)
 check("step 47 scanner implemented", status["Step47ScannerImplemented"], True)
 check("step 48 dry-run manifest ready", status["Step48DryRunManifestReady"], True)
-check("live process read not executed", status["LiveProcessReadExecuted"], False)
-check("live process read not approved for this run", status["LiveProcessReadApprovedForThisRun"], False)
+check("step 48 live read executed", status["Step48LiveReadExecuted"], True)
+check("step 48 pattern found", status["Step48PatternFound"], True)
+check("step 48 provider", status["Step48Provider"], "RiftReader.Reader")
+check("live process read executed", status["LiveProcessReadExecuted"], True)
+check("live process read approved for this run", status["LiveProcessReadApprovedForThisRun"], True)
 check("parser/export promotion remains blocked", status["ParserExportPromotionAllowed"], False)
-check_contains("next action names scanner", status["NextAction"], "scan-live-memory")
+check_contains("next action names Step 49", status["NextAction"], "Step 49")
 
 print("=== 50-step plan status text ===")
 text_output = StringIO()
@@ -65,7 +72,7 @@ with patch.object(sys, "argv", ["rift_workflow.py", "fifty-step-plan-status"]), 
     rift_workflow.main()
 text = text_output.getvalue()
 check_contains("text status title", text, "FiftyStepPlanStatus")
-check_contains("text current step", text, "Step 48")
+check_contains("text current step", text, "Step 49")
 
 print(f"\n{'=' * 50}")
 if failed:

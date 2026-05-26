@@ -10,10 +10,10 @@ Current position in that plan:
 
 ```text
 Stage 5 — Live-Game Safe Read-Only Validation
-Current step: Step 48 — Scan for @264/#15 index buffer pattern in live memory (dry-run target wired; live read gated)
+Current/next step: Step 49 — Scan for position float3 clusters matching mesh bounds
 ```
 
-Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core.
+Step 46 is complete via `docs/live-memory-readonly-safety-boundary.md`. Step 47 is complete via the gated `scan-live-memory` workflow command and fixture-backed scanner core. Step 48 is complete via the preferred RiftReader live-memory scanner provider.
 
 ## Why this is Step 48
 
@@ -26,7 +26,7 @@ The repo later completed or superseded the original offline steps through Stage 
 | Stage 2 — Position Source Discovery | 16-25 | Complete/superseded | `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` |
 | Stage 3 — Proof Guard Migration | 26-35 | Complete/superseded | Python guards and workflow tests |
 | Stage 4 — Discovery Automation Suite | 36-45 | Complete/superseded | `discovery-suite` command and Stage 14+ handoffs |
-| Stage 5 — Live Read-Only Validation | 46-50 | Active | Steps 46-47 complete; Step 48 in progress |
+| Stage 5 — Live Read-Only Validation | 46-50 | Active | Steps 46-48 complete; Step 49 next |
 
 ## Active safety boundary
 
@@ -35,17 +35,18 @@ The Stage 5 live validation lane is high-risk and must remain read-only.
 Current boundary:
 
 - Safety boundary doc exists: `docs/live-memory-readonly-safety-boundary.md`
-- Actual live process read executed: **false**
+- Actual live process read executed: **true**
 - Live process scanner implemented: **true**
 - Step 48 dry-run target manifest ready: **true**
+- Step 48 live pattern found by RiftReader: **true**
 - Parser/export promotion allowed: **false**
 
 ## Next action
 
-Implement Step 48 as a dry-run live-index scan plan first:
+Implement Step 49 as a manifest-backed position-cluster scan plan first:
 
-1. Generate or review the tracked dry-run plan with `python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json`.
-2. Review the exact PID, pattern, output paths, and limits before any live read.
-3. Keep actual live reads gated behind `--execute-live-read --experimental-live --confirm-live-read --pid`.
+1. Derive bounded float3 cluster byte patterns from guarded static decode/bounds evidence.
+2. Put Step 49 targets in a candidate-only manifest before any scan.
+3. Prefer the RiftReader memory scanner/provider for live reads.
 4. Write any live evidence only under ignored `Exports/discovery-plan/stage5-live/`.
 5. Do not promote parser/export behavior from live evidence without a later guard-backed patch.
