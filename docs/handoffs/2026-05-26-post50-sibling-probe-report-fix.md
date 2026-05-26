@@ -34,6 +34,14 @@ ignored candidate-only outputs under `Exports/`:
 - `Exports/position-source-sibling-probe-report.md`
 - representative, secondary, and extra-position sibling reports
 
+## Schema follow-up
+
+Added `docs/schemas/position-source-sibling-probe-report-v1.schema.json` and
+validated the fixture-backed sibling probe report against it in
+`scripts/test_rift_workflow_reports.py`. The schema keeps the report
+candidate-only and fail-closed around the exact shared-position evidence fields
+used by the workflow.
+
 ## Known blockers / uncertainty
 
 - The report remains candidate-only. Shared position-stream evidence is a
@@ -44,10 +52,9 @@ ignored candidate-only outputs under `Exports/`:
 
 ## Next recommended actions
 
-1. Add schema validation for `position-source-sibling-probe-report/v1`.
-2. Use the repaired report to keep the post-50 source-binding lane focused on
+1. Use the repaired/schema-validated report to keep the post-50 source-binding lane focused on
    meshSize `329` stream `@212`.
-3. Classify the meshSize `329` mesh `#34` extra `@304/#57` position-like stream
+2. Classify the meshSize `329` mesh `#34` extra `@304/#57` position-like stream
    as candidate-only source-binding evidence.
-4. Keep residual payload `288` evidence separate from sibling source-binding
+3. Keep residual payload `288` evidence separate from sibling source-binding
    reports until a strict parser/export promotion gate exists.

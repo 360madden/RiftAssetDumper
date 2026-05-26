@@ -484,6 +484,18 @@ with TemporaryDirectory() as temp_dir_name:
         sibling_md.read_text(encoding="utf-8"),
         "## Probe rows",
     )
+    sibling_schema = json.loads(
+        Path("docs/schemas/position-source-sibling-probe-report-v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    check_contains(
+        "sibling schema version",
+        str(sibling_schema["properties"]["Schema"]["const"]),
+        str(sibling_report["Schema"]),
+    )
+    jsonschema.validate(sibling_report, sibling_schema)
+    print("  PASS: sibling probe schema validation")
 
 print("=== MeshProbe Ghidra pairing summary ===")
 with TemporaryDirectory() as temp_dir:

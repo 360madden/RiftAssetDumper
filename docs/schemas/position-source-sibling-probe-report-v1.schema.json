@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/position-source-sibling-probe-report-v1.schema.json",
+  "title": "Position source sibling probe report v1",
+  "description": "Candidate-only report emitted by `python scripts/rift_workflow.py position-source-sibling-probe-report`. Shared position streams are discovery/search evidence only and do not promote parser, geometry, or export truth.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "SourceProbes",
+    "PairSummaries",
+    "ProbeRows",
+    "Interpretation"
+  ],
+  "properties": {
+    "Schema": { "const": "position-source-sibling-probe-report/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceProbes": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "PairSummaries": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/pairSummary" }
+    },
+    "ProbeRows": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/probeRow" }
+    },
+    "Interpretation": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hex16": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "pairSummary": {
+      "type": "object",
+      "required": [
+        "Pair",
+        "PairLabel",
+        "Id",
+        "MeshBlocks",
+        "MeshSizes",
+        "VertexCount",
+        "PrimaryTopology",
+        "SharedPositionStream",
+        "PositionOffsetPattern",
+        "NormalStreams",
+        "UvStreams",
+        "Decision"
+      ],
+      "properties": {
+        "Pair": { "$ref": "#/$defs/nonEmptyString" },
+        "PairLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "Id": { "$ref": "#/$defs/hex16" },
+        "MeshBlocks": { "$ref": "#/$defs/nonEmptyString" },
+        "MeshSizes": { "$ref": "#/$defs/nonEmptyString" },
+        "VertexCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryTopology": { "$ref": "#/$defs/nonEmptyString" },
+        "SharedPositionStream": { "$ref": "#/$defs/nonEmptyString" },
+        "PositionOffsetPattern": { "$ref": "#/$defs/nonEmptyString" },
+        "NormalStreams": { "$ref": "#/$defs/nonEmptyString" },
+        "UvStreams": { "$ref": "#/$defs/nonEmptyString" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "probeRow": {
+      "type": "object",
+      "required": [
+        "Pair",
+        "PairLabel",
+        "Id",
+        "MeshBlock",
+        "MeshSize",
+        "VertexCount",
+        "PrimaryTopology",
+        "TopologyConfidence",
+        "PositionMeshPayloadOffset",
+        "PositionBlockIndex",
+        "PositionDeclaredPayloadBytes",
+        "PositionDataStreamUsage",
+        "PositionDataStreamAccess",
+        "PositionRole",
+        "NormalMeshPayloadOffset",
+        "NormalBlockIndex",
+        "NormalDeclaredPayloadBytes",
+        "UvMeshPayloadOffset",
+        "UvBlockIndex",
+        "UvDeclaredPayloadBytes",
+        "PairingCount",
+        "ExtraStreamCount",
+        "ProbePath"
+      ],
+      "properties": {
+        "Pair": { "$ref": "#/$defs/nonEmptyString" },
+        "PairLabel": { "$ref": "#/$defs/nonEmptyString" },
+        "Id": { "$ref": "#/$defs/hex16" },
+        "MeshBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshSize": { "$ref": "#/$defs/nonNegativeInteger" },
+        "VertexCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PrimaryTopology": { "$ref": "#/$defs/nonEmptyString" },
+        "TopologyConfidence": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionMeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionDeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PositionDataStreamUsage": { "$ref": "#/$defs/nonEmptyString" },
+        "PositionDataStreamAccess": { "$ref": "#/$defs/nonEmptyString" },
+        "PositionRole": { "$ref": "#/$defs/nonEmptyString" },
+        "NormalMeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "NormalBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "NormalDeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "UvMeshPayloadOffset": { "$ref": "#/$defs/nonNegativeInteger" },
+        "UvBlockIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "UvDeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PairingCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ExtraStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ProbePath": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
