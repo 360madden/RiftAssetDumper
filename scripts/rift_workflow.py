@@ -6239,6 +6239,8 @@ def _run_fifty_step_plan_status(args: argparse.Namespace) -> None:
 POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
     "PositionSourceGap": "position-source-gap-report.json",
     "PositionSourceSiblingFamily": "position-source-sibling-family-report.json",
+    "PositionSourceSiblingProbe": "position-source-sibling-probe-report.json",
+    "PositionSourceSiblingExtraPosition": "position-source-sibling-extra-position-report.json",
     "ResidualPositionClassifier": "residual-position-classifier-report.json",
     "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
 }
@@ -6329,6 +6331,34 @@ def _post50_lane_from_sibling_family(row: dict[str, Any], rank: int) -> dict[str
         "ExportReady": False,
         "Rationale": "highest repeated sibling-family evidence; prove source binding before export changes",
         "Decision": str(row.get("Decision", "")),
+    }
+
+
+def _post50_lane_from_extra_position(rows: list[dict[str, Any]], rank: int) -> dict[str, Any]:
+    """Create a post-50 lane from mesh#34 extra-position sibling evidence."""
+    payloads: list[str] = []
+    for row in rows:
+        extra_text = str(row.get("Mesh34ExtraPosition", ""))
+        match = re.search(r"payload=(\d+)", extra_text)
+        if match:
+            payloads.append(match.group(1))
+    payload_label = ",".join(sorted(set(payloads), key=lambda item: int(item))) if payloads else "unknown"
+    return {
+        "Rank": rank,
+        "Lane": "source-binding-extra-position",
+        "MeshSize": 329,
+        "Stream": "mesh#34 @304/#57",
+        "Payload": None,
+        "EvidenceGroups": len(rows),
+        "TotalStreamLinks": len(rows),
+        "Plausible": None,
+        "StrictPass": None,
+        "ExportReady": False,
+        "Rationale": (
+            "mesh#34 extra position-like stream repeats across source-binding "
+            f"siblings; payloads={payload_label}"
+        ),
+        "Decision": "candidate-only source-binding oddity; classify before parser/export changes",
     }
 
 
@@ -6429,10 +6459,13 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
 
     gap_rows = _dict_rows(reports["PositionSourceGap"], "Rows")
     mesh325_gap = next((row for row in gap_rows if _as_rank_int(row.get("MeshSize")) == 325), {})
+    extra_position_rows = _dict_rows(reports["PositionSourceSiblingExtraPosition"], "PairSummaries")
 
     lanes: list[dict[str, Any]] = []
     if top_sibling:
         lanes.append(_post50_lane_from_sibling_family(top_sibling, len(lanes) + 1))
+    if extra_position_rows:
+        lanes.append(_post50_lane_from_extra_position(extra_position_rows, len(lanes) + 1))
     if top_residual:
         lanes.append(_post50_lane_from_residual(top_residual, len(lanes) + 1))
     if top_cluster:
@@ -6446,14 +6479,18 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
         blockers.append("residual-cluster-no-complete-geometry-binding")
     if mesh325_gap and _as_rank_int(mesh325_gap.get("ResidualStreamCount")) == 0:
         blockers.append("mesh325-position-source-sparse-no-residuals")
+    if extra_position_rows:
+        blockers.append("mesh329-extra-position-like-stream-candidate-only")
     blockers.append("parser-export-promotion-not-allowed")
 
     recommended_lane = lanes[0]["Lane"] if lanes else "refresh-post50-position-source-reports"
     next_action = (
         "Run the post-50 offline report refresh commands before choosing a proof lane."
         if missing_reports
-        else "Start a focused meshSize=329 stream@212 source-binding proof slice; keep residual "
-        "meshSize=305 payload 288 candidate-only until strict thresholds and geometry bindings pass."
+        else "Start a focused meshSize=329 stream@212 source-binding proof slice; classify mesh#34 "
+        "@304/#57 extra position-like streams as candidate-only source-binding oddities, and keep "
+        "residual meshSize=305 payload 288 candidate-only until strict thresholds and geometry "
+        "bindings pass."
     )
 
     return {

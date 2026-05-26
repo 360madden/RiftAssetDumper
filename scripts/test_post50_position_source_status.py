@@ -84,6 +84,65 @@ with tempfile.TemporaryDirectory() as tmp:
         ),
         encoding="utf-8",
     )
+    (out_dir / "position-source-sibling-probe-report.json").write_text(
+        json.dumps(
+            {
+                "Schema": "position-source-sibling-probe-report/v1",
+                "CandidateOnly": True,
+                "PairSummaries": [
+                    {
+                        "Pair": "8e016329",
+                        "PairLabel": "meshSize 329 repeated-position sibling",
+                        "Id": "8e01613d7ce9e297",
+                        "MeshBlocks": "mesh#6, mesh#31",
+                        "MeshSizes": "329, 329",
+                        "VertexCount": 93,
+                        "PrimaryTopology": "implicit-triangle-list-candidate",
+                        "SharedPositionStream": (
+                            "block#25 payload=1116 usage=1 access=19 "
+                            "role=position-float3-ror1-lead"
+                        ),
+                        "PositionOffsetPattern": "same mesh payload offset",
+                        "NormalStreams": "mesh#6:block#26 payload=1116 | mesh#31:block#45 payload=1116",
+                        "UvStreams": "mesh#6:block#30 payload=744 | mesh#31:block#49 payload=744",
+                        "Decision": "shared-position-stream sibling evidence; candidate-only",
+                    }
+                ],
+                "ProbeRows": [],
+                "Interpretation": "candidate-only",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (out_dir / "position-source-sibling-extra-position-report.json").write_text(
+        json.dumps(
+            {
+                "Schema": "position-source-sibling-extra-position-report/v1",
+                "CandidateOnly": True,
+                "PairSummaries": [
+                    {
+                        "Pair": "mesh329extra0364",
+                        "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                        "Id": "0364ea142bc00ce7",
+                        "SharedPrimaryPosition": "block#28 payload=576 offsets=@212/@212",
+                        "Mesh34ExtraPosition": "@304/#57 payload=240 position-float3-ror1-lead",
+                        "Decision": "mesh#34 extra @304/#57 position-like stream repeats",
+                    },
+                    {
+                        "Pair": "mesh329extra04de",
+                        "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                        "Id": "04de901531a091ab",
+                        "SharedPrimaryPosition": "block#28 payload=444 offsets=@212/@212",
+                        "Mesh34ExtraPosition": "@304/#57 payload=280 position-float3-ror1-lead",
+                        "Decision": "mesh#34 extra @304/#57 position-like stream repeats",
+                    },
+                ],
+                "ProbeRows": [],
+                "Interpretation": "candidate-only",
+            }
+        ),
+        encoding="utf-8",
+    )
     (out_dir / "residual-position-classifier-report.json").write_text(
         json.dumps(
             {
@@ -139,15 +198,19 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: post-50 status schema validation")
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
+    check("report status count", len(status["ReportStatuses"]), 6)
     check("recommended lane", status["RecommendedLane"], "source-binding-family")
-    check("lane count", len(status["CandidateLanes"]), 3)
+    check("lane count", len(status["CandidateLanes"]), 4)
     check("top lane mesh", status["CandidateLanes"][0]["MeshSize"], 329)
     check("top lane stream", status["CandidateLanes"][0]["Stream"], "stream@212")
-    check("residual payload lane", status["CandidateLanes"][1]["Payload"], 288)
-    check("cluster structure lane", status["CandidateLanes"][2]["Rationale"], "magic-43606-u16-ternary-alternating")
+    check("extra-position lane", status["CandidateLanes"][1]["Lane"], "source-binding-extra-position")
+    check("extra-position stream", status["CandidateLanes"][1]["Stream"], "mesh#34 @304/#57")
+    check("residual payload lane", status["CandidateLanes"][2]["Payload"], 288)
+    check("cluster structure lane", status["CandidateLanes"][3]["Rationale"], "magic-43606-u16-ternary-alternating")
     check("mesh325 residual disposition", status["Mesh325Disposition"]["ResidualStreamCount"], 0)
     check("promotion locked", status["ParserExportPromotionAllowed"], False)
     check_contains("strict blocker", "\n".join(status["Blockers"]), "residual-position-strict-threshold-not-met")
+    check_contains("extra-position blocker", "\n".join(status["Blockers"]), "mesh329-extra-position-like-stream")
     check_contains("next action", status["NextAction"], "meshSize=329 stream@212")
 
 with tempfile.TemporaryDirectory() as tmp:

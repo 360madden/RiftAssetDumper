@@ -42,6 +42,15 @@ validated the fixture-backed sibling probe report against it in
 candidate-only and fail-closed around the exact shared-position evidence fields
 used by the workflow.
 
+## Post-50 status integration follow-up
+
+Updated `post50-position-source-status` so it now reads the repaired sibling
+probe report and the extra-position sibling report alongside the four earlier
+post-50 reports. The status payload now surfaces a ranked
+`source-binding-extra-position` lane for meshSize `329` mesh `#34`
+`@304/#57`, keeping it explicitly candidate-only and blocked from parser/export
+promotion.
+
 ## Known blockers / uncertainty
 
 - The report remains candidate-only. Shared position-stream evidence is a
@@ -54,7 +63,7 @@ used by the workflow.
 
 1. Use the repaired/schema-validated report to keep the post-50 source-binding lane focused on
    meshSize `329` stream `@212`.
-2. Classify the meshSize `329` mesh `#34` extra `@304/#57` position-like stream
-   as candidate-only source-binding evidence.
+2. Build a narrow classification/checklist for meshSize `329` mesh `#34`
+   extra `@304/#57` before any parser/export behavior changes.
 3. Keep residual payload `288` evidence separate from sibling source-binding
    reports until a strict parser/export promotion gate exists.
