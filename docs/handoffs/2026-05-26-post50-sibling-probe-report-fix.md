@@ -59,6 +59,12 @@ Documented `docs/post50-source-binding-extra-position-checklist.md` so the
 meshSize `329` mesh `#34` `@304/#57` lane has explicit candidate-only
 promotion gates and non-goals before any parser/export work.
 
+Ran three offline experimental decode probes for meshSize `329` mesh `#34`
+examples. All exited `1` with export blocked. The fallback decoder selected the
+shared primary `@212/#28` position candidate first and left `@304/#57` as a
+smaller secondary position-like stream, strengthening the candidate-only
+classification rather than promoting export readiness.
+
 ## Known blockers / uncertainty
 
 - The report remains candidate-only. Shared position-stream evidence is a
@@ -71,7 +77,7 @@ promotion gates and non-goals before any parser/export work.
 
 1. Use the repaired/schema-validated report to keep the post-50 source-binding lane focused on
    meshSize `329` stream `@212`.
-2. Build the focused, ignored byte-level comparison report requested by
-   `docs/post50-source-binding-extra-position-checklist.md`.
+2. If further automation is worth it, convert the offline decode probe summary
+   into a generated ignored comparison report with schema validation.
 3. Keep residual payload `288` evidence separate from sibling source-binding
    reports until a strict parser/export promotion gate exists.

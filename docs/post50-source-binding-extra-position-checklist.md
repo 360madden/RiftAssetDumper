@@ -56,6 +56,32 @@ Current hard blockers:
 | Generated-output safety | `generated-output-guard` passes before commit; ignored `Exports/` reports are not staged. |
 | Promotion patch discipline | Parser/export behavior changes, if ever justified, must be a separate guarded patch after this checklist is satisfied. |
 
+## Latest offline decode probes
+
+On 2026-05-26, three offline `decode-geometry --experimental-position-source`
+probes were run against the current meshSize `329` mesh `#34` examples:
+
+```powershell
+python scripts/rift_workflow.py decode-geometry --id 0364ea142bc00ce7 --mesh-block 34 --experimental-position-source --skip-build
+python scripts/rift_workflow.py decode-geometry --id 04de901531a091ab --mesh-block 34 --experimental-position-source --skip-build
+python scripts/rift_workflow.py decode-geometry --id 066fa520a8ce62e3 --mesh-block 34 --experimental-position-source --skip-build
+```
+
+All three exited `1`, which keeps export blocked. The useful candidate-only
+evidence is that the fallback decoder chooses the shared primary `@212/#28`
+stream first and treats `@304/#57` as a second, smaller position-like stream:
+
+| ID | Primary position candidate | Extra position-like candidate | Normal coverage | Result |
+|---|---|---|---|---|
+| `0364ea142bc00ce7` | `@212/#28`, vertexCount 48 | `@304/#57`, vertexCount 20 | 30/48 | exit 1; export blocked |
+| `04de901531a091ab` | `@212/#28`, vertexCount 37 | `@304/#57`, vertexCount 23 | 35/37 | exit 1; export blocked |
+| `066fa520a8ce62e3` | `@212/#28`, vertexCount 22 | `@304/#57`, vertexCount 8 | 12/22 | exit 1; export blocked |
+
+Interpretation: `@304/#57` repeats as position-like evidence, but it is not the
+primary fallback position source and its smaller vertex counts make it an
+unproven side/secondary stream. This supports the current blocker
+`mesh329-extra-position-like-stream-candidate-only`.
+
 ## Explicit non-goals until promotion
 
 - Do not feed `@304/#57` into `DecodeNifGeometry`.
