@@ -4765,6 +4765,280 @@ def post50_mesh329_source_binding_compare(
     print("Post50Mesh329SourceBindingCompare passed: findings remain candidate-only.")
     return json_path, md_path
 
+
+def _int_list(raw: object) -> list[int]:
+    """Return integer values from a JSON list field."""
+    if not isinstance(raw, list):
+        return []
+    return [safe_int(item) for item in raw if not isinstance(item, dict)]
+
+
+def _mesh_size_count(row: dict[str, Any], mesh_size: int) -> int:
+    """Return the count for a mesh-size entry in a TopPositionSourceSiblings row."""
+    sizes = row.get("MeshSizes")
+    if not isinstance(sizes, list):
+        return 0
+    for item in sizes:
+        if isinstance(item, dict) and safe_int(item.get("Size")) == mesh_size:
+            return safe_int(item.get("Count"))
+    return 0
+
+
+def _family_sample_summary(sample: dict[str, Any]) -> dict[str, Any]:
+    """Return a slim, repo-safe sample summary for the mesh329 family proof."""
+    stream = sample.get("Stream") if isinstance(sample.get("Stream"), dict) else {}
+    return {
+        "ArchiveName": str(sample.get("ArchiveName", "")),
+        "EntryIndex": safe_int(sample.get("EntryIndex")),
+        "IdPrefix": str(sample.get("IdPrefix", "")),
+        "MeshBlockIndex": safe_int(sample.get("MeshBlockIndex")),
+        "MeshSize": safe_int(sample.get("MeshSize")),
+        "MeshPayloadOffset": safe_int(stream.get("MeshPayloadOffset")) if isinstance(stream, dict) else 0,
+        "TargetBlockIndex": safe_int(stream.get("TargetBlockIndex")) if isinstance(stream, dict) else 0,
+        "DeclaredPayloadBytes": safe_int(stream.get("DeclaredPayloadBytes")) if isinstance(stream, dict) else 0,
+        "DataStreamUsage": str(stream.get("DataStreamUsage", "")) if isinstance(stream, dict) else "",
+        "DataStreamAccess": str(stream.get("DataStreamAccess", "")) if isinstance(stream, dict) else "",
+        "Role": str(stream.get("RoleStats", {}).get("PrimaryRole", ""))
+        if isinstance(stream, dict) and isinstance(stream.get("RoleStats"), dict)
+        else "",
+        "GhidraStyleLayoutValid": bool(stream.get("GhidraStyleLayoutValid")) if isinstance(stream, dict) else False,
+        "StringValue": str(stream.get("StringValue", "")) if isinstance(stream, dict) else "",
+    }
+
+
+def post50_mesh329_family_proof_report(
+    inventory_path: str | Path,
+    report_dir: str | Path,
+    family_report_path: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Write a candidate-only proof packet for top meshSize=329 source-binding family rows."""
+    inventory_report = load_json_report(inventory_path)
+    if not isinstance(inventory_report, dict):
+        raise ValueError("Post50Mesh329FamilyProof source inventory is not a JSON object.")
+    sibling_rows_raw = inventory_report.get("TopPositionSourceSiblings")
+    if not isinstance(sibling_rows_raw, list):
+        raise ValueError("Post50Mesh329FamilyProof inventory is missing TopPositionSourceSiblings.")
+
+    family_report: dict[str, Any] = {}
+    if family_report_path is not None and Path(family_report_path).exists():
+        loaded_family_report = load_json_report(family_report_path)
+        if isinstance(loaded_family_report, dict):
+            family_report = loaded_family_report
+
+    proof_rows: list[dict[str, Any]] = []
+    for raw_row in sibling_rows_raw:
+        if not isinstance(raw_row, dict):
+            continue
+        mesh_blocks = _int_list(raw_row.get("MeshBlockIndices"))
+        mesh_payload_offsets = _int_list(raw_row.get("MeshPayloadOffsets"))
+        if sorted(mesh_blocks) != [7, 34]:
+            continue
+        if mesh_payload_offsets != [212]:
+            continue
+        if safe_int(raw_row.get("TargetBlockIndex")) != 28:
+            continue
+        if safe_int(raw_row.get("Count")) != 2:
+            continue
+        if safe_int(raw_row.get("DistinctMeshBlocks")) != 2:
+            continue
+        if _mesh_size_count(raw_row, 329) != 2:
+            continue
+        if str(raw_row.get("DataStreamUsage", "")) != "1" or str(raw_row.get("DataStreamAccess", "")) != "19":
+            continue
+        if str(raw_row.get("Role", "")) != "position-float3-ror1-lead":
+            continue
+
+        payload = safe_int(raw_row.get("DeclaredPayloadBytes"))
+        samples_raw = raw_row.get("Samples")
+        samples_iter = samples_raw if isinstance(samples_raw, list) else []
+        sample_summaries = [
+            _family_sample_summary(sample)
+            for sample in samples_iter
+            if isinstance(sample, dict)
+        ]
+        proof_rows.append(
+            {
+                "IdPrefix": str(raw_row.get("IdPrefix", "")),
+                "Pattern": str(raw_row.get("Pattern", "")),
+                "TargetBlockIndex": 28,
+                "DeclaredPayloadBytes": payload,
+                "VectorCount": _payload_vector_count(payload, 12),
+                "PayloadRemainder": payload % 12,
+                "DataStreamUsage": "1",
+                "DataStreamAccess": "19",
+                "Role": "position-float3-ror1-lead",
+                "StreamLinkCount": safe_int(raw_row.get("Count")),
+                "DistinctMeshBlocks": safe_int(raw_row.get("DistinctMeshBlocks")),
+                "MeshBlockIndices": sorted(mesh_blocks),
+                "MeshPayloadOffsets": mesh_payload_offsets,
+                "MeshSize": 329,
+                "SampleCount": len(sample_summaries),
+                "Samples": sample_summaries,
+                "AllSamplesGhidraStyleLayoutValid": all(
+                    bool(sample.get("GhidraStyleLayoutValid")) for sample in sample_summaries
+                ),
+                "CandidateOnly": True,
+                "ExportReady": False,
+                "Decision": (
+                    "candidate-only source-binding family row; shared @212/#28 "
+                    "position stream appears on mesh#7 and mesh#34"
+                ),
+            }
+        )
+
+    if not proof_rows:
+        raise ValueError(
+            "Post50Mesh329FamilyProof found no meshSize=329 mesh#7/#34 stream@212 "
+            "source-binding rows in TopPositionSourceSiblings."
+        )
+
+    proof_rows.sort(key=lambda row: (safe_int(row["DeclaredPayloadBytes"]), str(row["IdPrefix"])))
+    family_rows = family_report.get("Families", [])
+    top_family = {}
+    if isinstance(family_rows, list):
+        top_family = next(
+            (
+                row
+                for row in family_rows
+                if isinstance(row, dict)
+                and safe_int(row.get("MeshSize")) == 329
+                and str(row.get("MeshBlocks", "")) == "mesh#7, mesh#34"
+                and str(row.get("MeshPayloadOffsets", "")) == "stream@212"
+            ),
+            {},
+        )
+
+    evidence_groups = len(proof_rows)
+    total_stream_links = sum(safe_int(row["StreamLinkCount"]) for row in proof_rows)
+    distinct_ids = len({str(row["IdPrefix"]) for row in proof_rows})
+    payloads = sorted({safe_int(row["DeclaredPayloadBytes"]) for row in proof_rows})
+    vector_counts = sorted({safe_int(row["VectorCount"]) for row in proof_rows})
+    payload_remainders = sorted({safe_int(row["PayloadRemainder"]) for row in proof_rows})
+    family_report_consistency = {
+        "FamilyReportPresent": bool(top_family),
+        "EvidenceGroupsMatch": (
+            safe_int(top_family.get("EvidenceGroups")) == evidence_groups if top_family else False
+        ),
+        "TotalStreamLinksMatch": (
+            safe_int(top_family.get("TotalStreamLinks")) == total_stream_links if top_family else False
+        ),
+        "DistinctIdsMatch": safe_int(top_family.get("DistinctIds")) == distinct_ids if top_family else False,
+        "TargetBlocksMatch": str(top_family.get("TargetBlocks", "")) == "block#28" if top_family else False,
+        "PayloadBytesMatch": (
+            str(top_family.get("PayloadBytes", "")) == ", ".join(str(payload) for payload in payloads)
+            if top_family
+            else False
+        ),
+    }
+    blockers = [
+        "source-binding-family-candidate-only",
+        "mesh34-complete-geometry-binding-not-proven",
+        "parser-export-promotion-not-allowed",
+    ]
+    aggregate = {
+        "EvidenceGroups": evidence_groups,
+        "TotalStreamLinks": total_stream_links,
+        "DistinctIds": distinct_ids,
+        "PayloadBytes": payloads,
+        "VectorCounts": vector_counts,
+        "PayloadRemainders": payload_remainders,
+        "AllRowsMeshSize329": True,
+        "AllRowsMeshBlocks7And34": all(row["MeshBlockIndices"] == [7, 34] for row in proof_rows),
+        "AllRowsStreamAt212": all(row["MeshPayloadOffsets"] == [212] for row in proof_rows),
+        "AllRowsTargetBlock28": all(safe_int(row["TargetBlockIndex"]) == 28 for row in proof_rows),
+        "AllRowsUsageAccess1_19": all(
+            row["DataStreamUsage"] == "1" and row["DataStreamAccess"] == "19" for row in proof_rows
+        ),
+        "AllRowsRolePositionFloat3Ror1Lead": all(row["Role"] == "position-float3-ror1-lead" for row in proof_rows),
+        "AllSamplesGhidraStyleLayoutValid": all(
+            bool(row["AllSamplesGhidraStyleLayoutValid"]) for row in proof_rows
+        ),
+        "FamilyReportConsistency": family_report_consistency,
+        "CandidateOnly": True,
+        "ParserExportPromotionAllowed": False,
+        "ExportReady": False,
+        "Decision": (
+            "meshSize=329 stream@212 source-binding family is repeatable and "
+            "matches the family report, but remains candidate-only"
+        ),
+        "Blockers": blockers,
+    }
+
+    out_dir = Path(report_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "post50-mesh329-family-proof.json"
+    md_path = out_dir / "post50-mesh329-family-proof.md"
+    report = {
+        "SchemaVersion": "post50-mesh329-family-proof/v1",
+        "CandidateOnly": True,
+        "SourceInventory": _repo_relative_report_path(inventory_path),
+        "SourceFamilyReport": _repo_relative_report_path(family_report_path) if family_report_path else "",
+        "MeshSize": 329,
+        "MeshBlocks": [7, 34],
+        "MeshPayloadOffset": 212,
+        "TargetBlockIndex": 28,
+        "Role": "position-float3-ror1-lead",
+        "ProofRows": proof_rows,
+        "Aggregate": aggregate,
+        "ParserExportPromotionAllowed": False,
+        "Interpretation": (
+            "Post-50 meshSize=329 source-binding family proof packet. This "
+            "joins inventory-level TopPositionSourceSiblings rows into a "
+            "candidate-only, schema-backed packet for the current top lane. "
+            "It proves repeatability of stream@212/#28 across mesh#7/#34 rows, "
+            "not geometry/export truth."
+        ),
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Post-50 meshSize 329 family proof",
+        "",
+        "Candidate-only proof packet for source-binding family `meshSize=329`, "
+        "`mesh#7/#34`, `stream@212`, `block#28`.",
+        "",
+        f"Source inventory: `{_repo_relative_report_path(inventory_path)}`",
+        "",
+        "| ID | Payload bytes | Vectors | Remainder | Links | Samples valid | Decision |",
+        "|---|---:|---:|---:|---:|---|---|",
+    ]
+    for row in proof_rows:
+        md_lines.append(
+            f"| {format_markdown_cell(row['IdPrefix'])} "
+            f"| {row['DeclaredPayloadBytes']} "
+            f"| {row['VectorCount']} "
+            f"| {row['PayloadRemainder']} "
+            f"| {row['StreamLinkCount']} "
+            f"| {str(row['AllSamplesGhidraStyleLayoutValid']).lower()} "
+            f"| {format_markdown_cell(row['Decision'])} |"
+        )
+    md_lines += [
+        "",
+        "## Aggregate",
+        "",
+        f"- Evidence groups: `{evidence_groups}`",
+        f"- Total stream links: `{total_stream_links}`",
+        f"- Distinct IDs: `{distinct_ids}`",
+        f"- Payload bytes: `{', '.join(str(payload) for payload in payloads)}`",
+        f"- Family report consistency: `{family_report_consistency}`",
+        "- Parser/export promotion: `false`",
+        "",
+        "## Blockers",
+        "",
+    ]
+    md_lines.extend(f"- `{blocker}`" for blocker in blockers)
+    md_lines += ["", "Interpretation: repeatable source-binding family evidence, not export truth."]
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    print("\n--- Post50Mesh329FamilyProof candidate-only source-binding family proof")
+    print(f"{'EvidenceGroups':<16} {'TotalLinks':<11} {'DistinctIds':<12} {'Payloads'}")
+    print("-" * 90)
+    print(f"{evidence_groups:<16} {total_stream_links:<11} {distinct_ids:<12} {','.join(map(str, payloads))}")
+    print(f"Post50Mesh329FamilyProof JSON: {_repo_relative_report_path(json_path)}")
+    print(f"Post50Mesh329FamilyProof markdown: {_repo_relative_report_path(md_path)}")
+    print("Post50Mesh329FamilyProof passed: family evidence remains candidate-only.")
+    return json_path, md_path
+
 # ============================================================================
 # ResidualPositionClusterProbeReport  (focused cluster probes)
 # ============================================================================

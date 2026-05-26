@@ -206,6 +206,20 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     jsonschema.validate(extra_report, extra_schema)
     print("  PASS: extra-position report schema validation")
+    (out_dir / "post50-mesh329-family-proof.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "post50-mesh329-family-proof/v1",
+                "CandidateOnly": True,
+                "Aggregate": {
+                    "EvidenceGroups": 23,
+                    "TotalStreamLinks": 46,
+                    "ExportReady": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     (out_dir / "post50-mesh329-source-binding-compare.json").write_text(
         json.dumps(
             {
@@ -276,11 +290,12 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: post-50 status schema validation")
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
-    check("report status count", len(status["ReportStatuses"]), 7)
+    check("report status count", len(status["ReportStatuses"]), 8)
     check("recommended lane", status["RecommendedLane"], "source-binding-family")
     check("lane count", len(status["CandidateLanes"]), 4)
     check("top lane mesh", status["CandidateLanes"][0]["MeshSize"], 329)
     check("top lane stream", status["CandidateLanes"][0]["Stream"], "stream@212")
+    check_contains("top lane schema-backed rationale", status["CandidateLanes"][0]["Rationale"], "schema-backed")
     check("extra-position lane", status["CandidateLanes"][1]["Lane"], "source-binding-extra-position")
     check("extra-position stream", status["CandidateLanes"][1]["Stream"], "mesh#34 @304/#57")
     check_contains("extra-position schema-backed rationale", status["CandidateLanes"][1]["Rationale"], "schema-backed")
@@ -290,6 +305,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("promotion locked", status["ParserExportPromotionAllowed"], False)
     check_contains("strict blocker", "\n".join(status["Blockers"]), "residual-position-strict-threshold-not-met")
     check_contains("extra-position blocker", "\n".join(status["Blockers"]), "mesh329-extra-position-like-stream")
+    check_contains("family proof blocker", "\n".join(status["Blockers"]), "mesh329-family-proof-candidate-only")
     check_contains("compare export blocker", "\n".join(status["Blockers"]), "mesh329-source-binding-compare-export-blocked")
     check_contains("next action", status["NextAction"], "source-binding compare report")
 

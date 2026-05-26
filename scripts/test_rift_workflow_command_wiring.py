@@ -34,6 +34,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "GhidraWorkflowGuardSuite": "ghidra-workflow-guard-suite",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
     "Post50PositionSourceStatus": "post50-position-source-status",
+    "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "ScanLiveMemory": "scan-live-memory",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",

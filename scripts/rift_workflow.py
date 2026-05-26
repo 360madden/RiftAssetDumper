@@ -49,6 +49,7 @@ Commands (kebab-case):
     tools-status                 — show configured third-party reverse-engineering tools
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
     post50-position-source-status — rank the next offline proof lane from ignored post-50 reports
+    post50-mesh329-family-proof  — prove top meshSize=329 stream@212 family from inventory rows
     post50-mesh329-source-binding-compare — compare meshSize=329 @212/#28 and mesh#34 @304/#57 evidence
     scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
@@ -126,6 +127,7 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     position_source_sibling_probe_report,
     position_source_sibling_representative_probe_report,
     position_source_sibling_secondary_probe_report,
+    post50_mesh329_family_proof_report,
     post50_mesh329_source_binding_compare,
     residual_position_classifier_report,
     residual_position_cluster_probe_report,
@@ -314,6 +316,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-mesh329-family-proof": {
+        "dotnet": "",
+        "base": "",
+    },
     "post50-mesh329-source-binding-compare": {
         "dotnet": "",
         "base": "",
@@ -455,6 +461,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "ToolsStatus": "tools-status",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
     "Post50PositionSourceStatus": "post50-position-source-status",
+    "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
@@ -6248,6 +6255,7 @@ POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
     "PositionSourceSiblingFamily": "position-source-sibling-family-report.json",
     "PositionSourceSiblingProbe": "position-source-sibling-probe-report.json",
     "PositionSourceSiblingExtraPosition": "position-source-sibling-extra-position-report.json",
+    "Post50Mesh329FamilyProof": "post50-mesh329-family-proof.json",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare.json",
     "ResidualPositionClassifier": "residual-position-classifier-report.json",
     "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
@@ -6468,12 +6476,26 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
     gap_rows = _dict_rows(reports["PositionSourceGap"], "Rows")
     mesh325_gap = next((row for row in gap_rows if _as_rank_int(row.get("MeshSize")) == 325), {})
     extra_position_rows = _dict_rows(reports["PositionSourceSiblingExtraPosition"], "PairSummaries")
+    family_proof_aggregate_raw = reports["Post50Mesh329FamilyProof"].get("Aggregate", {})
+    family_proof_aggregate = family_proof_aggregate_raw if isinstance(family_proof_aggregate_raw, dict) else {}
     compare_aggregate_raw = reports["Post50Mesh329SourceBindingCompare"].get("Aggregate", {})
     compare_aggregate = compare_aggregate_raw if isinstance(compare_aggregate_raw, dict) else {}
 
     lanes: list[dict[str, Any]] = []
     if top_sibling:
-        lanes.append(_post50_lane_from_sibling_family(top_sibling, len(lanes) + 1))
+        family_lane = _post50_lane_from_sibling_family(top_sibling, len(lanes) + 1)
+        if family_proof_aggregate:
+            family_lane["EvidenceGroups"] = _as_rank_int(family_proof_aggregate.get("EvidenceGroups")) or family_lane[
+                "EvidenceGroups"
+            ]
+            family_lane["TotalStreamLinks"] = _as_rank_int(
+                family_proof_aggregate.get("TotalStreamLinks")
+            ) or family_lane["TotalStreamLinks"]
+            family_lane["Rationale"] = (
+                "schema-backed inventory proof confirms meshSize=329 "
+                "mesh#7/#34 stream@212 source-binding family"
+            )
+        lanes.append(family_lane)
     if extra_position_rows:
         extra_lane = _post50_lane_from_extra_position(extra_position_rows, len(lanes) + 1)
         if compare_aggregate:
@@ -6509,13 +6531,20 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
         blockers.append("mesh325-position-source-sparse-no-residuals")
     if extra_position_rows:
         blockers.append("mesh329-extra-position-like-stream-candidate-only")
+    if family_proof_aggregate and family_proof_aggregate.get("ExportReady") is not True:
+        blockers.append("mesh329-family-proof-candidate-only")
     if compare_aggregate and compare_aggregate.get("ExportReady") is not True:
         blockers.append("mesh329-source-binding-compare-export-blocked")
     blockers.append("parser-export-promotion-not-allowed")
 
     recommended_lane = lanes[0]["Lane"] if lanes else "refresh-post50-position-source-reports"
     if missing_reports:
-        if "Post50Mesh329SourceBindingCompare" in missing_reports and extra_position_rows:
+        if "Post50Mesh329FamilyProof" in missing_reports and top_sibling:
+            next_action = (
+                "Run post50-mesh329-family-proof to schema-lock inventory rows for "
+                "the current meshSize=329 stream@212 source-binding family."
+            )
+        elif "Post50Mesh329SourceBindingCompare" in missing_reports and extra_position_rows:
             next_action = (
                 "Run post50-mesh329-source-binding-compare to schema-lock the current "
                 "meshSize=329 @212/#28 and mesh#34 @304/#57 sibling evidence."
@@ -6650,6 +6679,17 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "post50-position-source-status":
         _run_post50_position_source_status(args)
+        return
+
+    if command == "post50-mesh329-family-proof":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        inventory_path = out_dir / "nif-mesh-binding-inventory.json"
+        family_report_path = out_dir / "position-source-sibling-family-report.json"
+        try:
+            post50_mesh329_family_proof_report(inventory_path, out_dir, family_report_path)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
         return
 
     if command == "post50-mesh329-source-binding-compare":

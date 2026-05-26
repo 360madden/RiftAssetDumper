@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-mesh329-family-proof-v1.schema.json",
+  "title": "Post-50 meshSize 329 family proof report v1",
+  "description": "Candidate-only inventory proof packet for the top post-50 meshSize=329 mesh#7/#34 stream@212 source-binding family. This report is evidence only and must not promote parser, geometry, or export behavior.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "SourceInventory",
+    "SourceFamilyReport",
+    "MeshSize",
+    "MeshBlocks",
+    "MeshPayloadOffset",
+    "TargetBlockIndex",
+    "Role",
+    "ProofRows",
+    "Aggregate",
+    "ParserExportPromotionAllowed",
+    "Interpretation"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-mesh329-family-proof/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceInventory": { "$ref": "#/$defs/nonEmptyString" },
+    "SourceFamilyReport": { "type": "string" },
+    "MeshSize": { "const": 329 },
+    "MeshBlocks": {
+      "type": "array",
+      "prefixItems": [{ "const": 7 }, { "const": 34 }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "MeshPayloadOffset": { "const": 212 },
+    "TargetBlockIndex": { "const": 28 },
+    "Role": { "const": "position-float3-ror1-lead" },
+    "ProofRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/proofRow" }
+    },
+    "Aggregate": { "$ref": "#/$defs/aggregate" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hex16": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "integerArray": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonNegativeInteger" }
+    },
+    "meshBlocks": {
+      "type": "array",
+      "prefixItems": [{ "const": 7 }, { "const": 34 }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "meshPayloadOffsets": {
+      "type": "array",
+      "prefixItems": [{ "const": 212 }],
+      "minItems": 1,
+      "maxItems": 1
+    },
+    "sample": {
+      "type": "object",
+      "required": [
+        "ArchiveName",
+        "EntryIndex",
+        "IdPrefix",
+        "MeshBlockIndex",
+        "MeshSize",
+        "MeshPayloadOffset",
+        "TargetBlockIndex",
+        "DeclaredPayloadBytes",
+        "DataStreamUsage",
+        "DataStreamAccess",
+        "Role",
+        "GhidraStyleLayoutValid",
+        "StringValue"
+      ],
+      "properties": {
+        "ArchiveName": { "$ref": "#/$defs/nonEmptyString" },
+        "EntryIndex": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IdPrefix": { "$ref": "#/$defs/hex16" },
+        "MeshBlockIndex": { "enum": [7, 34] },
+        "MeshSize": { "const": 329 },
+        "MeshPayloadOffset": { "const": 212 },
+        "TargetBlockIndex": { "const": 28 },
+        "DeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DataStreamUsage": { "const": "1" },
+        "DataStreamAccess": { "const": "19" },
+        "Role": { "const": "position-float3-ror1-lead" },
+        "GhidraStyleLayoutValid": { "type": "boolean" },
+        "StringValue": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "proofRow": {
+      "type": "object",
+      "required": [
+        "IdPrefix",
+        "Pattern",
+        "TargetBlockIndex",
+        "DeclaredPayloadBytes",
+        "VectorCount",
+        "PayloadRemainder",
+        "DataStreamUsage",
+        "DataStreamAccess",
+        "Role",
+        "StreamLinkCount",
+        "DistinctMeshBlocks",
+        "MeshBlockIndices",
+        "MeshPayloadOffsets",
+        "MeshSize",
+        "SampleCount",
+        "Samples",
+        "AllSamplesGhidraStyleLayoutValid",
+        "CandidateOnly",
+        "ExportReady",
+        "Decision"
+      ],
+      "properties": {
+        "IdPrefix": { "$ref": "#/$defs/hex16" },
+        "Pattern": { "$ref": "#/$defs/nonEmptyString" },
+        "TargetBlockIndex": { "const": 28 },
+        "DeclaredPayloadBytes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "VectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PayloadRemainder": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DataStreamUsage": { "const": "1" },
+        "DataStreamAccess": { "const": "19" },
+        "Role": { "const": "position-float3-ror1-lead" },
+        "StreamLinkCount": { "const": 2 },
+        "DistinctMeshBlocks": { "const": 2 },
+        "MeshBlockIndices": { "$ref": "#/$defs/meshBlocks" },
+        "MeshPayloadOffsets": { "$ref": "#/$defs/meshPayloadOffsets" },
+        "MeshSize": { "const": 329 },
+        "SampleCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sample" }
+        },
+        "AllSamplesGhidraStyleLayoutValid": { "type": "boolean" },
+        "CandidateOnly": { "const": true },
+        "ExportReady": { "const": false },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" }
+      },
+      "additionalProperties": false
+    },
+    "familyReportConsistency": {
+      "type": "object",
+      "required": [
+        "FamilyReportPresent",
+        "EvidenceGroupsMatch",
+        "TotalStreamLinksMatch",
+        "DistinctIdsMatch",
+        "TargetBlocksMatch",
+        "PayloadBytesMatch"
+      ],
+      "properties": {
+        "FamilyReportPresent": { "type": "boolean" },
+        "EvidenceGroupsMatch": { "type": "boolean" },
+        "TotalStreamLinksMatch": { "type": "boolean" },
+        "DistinctIdsMatch": { "type": "boolean" },
+        "TargetBlocksMatch": { "type": "boolean" },
+        "PayloadBytesMatch": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "EvidenceGroups",
+        "TotalStreamLinks",
+        "DistinctIds",
+        "PayloadBytes",
+        "VectorCounts",
+        "PayloadRemainders",
+        "AllRowsMeshSize329",
+        "AllRowsMeshBlocks7And34",
+        "AllRowsStreamAt212",
+        "AllRowsTargetBlock28",
+        "AllRowsUsageAccess1_19",
+        "AllRowsRolePositionFloat3Ror1Lead",
+        "AllSamplesGhidraStyleLayoutValid",
+        "FamilyReportConsistency",
+        "CandidateOnly",
+        "ParserExportPromotionAllowed",
+        "ExportReady",
+        "Decision",
+        "Blockers"
+      ],
+      "properties": {
+        "EvidenceGroups": { "$ref": "#/$defs/nonNegativeInteger" },
+        "TotalStreamLinks": { "$ref": "#/$defs/nonNegativeInteger" },
+        "DistinctIds": { "$ref": "#/$defs/nonNegativeInteger" },
+        "PayloadBytes": { "$ref": "#/$defs/integerArray" },
+        "VectorCounts": { "$ref": "#/$defs/integerArray" },
+        "PayloadRemainders": { "$ref": "#/$defs/integerArray" },
+        "AllRowsMeshSize329": { "type": "boolean" },
+        "AllRowsMeshBlocks7And34": { "type": "boolean" },
+        "AllRowsStreamAt212": { "type": "boolean" },
+        "AllRowsTargetBlock28": { "type": "boolean" },
+        "AllRowsUsageAccess1_19": { "type": "boolean" },
+        "AllRowsRolePositionFloat3Ror1Lead": { "type": "boolean" },
+        "AllSamplesGhidraStyleLayoutValid": { "type": "boolean" },
+        "FamilyReportConsistency": { "$ref": "#/$defs/familyReportConsistency" },
+        "CandidateOnly": { "const": true },
+        "ParserExportPromotionAllowed": { "const": false },
+        "ExportReady": { "const": false },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" },
+        "Blockers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

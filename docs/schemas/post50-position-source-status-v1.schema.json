@@ -21,7 +21,7 @@
     "ReportRoot": { "type": "string", "minLength": 1 },
     "ReportStatuses": {
       "type": "array",
-      "minItems": 7,
+      "minItems": 8,
       "items": { "$ref": "#/$defs/reportStatus" }
     },
     "RecommendedLane": { "type": "string", "minLength": 1 },
