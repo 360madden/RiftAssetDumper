@@ -142,6 +142,23 @@ def write_minimal_post50_reports(out_dir: Path) -> None:
     )
     write_json(
         out_dir,
+        "post50-residual-strict-threshold-delta.json",
+        {
+            "SchemaVersion": "post50-residual-strict-threshold-delta/v1",
+            "CandidateOnly": True,
+            "Aggregate": {
+                "TargetPayload": 288,
+                "TargetPlausible": 0.9444,
+                "TargetPlausibleDeltaToStrict": 0.0056,
+                "TargetStrictPass": False,
+                "TargetCompleteGeometryBindingProven": False,
+                "ParserExportPromotionAllowed": False,
+                "ExportReady": False,
+            },
+        },
+    )
+    write_json(
+        out_dir,
         "residual-position-classifier-report.json",
         {
             "Schema": "residual-position-classifier-report/v1",
@@ -203,12 +220,13 @@ with tempfile.TemporaryDirectory() as tmp:
     check("validation passed", status["ValidationPassed"], True)
     check("failed required checks", status["FailedRequiredChecks"], [])
     check("promotion locked", status["ParserExportPromotionAllowed"], False)
-    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 9)
+    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 10)
     rows = {row["Check"]: row for row in status["ValidationRows"]}
     check("schema-backed row", rows["post50-reports-schema-backed-candidate"]["Pass"], True)
     check("promotion lock row", rows["post50-parser-export-promotion-locked"]["Pass"], True)
     check("mesh34 negative row", rows["mesh34-negative-binding-recorded"]["Pass"], True)
     check("mesh34 complete-binding negative proof row", rows["mesh34-complete-binding-negative-proof-present"]["Pass"], True)
+    check("residual threshold delta row", rows["residual-strict-threshold-delta-present"]["Pass"], True)
     check_contains("next action", status["NextAction"], "do not change parser/export behavior")
 
 with tempfile.TemporaryDirectory() as tmp:

@@ -55,6 +55,7 @@ $PSModeToKebab = @{
     'Post50Mesh329SourceBindingCompare' = 'post50-mesh329-source-binding-compare'
     'Post50PromotionReadinessStatus' = 'post50-promotion-readiness-status'
     'Post50ValidationSuite' = 'post50-validation-suite'
+    'Post50ResidualStrictThresholdDelta' = 'post50-residual-strict-threshold-delta'
     'ScanLiveMemory' = 'scan-live-memory'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'

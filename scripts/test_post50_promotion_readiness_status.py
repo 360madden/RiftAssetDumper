@@ -150,6 +150,23 @@ def write_minimal_post50_reports(out_dir: Path) -> None:
     )
     write_json(
         out_dir,
+        "post50-residual-strict-threshold-delta.json",
+        {
+            "SchemaVersion": "post50-residual-strict-threshold-delta/v1",
+            "CandidateOnly": True,
+            "Aggregate": {
+                "TargetPayload": 288,
+                "TargetPlausible": 0.9444,
+                "TargetPlausibleDeltaToStrict": 0.0056,
+                "TargetStrictPass": False,
+                "TargetCompleteGeometryBindingProven": False,
+                "ParserExportPromotionAllowed": False,
+                "ExportReady": False,
+            },
+        },
+    )
+    write_json(
+        out_dir,
         "residual-position-classifier-report.json",
         {
             "Schema": "residual-position-classifier-report/v1",
@@ -231,13 +248,14 @@ with tempfile.TemporaryDirectory() as tmp:
     check("readiness schema", readiness_status["SchemaVersion"], "post50-promotion-readiness-status/v1")
     check("overall ready", readiness_status["OverallReady"], False)
     check("promotion locked", readiness_status["ParserExportPromotionAllowed"], False)
-    check("schema backed report count", readiness_status["SchemaBackedReportCount"], 9)
-    check("freshness existing reports", readiness_status["ReportFreshness"]["ExistingReportCount"], 9)
+    check("schema backed report count", readiness_status["SchemaBackedReportCount"], 10)
+    check("freshness existing reports", readiness_status["ReportFreshness"]["ExistingReportCount"], 10)
     check("freshness missing reports", readiness_status["ReportFreshness"]["MissingReportCount"], 0)
     gates = {row["Gate"]: row["Pass"] for row in readiness_status["GateRows"]}
     check("all reports schema-backed gate", gates["all-post50-reports-schema-backed"], True)
     check("mesh34 binding gate blocked", gates["mesh34-complete-geometry-binding"], False)
     check("residual strict gate blocked", gates["residual-strict-threshold"], False)
+    check("residual delta gate present", gates["residual-strict-threshold-delta-present"], True)
     check_contains("readiness blocker", "\n".join(readiness_status["Blockers"]), "parser-export-promotion-not-allowed")
 
 print(f"\n{'=' * 50}")

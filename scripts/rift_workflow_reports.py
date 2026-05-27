@@ -4933,6 +4933,189 @@ def post50_mesh34_complete_binding_negative_proof(
     return json_path, md_path
 
 
+def post50_residual_strict_threshold_delta_report(
+    classifier_report_path: str | Path,
+    report_dir: str | Path | None = None,
+    cluster_report_path: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Write candidate-only residual strict-threshold delta report."""
+    classifier_path = Path(classifier_report_path)
+    classifier_report = load_json_report(classifier_path)
+    if not isinstance(classifier_report, dict):
+        raise ValueError(f"Expected JSON object in {classifier_path}")
+    if classifier_report.get("CandidateOnly") is not True:
+        raise ValueError("classifier report must be CandidateOnly=true")
+    classifier_rows_raw = classifier_report.get("CandidateGuardRows")
+    if not isinstance(classifier_rows_raw, list) or not classifier_rows_raw:
+        raise ValueError("classifier report has no CandidateGuardRows")
+    classifier_rows = [row for row in classifier_rows_raw if isinstance(row, dict)]
+    if not classifier_rows:
+        raise ValueError("classifier report has no object CandidateGuardRows")
+
+    strict_threshold = 0.95
+    delta_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(
+        sorted(classifier_rows, key=lambda item: json_double_or_none(item, "Plausible") or 0.0, reverse=True),
+        start=1,
+    ):
+        plausible = json_double_or_none(row, "Plausible") or 0.0
+        delta_rows.append(
+            {
+                "Rank": index,
+                "MeshSize": safe_int(row.get("MeshSize")),
+                "Stream": str(row.get("Stream", "")),
+                "Payload": safe_int(row.get("Payload")),
+                "Count": safe_int(row.get("Count")),
+                "SampleCount": safe_int(row.get("SampleCount")),
+                "VectorCount": safe_int(row.get("VectorCount")),
+                "Plausible": round(plausible, 6),
+                "StrictThreshold": strict_threshold,
+                "PlausibleDeltaToStrict": round(max(0.0, strict_threshold - plausible), 6),
+                "StrictPass": row.get("StrictPass") is True,
+                "MaxPlausibleThresholdForSample": round(
+                    json_double_or_none(row, "MaxPlausibleThresholdForSample") or plausible,
+                    6,
+                ),
+                "MissReasons": str(row.get("MissReasons", "")),
+                "IsTarget": safe_int(row.get("MeshSize")) == 305
+                and str(row.get("Stream", "")) == "stream@188"
+                and safe_int(row.get("Payload")) == 288,
+            }
+        )
+
+    target_row = next((row for row in delta_rows if row["IsTarget"] is True), {})
+    if not target_row:
+        raise ValueError("classifier report has no target meshSize=305 stream@188 payload=288 row")
+
+    cluster_path = Path(cluster_report_path) if cluster_report_path is not None else classifier_path.parent / "residual-position-cluster-probe-report.json"
+    cluster_payload_row: dict[str, Any] = {}
+    if cluster_path.exists():
+        cluster_report = load_json_report(cluster_path)
+        if isinstance(cluster_report, dict):
+            payload_rows = cluster_report.get("PayloadRows")
+            if isinstance(payload_rows, list):
+                cluster_payload_row = next(
+                    (
+                        row
+                        for row in payload_rows
+                        if isinstance(row, dict) and safe_int(row.get("Payload")) == 288
+                    ),
+                    {},
+                )
+
+    binding_summary = {
+        "SourceReport": _repo_relative_report_path(cluster_path) if cluster_path.exists() else "",
+        "ClusterRowPresent": bool(cluster_payload_row),
+        "AttributeSetTotal": safe_int(cluster_payload_row.get("AttributeSetTotal")),
+        "PairingTotal": safe_int(cluster_payload_row.get("PairingTotal")),
+        "ExportReady": cluster_payload_row.get("ExportReady") is True,
+        "GeometryTruthPromoted": cluster_payload_row.get("GeometryTruthPromoted") is True,
+        "Decision": str(cluster_payload_row.get("Decision", "")),
+    }
+    target_plausible = float(target_row["Plausible"])
+    blockers = [
+        "residual-position-strict-threshold-not-met",
+        "residual-cluster-no-complete-geometry-binding",
+        "parser-export-promotion-not-allowed",
+    ]
+    aggregate = {
+        "RowCount": len(delta_rows),
+        "RowsAtOrAboveStrictThreshold": sum(1 for row in delta_rows if row["StrictPass"] is True),
+        "BestPlausible": max(float(row["Plausible"]) for row in delta_rows),
+        "TargetPayload": 288,
+        "TargetPlausible": target_plausible,
+        "TargetPlausibleDeltaToStrict": float(target_row["PlausibleDeltaToStrict"]),
+        "TargetStrictPass": target_row["StrictPass"] is True,
+        "TargetCompleteGeometryBindingProven": binding_summary["ExportReady"] is True
+        and binding_summary["GeometryTruthPromoted"] is True,
+        "ParserExportPromotionAllowed": False,
+        "ExportReady": False,
+        "Blockers": blockers,
+        "Decision": (
+            "payload 288 is the strongest residual candidate but remains below the strict plausible "
+            "threshold and lacks complete geometry binding"
+        ),
+    }
+
+    out_dir = Path(report_dir) if report_dir is not None else classifier_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "post50-residual-strict-threshold-delta.json"
+    md_path = out_dir / "post50-residual-strict-threshold-delta.md"
+    report = {
+        "SchemaVersion": "post50-residual-strict-threshold-delta/v1",
+        "CandidateOnly": True,
+        "SourceReports": {
+            "ClassifierReport": _repo_relative_report_path(classifier_path),
+            "ClusterReport": _repo_relative_report_path(cluster_path) if cluster_path.exists() else "",
+        },
+        "Target": {
+            "MeshSize": 305,
+            "Stream": "stream@188",
+            "Payload": 288,
+            "StrictPlausibleThreshold": strict_threshold,
+        },
+        "DeltaRows": delta_rows,
+        "TargetRow": target_row,
+        "BindingSummary": binding_summary,
+        "Aggregate": aggregate,
+        "ParserExportPromotionAllowed": False,
+        "Interpretation": (
+            "Candidate-only residual threshold delta report. It documents why payload 288 remains blocked "
+            "despite being the best residual candidate, and it does not promote parser/export behavior."
+        ),
+        "NextAction": (
+            "Investigate why payload 288 misses the 0.95 plausible threshold and find complete geometry "
+            "binding before any parser/export promotion."
+        ),
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Post-50 residual strict-threshold delta",
+        "",
+        "Candidate-only report for meshSize 305 `stream@188` payload candidates.",
+        "",
+        f"Classifier report: `{_repo_relative_report_path(classifier_path)}`",
+        f"Cluster report: `{_repo_relative_report_path(cluster_path) if cluster_path.exists() else ''}`",
+        "",
+        "| Rank | Payload | Plausible | Delta to 0.95 | Strict pass | Target |",
+        "|---:|---:|---:|---:|---|---|",
+    ]
+    for row in delta_rows:
+        md_lines.append(
+            f"| {row['Rank']} | {row['Payload']} | {row['Plausible']} | "
+            f"{row['PlausibleDeltaToStrict']} | `{str(row['StrictPass']).lower()}` | "
+            f"`{str(row['IsTarget']).lower()}` |"
+        )
+    md_lines += [
+        "",
+        "## Aggregate",
+        "",
+        f"- Target plausible: `{aggregate['TargetPlausible']}`",
+        f"- Target delta to strict threshold: `{aggregate['TargetPlausibleDeltaToStrict']}`",
+        f"- Target complete geometry binding proven: `{str(aggregate['TargetCompleteGeometryBindingProven']).lower()}`",
+        "- Parser/export promotion: `false`",
+        "",
+        "## Blockers",
+        "",
+    ]
+    md_lines.extend(f"- `{blocker}`" for blocker in blockers)
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    print("\n--- Post50ResidualStrictThresholdDelta")
+    print(f"{'Rank':<5} {'Payload':<8} {'Plausible':<10} {'Delta':<10} {'StrictPass'}")
+    print("-" * 60)
+    for row in delta_rows:
+        print(
+            f"{row['Rank']:<5} {row['Payload']:<8} {row['Plausible']:<10} "
+            f"{row['PlausibleDeltaToStrict']:<10} {str(row['StrictPass']).lower()}"
+        )
+    print(f"Post50ResidualStrictThresholdDelta JSON: {_repo_relative_report_path(json_path)}")
+    print(f"Post50ResidualStrictThresholdDelta markdown: {_repo_relative_report_path(md_path)}")
+    print("Post50ResidualStrictThresholdDelta passed: payload 288 remains candidate-only.")
+    return json_path, md_path
+
+
 def _int_list(raw: object) -> list[int]:
     """Return integer values from a JSON list field."""
     if not isinstance(raw, list):

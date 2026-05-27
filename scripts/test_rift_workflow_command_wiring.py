@@ -40,6 +40,7 @@ EXPECTED_GHIDRA_ALIASES = {
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
     "Post50ValidationSuite": "post50-validation-suite",
+    "Post50ResidualStrictThresholdDelta": "post50-residual-strict-threshold-delta",
     "ScanLiveMemory": "scan-live-memory",
     "NiDataStreamEvidenceStatus": "nidatastream-evidence-status",
     "NiDataStreamPromotionStatus": "nidatastream-promotion-status",

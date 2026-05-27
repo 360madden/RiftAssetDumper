@@ -55,6 +55,7 @@ Commands (kebab-case):
     post50-mesh329-source-binding-compare — compare meshSize=329 @212/#28 and mesh#34 @304/#57 evidence
     post50-promotion-readiness-status — summarize post-50 parser/export promotion gates
     post50-validation-suite     — run compact post-50 status/proof hygiene checks
+    post50-residual-strict-threshold-delta — write residual payload 288 threshold delta proof
     scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
@@ -134,6 +135,7 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     post50_mesh34_complete_binding_negative_proof,
     post50_mesh329_family_proof_report,
     post50_mesh329_source_binding_compare,
+    post50_residual_strict_threshold_delta_report,
     residual_position_classifier_report,
     residual_position_cluster_probe_report,
     semantic_hint_cross_tab,
@@ -345,6 +347,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-residual-strict-threshold-delta": {
+        "dotnet": "",
+        "base": "",
+    },
     "scan-live-memory": {
         "dotnet": "",
         "base": "",
@@ -488,6 +494,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
     "Post50ValidationSuite": "post50-validation-suite",
+    "Post50ResidualStrictThresholdDelta": "post50-residual-strict-threshold-delta",
     "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
@@ -6283,6 +6290,7 @@ POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof.json",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare.json",
     "Post50Mesh34CompleteBindingNegativeProof": "post50-mesh34-complete-binding-negative-proof.json",
+    "Post50ResidualStrictThresholdDelta": "post50-residual-strict-threshold-delta.json",
     "ResidualPositionClassifier": "residual-position-classifier-report.json",
     "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
 }
@@ -6863,6 +6871,7 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
         post50_status,
         "Post50Mesh34CompleteBindingNegativeProof",
     )
+    residual_delta_status = _report_status_by_key(post50_status, "Post50ResidualStrictThresholdDelta")
     all_reports_schema_backed = bool(report_rows) and schema_backed_count == len(report_rows)
 
     lanes = post50_status.get("CandidateLanes")
@@ -6918,6 +6927,13 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
             "Pass": bool(residual_lane.get("StrictPass")) if residual_lane else False,
             "Evidence": f"plausible={residual_lane.get('Plausible', None)}",
             "CurrentValue": str(residual_lane.get("StrictPass", False)),
+        },
+        {
+            "Gate": "residual-strict-threshold-delta-present",
+            "RequiredForPromotion": False,
+            "Pass": residual_delta_status.get("EvidenceLevel") == "schema-backed-candidate",
+            "Evidence": str(residual_delta_status.get("Schema", "")),
+            "CurrentValue": "candidate-only-delta-proof",
         },
         {
             "Gate": "residual-complete-geometry-binding",
@@ -7011,6 +7027,7 @@ def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
         post50_status,
         "Post50Mesh34CompleteBindingNegativeProof",
     )
+    residual_delta_status = _report_status_by_key(post50_status, "Post50ResidualStrictThresholdDelta")
     missing_count = _as_rank_int(freshness.get("MissingReportCount"))
     unreadable_count = _as_rank_int(freshness.get("UnreadableReportCount"))
     candidate_only_rows = sum(1 for row in report_rows if row.get("CandidateOnly") is True)
@@ -7058,6 +7075,11 @@ def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
             "mesh34-complete-binding-negative-proof-present",
             complete_binding_negative_status.get("EvidenceLevel") == "schema-backed-candidate",
             str(complete_binding_negative_status.get("Schema", "")),
+        ),
+        _validation_row(
+            "residual-strict-threshold-delta-present",
+            residual_delta_status.get("EvidenceLevel") == "schema-backed-candidate",
+            str(residual_delta_status.get("Schema", "")),
         ),
         _validation_row(
             "promotion-readiness-remains-not-ready",
@@ -7248,6 +7270,17 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "post50-validation-suite":
         _run_post50_validation_suite(args)
+        return
+
+    if command == "post50-residual-strict-threshold-delta":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        classifier_path = out_dir / "residual-position-classifier-report.json"
+        cluster_path = out_dir / "residual-position-cluster-probe-report.json"
+        try:
+            post50_residual_strict_threshold_delta_report(classifier_path, out_dir, cluster_path)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
         return
 
     if command == "scan-live-memory":

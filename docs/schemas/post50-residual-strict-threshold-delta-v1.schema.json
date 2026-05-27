@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-residual-strict-threshold-delta-v1.schema.json",
+  "title": "Post-50 residual strict-threshold delta v1",
+  "description": "Candidate-only report documenting residual payload strict-threshold deltas and promotion blockers.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "SourceReports",
+    "Target",
+    "DeltaRows",
+    "TargetRow",
+    "BindingSummary",
+    "Aggregate",
+    "ParserExportPromotionAllowed",
+    "Interpretation",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-residual-strict-threshold-delta/v1" },
+    "CandidateOnly": { "const": true },
+    "SourceReports": { "$ref": "#/$defs/sourceReports" },
+    "Target": { "$ref": "#/$defs/target" },
+    "DeltaRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/deltaRow" }
+    },
+    "TargetRow": { "$ref": "#/$defs/deltaRow" },
+    "BindingSummary": { "$ref": "#/$defs/bindingSummary" },
+    "Aggregate": { "$ref": "#/$defs/aggregate" },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Interpretation": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sourceReports": {
+      "type": "object",
+      "required": ["ClassifierReport", "ClusterReport"],
+      "properties": {
+        "ClassifierReport": { "type": "string", "minLength": 1 },
+        "ClusterReport": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["MeshSize", "Stream", "Payload", "StrictPlausibleThreshold"],
+      "properties": {
+        "MeshSize": { "const": 305 },
+        "Stream": { "const": "stream@188" },
+        "Payload": { "const": 288 },
+        "StrictPlausibleThreshold": { "const": 0.95 }
+      },
+      "additionalProperties": false
+    },
+    "deltaRow": {
+      "type": "object",
+      "required": [
+        "Rank",
+        "MeshSize",
+        "Stream",
+        "Payload",
+        "Count",
+        "SampleCount",
+        "VectorCount",
+        "Plausible",
+        "StrictThreshold",
+        "PlausibleDeltaToStrict",
+        "StrictPass",
+        "MaxPlausibleThresholdForSample",
+        "MissReasons",
+        "IsTarget"
+      ],
+      "properties": {
+        "Rank": { "type": "integer", "minimum": 1 },
+        "MeshSize": { "type": "integer", "minimum": 0 },
+        "Stream": { "type": "string" },
+        "Payload": { "type": "integer", "minimum": 0 },
+        "Count": { "type": "integer", "minimum": 0 },
+        "SampleCount": { "type": "integer", "minimum": 0 },
+        "VectorCount": { "type": "integer", "minimum": 0 },
+        "Plausible": { "type": "number", "minimum": 0 },
+        "StrictThreshold": { "const": 0.95 },
+        "PlausibleDeltaToStrict": { "type": "number", "minimum": 0 },
+        "StrictPass": { "type": "boolean" },
+        "MaxPlausibleThresholdForSample": { "type": "number", "minimum": 0 },
+        "MissReasons": { "type": "string" },
+        "IsTarget": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "bindingSummary": {
+      "type": "object",
+      "required": [
+        "SourceReport",
+        "ClusterRowPresent",
+        "AttributeSetTotal",
+        "PairingTotal",
+        "ExportReady",
+        "GeometryTruthPromoted",
+        "Decision"
+      ],
+      "properties": {
+        "SourceReport": { "type": "string" },
+        "ClusterRowPresent": { "type": "boolean" },
+        "AttributeSetTotal": { "type": "integer", "minimum": 0 },
+        "PairingTotal": { "type": "integer", "minimum": 0 },
+        "ExportReady": { "type": "boolean" },
+        "GeometryTruthPromoted": { "type": "boolean" },
+        "Decision": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "aggregate": {
+      "type": "object",
+      "required": [
+        "RowCount",
+        "RowsAtOrAboveStrictThreshold",
+        "BestPlausible",
+        "TargetPayload",
+        "TargetPlausible",
+        "TargetPlausibleDeltaToStrict",
+        "TargetStrictPass",
+        "TargetCompleteGeometryBindingProven",
+        "ParserExportPromotionAllowed",
+        "ExportReady",
+        "Blockers",
+        "Decision"
+      ],
+      "properties": {
+        "RowCount": { "type": "integer", "minimum": 1 },
+        "RowsAtOrAboveStrictThreshold": { "type": "integer", "minimum": 0 },
+        "BestPlausible": { "type": "number", "minimum": 0 },
+        "TargetPayload": { "const": 288 },
+        "TargetPlausible": { "type": "number", "minimum": 0 },
+        "TargetPlausibleDeltaToStrict": { "type": "number", "minimum": 0 },
+        "TargetStrictPass": { "type": "boolean" },
+        "TargetCompleteGeometryBindingProven": { "type": "boolean" },
+        "ParserExportPromotionAllowed": { "const": false },
+        "ExportReady": { "const": false },
+        "Blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "Decision": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
