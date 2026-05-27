@@ -10,7 +10,9 @@ post-50 position-source evidence.
 Run before any decision:
 
 ```powershell
+python scripts/rift_workflow.py post50-validation-suite --list-json
 python scripts/rift_workflow.py post50-position-source-status --list-json
+python scripts/rift_workflow.py post50-promotion-readiness-status --list-json
 python scripts/rift_workflow.py generated-output-guard
 ```
 
@@ -19,9 +21,11 @@ Current expected posture:
 | Gate | Required before promotion | Current status |
 |---|---|---|
 | All post-50 reports schema-backed | yes | ✅ all current inputs report `EvidenceLevel=schema-backed-candidate` |
-| Candidate-only reports present | yes | ✅ 8/8 current inputs present locally |
+| Candidate-only reports present | yes | ✅ 10/10 current inputs present locally |
 | mesh329 family proof | required | ✅ candidate-only proof exists |
 | mesh329 mesh#34 extra compare | required | ✅ candidate-only compare exists |
+| mesh#34 complete-binding negative proof | advisory/blocking evidence | ✅ candidate-only negative proof exists |
+| residual strict-threshold delta proof | advisory/blocking evidence | ✅ candidate-only delta proof exists |
 | mesh#34 complete binding | required | ❌ missing |
 | residual classifier strict pass | required for residual promotion | ❌ strict pass false |
 | residual cluster complete binding | required for residual promotion | ❌ missing |
@@ -46,12 +50,14 @@ Before changing parser/export behavior, create a dated decision handoff under
 `docs/handoffs/` that includes:
 
 1. Exact `post50-position-source-status --list-json` summary.
-2. The proof packet names and schema versions used.
-3. A before/after explanation of parser/export behavior.
-4. A generated-output safety statement.
-5. Targeted tests proving the new behavior.
-6. Non-consumption guard updates, if candidate fields are promoted.
-7. A rollback plan.
+2. Exact `post50-promotion-readiness-status --list-json` summary.
+3. Exact `post50-validation-suite --list-json` summary.
+4. The proof packet names and schema versions used.
+5. A before/after explanation of parser/export behavior.
+6. A generated-output safety statement.
+7. Targeted tests proving the new behavior.
+8. Non-consumption guard updates, if candidate fields are promoted.
+9. A rollback plan.
 
 ## Current decision
 

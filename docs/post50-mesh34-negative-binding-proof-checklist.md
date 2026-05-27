@@ -13,7 +13,17 @@ source-binding evidence.
 | `post50-mesh329-source-binding-compare` | schema-backed candidate report | ✅ present in `post50-position-source-status` |
 | `position-source-sibling-extra-position-report` | schema-backed candidate report | ✅ present in `post50-position-source-status` |
 | `post50-mesh329-family-proof` | schema-backed top-family proof | ✅ present in `post50-position-source-status` |
+| `post50-mesh34-complete-binding-negative-proof` | schema-backed negative proof | ✅ present in `post50-position-source-status` |
 | Parser/export promotion gate | locked false | ✅ `ParserExportPromotionAllowed=false` |
+
+Refresh/check command sequence:
+
+```powershell
+python scripts/rift_workflow.py post50-mesh329-source-binding-compare
+python scripts/rift_workflow.py post50-mesh34-complete-binding-negative-proof
+python scripts/rift_workflow.py post50-mesh34-negative-binding-status --list-json
+python scripts/rift_workflow.py post50-validation-suite --list-json
+```
 
 ## Negative-binding facts to preserve
 

@@ -8,7 +8,22 @@ Original 50-step plan position: `docs/discovery-plan-50.md` is revived as a hist
 
 For live-memory discovery, prefer the RiftReader scanner over Assets-local fallback code. Use RiftReader's bounded `--scan-float-triplet <x,y,z> --scan-region-base <address> --scan-region-size <bytes>` command only for asset-load-backed candidate float3 probes, with bounded `--scan-context` and `--max-hits` values. Do not repeat broad live scans for the same static triplets unless the target asset/load condition and representation hypothesis are newly proven.
 
-Post-50 offline position-source routing: refresh `position-source-gap-report`, `position-source-sibling-family-report`, `residual-position-classifier-report`, and `residual-position-cluster-probe-report`, then run `post50-position-source-status --list-json` to rank the next safe proof lane. Current routing should prefer `meshSize=329 stream@212` sibling-family source-binding proof before revisiting `meshSize=305 stream@188` residual packed-position candidates or any more broad live-memory scans.
+Post-50 offline position-source routing: refresh the ignored position-source reports, then run the post-50 proof/status commands in order. Current routing should prefer schema-backed source-binding proof and negative-proof hardening before any parser/export behavior change. Treat all post-50 outputs as candidate-only unless a future promotion handoff and guard update explicitly says otherwise.
+
+Recommended post-50 command order:
+
+```powershell
+python scripts/rift_workflow.py post50-mesh329-family-proof
+python scripts/rift_workflow.py post50-mesh329-source-binding-compare
+python scripts/rift_workflow.py post50-mesh34-complete-binding-negative-proof
+python scripts/rift_workflow.py post50-residual-strict-threshold-delta
+python scripts/rift_workflow.py post50-position-source-status --list-json
+python scripts/rift_workflow.py post50-mesh34-negative-binding-status --list-json
+python scripts/rift_workflow.py post50-promotion-readiness-status --list-json
+python scripts/rift_workflow.py post50-validation-suite --list-json
+```
+
+The current compact validation suite expects 10 schema-backed candidate post-50 inputs locally. It is a workflow hygiene gate, not parser/export promotion.
 
 ## Default loop
 
