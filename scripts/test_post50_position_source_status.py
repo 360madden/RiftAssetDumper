@@ -235,6 +235,23 @@ with tempfile.TemporaryDirectory() as tmp:
         ),
         encoding="utf-8",
     )
+    (out_dir / "post50-mesh34-complete-binding-negative-proof.json").write_text(
+        json.dumps(
+            {
+                "SchemaVersion": "post50-mesh34-complete-binding-negative-proof/v1",
+                "CandidateOnly": True,
+                "Aggregate": {
+                    "ExampleCount": 2,
+                    "CompleteGeometryBindingCount": 0,
+                    "NegativeBindingCount": 2,
+                    "AllRowsNegativeBinding": True,
+                    "ParserExportPromotionAllowed": False,
+                    "ExportReady": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     (out_dir / "residual-position-classifier-report.json").write_text(
         json.dumps(
             {
@@ -290,8 +307,8 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: post-50 status schema validation")
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
-    check("report status count", len(status["ReportStatuses"]), 8)
-    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 8)
+    check("report status count", len(status["ReportStatuses"]), 9)
+    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 9)
     check("freshness missing reports", status["ReportFreshness"]["MissingReportCount"], 0)
     check("freshness unreadable reports", status["ReportFreshness"]["UnreadableReportCount"], 0)
     check("freshness missing keys", status["ReportFreshness"]["MissingOrUnreadableKeys"], [])
@@ -331,7 +348,7 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: missing-report status schema validation")
     check("missing report lanes", missing_status["CandidateLanes"], [])
     check("missing freshness existing reports", missing_status["ReportFreshness"]["ExistingReportCount"], 0)
-    check("missing freshness missing reports", missing_status["ReportFreshness"]["MissingReportCount"], 8)
+    check("missing freshness missing reports", missing_status["ReportFreshness"]["MissingReportCount"], 9)
     check(
         "missing report evidence levels",
         {report_status["EvidenceLevel"] for report_status in missing_status["ReportStatuses"]},

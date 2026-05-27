@@ -50,6 +50,7 @@ Commands (kebab-case):
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
     post50-position-source-status — rank the next offline proof lane from ignored post-50 reports
     post50-mesh34-negative-binding-status — show mesh#34 @304/#57 non-promotion gates
+    post50-mesh34-complete-binding-negative-proof — write mesh#34 complete-binding negative proof
     post50-mesh329-family-proof  — prove top meshSize=329 stream@212 family from inventory rows
     post50-mesh329-source-binding-compare — compare meshSize=329 @212/#28 and mesh#34 @304/#57 evidence
     post50-promotion-readiness-status — summarize post-50 parser/export promotion gates
@@ -130,6 +131,7 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     position_source_sibling_probe_report,
     position_source_sibling_representative_probe_report,
     position_source_sibling_secondary_probe_report,
+    post50_mesh34_complete_binding_negative_proof,
     post50_mesh329_family_proof_report,
     post50_mesh329_source_binding_compare,
     residual_position_classifier_report,
@@ -323,6 +325,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-mesh34-complete-binding-negative-proof": {
+        "dotnet": "",
+        "base": "",
+    },
     "post50-mesh329-family-proof": {
         "dotnet": "",
         "base": "",
@@ -477,6 +483,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "FiftyStepPlanStatus": "fifty-step-plan-status",
     "Post50PositionSourceStatus": "post50-position-source-status",
     "Post50Mesh34NegativeBindingStatus": "post50-mesh34-negative-binding-status",
+    "Post50Mesh34CompleteBindingNegativeProof": "post50-mesh34-complete-binding-negative-proof",
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
@@ -6275,6 +6282,7 @@ POST50_POSITION_SOURCE_REPORTS: dict[str, str] = {
     "PositionSourceSiblingExtraPosition": "position-source-sibling-extra-position-report.json",
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof.json",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare.json",
+    "Post50Mesh34CompleteBindingNegativeProof": "post50-mesh34-complete-binding-negative-proof.json",
     "ResidualPositionClassifier": "residual-position-classifier-report.json",
     "ResidualPositionClusterProbe": "residual-position-cluster-probe-report.json",
 }
@@ -6716,6 +6724,10 @@ def _post50_mesh34_negative_binding_status_payload(out_dir: Path) -> dict[str, A
     )
     extra_status = _report_status_by_key(post50_status, "PositionSourceSiblingExtraPosition")
     family_status = _report_status_by_key(post50_status, "Post50Mesh329FamilyProof")
+    complete_binding_negative_status = _report_status_by_key(
+        post50_status,
+        "Post50Mesh34CompleteBindingNegativeProof",
+    )
 
     comparison_rows = _dict_rows(compare_report, "ComparisonRows")
     aggregate_raw = compare_report.get("Aggregate", {}) if compare_report else {}
@@ -6781,6 +6793,12 @@ def _post50_mesh34_negative_binding_status_payload(out_dir: Path) -> dict[str, A
                 "EvidenceLevel": str(family_status.get("EvidenceLevel", "")),
                 "Schema": str(family_status.get("Schema", "")),
             },
+            {
+                "Key": "Post50Mesh34CompleteBindingNegativeProof",
+                "Exists": bool(complete_binding_negative_status.get("Exists")),
+                "EvidenceLevel": str(complete_binding_negative_status.get("EvidenceLevel", "")),
+                "Schema": str(complete_binding_negative_status.get("Schema", "")),
+            },
         ],
         "MeshSize": 329,
         "MeshBlock": 34,
@@ -6841,6 +6859,10 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
     report_statuses = post50_status.get("ReportStatuses")
     report_rows = [row for row in report_statuses if isinstance(row, dict)] if isinstance(report_statuses, list) else []
     schema_backed_count = sum(1 for row in report_rows if row.get("EvidenceLevel") == "schema-backed-candidate")
+    complete_binding_negative_status = _report_status_by_key(
+        post50_status,
+        "Post50Mesh34CompleteBindingNegativeProof",
+    )
     all_reports_schema_backed = bool(report_rows) and schema_backed_count == len(report_rows)
 
     lanes = post50_status.get("CandidateLanes")
@@ -6882,6 +6904,13 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
             "Pass": False,
             "Evidence": str(extra_lane.get("Rationale", "")),
             "CurrentValue": "candidate-only",
+        },
+        {
+            "Gate": "mesh34-complete-binding-negative-proof-present",
+            "RequiredForPromotion": False,
+            "Pass": complete_binding_negative_status.get("EvidenceLevel") == "schema-backed-candidate",
+            "Evidence": str(complete_binding_negative_status.get("Schema", "")),
+            "CurrentValue": "candidate-only-negative-proof",
         },
         {
             "Gate": "residual-strict-threshold",
@@ -6978,6 +7007,10 @@ def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
     report_count = len(report_rows)
     expected_report_count = len(POST50_POSITION_SOURCE_REPORTS)
     schema_backed_count = sum(1 for row in report_rows if row.get("EvidenceLevel") == "schema-backed-candidate")
+    complete_binding_negative_status = _report_status_by_key(
+        post50_status,
+        "Post50Mesh34CompleteBindingNegativeProof",
+    )
     missing_count = _as_rank_int(freshness.get("MissingReportCount"))
     unreadable_count = _as_rank_int(freshness.get("UnreadableReportCount"))
     candidate_only_rows = sum(1 for row in report_rows if row.get("CandidateOnly") is True)
@@ -7020,6 +7053,11 @@ def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
                 f"attributeSets={mesh34_aggregate.get('Mesh34CompleteAttributeSetCount', 0)} "
                 f"uvStreams={mesh34_aggregate.get('Mesh34UvStreamTotal', 0)}"
             ),
+        ),
+        _validation_row(
+            "mesh34-complete-binding-negative-proof-present",
+            complete_binding_negative_status.get("EvidenceLevel") == "schema-backed-candidate",
+            str(complete_binding_negative_status.get("Schema", "")),
         ),
         _validation_row(
             "promotion-readiness-remains-not-ready",
@@ -7171,6 +7209,16 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "post50-mesh34-negative-binding-status":
         _run_post50_mesh34_negative_binding_status(args)
+        return
+
+    if command == "post50-mesh34-complete-binding-negative-proof":
+        out_dir = Path(args.out) if args.out else DEFAULT_OUT
+        source_path = out_dir / "post50-mesh329-source-binding-compare.json"
+        try:
+            post50_mesh34_complete_binding_negative_proof(source_path, out_dir)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
         return
 
     if command == "post50-mesh329-family-proof":

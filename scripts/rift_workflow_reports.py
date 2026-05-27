@@ -4766,6 +4766,173 @@ def post50_mesh329_source_binding_compare(
     return json_path, md_path
 
 
+def post50_mesh34_complete_binding_negative_proof(
+    source_report_path: str | Path,
+    report_dir: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Write candidate-only proof that current mesh#34 examples lack complete geometry binding."""
+    source_path = Path(source_report_path)
+    compare_report = load_json_report(source_path)
+    if not isinstance(compare_report, dict):
+        raise ValueError(f"Expected JSON object in {source_path}")
+    if compare_report.get("CandidateOnly") is not True:
+        raise ValueError("source compare report must be CandidateOnly=true")
+
+    comparison_rows = compare_report.get("ComparisonRows")
+    if not isinstance(comparison_rows, list) or not comparison_rows:
+        raise ValueError("source compare report has no ComparisonRows")
+
+    proof_rows: list[dict[str, Any]] = []
+    for raw_row in comparison_rows:
+        if not isinstance(raw_row, dict):
+            continue
+        attribute_set_count = safe_int(raw_row.get("Mesh34AttributeSetCount"))
+        uv_stream_count = safe_int(raw_row.get("Mesh34UvStreamCount"))
+        primary_stream = str(raw_row.get("PrimaryStream", ""))
+        extra_stream = str(raw_row.get("ExtraStream", ""))
+        has_complete_attribute_set = attribute_set_count > 0
+        has_uv_stream = uv_stream_count > 0
+        shared_primary = raw_row.get("SharedPrimaryStream") is True
+        extra_at_expected_stream = extra_stream == "@304/#57"
+        complete_geometry_binding_proven = has_complete_attribute_set and has_uv_stream
+        negative_binding_proven = (
+            shared_primary
+            and primary_stream == "@212/#28"
+            and extra_at_expected_stream
+            and not has_complete_attribute_set
+            and not has_uv_stream
+        )
+        proof_rows.append(
+            {
+                "Pair": str(raw_row.get("Pair", "")),
+                "Id": str(raw_row.get("Id", "")),
+                "PrimaryStream": primary_stream,
+                "PrimaryVectorCount": safe_int(raw_row.get("PrimaryVectorCount")),
+                "ExtraStream": extra_stream,
+                "ExtraVectorCount": safe_int(raw_row.get("ExtraVectorCount")),
+                "ExtraPayloadRemainder": safe_int(raw_row.get("ExtraPayloadRemainder")),
+                "Mesh34NormalStream": str(raw_row.get("Mesh34NormalStream", "")),
+                "Mesh34NormalVectorCount": safe_int(raw_row.get("Mesh34NormalVectorCount")),
+                "Mesh34AttributeSetCount": attribute_set_count,
+                "Mesh34UvStreamCount": uv_stream_count,
+                "SharedPrimaryStream": shared_primary,
+                "HasCompleteAttributeSet": has_complete_attribute_set,
+                "HasUvStream": has_uv_stream,
+                "CompleteGeometryBindingProven": complete_geometry_binding_proven,
+                "NegativeBindingProven": negative_binding_proven,
+                "Decision": (
+                    "negative-binding proof row; mesh#34 repeats shared @212/#28 and extra @304/#57 "
+                    "position-like evidence but lacks complete attribute-set and UV binding"
+                ),
+            }
+        )
+
+    if not proof_rows:
+        raise ValueError("source compare report produced no proof rows")
+
+    blockers = [
+        "mesh34-complete-geometry-binding-not-proven",
+        "mesh34-uv-stream-missing",
+        "mesh34-attribute-set-missing",
+        "parser-export-promotion-not-allowed",
+    ]
+    complete_binding_count = sum(1 for row in proof_rows if row["CompleteGeometryBindingProven"] is True)
+    negative_binding_count = sum(1 for row in proof_rows if row["NegativeBindingProven"] is True)
+    aggregate = {
+        "ExampleCount": len(proof_rows),
+        "CompleteGeometryBindingCount": complete_binding_count,
+        "NegativeBindingCount": negative_binding_count,
+        "AllRowsSharedPrimaryAt212Block28": all(
+            row["SharedPrimaryStream"] is True and row["PrimaryStream"] == "@212/#28" for row in proof_rows
+        ),
+        "AllRowsExtraAt304Block57": all(row["ExtraStream"] == "@304/#57" for row in proof_rows),
+        "AllRowsLackCompleteAttributeSet": all(row["HasCompleteAttributeSet"] is False for row in proof_rows),
+        "AllRowsLackUvStreams": all(row["HasUvStream"] is False for row in proof_rows),
+        "AllRowsNegativeBinding": negative_binding_count == len(proof_rows),
+        "ParserExportPromotionAllowed": False,
+        "ExportReady": False,
+        "Blockers": blockers,
+        "Decision": (
+            "current mesh#34 examples prove absence of complete geometry binding for parser/export promotion; "
+            "@304/#57 remains candidate-only evidence"
+        ),
+    }
+
+    out_dir = Path(report_dir) if report_dir is not None else source_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "post50-mesh34-complete-binding-negative-proof.json"
+    md_path = out_dir / "post50-mesh34-complete-binding-negative-proof.md"
+    report = {
+        "SchemaVersion": "post50-mesh34-complete-binding-negative-proof/v1",
+        "CandidateOnly": True,
+        "SourceReport": _repo_relative_report_path(source_path),
+        "MeshSize": 329,
+        "MeshBlock": 34,
+        "PrimaryStream": "@212/#28",
+        "ExtraStream": "@304/#57",
+        "ProofRows": proof_rows,
+        "Aggregate": aggregate,
+        "ParserExportPromotionAllowed": False,
+        "Interpretation": (
+            "Candidate-only negative proof for current meshSize=329 mesh#34 examples. "
+            "The extra @304/#57 position-like stream is repeatable, but current rows do not "
+            "prove complete position/normal/UV geometry binding and must not drive parser/export behavior."
+        ),
+        "NextAction": (
+            "Keep mesh#34 @304/#57 candidate-only unless a future proof finds complete "
+            "attribute-set and UV binding across current examples."
+        ),
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Post-50 mesh#34 complete-binding negative proof",
+        "",
+        "Candidate-only proof that current meshSize 329 mesh#34 examples do not prove complete geometry binding.",
+        "",
+        f"Source report: `{_repo_relative_report_path(source_path)}`",
+        "",
+        "| ID | Primary stream | Extra stream | Attr sets | UV streams | Negative binding |",
+        "|---|---|---|---:|---:|---|",
+    ]
+    for row in proof_rows:
+        md_lines.append(
+            f"| {format_markdown_cell(row['Id'])} "
+            f"| `{format_markdown_cell(row['PrimaryStream'])}` "
+            f"| `{format_markdown_cell(row['ExtraStream'])}` "
+            f"| {row['Mesh34AttributeSetCount']} "
+            f"| {row['Mesh34UvStreamCount']} "
+            f"| `{str(row['NegativeBindingProven']).lower()}` |"
+        )
+    md_lines += [
+        "",
+        "## Aggregate",
+        "",
+        f"- Examples: `{aggregate['ExampleCount']}`",
+        f"- Complete geometry binding count: `{aggregate['CompleteGeometryBindingCount']}`",
+        f"- Negative binding count: `{aggregate['NegativeBindingCount']}`",
+        f"- Parser/export promotion: `{str(aggregate['ParserExportPromotionAllowed']).lower()}`",
+        "",
+        "## Blockers",
+        "",
+    ]
+    md_lines.extend(f"- `{blocker}`" for blocker in blockers)
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    print("\n--- Post50Mesh34CompleteBindingNegativeProof")
+    print(f"{'Id':<18} {'AttrSets':<8} {'UVStreams':<9} {'NegativeBinding'}")
+    print("-" * 64)
+    for row in proof_rows:
+        print(
+            f"{row['Id']:<18} {row['Mesh34AttributeSetCount']:<8} "
+            f"{row['Mesh34UvStreamCount']:<9} {str(row['NegativeBindingProven']).lower()}"
+        )
+    print(f"Post50Mesh34CompleteBindingNegativeProof JSON: {_repo_relative_report_path(json_path)}")
+    print(f"Post50Mesh34CompleteBindingNegativeProof markdown: {_repo_relative_report_path(md_path)}")
+    print("Post50Mesh34CompleteBindingNegativeProof passed: parser/export remains locked.")
+    return json_path, md_path
+
+
 def _int_list(raw: object) -> list[int]:
     """Return integer values from a JSON list field."""
     if not isinstance(raw, list):

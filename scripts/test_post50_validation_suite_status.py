@@ -126,6 +126,22 @@ def write_minimal_post50_reports(out_dir: Path) -> None:
     )
     write_json(
         out_dir,
+        "post50-mesh34-complete-binding-negative-proof.json",
+        {
+            "SchemaVersion": "post50-mesh34-complete-binding-negative-proof/v1",
+            "CandidateOnly": True,
+            "Aggregate": {
+                "ExampleCount": 1,
+                "CompleteGeometryBindingCount": 0,
+                "NegativeBindingCount": 1,
+                "AllRowsNegativeBinding": True,
+                "ParserExportPromotionAllowed": False,
+                "ExportReady": False,
+            },
+        },
+    )
+    write_json(
+        out_dir,
         "residual-position-classifier-report.json",
         {
             "Schema": "residual-position-classifier-report/v1",
@@ -187,11 +203,12 @@ with tempfile.TemporaryDirectory() as tmp:
     check("validation passed", status["ValidationPassed"], True)
     check("failed required checks", status["FailedRequiredChecks"], [])
     check("promotion locked", status["ParserExportPromotionAllowed"], False)
-    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 8)
+    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 9)
     rows = {row["Check"]: row for row in status["ValidationRows"]}
     check("schema-backed row", rows["post50-reports-schema-backed-candidate"]["Pass"], True)
     check("promotion lock row", rows["post50-parser-export-promotion-locked"]["Pass"], True)
     check("mesh34 negative row", rows["mesh34-negative-binding-recorded"]["Pass"], True)
+    check("mesh34 complete-binding negative proof row", rows["mesh34-complete-binding-negative-proof-present"]["Pass"], True)
     check_contains("next action", status["NextAction"], "do not change parser/export behavior")
 
 with tempfile.TemporaryDirectory() as tmp:

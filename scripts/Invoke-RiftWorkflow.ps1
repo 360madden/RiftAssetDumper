@@ -50,6 +50,7 @@ $PSModeToKebab = @{
     'FiftyStepPlanStatus' = 'fifty-step-plan-status'
     'Post50PositionSourceStatus' = 'post50-position-source-status'
     'Post50Mesh34NegativeBindingStatus' = 'post50-mesh34-negative-binding-status'
+    'Post50Mesh34CompleteBindingNegativeProof' = 'post50-mesh34-complete-binding-negative-proof'
     'Post50Mesh329FamilyProof' = 'post50-mesh329-family-proof'
     'Post50Mesh329SourceBindingCompare' = 'post50-mesh329-source-binding-compare'
     'Post50PromotionReadinessStatus' = 'post50-promotion-readiness-status'

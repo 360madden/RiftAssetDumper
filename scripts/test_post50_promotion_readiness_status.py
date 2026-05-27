@@ -134,6 +134,22 @@ def write_minimal_post50_reports(out_dir: Path) -> None:
     )
     write_json(
         out_dir,
+        "post50-mesh34-complete-binding-negative-proof.json",
+        {
+            "SchemaVersion": "post50-mesh34-complete-binding-negative-proof/v1",
+            "CandidateOnly": True,
+            "Aggregate": {
+                "ExampleCount": 1,
+                "CompleteGeometryBindingCount": 0,
+                "NegativeBindingCount": 1,
+                "AllRowsNegativeBinding": True,
+                "ParserExportPromotionAllowed": False,
+                "ExportReady": False,
+            },
+        },
+    )
+    write_json(
+        out_dir,
         "residual-position-classifier-report.json",
         {
             "Schema": "residual-position-classifier-report/v1",
@@ -215,8 +231,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("readiness schema", readiness_status["SchemaVersion"], "post50-promotion-readiness-status/v1")
     check("overall ready", readiness_status["OverallReady"], False)
     check("promotion locked", readiness_status["ParserExportPromotionAllowed"], False)
-    check("schema backed report count", readiness_status["SchemaBackedReportCount"], 8)
-    check("freshness existing reports", readiness_status["ReportFreshness"]["ExistingReportCount"], 8)
+    check("schema backed report count", readiness_status["SchemaBackedReportCount"], 9)
+    check("freshness existing reports", readiness_status["ReportFreshness"]["ExistingReportCount"], 9)
     check("freshness missing reports", readiness_status["ReportFreshness"]["MissingReportCount"], 0)
     gates = {row["Gate"]: row["Pass"] for row in readiness_status["GateRows"]}
     check("all reports schema-backed gate", gates["all-post50-reports-schema-backed"], True)

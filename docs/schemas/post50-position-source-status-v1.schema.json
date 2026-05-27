@@ -22,7 +22,7 @@
     "ReportRoot": { "type": "string", "minLength": 1 },
     "ReportStatuses": {
       "type": "array",
-      "minItems": 8,
+      "minItems": 9,
       "items": { "$ref": "#/$defs/reportStatus" }
     },
     "ReportFreshness": { "$ref": "#/$defs/reportFreshness" },
