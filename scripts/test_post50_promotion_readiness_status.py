@@ -216,6 +216,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("overall ready", readiness_status["OverallReady"], False)
     check("promotion locked", readiness_status["ParserExportPromotionAllowed"], False)
     check("schema backed report count", readiness_status["SchemaBackedReportCount"], 8)
+    check("freshness existing reports", readiness_status["ReportFreshness"]["ExistingReportCount"], 8)
+    check("freshness missing reports", readiness_status["ReportFreshness"]["MissingReportCount"], 0)
     gates = {row["Gate"]: row["Pass"] for row in readiness_status["GateRows"]}
     check("all reports schema-backed gate", gates["all-post50-reports-schema-backed"], True)
     check("mesh34 binding gate blocked", gates["mesh34-complete-geometry-binding"], False)

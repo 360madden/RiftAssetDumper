@@ -8,6 +8,7 @@
     "CandidateOnly",
     "ReportRoot",
     "ReportStatuses",
+    "ReportFreshness",
     "RecommendedLane",
     "CandidateLanes",
     "Mesh325Disposition",
@@ -24,6 +25,7 @@
       "minItems": 8,
       "items": { "$ref": "#/$defs/reportStatus" }
     },
+    "ReportFreshness": { "$ref": "#/$defs/reportFreshness" },
     "RecommendedLane": { "type": "string", "minLength": 1 },
     "CandidateLanes": {
       "type": "array",
@@ -53,6 +55,46 @@
         "ParseError": { "type": "string" },
         "EvidenceLevel": {
           "enum": ["schema-backed-candidate", "raw-candidate", "missing-or-unreadable"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "reportFreshness": {
+      "type": "object",
+      "required": [
+        "ExistingReportCount",
+        "MissingReportCount",
+        "UnreadableReportCount",
+        "OldestReportMtimeUtc",
+        "NewestReportMtimeUtc",
+        "MtimeRangeSeconds",
+        "OldestReportKeys",
+        "NewestReportKeys",
+        "OlderThanNewestKeys",
+        "MissingOrUnreadableKeys"
+      ],
+      "properties": {
+        "ExistingReportCount": { "type": "integer", "minimum": 0 },
+        "MissingReportCount": { "type": "integer", "minimum": 0 },
+        "UnreadableReportCount": { "type": "integer", "minimum": 0 },
+        "OldestReportMtimeUtc": { "type": "string" },
+        "NewestReportMtimeUtc": { "type": "string" },
+        "MtimeRangeSeconds": { "type": "integer", "minimum": 0 },
+        "OldestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "NewestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "OlderThanNewestKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "MissingOrUnreadableKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       },
       "additionalProperties": false

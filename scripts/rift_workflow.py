@@ -6313,6 +6313,65 @@ def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict
     return report, status
 
 
+def _parse_utc_timestamp(value: Any) -> datetime | None:
+    """Parse a repo status UTC timestamp, returning None for absent/bad values."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).replace(microsecond=0)
+
+
+def _format_utc_timestamp(value: datetime | None) -> str:
+    """Format a UTC timestamp for JSON status payloads."""
+    if value is None:
+        return ""
+    return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _post50_report_freshness(report_statuses: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize relative freshness of ignored post-50 report inputs."""
+    missing_keys: list[str] = []
+    unreadable_keys: list[str] = []
+    mtime_rows: list[tuple[str, datetime]] = []
+
+    for status in report_statuses:
+        key = str(status.get("Key", ""))
+        exists = bool(status.get("Exists"))
+        parse_error = str(status.get("ParseError", ""))
+        if not exists:
+            missing_keys.append(key)
+        if exists and parse_error:
+            unreadable_keys.append(key)
+        parsed_mtime = _parse_utc_timestamp(status.get("MtimeUtc"))
+        if key and parsed_mtime is not None:
+            mtime_rows.append((key, parsed_mtime))
+
+    oldest = min((mtime for _, mtime in mtime_rows), default=None)
+    newest = max((mtime for _, mtime in mtime_rows), default=None)
+    oldest_keys = sorted(key for key, mtime in mtime_rows if oldest is not None and mtime == oldest)
+    newest_keys = sorted(key for key, mtime in mtime_rows if newest is not None and mtime == newest)
+    older_than_newest_keys = sorted(key for key, mtime in mtime_rows if newest is not None and mtime < newest)
+    mtime_range_seconds = int((newest - oldest).total_seconds()) if oldest is not None and newest is not None else 0
+
+    return {
+        "ExistingReportCount": sum(1 for status in report_statuses if status.get("Exists") is True),
+        "MissingReportCount": len(missing_keys),
+        "UnreadableReportCount": len(unreadable_keys),
+        "OldestReportMtimeUtc": _format_utc_timestamp(oldest),
+        "NewestReportMtimeUtc": _format_utc_timestamp(newest),
+        "MtimeRangeSeconds": mtime_range_seconds,
+        "OldestReportKeys": oldest_keys,
+        "NewestReportKeys": newest_keys,
+        "OlderThanNewestKeys": older_than_newest_keys,
+        "MissingOrUnreadableKeys": sorted(set(missing_keys + unreadable_keys)),
+    }
+
+
 def _dict_rows(report: dict[str, Any], key: str) -> list[dict[str, Any]]:
     """Return a report list field filtered to object rows."""
     rows = report.get(key)
@@ -6583,6 +6642,7 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
         "CandidateOnly": True,
         "ReportRoot": _display_path(out_dir),
         "ReportStatuses": report_statuses,
+        "ReportFreshness": _post50_report_freshness(report_statuses),
         "RecommendedLane": recommended_lane,
         "CandidateLanes": lanes,
         "Mesh325Disposition": {
@@ -6600,6 +6660,13 @@ def _print_post50_position_source_status(status: dict[str, Any]) -> None:
     """Print a concise post-50 position-source status summary."""
     print("--- Post50PositionSourceStatus")
     print(f"Report root: {status['ReportRoot']}")
+    freshness = status["ReportFreshness"]
+    print(
+        "Report freshness: "
+        f"existing={freshness['ExistingReportCount']} "
+        f"missing={freshness['MissingReportCount']} "
+        f"mtimeRangeSeconds={freshness['MtimeRangeSeconds']}"
+    )
     print(f"Recommended lane: {status['RecommendedLane']}")
     print(f"Parser/export promotion allowed: {str(status['ParserExportPromotionAllowed']).lower()}")
     print("Candidate lanes:")
@@ -6844,6 +6911,7 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
         "ParserExportPromotionAllowed": False,
         "SchemaBackedReportCount": schema_backed_count,
         "TotalReportCount": len(report_rows),
+        "ReportFreshness": post50_status.get("ReportFreshness", {}),
         "RecommendedLane": str(post50_status.get("RecommendedLane", "")),
         "GateRows": gate_rows,
         "Blockers": blockers,

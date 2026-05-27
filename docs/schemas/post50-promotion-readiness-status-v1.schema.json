@@ -12,6 +12,7 @@
     "ParserExportPromotionAllowed",
     "SchemaBackedReportCount",
     "TotalReportCount",
+    "ReportFreshness",
     "RecommendedLane",
     "GateRows",
     "Blockers",
@@ -26,6 +27,7 @@
     "ParserExportPromotionAllowed": { "const": false },
     "SchemaBackedReportCount": { "type": "integer", "minimum": 0 },
     "TotalReportCount": { "type": "integer", "minimum": 0 },
+    "ReportFreshness": { "$ref": "#/$defs/reportFreshness" },
     "RecommendedLane": { "type": "string" },
     "GateRows": {
       "type": "array",
@@ -41,6 +43,46 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "reportFreshness": {
+      "type": "object",
+      "required": [
+        "ExistingReportCount",
+        "MissingReportCount",
+        "UnreadableReportCount",
+        "OldestReportMtimeUtc",
+        "NewestReportMtimeUtc",
+        "MtimeRangeSeconds",
+        "OldestReportKeys",
+        "NewestReportKeys",
+        "OlderThanNewestKeys",
+        "MissingOrUnreadableKeys"
+      ],
+      "properties": {
+        "ExistingReportCount": { "type": "integer", "minimum": 0 },
+        "MissingReportCount": { "type": "integer", "minimum": 0 },
+        "UnreadableReportCount": { "type": "integer", "minimum": 0 },
+        "OldestReportMtimeUtc": { "type": "string" },
+        "NewestReportMtimeUtc": { "type": "string" },
+        "MtimeRangeSeconds": { "type": "integer", "minimum": 0 },
+        "OldestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "NewestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "OlderThanNewestKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "MissingOrUnreadableKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
     "gateRow": {
       "type": "object",
       "required": ["Gate", "RequiredForPromotion", "Pass", "Evidence", "CurrentValue"],

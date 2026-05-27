@@ -291,6 +291,10 @@ with tempfile.TemporaryDirectory() as tmp:
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
     check("report status count", len(status["ReportStatuses"]), 8)
+    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 8)
+    check("freshness missing reports", status["ReportFreshness"]["MissingReportCount"], 0)
+    check("freshness unreadable reports", status["ReportFreshness"]["UnreadableReportCount"], 0)
+    check("freshness missing keys", status["ReportFreshness"]["MissingOrUnreadableKeys"], [])
     check(
         "schema-backed report statuses",
         {report_status["EvidenceLevel"] for report_status in status["ReportStatuses"]},
@@ -326,6 +330,8 @@ with tempfile.TemporaryDirectory() as tmp:
     jsonschema.validate(missing_status, schema)
     print("  PASS: missing-report status schema validation")
     check("missing report lanes", missing_status["CandidateLanes"], [])
+    check("missing freshness existing reports", missing_status["ReportFreshness"]["ExistingReportCount"], 0)
+    check("missing freshness missing reports", missing_status["ReportFreshness"]["MissingReportCount"], 8)
     check(
         "missing report evidence levels",
         {report_status["EvidenceLevel"] for report_status in missing_status["ReportStatuses"]},
