@@ -53,6 +53,7 @@ Commands (kebab-case):
     post50-mesh329-family-proof  — prove top meshSize=329 stream@212 family from inventory rows
     post50-mesh329-source-binding-compare — compare meshSize=329 @212/#28 and mesh#34 @304/#57 evidence
     post50-promotion-readiness-status — summarize post-50 parser/export promotion gates
+    post50-validation-suite     — run compact post-50 status/proof hygiene checks
     scan-live-memory            — plan or execute a gated read-only live memory scan
     ghidra-dry-run               — verify Ghidra/JDK registry wiring without launching Ghidra
     ghidra-run                   — run Ghidra headless through the repo workflow guard
@@ -334,6 +335,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "post50-validation-suite": {
+        "dotnet": "",
+        "base": "",
+    },
     "scan-live-memory": {
         "dotnet": "",
         "base": "",
@@ -475,6 +480,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
     "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
+    "Post50ValidationSuite": "post50-validation-suite",
     "ScanLiveMemory": "scan-live-memory",
     "GhidraDryRun": "ghidra-dry-run",
     "GhidraRun": "ghidra-run",
@@ -6949,6 +6955,146 @@ def _run_post50_promotion_readiness_status(args: argparse.Namespace) -> None:
     _print_post50_promotion_readiness_status(status)
 
 
+def _validation_row(check_id: str, passed: bool, evidence: str, required: bool = True) -> dict[str, Any]:
+    """Create a compact validation-suite row."""
+    return {
+        "Check": check_id,
+        "Required": required,
+        "Pass": passed,
+        "Evidence": evidence,
+    }
+
+
+def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
+    """Run lightweight post-50 status/proof hygiene checks without refreshing ignored reports."""
+    post50_status = _post50_position_source_status_payload(out_dir)
+    mesh34_status = _post50_mesh34_negative_binding_status_payload(out_dir)
+    readiness_status = _post50_promotion_readiness_status_payload(out_dir)
+
+    report_rows_raw = post50_status.get("ReportStatuses")
+    report_rows = [row for row in report_rows_raw if isinstance(row, dict)] if isinstance(report_rows_raw, list) else []
+    freshness_raw = post50_status.get("ReportFreshness")
+    freshness = freshness_raw if isinstance(freshness_raw, dict) else {}
+    report_count = len(report_rows)
+    expected_report_count = len(POST50_POSITION_SOURCE_REPORTS)
+    schema_backed_count = sum(1 for row in report_rows if row.get("EvidenceLevel") == "schema-backed-candidate")
+    missing_count = _as_rank_int(freshness.get("MissingReportCount"))
+    unreadable_count = _as_rank_int(freshness.get("UnreadableReportCount"))
+    candidate_only_rows = sum(1 for row in report_rows if row.get("CandidateOnly") is True)
+    mesh34_aggregate = mesh34_status.get("Aggregate") if isinstance(mesh34_status.get("Aggregate"), dict) else {}
+    promotion_locked = (
+        post50_status.get("ParserExportPromotionAllowed") is False
+        and mesh34_status.get("ParserExportPromotionAllowed") is False
+        and readiness_status.get("ParserExportPromotionAllowed") is False
+    )
+    readiness_not_ready = readiness_status.get("OverallReady") is False
+    older_than_newest = freshness.get("OlderThanNewestKeys")
+    older_keys = [str(item) for item in older_than_newest] if isinstance(older_than_newest, list) else []
+
+    validation_rows = [
+        _validation_row(
+            "post50-reports-present-and-readable",
+            report_count == expected_report_count and missing_count == 0 and unreadable_count == 0,
+            f"reports={report_count}/{expected_report_count} missing={missing_count} unreadable={unreadable_count}",
+        ),
+        _validation_row(
+            "post50-reports-schema-backed-candidate",
+            schema_backed_count == expected_report_count,
+            f"schemaBacked={schema_backed_count}/{expected_report_count}",
+        ),
+        _validation_row(
+            "post50-report-candidate-only-lock",
+            candidate_only_rows == expected_report_count,
+            f"candidateOnlyReports={candidate_only_rows}/{expected_report_count}",
+        ),
+        _validation_row(
+            "post50-parser-export-promotion-locked",
+            promotion_locked,
+            "post50, mesh34, and promotion-readiness statuses all report ParserExportPromotionAllowed=false",
+        ),
+        _validation_row(
+            "mesh34-negative-binding-recorded",
+            mesh34_aggregate.get("NegativeBindingProven") is True,
+            (
+                f"examples={mesh34_aggregate.get('ExampleCount', 0)} "
+                f"attributeSets={mesh34_aggregate.get('Mesh34CompleteAttributeSetCount', 0)} "
+                f"uvStreams={mesh34_aggregate.get('Mesh34UvStreamTotal', 0)}"
+            ),
+        ),
+        _validation_row(
+            "promotion-readiness-remains-not-ready",
+            readiness_not_ready,
+            str(readiness_status.get("Decision", "")),
+        ),
+        _validation_row(
+            "post50-relative-freshness-visible",
+            bool(freshness),
+            f"mtimeRangeSeconds={freshness.get('MtimeRangeSeconds', 0)} olderThanNewest={len(older_keys)}",
+            required=False,
+        ),
+    ]
+    failed_required = [row["Check"] for row in validation_rows if row["Required"] and not row["Pass"]]
+
+    warnings: list[str] = []
+    if older_keys:
+        warnings.append(
+            "relative-report-mtime-drift:"
+            + ",".join(older_keys[:8])
+            + ("..." if len(older_keys) > 8 else "")
+        )
+    if missing_count or unreadable_count:
+        warnings.append("missing-or-unreadable-post50-report-inputs")
+
+    return {
+        "SchemaVersion": "post50-validation-suite-status/v1",
+        "CandidateOnly": True,
+        "ReportRoot": _display_path(out_dir),
+        "ValidationPassed": not failed_required,
+        "FailedRequiredChecks": failed_required,
+        "ValidationRows": validation_rows,
+        "ReportFreshness": freshness,
+        "Warnings": warnings,
+        "ParserExportPromotionAllowed": False,
+        "Decision": (
+            "passed: post-50 proof/status hygiene is safe to consume as candidate-only workflow evidence"
+            if not failed_required
+            else "failed: one or more required post-50 proof/status hygiene checks did not pass"
+        ),
+        "NextAction": (
+            "Continue proof work on mesh#34 complete geometry binding or residual strict-threshold deltas; "
+            "do not change parser/export behavior."
+        ),
+    }
+
+
+def _print_post50_validation_suite_status(status: dict[str, Any]) -> None:
+    """Print post-50 validation-suite status."""
+    print("--- Post50ValidationSuite")
+    print(f"Report root: {status['ReportRoot']}")
+    print(f"Validation passed: {str(status['ValidationPassed']).lower()}")
+    print("Checks:")
+    for row in status["ValidationRows"]:
+        required = "required" if row["Required"] else "advisory"
+        print(f"  - {row['Check']} [{required}]: {str(row['Pass']).lower()} - {row['Evidence']}")
+    if status["Warnings"]:
+        print("Warnings:")
+        for warning in status["Warnings"]:
+            print(f"  - {warning}")
+    print(f"Next action: {status['NextAction']}")
+
+
+def _run_post50_validation_suite(args: argparse.Namespace) -> None:
+    """Run compact post-50 status/proof hygiene validation."""
+    out_dir = Path(args.out) if args.out else DEFAULT_OUT
+    status = _post50_validation_suite_status_payload(out_dir)
+    if args.list_json:
+        print(json.dumps(status, indent=2))
+    else:
+        _print_post50_validation_suite_status(status)
+    if not status["ValidationPassed"]:
+        sys.exit(1)
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -7050,6 +7196,10 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "post50-promotion-readiness-status":
         _run_post50_promotion_readiness_status(args)
+        return
+
+    if command == "post50-validation-suite":
+        _run_post50_validation_suite(args)
         return
 
     if command == "scan-live-memory":
@@ -8927,6 +9077,7 @@ Examples:
         "post50-position-source-status",
         "post50-mesh34-negative-binding-status",
         "post50-promotion-readiness-status",
+        "post50-validation-suite",
         "scan-live-memory",
         "ghidra-function-site-survey",
         "ghidra-function-site-status",
@@ -8947,6 +9098,7 @@ Examples:
             "post50-position-source-status, "
             "post50-mesh34-negative-binding-status, "
             "post50-promotion-readiness-status, "
+            "post50-validation-suite, "
             "ghidra-function-site-survey, "
             "ghidra-function-site-status, nidatastream-evidence-status, "
             "nidatastream-promotion-status, nidatastream-descriptor-proof-status, "

@@ -53,6 +53,7 @@ $PSModeToKebab = @{
     'Post50Mesh329FamilyProof' = 'post50-mesh329-family-proof'
     'Post50Mesh329SourceBindingCompare' = 'post50-mesh329-source-binding-compare'
     'Post50PromotionReadinessStatus' = 'post50-promotion-readiness-status'
+    'Post50ValidationSuite' = 'post50-validation-suite'
     'ScanLiveMemory' = 'scan-live-memory'
     'GhidraDryRun' = 'ghidra-dry-run'
     'GhidraRun' = 'ghidra-run'

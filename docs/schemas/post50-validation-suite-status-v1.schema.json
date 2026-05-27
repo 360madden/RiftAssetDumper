@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/post50-validation-suite-status-v1.schema.json",
+  "title": "Post-50 validation suite status v1",
+  "description": "Compact validation-suite output for post-50 candidate-only proof/status workflow hygiene.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "CandidateOnly",
+    "ReportRoot",
+    "ValidationPassed",
+    "FailedRequiredChecks",
+    "ValidationRows",
+    "ReportFreshness",
+    "Warnings",
+    "ParserExportPromotionAllowed",
+    "Decision",
+    "NextAction"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "post50-validation-suite-status/v1" },
+    "CandidateOnly": { "const": true },
+    "ReportRoot": { "type": "string", "minLength": 1 },
+    "ValidationPassed": { "type": "boolean" },
+    "FailedRequiredChecks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "ValidationRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/validationRow" }
+    },
+    "ReportFreshness": { "$ref": "#/$defs/reportFreshness" },
+    "Warnings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "ParserExportPromotionAllowed": { "const": false },
+    "Decision": { "type": "string", "minLength": 1 },
+    "NextAction": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "validationRow": {
+      "type": "object",
+      "required": ["Check", "Required", "Pass", "Evidence"],
+      "properties": {
+        "Check": { "type": "string", "minLength": 1 },
+        "Required": { "type": "boolean" },
+        "Pass": { "type": "boolean" },
+        "Evidence": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "reportFreshness": {
+      "type": "object",
+      "required": [
+        "ExistingReportCount",
+        "MissingReportCount",
+        "UnreadableReportCount",
+        "OldestReportMtimeUtc",
+        "NewestReportMtimeUtc",
+        "MtimeRangeSeconds",
+        "OldestReportKeys",
+        "NewestReportKeys",
+        "OlderThanNewestKeys",
+        "MissingOrUnreadableKeys"
+      ],
+      "properties": {
+        "ExistingReportCount": { "type": "integer", "minimum": 0 },
+        "MissingReportCount": { "type": "integer", "minimum": 0 },
+        "UnreadableReportCount": { "type": "integer", "minimum": 0 },
+        "OldestReportMtimeUtc": { "type": "string" },
+        "NewestReportMtimeUtc": { "type": "string" },
+        "MtimeRangeSeconds": { "type": "integer", "minimum": 0 },
+        "OldestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "NewestReportKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "OlderThanNewestKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "MissingOrUnreadableKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
