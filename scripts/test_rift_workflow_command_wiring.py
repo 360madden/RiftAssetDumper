@@ -21,6 +21,13 @@ def check(desc: str, actual: object, expected: object) -> None:
         failed += 1
 
 
+EXPECTED_PYTHON_ONLY_COMMANDS = {
+    "Phase1M12_304MagicAnalysis": "phase1-m1.2-304-magic-analysis",
+    "Phase1M13_329VariantLayoutGuard": "phase1-m1.3-329-variant-layout-guard",
+    "Mesh329AttributeRoleMatrix": "mesh329-attribute-role-matrix",
+}
+
+
 EXPECTED_GHIDRA_ALIASES = {
     "GhidraPairingNonExportGuard": "ghidra-pairing-non-export-guard",
     "GhidraPairingReviewReport": "ghidra-pairing-review-report",
@@ -38,6 +45,8 @@ EXPECTED_GHIDRA_ALIASES = {
     "Post50Mesh34CompleteBindingNegativeProof": "post50-mesh34-complete-binding-negative-proof",
     "Post50Mesh329FamilyProof": "post50-mesh329-family-proof",
     "Post50Mesh329SourceBindingCompare": "post50-mesh329-source-binding-compare",
+    "Mesh329AttributeRoleMatrix": "mesh329-attribute-role-matrix",
+    "Phase1M12_304MagicAnalysis": "phase1-m1.2-304-magic-analysis",
     "Post50PromotionReadinessStatus": "post50-promotion-readiness-status",
     "Post50ValidationSuite": "post50-validation-suite",
     "Post50ResidualStrictThresholdDelta": "post50-residual-strict-threshold-delta",
@@ -59,7 +68,12 @@ EXPECTED_GHIDRA_ALIASES = {
 }
 
 
-print("=== Ghidra command wiring ===")
+print("=== Python-only workflow command wiring ===")
+for legacy_name, kebab_name in EXPECTED_PYTHON_ONLY_COMMANDS.items():
+    check(f"python PS_MODE_TO_COMMAND {legacy_name}", PS_MODE_TO_COMMAND.get(legacy_name), kebab_name)
+    check(f"python COMMAND_MAP has {kebab_name}", kebab_name in COMMAND_MAP, True)
+
+print("\n=== Ghidra command wiring ===")
 wrapper_text = Path("scripts/Invoke-RiftWorkflow.ps1").read_text(encoding="utf-8-sig")
 
 for legacy_name, kebab_name in EXPECTED_GHIDRA_ALIASES.items():

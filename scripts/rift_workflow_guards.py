@@ -11,6 +11,8 @@ Contains:
   parser/export consumers until explicitly promoted
 - ghidra_attribute_candidate_guard() — fail-closed guard for grouped
   Ghidra-only candidate report baseline
+- phase1_m13_329_variant_layout_guard() — Phase 1 M1.3 pilot meshSize=329
+  sibling variant attribute layout guard (matrix + optional probes)
 
 All assertions raise ValueError on regression.  Called from rift_workflow.py.
 
@@ -2186,3 +2188,308 @@ def residual_lead_guard(report_path: str | Path) -> None:
         "evidence; meshSize=321/329 side streams stayed low-signal and no role "
         "or geometry truth was promoted."
     )
+
+
+# ============================================================================
+# Phase1M13_329VariantLayoutGuard (meshSize=329 pilot sibling layout proof)
+# ============================================================================
+
+PHASE1_M13_PILOT_IDS: tuple[str, ...] = (
+    "0364ea142bc00ce7",
+    "04de901531a091ab",
+    "066fa520a8ce62e3",
+)
+PHASE1_M13_MATRIX_SCHEMA = "329-family-attribute-role-matrix/v1"
+PHASE1_M13_GUARD_SCHEMA = "phase1-m1.3-329-variant-layout-guard/v1"
+PHASE1_M13_GUARD_JSON = "phase1-m1.3-329-variant-layout-guard.json"
+PHASE1_M13_GUARD_MD = "phase1-m1.3-329-variant-layout-guard.md"
+PHASE1_M13_PRIMARY_ROLE = "position-float3-ror1-lead"
+PHASE1_M13_MESH34_304_CONF = 75
+PHASE1_M13_MESH7_ATTR_SETS = 1
+PHASE1_M13_MESH34_ATTR_SETS = 0
+PHASE1_M13_MESH_SIZE = 329
+
+
+def _phase1_m13_matrix_row(
+    matrix_rows: list[dict[str, Any]],
+    asset_id: str,
+    mesh_block: int,
+) -> dict[str, Any] | None:
+    for row in matrix_rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("Id", "")).lower() == asset_id.lower() and safe_int(row.get("MeshBlock")) == mesh_block:
+            return row
+    return None
+
+
+def _phase1_m13_pair_comparison(
+    pair_comps: list[dict[str, Any]],
+    asset_id: str,
+) -> dict[str, Any] | None:
+    for row in pair_comps:
+        if isinstance(row, dict) and str(row.get("Id", "")).lower() == asset_id.lower():
+            return row
+    return None
+
+
+def _phase1_m13_stream_role_conf(stream: dict[str, Any] | None) -> tuple[str, int]:
+    if not stream or not isinstance(stream, dict):
+        return "", 0
+    return str(stream.get("role", "") or ""), safe_int(stream.get("conf", 0))
+
+
+def _phase1_m13_probe_mesh_entry(report: dict[str, Any], mesh_block: int) -> dict[str, Any] | None:
+    meshes = report.get("Meshes") or []
+    matches = [
+        m
+        for m in meshes
+        if isinstance(m, dict)
+        and safe_int(m.get("MeshBlockIndex", -1)) == mesh_block
+        and safe_int(m.get("MeshSize", 0)) == PHASE1_M13_MESH_SIZE
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _phase1_m13_probe_stream(mesh: dict[str, Any], offset: int) -> dict[str, Any] | None:
+    for stream in mesh.get("Streams") or []:
+        if not isinstance(stream, dict):
+            continue
+        if safe_int(stream.get("MeshPayloadOffset", -1)) == offset:
+            return stream
+    return None
+
+
+def _phase1_m13_assert_pilot_matrix_layout(
+    asset_id: str,
+    pair_row: dict[str, Any] | None,
+    row7: dict[str, Any] | None,
+    row34: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Validate one pilot ID against matrix pair rows + per-block stream rows."""
+    ctx = f"pilot {asset_id}"
+    assert_proof_guard(pair_row is not None, f"{ctx}: missing PairComparisons row in matrix.")
+    assert_proof_guard(row7 is not None, f"{ctx}: missing mesh#7 MatrixRows entry.")
+    assert_proof_guard(row34 is not None, f"{ctx}: missing mesh#34 MatrixRows entry.")
+
+    pair = pair_row
+    assert_proof_guard(
+        safe_int(pair.get("AttrSetCount7")) == PHASE1_M13_MESH7_ATTR_SETS,
+        f"{ctx}: mesh#7 attributeSets expected {PHASE1_M13_MESH7_ATTR_SETS}, "
+        f"got {safe_int(pair.get('AttrSetCount7'))}.",
+    )
+    assert_proof_guard(
+        safe_int(pair.get("AttrSetCount34")) == PHASE1_M13_MESH34_ATTR_SETS,
+        f"{ctx}: mesh#34 attributeSets expected {PHASE1_M13_MESH34_ATTR_SETS}, "
+        f"got {safe_int(pair.get('AttrSetCount34'))}.",
+    )
+    role304 = str(pair.get("Mesh34_304Role", "") or "")
+    conf304 = safe_int(pair.get("Mesh34_304Conf"))
+    assert_proof_guard(
+        role304 == PHASE1_M13_PRIMARY_ROLE,
+        f"{ctx}: mesh#34 @304 role expected {PHASE1_M13_PRIMARY_ROLE}, got {role304!r}.",
+    )
+    assert_proof_guard(
+        conf304 == PHASE1_M13_MESH34_304_CONF,
+        f"{ctx}: mesh#34 @304 confidence expected {PHASE1_M13_MESH34_304_CONF}, got {conf304}.",
+    )
+
+    role7_212, conf7_212 = _phase1_m13_stream_role_conf(row7.get("StreamsAt212"))
+    role34_212, conf34_212 = _phase1_m13_stream_role_conf(row34.get("StreamsAt212"))
+    assert_proof_guard(
+        role7_212 == PHASE1_M13_PRIMARY_ROLE,
+        f"{ctx}: mesh#7 @212 role expected {PHASE1_M13_PRIMARY_ROLE}, got {role7_212!r}.",
+    )
+    assert_proof_guard(
+        role34_212 == PHASE1_M13_PRIMARY_ROLE,
+        f"{ctx}: mesh#34 @212 role expected {PHASE1_M13_PRIMARY_ROLE}, got {role34_212!r}.",
+    )
+
+    return {
+        "Id": asset_id,
+        "AttrSetCount7": safe_int(pair.get("AttrSetCount7")),
+        "AttrSetCount34": safe_int(pair.get("AttrSetCount34")),
+        "Mesh34_304Role": role304,
+        "Mesh34_304Conf": conf304,
+        "Mesh7_212Role": role7_212,
+        "Mesh7_212Conf": conf7_212,
+        "Mesh34_212Role": role34_212,
+        "Mesh34_212Conf": conf34_212,
+        "Shared212Payload": bool(pair.get("Shared212Payload")),
+        "Shared212Block": bool(pair.get("Shared212Block")),
+        "MatrixValidated": True,
+        "ProbeValidated": False,
+    }
+
+
+def _phase1_m13_validate_pilot_probes(report_dir: Path, asset_id: str, summary: dict[str, Any]) -> None:
+    """Optional cross-check when probe JSONs exist (live Exports runs)."""
+    p7 = report_dir / f"probe-nif-mesh-{asset_id}-mesh7.json"
+    p34 = report_dir / f"probe-nif-mesh-{asset_id}-mesh34.json"
+    if not p7.exists() or not p34.exists():
+        return
+
+    ctx = f"pilot {asset_id} probes"
+    report7 = load_json_report(p7)
+    report34 = load_json_report(p34)
+    mesh7 = _phase1_m13_probe_mesh_entry(report7, 7)
+    mesh34 = _phase1_m13_probe_mesh_entry(report34, 34)
+    assert_proof_guard(mesh7 is not None, f"{ctx}: mesh#7 probe missing 329-sized block 7.")
+    assert_proof_guard(mesh34 is not None, f"{ctx}: mesh#34 probe missing 329-sized block 34.")
+
+    attr7 = mesh7.get("AttributeSets") or []
+    attr34 = mesh34.get("AttributeSets") or []
+    assert_proof_guard(
+        len(attr7) == PHASE1_M13_MESH7_ATTR_SETS,
+        f"{ctx}: mesh#7 attributeSets expected {PHASE1_M13_MESH7_ATTR_SETS}, got {len(attr7)}.",
+    )
+    assert_proof_guard(
+        len(attr34) == PHASE1_M13_MESH34_ATTR_SETS,
+        f"{ctx}: mesh#34 attributeSets expected {PHASE1_M13_MESH34_ATTR_SETS}, got {len(attr34)}.",
+    )
+
+    for mesh, block in ((mesh7, 7), (mesh34, 34)):
+        stream212 = _phase1_m13_probe_stream(mesh, 212)
+        assert_proof_guard(stream212 is not None, f"{ctx}: mesh#{block} missing stream@212.")
+        rs = stream212.get("RoleStats") or {}
+        role = str(rs.get("PrimaryRole", "") or "")
+        assert_proof_guard(
+            role == PHASE1_M13_PRIMARY_ROLE,
+            f"{ctx}: mesh#{block} @212 role expected {PHASE1_M13_PRIMARY_ROLE}, got {role!r}.",
+        )
+
+    stream304 = _phase1_m13_probe_stream(mesh34, 304)
+    assert_proof_guard(stream304 is not None, f"{ctx}: mesh#34 missing stream@304.")
+    rs304 = stream304.get("RoleStats") or {}
+    role304 = str(rs304.get("PrimaryRole", "") or "")
+    conf304 = safe_int(rs304.get("Confidence", 0))
+    assert_proof_guard(
+        role304 == PHASE1_M13_PRIMARY_ROLE,
+        f"{ctx}: mesh#34 @304 role expected {PHASE1_M13_PRIMARY_ROLE}, got {role304!r}.",
+    )
+    assert_proof_guard(
+        conf304 == PHASE1_M13_MESH34_304_CONF,
+        f"{ctx}: mesh#34 @304 confidence expected {PHASE1_M13_MESH34_304_CONF}, got {conf304}.",
+    )
+
+    summary["ProbeValidated"] = True
+    summary["ProbePaths"] = {
+        "Mesh7": str(p7),
+        "Mesh34": str(p34),
+    }
+
+
+def phase1_m13_329_variant_layout_guard(
+    report_dir: str | Path,
+    *,
+    pilot_ids: list[str] | None = None,
+) -> tuple[Path, Path]:
+    """Candidate-only proof guard for meshSize=329 pilot sibling variant layout.
+
+    Asserts per pilot paired ID (default: three M1.2 anchors):
+    - mesh#7 attributeSets=1, mesh#34 attributeSets=0
+    - mesh#34 @304 role ``position-float3-ror1-lead`` with confidence 75
+    - shared primary @212 ``position-float3-ror1-lead`` on both mesh blocks
+
+    Reads ``mesh329-family-attribute-role-matrix.json`` from *report_dir*.
+    When matching probe JSONs exist, cross-checks them. Writes guard JSON+MD under
+    *report_dir*. Raises ``ValueError`` on regression.
+
+    Reference: docs/roadmap/phase1-m1.3-prep.md, M1.2 @304 handoff.
+    """
+    out_dir = Path(report_dir)
+    matrix_path = out_dir / "mesh329-family-attribute-role-matrix.json"
+    if not matrix_path.exists():
+        raise FileNotFoundError(
+            f"phase1-m1.3-329-variant-layout-guard requires {matrix_path}. "
+            "Run mesh329-attribute-role-matrix first or pass --out with matrix present."
+        )
+
+    matrix = load_json_report(matrix_path)
+    if not isinstance(matrix, dict):
+        raise ValueError("mesh329-family-attribute-role-matrix.json is not a JSON object.")
+    if matrix.get("Schema") != PHASE1_M13_MATRIX_SCHEMA:
+        raise ValueError(
+            f"Expected matrix schema {PHASE1_M13_MATRIX_SCHEMA!r}, "
+            f"got {matrix.get('Schema')!r}."
+        )
+    if matrix.get("CandidateOnly") is not True:
+        raise ValueError("Matrix evidence must remain candidate-only.")
+
+    ids = [i.lower() for i in (pilot_ids or list(PHASE1_M13_PILOT_IDS))]
+    matrix_rows = [r for r in (matrix.get("MatrixRows") or []) if isinstance(r, dict)]
+    pair_comps = [r for r in (matrix.get("PairComparisons") or []) if isinstance(r, dict)]
+
+    per_id: list[dict[str, Any]] = []
+    for asset_id in ids:
+        summary = _phase1_m13_assert_pilot_matrix_layout(
+            asset_id,
+            _phase1_m13_pair_comparison(pair_comps, asset_id),
+            _phase1_m13_matrix_row(matrix_rows, asset_id, 7),
+            _phase1_m13_matrix_row(matrix_rows, asset_id, 34),
+        )
+        _phase1_m13_validate_pilot_probes(out_dir, asset_id, summary)
+        per_id.append(summary)
+
+    json_path = out_dir / PHASE1_M13_GUARD_JSON
+    md_path = out_dir / PHASE1_M13_GUARD_MD
+    report: dict[str, Any] = {
+        "Schema": PHASE1_M13_GUARD_SCHEMA,
+        "CandidateOnly": True,
+        "ParserExportPromotionAllowed": False,
+        "MeshSize": PHASE1_M13_MESH_SIZE,
+        "PilotIDs": ids,
+        "MatrixSource": str(matrix_path),
+        "PerID": per_id,
+        "Aggregate": {
+            "PilotCount": len(ids),
+            "AllMatrixValidated": all(r.get("MatrixValidated") for r in per_id),
+            "AllProbeValidated": all(r.get("ProbeValidated") for r in per_id),
+            "ProbeCrossCheckCount": sum(1 for r in per_id if r.get("ProbeValidated")),
+        },
+        "Interpretation": (
+            "Phase 1 M1.3 pilot guard: sibling source-binding layout for mesh#7 vs "
+            "mesh#34 in the meshSize=329 family. Confirms attribute-set split and "
+            "@304 role inversion on #34 vs UV-capable #7, with shared primary @212 "
+            "position role. Candidate-only; does not promote parser/export truth."
+        ),
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Phase 1 M1.3 — 329 variant layout guard (pilot)",
+        "",
+        "**Candidate-only** · meshSize=329 · pilot paired anchors",
+        "",
+        f"Pilot IDs: {', '.join(ids)}",
+        f"Matrix: `{matrix_path.name}`",
+        "",
+        "| ID | mesh#7 attr | mesh#34 attr | @212 mesh#7 | @212 mesh#34 | @304 mesh#34 (c) | matrix | probe |",
+        "|---|---:|---:|---|---|---:|---|---|",
+    ]
+    for row in per_id:
+        md_lines.append(
+            f"| {format_markdown_cell(row['Id'])} "
+            f"| {row['AttrSetCount7']} "
+            f"| {row['AttrSetCount34']} "
+            f"| {format_markdown_cell(row['Mesh7_212Role'])} "
+            f"| {format_markdown_cell(row['Mesh34_212Role'])} "
+            f"| {format_markdown_cell(row['Mesh34_304Role'])} ({row['Mesh34_304Conf']}) "
+            f"| {'yes' if row.get('MatrixValidated') else 'no'} "
+            f"| {'yes' if row.get('ProbeValidated') else 'no'} |"
+        )
+    md_lines += [
+        "",
+        report["Interpretation"],
+        "",
+        "Guard passed: layout expectations hold for pilot IDs (candidate-only).",
+    ]
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    print("\n--- Phase1M13_329VariantLayoutGuard candidate-only variant layout pilot")
+    print(f"Pilot IDs guarded: {len(ids)}")
+    print(f"Probe cross-checks: {report['Aggregate']['ProbeCrossCheckCount']}/{len(ids)}")
+    print(f"Phase1M13 guard JSON: {json_path}")
+    print(f"Phase1M13 guard markdown: {md_path}")
+    print("Phase1M13_329VariantLayoutGuard passed: pilot layout remains candidate-only.")
+    return json_path, md_path
