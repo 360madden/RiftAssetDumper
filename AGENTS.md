@@ -9,6 +9,8 @@
 - Treat `Source/`, `Extracted/`, and `Exports/` as local/generated data unless the user explicitly says otherwise.
 - Do not commit copied RIFT game assets or generated extraction output by accident.
 - Redact Windows user-profile paths and account-like local usernames in chat, docs, and generated artifacts unless the user explicitly requests exact local paths; prefer environment-variable placeholders such as `%USERPROFILE%`.
+- **Hard rule**: No new PowerShell (`.ps1`, `.psm1`) or significant CMD scripting from this point forward. All new code, tools, launchers, and automation must be written in Python. Existing thin wrappers may be maintained temporarily but should trend toward removal or minimal `.bat`/`.cmd` shims that only invoke Python. When starting Grok sessions in this repo, prefer the Python-based launcher (see `docs/grok-memory-and-context.md`).
+- **All work must follow the project roadmap** (`docs/roadmap/project-roadmap.md`). Reference the current phase and milestone in handoffs and major commits. Use `docs/roadmap/current-phase.md` as the living pointer. Anti-drift rules in the roadmap are mandatory.
 
 ## Reasoning and task-routing safety policy
 

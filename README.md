@@ -58,6 +58,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scri
 
 Prefer adding options/modes to this helper before creating new one-off helper apps.
 
+## Grok AI sessions (memory enabled)
+
+Grok is the primary coding/research agent in this workspace. Cross-session memory is enabled for persistent recall of discovery state, proofs, and conventions.
+
+- Recommended launcher (from this directory): `python grok-here.py`
+- Full setup & commands: `docs/grok-memory-and-context.md`
+- Global config: `%USERPROFILE%\.grok\config.toml`
+
+**Project Roadmap**: All work follows the structured plan in `docs/roadmap/project-roadmap.md`. Current phase pointer: `docs/roadmap/current-phase.md`.
+
 ## Ghidra static-analysis lane
 
 Ghidra is integrated as an offline static-analysis support tool for bounded parser/format proof work. It is not part of the default discovery suite and should not replace parser tests or byte-level proof.

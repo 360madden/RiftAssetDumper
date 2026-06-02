@@ -1,0 +1,208 @@
+# RiftAssetDumper Project Roadmap
+
+**Purpose of this document**: Provide a single source of truth for the long-term plan. It breaks the work into discrete, focused phases with clear entry/exit criteria, milestones, and anti-drift rules. This keeps the primary agent and any subagents locked on the current task.
+
+**Repo Purpose (never lose sight of this)**:
+- Research workspace for safe, evidence-driven reverse engineering of RIFT game assets.
+- Primary focus: Prove and implement reliable decoding of NIF geometry (NiMesh → NiDataStream bindings, stream role assignment, position sources, topology).
+- Core output: Verifiable parser components, schemas, proof guards, and documented truth — not speculative exports.
+- Operating mode: **Aggressive Evidence Workflow** (small focused probe → smoke → full inventory → ranked evidence → documented truth → small commit → next lead).
+- Non-negotiable: Strict safety gates (no committing Source/Extracted/Exports data, no parser/export promotion without passing all gates, high-reasoning for all truth/proof work).
+
+**Current Baseline (as of June 2026)**:
+- Original 50-step discovery plan completed as a cycle (ended negative on live position validation in current game state).
+- Python workflow + all proof guards fully migrated and tested.
+- Strong offline evidence on repeated source-binding families (meshSize=329 is strongest: 23 groups / 46 links on stream@212 between mesh#7/#34 variants).
+- Recent deep autonomous analysis on 329 family revealed consistent role/attribute patterns (mesh#7 often has complete attribute sets; mesh#34 shares primary position but shows 0 attribute sets + extra position-like streams).
+- NiDataStream/Ghidra analysis advanced but promotion remains locked (candidate-only).
+- Rich set of schemas, checklists, handoffs, and automation exists.
+- Parser/export promotion: Blocked.
+
+**Definition of Project Completion**:
+A state where:
+- Core NIF geometry structures (bindings, stream roles, position sources) are mapped with high-confidence, machine-readable evidence.
+- Working, guarded parser components exist for base mesh decoding and position source resolution.
+- All critical promotion gates are passed and documented.
+- Sustainable, low-drift discovery process is in place (automation, proof systems, clear handoff patterns).
+- The repo serves as a trustworthy foundation for further RIFT asset work.
+
+---
+
+## Phase Structure
+
+Each phase follows this template for focus:
+- **Objective**
+- **Entry Criteria**
+- **Key Milestones / Discrete Steps** (with anti-drift rules)
+- **Exit Criteria & Success Metrics**
+- **Required Artifacts**
+- **Focus & Anti-Drift Rules**
+
+---
+
+## Phase 0: Foundation & Roadmap Establishment (Current — In Progress)
+
+**Objective**: Establish this roadmap as the single source of truth, consolidate current state, and lock in operating conventions so all future work has minimal drift.
+
+**Entry Criteria**:
+- Existing 50-step cycle complete.
+- Python migration complete.
+- Recent 329-family role analysis completed.
+
+**Key Milestones / Steps**:
+1. Create and commit this `docs/roadmap/project-roadmap.md`.
+2. Create `docs/roadmap/current-phase.md` (symlink or pointer to active phase).
+3. Update AGENTS.md and README.md to reference the roadmap.
+4. Baseline current evidence state (run key status commands).
+5. Define "Current Phase" and seed the first 1-2 milestones with concrete todos.
+
+**Exit Criteria**:
+- Roadmap document exists and is referenced in AGENTS.md.
+- `current-phase.md` points to Phase 1.
+- At least one full status baseline run completed and documented.
+
+**Required Artifacts**:
+- This roadmap.
+- Updated AGENTS.md / README.md.
+- `docs/roadmap/current-state-baseline.md` (or handoff).
+
+**Focus Rules**:
+- Do not start new discovery probes until Phase 0 exit criteria are met.
+- All new work must reference this roadmap.
+
+---
+
+## Phase 1: Position Source Family Proof & Role Classification (Current Strongest Lead)
+
+**Objective**: Turn the strongest offline signal (meshSize=329 family and related) into high-confidence, classified evidence on bindings and stream roles. Directly attack the "extra position-like stream" and "attribute set completion" blockers.
+
+**Entry Criteria**:
+- Phase 0 complete.
+- 329 family data + recent role analysis handoffs exist.
+
+**Key Milestones** (discrete, one at a time):
+1. **M1.1**: Expand sample of 329-family mesh pairs (target 10+ groups). Systematically run `mesh-probe` on mesh#7 and #34 variants. Produce machine-readable attribute/role matrix.
+2. **M1.2**: Deep classification of the @304 extra stream on mesh#34 variants (payload analysis, vector comparison, magic patterns, role scoring refinement).
+3. **M1.3**: Develop or extend proof guard(s) for "sibling source-binding + variant attribute layout".
+4. **M1.4**: Apply similar (lighter) treatment to the #2 family (meshSize=305) for comparison.
+5. **M1.5**: Produce comprehensive family proof handoff + update promotion-readiness checklists.
+
+**Exit Criteria**:
+- At least 10 high-confidence 329-family examples with classified roles and attribute status.
+- New or updated guard(s) passing on the family.
+- Clear "candidate-only" vs "promotion-blocking" distinctions documented.
+- One major focused handoff committed.
+
+**Required Artifacts**:
+- Updated schemas or reports for family evidence.
+- New/updated proof guard code + tests.
+- Dedicated handoff in `docs/handoffs/`.
+
+**Focus & Anti-Drift Rules**:
+- Stay strictly within meshSize=329 (and light 305 comparison). Do not open new unrelated leads.
+- Every probe must produce JSON + markdown + handoff contribution.
+- Use existing `rift_workflow.py` commands; only add narrow new modes if justified by a milestone.
+
+---
+
+## Phase 2: NiDataStream Descriptor & Binding Proof System
+
+**Objective**: Mature the NiDataStream side (Ghidra + offline) into a reliable, machine-readable binding and descriptor system that can feed the parser.
+
+**Entry Criteria**:
+- Phase 1 exit complete (strong position source families classified).
+- Existing Ghidra/NiDataStream work and promotion checklists reviewed.
+
+**Key Milestones**:
+1. M2.1: Complete field-order + semantic mapping for high-priority NiDataStream descriptors using Ghidra + sample bytes.
+2. M2.2: Build/validate "NiMesh offset → NiDataStream block" binding proofs at scale.
+3. M2.3: Integrate role assignment (position/normal/UV/index) with descriptor data.
+4. M2.4: Pass key NiDataStream promotion gates (or document exactly why they remain blocked).
+
+**Exit Criteria**:
+- Machine-readable descriptor field map with high coverage on relevant streams.
+- Binding proofs for top position source families.
+- Promotion dashboard shows measurable progress (or locked reasons clearly documented).
+
+**Anti-Drift Rules**:
+- All Ghidra work must tie back to specific mesh/stream families from Phase 1.
+- No new Ghidra targets without explicit linkage to geometry proof.
+
+---
+
+## Phase 3: Parser Component Implementation & Guard Hardening
+
+**Objective**: Convert proven evidence into working, guarded C# parser components (experimental first, then hardened).
+
+**Entry Criteria**:
+- Phase 2 has sufficient binding + descriptor truth for at least one core path (e.g., 329-family position sources).
+
+**Key Milestones**:
+1. M3.1: Implement experimental position/normal/UV resolution using proven bindings.
+2. M3.2: Add strict proof guards that block promotion on unproven paths.
+3. M3.3: End-to-end validation on a growing set of verified meshes.
+4. M3.4: Topology validation (maxIndex < vertexCount, strip/list behavior).
+
+**Exit Criteria**:
+- Working decode path for at least the strongest families.
+- All promotion-sensitive code protected by guards.
+- Comprehensive test suite + negative fixtures.
+
+**Anti-Drift**:
+- No speculative OBJ export work until this phase's guards are green.
+- Every parser change must have a corresponding guard update or test.
+
+---
+
+## Phase 4: Promotion Readiness & Controlled Release
+
+**Objective**: Pass the defined promotion gates and enable limited, documented parser/export behavior for verified geometry only.
+
+**Entry Criteria**:
+- Phase 3 complete with strong evidence on at least one major family.
+
+**Key Milestones**:
+1. M4.1: Execute full `nidatastream-promotion-preflight` + decision template for first candidate.
+2. M4.2: Controlled promotion for base geometry (position sources + bindings) on proven families only.
+3. M4.3: Update all downstream consumers and documentation.
+4. M4.4: Establish ongoing monitoring for drift/regression.
+
+**Exit Criteria**:
+- First parser/export promotion approved and documented via decision template.
+- Clear "what is promoted vs still candidate-only" boundaries.
+- Repo can safely produce verified geometry for a subset of assets.
+
+---
+
+## Phase 5: Stabilization, Documentation & Sustainable Operations
+
+**Objective**: Make the system maintainable and handoff-ready for future work or contributors.
+
+**Key Milestones**:
+- Comprehensive user/developer docs.
+- Full schema registry + validation.
+- Automated promotion regression suite.
+- Final "state of the geometry understanding" comprehensive handoff.
+- Roadmap marked complete or transitioned to maintenance mode.
+
+---
+
+## Anti-Drift & Focus Mechanisms (Apply to All Phases)
+
+1. **Always reference the current phase** in every handoff and major commit.
+2. **One lead at a time** (per Aggressive Evidence Workflow). New leads only after current phase milestone exit.
+3. **Mandatory artifacts per milestone**: JSON report + markdown summary + handoff contribution (even small).
+4. **High-reasoning lane** for any truth, role assignment, or promotion decision (per task-routing-safety-policy.md).
+5. **Living `docs/roadmap/current-phase.md`** — updated at the start of every session or major milestone.
+6. **Weekly (or per session) "drift check"**: Explicitly confirm work is still inside the active phase/milestone.
+
+**Living Documents**:
+- `docs/roadmap/current-phase.md` (points to active phase + current milestone)
+- `docs/current-status.md` (high-level summary, updated at phase boundaries)
+- This roadmap (revised only at phase transitions with justification)
+
+---
+
+*This roadmap is the single source of truth for scope and sequencing. All autonomous or subagent work must be traceable to a specific phase + milestone.*
+
+**Last Updated**: 2026-06 (initial creation during autonomous planning session)

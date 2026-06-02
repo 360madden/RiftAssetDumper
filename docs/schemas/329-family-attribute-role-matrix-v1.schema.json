@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/329-family-attribute-role-matrix-v1.schema.json",
+  "title": "329 Family Attribute & Role Matrix v1",
+  "description": "Candidate-only comparative matrix for meshSize=329 family (mesh#7 vs mesh#34 variants) built from mesh-probe JSON outputs. Focus: attributeSets counts, key stream offsets/blocks/roles/payloads/vector-counts at @212/@220/@296/@304, confidence scores. All claims candidate-only. Phase 1 M1.1 artifact.",
+  "type": "object",
+  "required": [
+    "Schema",
+    "CandidateOnly",
+    "MeshSize",
+    "TargetMeshBlocks",
+    "IDsCovered",
+    "ProbeCount",
+    "MatrixRows",
+    "PairComparisons",
+    "PatternQuantification",
+    "Interpretation",
+    "ParserExportPromotionAllowed"
+  ],
+  "properties": {
+    "Schema": { "const": "329-family-attribute-role-matrix/v1" },
+    "CandidateOnly": { "const": true },
+    "MeshSize": { "const": 329 },
+    "TargetMeshBlocks": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "minItems": 2
+    },
+    "IDsCovered": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hex16" }
+    },
+    "ProbeCount": { "$ref": "#/$defs/nonNegativeInteger" },
+    "MatrixRows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/matrixRow" }
+    },
+    "PairComparisons": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pairComparison" }
+    },
+    "PatternQuantification": { "$ref": "#/$defs/patternQuant" },
+    "Interpretation": { "$ref": "#/$defs/nonEmptyString" },
+    "ParserExportPromotionAllowed": { "const": false }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hex16": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{16}$"
+    },
+    "streamDetail": {
+      "type": ["object", "null"],
+      "properties": {
+        "block": { "$ref": "#/$defs/nonNegativeInteger" },
+        "payload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "conf": { "$ref": "#/$defs/nonNegativeInteger" },
+        "vectorCount": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "matrixRow": {
+      "type": "object",
+      "required": [
+        "Id",
+        "MeshBlock",
+        "MeshSize",
+        "AttributeSetCount",
+        "VertexCount",
+        "StreamsAt212",
+        "StreamsAt220",
+        "StreamsAt296",
+        "StreamsAt304",
+        "TotalStreams",
+        "AttrExtraStreamCount",
+        "ProbePath",
+        "CandidateOnly"
+      ],
+      "properties": {
+        "Id": { "$ref": "#/$defs/hex16" },
+        "MeshBlock": { "$ref": "#/$defs/nonNegativeInteger" },
+        "MeshSize": { "const": 329 },
+        "AttributeSetCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "VertexCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "StreamsAt212": { "$ref": "#/$defs/streamDetail" },
+        "StreamsAt220": { "$ref": "#/$defs/streamDetail" },
+        "StreamsAt296": { "$ref": "#/$defs/streamDetail" },
+        "StreamsAt304": { "$ref": "#/$defs/streamDetail" },
+        "TotalStreams": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttrExtraStreamCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ProbePath": { "$ref": "#/$defs/nonEmptyString" },
+        "CandidateOnly": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "pairComparison": {
+      "type": "object",
+      "required": [
+        "Id",
+        "AttrSetCount7",
+        "AttrSetCount34",
+        "AttrDelta",
+        "Shared212Payload",
+        "Shared212Block",
+        "Mesh34_304Role",
+        "Mesh34_304Conf",
+        "Mesh34_304VectorCount",
+        "Mesh7HasUV",
+        "Mesh34HasUV",
+        "Mesh7HasAttrSet",
+        "Mesh34HasAttrSet",
+        "Decision"
+      ],
+      "properties": {
+        "Id": { "$ref": "#/$defs/hex16" },
+        "AttrSetCount7": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttrSetCount34": { "$ref": "#/$defs/nonNegativeInteger" },
+        "AttrDelta": { "type": "integer" },
+        "Shared212Payload": { "type": "boolean" },
+        "Shared212Block": { "type": "boolean" },
+        "Mesh34_304Role": { "$ref": "#/$defs/nonEmptyString" },
+        "Mesh34_304Conf": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34_304VectorCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh7HasUV": { "type": "boolean" },
+        "Mesh34HasUV": { "type": "boolean" },
+        "Mesh7HasAttrSet": { "type": "boolean" },
+        "Mesh34HasAttrSet": { "type": "boolean" },
+        "Mesh7PosPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Mesh34PosPrimaryPayload": { "$ref": "#/$defs/nonNegativeInteger" },
+        "Decision": { "$ref": "#/$defs/nonEmptyString" },
+        "CandidateOnly": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "patternQuant": {
+      "type": "object",
+      "required": [
+        "IDsWithBothProbes",
+        "IDsWithMesh7Attr1",
+        "IDsWithMesh34Attr0",
+        "IDsWithMesh34_304ScoredAsPosition",
+        "IDsWithMesh7UVPresent",
+        "IDsWithMesh34UVAbsent",
+        "ConsistentPatterns",
+        "QuantifiedNotes"
+      ],
+      "properties": {
+        "IDsWithBothProbes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IDsWithMesh7Attr1": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IDsWithMesh34Attr0": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IDsWithMesh34_304ScoredAsPosition": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IDsWithMesh7UVPresent": { "$ref": "#/$defs/nonNegativeInteger" },
+        "IDsWithMesh34UVAbsent": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ConsistentPatterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "QuantifiedNotes": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    }
+  }
+}
