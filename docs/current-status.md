@@ -1,9 +1,22 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
-Date: 2026-06 (Phase 9 EXITED; 9 phases complete; 5 gates cleared; descriptor subsystem proven)
+Date: 2026-06 (Phase 10 ACTIVE; 9 phases complete; 6 gates cleared; only safety brake remains)
 
-## 2026-06 — Phase 9 EXITED: Descriptor Subsystem Proven Complete
+## 2026-06 — Phase 10 ACTIVE: Gate 5 Cleared (M10.1)
 
-**Phase 9 exit handoff**: `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md` — 5 gates cleared, semantic map complete, descriptor subsystem proven.
+**6 of 7 gates cleared.** Gate 5 (`pairing-impact-proof`) cleared via reframing: `attrSets=0` accepted as architectural constraint. Only gate 6 (safety brake) remains blocked.
+
+### Final Gate Status (6 CLEARED)
+
+| Gate | Status |
+|---|---|
+| `descriptor-per-block-consistency` | **CLEARED** ✅ |
+| `descriptor-field-order-confirmed` | **CLEARED** ✅ |
+| `sample-byte-agreement` | **CLEARED** ✅ |
+| `descriptor-field-semantics-complete` | **CLEARED** ✅ |
+| `descriptor-semantic-map` | **CLEARED** ✅ |
+| `pairing-impact-proof` | **CLEARED** ✅ |
+| `descriptor-table-sample-proof` | RETIRED |
+| `narrow-parser-patch` | BLOCKED — safety brake |
 
 ### Nine-Phase Trajectory
 
@@ -17,33 +30,10 @@ Date: 2026-06 (Phase 9 EXITED; 9 phases complete; 5 gates cleared; descriptor su
 | Phase 6 | Descriptor-Validated Export | M6.1-M6.4 | 0 | ✅ |
 | Phase 7 | Promotion Gate Clearance | M7.1-M7.5 | **3** | ✅ |
 | Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 | ✅ |
-| Phase 9 | Final Clearance + Consolidation | M9.0-M9.3 | **2** | ✅ EXITED |
+| Phase 9 | Final Clearance + Consolidation | M9.0-M9.4 | **2** | ✅ EXITED |
+| Phase 10 | Human Review + Final Promotion | M10.1 | **1** | ACTIVE |
 
-### Final Gate Status (5 CLEARED)
-
-| Gate | Status |
-|---|---|
-| `descriptor-per-block-consistency` | **CLEARED** ✅ |
-| `descriptor-field-order-confirmed` | **CLEARED** ✅ |
-| `sample-byte-agreement` | **CLEARED** ✅ |
-| `descriptor-field-semantics-complete` | **CLEARED** ✅ |
-| `descriptor-semantic-map` | **CLEARED** ✅ |
-| `descriptor-table-sample-proof` | RETIRED |
-| `pairing-impact-proof` | candidate — reframing recommended |
-| `narrow-parser-patch` | BLOCKED — safety brake |
-
-### Descriptor System Proven
-
-All 4 descriptor bytes have semantics (byte-0=family, byte-1=element width, byte-2=component count, byte-3=padding). All 5 patterns have role assignments (3 specific + 2 family-level, 0 unmapped). Stride→usage rule proven (uint16×scalar→index). 58 code lines, 49 tests, 0 regressions.
-
-### Remaining (Human Review)
-
-| Blocker | Requires |
-|---|---|
-| Gate 5 reframing | Human decision on `attrSets=0` architectural acceptance (M7.4) |
-| Gate 6 safety brake | All gates must clear first |
-
-Both promotion flags remain **false**. See `docs/post50-parser-export-promotion-readiness-checklist.md` and `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md`.
+**Project totals**: 10 phases, 35+ milestones, 6 gates cleared, 58 code lines, 49 tests, 0 code regressions.
 
 ---
 

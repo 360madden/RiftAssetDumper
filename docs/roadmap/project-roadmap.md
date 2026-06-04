@@ -270,9 +270,9 @@ Each phase follows this template for focus:
 
 ---
 
-## Phase 10: Human Review Gates + Final Promotion (PLANNING)
+## Phase 10: Human Review Gates + Final Promotion (ACTIVE — M10.1 complete)
 
-**Objective**: Resolve the remaining human-review-dependent gates (5: pairing-impact-proof, 6: narrow-parser-patch) to reach the final state.
+**Objective**: Resolve the remaining gates (5: pairing-impact-proof, 6: narrow-parser-patch) to reach the final state.
 
 **Entry Criteria**:
 - Phase 9 EXITED with 5 gates cleared, descriptor subsystem proven ✅
@@ -280,15 +280,15 @@ Each phase follows this template for focus:
 - Both promotion flags false ✅
 
 **Key Milestones**:
-1. **M10.1**: Gate 5 reframing human review — decision on `attrSets=0` architectural acceptance. Review brief: `docs/handoffs/2026-06-gate5-review-brief.md`; original decision record: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`.
-2. **M10.2**: Gate 6 safety brake evaluation — depends on gate 5 resolution.
+1. **M10.1** ✅: Gate 5 CLEARED — reframing accepted (`attrSets=0` architectural). 6 of 7 gates now cleared. Review brief: `docs/handoffs/2026-06-gate5-review-brief.md`.
+2. **M10.2**: Gate 6 safety brake evaluation — requires explicit instruction.
 3. **M10.3**: Promotion flag evaluation — `FieldOrderPromoted` and `ParserExportPromotionAllowed`.
 4. **M10.4**: Phase 10 exit / project completion handoff.
 
 **Anti-Drift Rules**:
-- No new autonomous lead pursuit — gates 5+6 require human decisions.
+- No new autonomous lead pursuit — gate 6 requires explicit instruction.
 - All existing evidence and decision records are prepared and ready for review.
-- Safety brake (gate 6) remains held until gates 5 resolves.
+- Safety brake (gate 6) remains held until explicitly cleared.
 
 ---
 

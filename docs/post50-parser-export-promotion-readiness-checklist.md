@@ -486,12 +486,12 @@ This is the **5th gate clearance** in project history and the **final semantic g
 | `sample-byte-agreement` (gate 4) | **CLEARED** (M7.3) |
 | `descriptor-field-semantics-complete` (gate 1b) | **CLEARED** ✅ — stride hypothesis 16/16, p≈7.4×10⁻¹⁴ (M9.1) |
 | `descriptor-semantic-map` (gate 2) | **CLEARED** ✅ — semantic map complete; 3/5 specific + 2/5 family-level, 0 unmapped; dual-validated stride+usage 16/16 (M9.2+M9.3) |
-| `pairing-impact-proof` (gate 5) | candidate (strongly) — reframing recommended (M7.4) |
+| `pairing-impact-proof` (gate 5) | **CLEARED** ✅ — reframed: attrSets=0 accepted as architectural (M10.1) |
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
-**Final tally (M9.4 — Phase 9 exited)**: 5 gates CLEARED, 1 gate RETIRED, gate 5 reframing documented and awaiting human review, 1 gate remains blocked.
+**Final tally (M10.1 — gate 5 cleared)**: 6 gates CLEARED, 1 gate RETIRED, 1 gate remains blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
-**Gate 5 review brief** (awaiting human decision): `docs/handoffs/2026-06-gate5-review-brief.md` — concise standalone document with current 5-gate-cleared state, attrSets=0 architectural evidence, and decision options.
+**Gate 5 cleared** (M10.1): reframed criterion accepts `attrSets=0` as architectural constraint (15/15 pairs across 2 families). Review brief + decision at `docs/handoffs/2026-06-gate5-review-brief.md`.
 
 See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.

@@ -2,7 +2,9 @@
 
 **Date**: 2026-06
 **Type**: Human Review Brief
-**Status**: **Awaiting decision** — 5 of 7 gates cleared; gate 5 is next
+**Status**: **DECIDED — Gate 5 CLEARED** ✅ (M10.1, June 2026)
+
+**Decision**: Reframing accepted. Gate 5 (`pairing-impact-proof`) is CLEARED. The `attrSets=0` constraint is architectural (15/15 pairs across 2 families), not a gap. Complete geometry groups do not exist in the game's asset data. Descriptor-guided pairing improves evidence at 3 levels with zero noise. 94 OBJ exports work with partial bindings. Gate 6 (safety brake) remains BLOCKED. Both promotion flags remain false.
 
 ---
 
@@ -10,9 +12,7 @@
 
 **Gate 5 blocks parser/export promotion because it requires "complete position+normal+UV evidence."** But the RIFT game engine uses `attrSets=0` on sibling meshes by design — complete geometry groups don't exist. The gate's criterion is architecturally impossible to satisfy.
 
-**Recommendation**: Reframe gate 5 to accept the game's architectural constraint. If reframed, gate 5 would CLEAR on current evidence (13 code milestones, 3 levels of descriptor-guided pairing, 94 OBJ exports working with partial bindings).
-
-**No code changes are proposed.** Both promotion flags remain false until gate 6 (safety brake) is also resolved.
+**Decision**: Gate 5 CLEARED ✅ — reframing accepted. The `attrSets=0` architectural constraint is accepted. Gate 5 now passes on current evidence (13 code milestones, 3 levels of descriptor-guided pairing, 94 OBJ exports working with partial bindings). 6 of 7 gates cleared. Only gate 6 (safety brake) remains.
 
 ---
 
@@ -28,10 +28,10 @@
 | 3 | (retired) | RETIRED | M7.1 |
 | 4 | sample-byte-agreement | **CLEARED** ✅ | M7.3 — 100% population |
 | — | per-block-consistency | **CLEARED** ✅ | M7.1 — replacement for gate 3 |
-| **5** | **pairing-impact-proof** | **candidate — reframing recommended** | **M7.4 — THIS GATE** |
+| **5** | **pairing-impact-proof** | **CLEARED** ✅ | **M10.1 — reframing accepted** |
 | 6 | narrow-parser-patch | BLOCKED — safety brake | Must be last |
 
-**5 of 7 gates cleared.** Only gates 5 and 6 remain.
+**6 of 7 gates cleared.** Only gate 6 (safety brake) remains.
 
 ### Descriptor Subsystem
 
@@ -110,15 +110,9 @@ Under this reframing:
 
 ---
 
-## Decision Required
+## Decision (M10.1)
 
-**Should gate 5 (`pairing-impact-proof`) be reframed to accept the `attrSets=0` architectural constraint?**
-
-| Option | Outcome |
-|---|---|
-| **Accept reframing** | Gate 5 CLEARS. 6 of 7 gates cleared. Only gate 6 (safety brake) remains. |
-| **Reject reframing** | Gate 5 remains candidate. Project stalls on architecturally impossible criterion. |
-| **Hold for more evidence** | Gate 5 remains candidate. Specify what additional evidence would suffice. |
+**Gate 5 CLEARED** ✅ — reframing accepted. The `attrSets=0` architectural constraint is accepted. Gate 5's criterion is now: "improves available geometry evidence given the architectural constraint" — which passes on 3 levels of descriptor-guided pairing evidence. 6 of 7 gates now cleared. Only gate 6 (safety brake) remains.
 
 ---
 

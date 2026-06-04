@@ -1,15 +1,15 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 9 EXITED; Phase 10 PLANNING — 5 gates cleared, gates 5+6 pending human review)
+**Last Updated**: 2026-06 (Phase 10 ACTIVE — 6 gates cleared; gate 6 safety brake remaining)
 
 ---
 
 ## Current State
 
 **Phase 9: Final Clearance + Consolidation** — **EXITED** ✅  
-**Phase 10: Human Review Gates + Final Promotion** — **PLANNING**
+**Phase 10: Human Review Gates + Final Promotion** — **ACTIVE** (M10.1 complete)
 
-### Gate Landscape (5 of 7 cleared)
+### Gate Landscape (6 of 7 cleared)
 
 | Gate | Status | Cleared By |
 |---|---|---|
@@ -18,9 +18,9 @@
 | `sample-byte-agreement` (4) | **CLEARED** ✅ | M7.3 |
 | `descriptor-field-semantics-complete` (1b) | **CLEARED** ✅ | M9.1 |
 | `descriptor-semantic-map` (2) | **CLEARED** ✅ | M9.3 |
+| `pairing-impact-proof` (5) | **CLEARED** ✅ | M10.1 |
 | ~`descriptor-table-sample-proof`~ (3) | RETIRED | M7.1 |
-| `pairing-impact-proof` (5) | **candidate — reframing recommended** | Review brief ready |
-| `narrow-parser-patch` (6) | **BLOCKED — safety brake** | Depends on gate 5 |
+| `narrow-parser-patch` (6) | **BLOCKED — safety brake** | Depends on explicit instruction |
 
 **Both flags**: `FieldOrderPromoted=false`, `ParserExportPromotionAllowed=false`
 
@@ -37,10 +37,9 @@
 
 | # | Action | Status | Reference |
 |---|---|---|---|
-| 1 | **Gate 5 human review** | ⏳ Awaiting decision | `docs/handoffs/2026-06-gate5-review-brief.md` |
-| 2 | Gate 6 safety brake evaluation | ⏳ Depends on gate 5 | |
-| 3 | Promotion flag evaluation | ⏳ Depends on gates 5+6 | |
-| 4 | Phase 10 exit / project completion | ⏳ | |
+| 1 | **Gate 5 review** | ✅ CLEARED (M10.1) | `docs/handoffs/2026-06-gate5-review-brief.md` |
+| 2 | Gate 6 safety brake evaluation | ⏳ BLOCKED | Requires explicit instruction |
+| 3 | Promotion flag evaluation | ⏳ | Depends on gate 6 |
 
 ---
 
@@ -60,7 +59,7 @@
 
 ## Active Focus Rules
 
-- No autonomous parser/export code changes — gates 5+6 require human decisions
+- No autonomous code changes — gate 6 requires explicit instruction
 - Both promotion flags remain false
 - Safety brake (gate 6) must be the last gate to clear
 - All evidence and decision records are prepared and ready for review
@@ -81,6 +80,8 @@
 | Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 | ✅ |
 | Phase 9 | Final Clearance + Consolidation | M9.0-M9.4 | **2** | ✅ EXITED |
 
-**Project totals**: 9 phases, 35+ milestones, 5 gates cleared, 58 code lines, 49 tests, 0 code regressions.
+| Phase 10 | Human Review + Final Promotion | M10.1 | **1** | ✅ ACTIVE |
+
+**Project totals**: 10 phases, 35+ milestones, 6 gates cleared, 58 code lines, 49 tests, 0 code regressions.
 
 See individual exit handoffs under `docs/handoffs/2026-06-m*.*-phase*-exit-consolidation.md`.
