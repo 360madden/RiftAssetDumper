@@ -46,7 +46,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.4** | **COMPLETE** | Console descriptor classification summary in `inventory-nif-stream-headers` output; 23/23 tests |
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
-| **M4.x** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m4.x-phase4-exit-consolidation.md` |
+| **M4.x** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m4.6-phase4-exit-consolidation.md` |
 
 ## Phase 3: Parser/Export Implementation (Descriptor Propagation)
 
