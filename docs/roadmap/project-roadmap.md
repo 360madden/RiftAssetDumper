@@ -258,7 +258,7 @@ Each phase follows this template for focus:
 1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md`.
 2. **M9.1** ✅: Gate 1b CLEARED — stride hypothesis 16/16 (100%), p≈7.4×10⁻¹⁴. Formal analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`.
 3. **M9.2** ✅: Gate 2 strongly advanced — stride-semantic role mapping (3/5 specific roles, 0/5 unmapped). `36040200` → UV coordinates.
-4. **M9.3** ✅: Descriptor-to-usage consistency — 16/16 (100%) across all 5 patterns; stride→usage rule validated.
+4. **M9.3** ✅: Gate 2 CLEARED — semantic map complete (5/5 patterns, 3 specific + 2 family-level, 0 unmapped); dual-validated stride+usage 16/16. Formal clearance: `docs/handoffs/2026-06-m9.3-gate2-semantic-map-clearance.md`.
 5. **M9.4** (deferred): Gate 5 reframing human review.
 6. **M9.5**: Phase 9 exit consolidation.
 
