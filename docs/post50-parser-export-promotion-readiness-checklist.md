@@ -249,8 +249,59 @@ blocked by bytes 1-2.
 | `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
 | `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
 
-**Final tally (M7.2)**: 2 gates CLEARED ✅, 1 gate RETIRED ✅, 1 new sub-gate BLOCKED, 4 gates unchanged.
+**Final tally (M7.3)**: 3 gates CLEARED (with M7.3), 1 gate RETIRED, 1 new sub-gate BLOCKED, 3 gates unchanged.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
+
+### M7.3: Gate 4 Population Inventory — `sample-byte-agreement` → ADVANCED
+
+**Decision**: Full-population descriptor inventory completed on all 31,777 NiDataStream blocks
+(100% of copied set). Gate 4 advanced from "candidate (substantially strengthened)" to
+**population-validated**.
+
+**Population results**:
+
+| Metric | Pre-M7.3 (sample) | Post-M7.3 (population) |
+|---|---|---|
+| Blocks | 375 (1.18%) | 31,777 (100%) |
+| NIF payloads | 200 | 5,111 |
+| Byte-3 = 0x00 | 0/375 | 0/31,777 |
+| Invalid declared payloads | 0 | 0 |
+| Descriptor patterns | 5 (sample-confirmed) | 5 (population-confirmed) |
+| Cross-record validation | 6 record types | 6 record types |
+
+**Evidence chain**:
+- `inventory-nif-stream-headers --root Source --max-total 0` on 5,111 NIF payloads
+- 31,777 valid blocks, 0 invalid, 0 byte-3 non-zero
+- 5 patterns consistent with Phase 3-4 sample evidence
+- Inventory report: `Exports/nif-stream-header-inventory.json` (2.3MB, full population)
+
+**Gate 4 status update**:
+
+| Criterion | Pre-M7.3 | Post-M7.3 |
+|---|---|---|
+| Sample coverage | 1.18% (375 blocks) | **100%** (31,777 blocks) |
+| Byte-3 = 0x00 | 0/375 | **0/31,777** (universal) |
+| Pattern distribution | 5 patterns (sample) | **5 patterns (population)** |
+| Cross-record validation | 6 record types | 6 record types |
+| Cross-check validation | Descriptor-role + Usage/Access | Descriptor-role + Usage/Access |
+
+**Assessment**: Gate 4 (`sample-byte-agreement`) is now **population-validated**. The 10%
+coverage target is exceeded (100%). Internal consistency is verified at population scale
+with cross-record and cross-check validation. Byte-3=0x00 is a universal invariant.
+
+**Gate 4 status**: candidate (substantially strengthened) → **CLEARED** ✅
+
+### Updated Promotion Gate Status (post M7.1-M7.3)
+
+| Gate | Pre-Phase 7 State | M7.3 State | Change |
+|---:|---|---|---|
+| `descriptor-per-block-consistency` (new, replacing gate 3) | — | **CLEARED** (M7.1) | Gate 3 retired |
+| `descriptor-field-order-confirmed` (gate 1a) | — | **CLEARED** (M7.2) | Split from gate 1 |
+| `sample-byte-agreement` (gate 4) | candidate (substantially) | **CLEARED** (M7.3) | Population-validated |
+| `descriptor-field-semantics-complete` (gate 1b) | — | **BLOCKED** (M7.2) | Bytes 1-2 unknown |
+| `descriptor-semantic-map` (gate 2) | blocked (improved) | blocked (improved) | — |
+| `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
+| `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
 
 ---
 
@@ -263,5 +314,8 @@ are the first gate clearances in project history.
 The remaining gates (1b field-semantics-complete, 2 semantic-map, 4 sample-byte-agreement,
 5 pairing-impact-proof, 6 narrow-parser-patch) remain blocked or candidate-only. Both
 promotion flags must remain false.
+
+**Final tally (M7.3)**: 3 gates CLEARED (M7.1-M7.3), 1 gate RETIRED, 1 sub-gate BLOCKED, 3 gates unchanged.
+`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
 See Phase 7 prep: `docs/roadmap/phase7-prep.md`.

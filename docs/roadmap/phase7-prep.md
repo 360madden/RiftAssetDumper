@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 7 Entry
-**Status**: **ACTIVE** — M7.2 COMPLETE: gate 3 retired + gate 1 split; 2 gate clearances; M7.3 planning
+**Status**: **ACTIVE** — M7.3 COMPLETE: population inventory (100% coverage); 3 gates cleared; M7.4 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`
 **Entry**: Phase 6 EXITED — descriptor-validated export complete (M6.1-M6.3); 58 descriptor code lines, 49 tests, 6 record types, 0 decode/export changes across 13 milestones
 
@@ -39,11 +39,17 @@ Convert the 18-milestone cumulative evidence (Phases 2-6) into explicit promotio
 - [x] Update promotion readiness checklist with split gates
 - [x] Field-order sub-gate formally cleared
 
-### M7.3 — Full-Population Descriptor Inventory (PLANNING)
-- Run `inventory-nif-stream-headers --max-total 0` on all 31,777 copied-set blocks
-- Verify byte-3 = 0x00 at population scale
-- Get exact 5-pattern distribution percentages
-- If clean, advance gate 4 (`sample-byte-agreement`) to population-validated
+### M7.3 — Full-Population Descriptor Inventory
+
+- [x] Run `inventory-nif-stream-headers --root Source --max-total 0` on all 31,777 blocks (100% coverage)
+- [x] 5,111 NIF payloads across 40,203 inspected entries
+- [x] 0 byte-3 non-zero warnings (universal invariant at population scale)
+- [x] 0 invalid declared payloads; 5 patterns confirmed at population scale
+- [x] Gate 4 (`sample-byte-agreement`) advanced from 1.18% sample to **100% population coverage**
+- [x] Inventory report: `Exports/nif-stream-header-inventory.json` (2.3MB, full population)
+- [x] 3 Usage/Access groups: usage=1/access=19 (26,087), usage=0/access=19 (5,507), usage=3/access=3 (183)
+
+**Gate 4 now CLEARED** ✅ — third gate clearance in Phase 7.
 
 ### M7.4 — Formal Decision Record (PLANNING)
 - Complete `docs/nidatastream-parser-export-promotion-decision-template.md`
@@ -66,7 +72,7 @@ dotnet format RiftAssetDumper.slnx --verify-no-changes
 - [ ] `dotnet format --verify-no-changes` clean
 - [ ] `FieldOrderPromoted` still false (gate 6 blocks)
 - [ ] `ParserExportPromotionAllowed` still false (gate 6 blocks)
-- [x] At least 1 gate formally retired or cleared (2 cleared + 1 retired in M7.1-M7.2)
+- [x] At least 1 gate formally retired or cleared (3 cleared + 1 retired in M7.1-M7.3)
 - [x] All gate changes traceable to specific Phase 2-6 evidence
 
 ## Gate Clearance Strategy
