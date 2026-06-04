@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.1 gate 1b CLEARED; 4 gates cleared; p≈7.4×10⁻¹⁴)
+**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.2 gate 2 strongly advanced; 3/5 specific roles, 0 unmapped; 4 gates cleared)
 
 ## Current Phase
 **Phase 9: Final Clearance + Consolidation** (ACTIVE)
@@ -95,16 +95,17 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 9)
-**M9.1** — Gate 1b CLEARED ✅ (4th gate clearance): all 4 descriptor bytes have identified semantics. Statistical case p≈7.4×10⁻¹⁴ from 16/16 stride divisibility. Formal analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`. Next: M9.2 gate 6 analysis, or M9.3 gate 5 human review.
+**M9.2** — Gate 2 strongly advanced (stride-semantic role mapping): 3/5 specific roles (+ UV), 2/5 probable, 0/5 unmapped. `36040200` → UV coordinates mapped. Next: M9.3 gate 5 human review or M9.4 Phase 9 exit.
 
 | **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` |
 | **M9.1** | **COMPLETE** | Gate 1b CLEARED: stride hypothesis 16/16 100%; formal clearance analysis |
+| **M9.2** | **COMPLETE** | Gate 2 advanced: stride-semantic mapping; 3/5 specific roles; `36040200`→UV |
 
 ## Next Concrete Actions (Phase 9)
 1. ✅ Comprehensive project-wide consolidation handoff — `docs/handoffs/2026-06-phase9-project-consolidation.md`
-2. ✅ Gate 1b CLEARED — stride hypothesis 16/16 100%; 4 gates now cleared; formal analysis at `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`
-3. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M9.3 deferred
-4. ✅ `post50-validation-suite` + `generated-output-guard` — 9/9 PASS, CLEAN
+2. ✅ Gate 1b CLEARED — stride hypothesis 16/16 100%; 4 gates now cleared
+3. ✅ Gate 2 strongly advanced — stride-semantic mapping: 3/5 specific roles, 0/5 unmapped; `36040200`→UV
+4. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M9.3 deferred
 
 ## Entry Criteria Met
 - Phase 0 complete.

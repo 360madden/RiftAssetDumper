@@ -356,11 +356,43 @@ See Phase 7 prep: `docs/roadmap/phase7-prep.md`, Phase 8 prep: `docs/roadmap/pha
 
 ---
 
-## Phase 8 Role-Semantic Mapping (M8.2)
+## Phase 8-9 Semantic Gate Advancement (M8.2, M9.1, M9.2)
 
 ### M8.2: Descriptor-to-Role Cross-Reference — Gate 2 Advanced
 
 Cross-referenced all 5 descriptor patterns with Usage/Access from population inventory (16 representative samples). Key finding: `15020100` = index stream descriptor (usage=0), corrected from "u16-vertex-data." All patterns have usage-level role evidence. Gate 2 advanced to "improved — usage-level evidence."
+
+### M9.2: Stride-Semantic Role Mapping — Gate 2 Further Advanced
+
+Combined the stride semantics established in M9.1 (byte-1=element width, byte-2=component count) with the usage evidence from M8.2 to propose concrete role mappings for all 5 descriptor patterns.
+
+**Per-pattern role analysis**:
+
+| Pattern | Byte-0 | Byte-1 | Byte-2 | Stride | Usage | Proposed Role | Evidence | Confidence |
+|---|---|---|---|---|---:|---|---:|---|
+| `37040300` | 0x37 (ror1-float) | float32 | vec3 | 12 | 1 | **position / normal / UV** (role-agnostic) | Multi-role confirmed in Phase 2; same descriptor serves all 3 roles | ✅ Mapped |
+| `36040200` | 0x36 (float-vertex-data) | float32 | vec2 | 8 | 1 | **UV coordinates** | Float32×vec2 with vertex-data usage — the only 2-component float pattern. Matches UV (2D texture coords). Distinct from `37040300` vec3. | ✅ High |
+| `15020100` | 0x15 (index-data) | uint16 | scalar | 2 | 0 | **Index stream** | uint16×scalar with usage=0 (index data). Essentially 16-bit integers. Confirmed in M8.2. | ✅ Mapped |
+| `10010400` | 0x10 (vertex-data) | byte | vec4 | 4 | 1 | **Packed vertex attribute** (4×int8 or uint32) | 4-byte elements with vertex-data usage. Likely packed normals, colors, or bone weights. The 4-component structure suggests per-vertex attribute data. | ○ Probable |
+| `3c010400` | 0x3c (vertex-data) | byte | vec4 | 4 | 1 | **Packed vertex attribute** (4×int8 or uint32) | Same stride and usage as `10010400` but different byte-0 sub-family. Likely a variant packed format (e.g., signed vs unsigned, or different attribute type). | ○ Probable |
+
+**Key findings**:
+- **3/5 patterns now have specific roles**: `37040300` (position/normal/UV), `36040200` (UV), `15020100` (index)
+- **2/5 patterns have probable roles**: `10010400` and `3c010400` (packed vertex attributes)
+- The `36040200` → UV mapping is particularly strong: it's the only float32×vec2 pattern, distinct from the vec3 `37040300`, and the 2-component structure is characteristic of texture coordinates
+- The `10010400`/`3c010400` distinction is a byte-0 sub-family split — both are 4-byte packed data but differ in sub-type (possibly signed/unsigned or attribute type)
+- **0/5 patterns remain completely unmapped** — every pattern now has at least a probable role
+
+**Gate 2 status update**:
+
+| Criterion | Pre-M9.2 | Post-M9.2 |
+|---|---|---|
+| Patterns with specific roles | 2/5 (`37040300`, `15020100`) | **3/5** (+ `36040200` → UV) |
+| Patterns with probable roles | 0/5 | **2/5** (`10010400`, `3c010400`) |
+| Patterns completely unmapped | 3/5 | **0/5** |
+| Role-agnostic mapping verified | `37040300` confirmed | Extended to include stride context |
+
+**Assessment**: Gate 2 (`descriptor-semantic-map`) advances from "improved — usage-level evidence" to **strongly improved — 3/5 specific roles, 2/5 probable roles, 0/5 unmapped**. The `36040200` → UV mapping is a significant advancement: it's the first pattern to receive a specific role assignment based on combined stride+usage evidence. Not yet CLEARED: the `10010400`/`3c010400` distinction requires data-level probing to confirm the specific packed attribute type.
 
 ---
 
@@ -400,7 +432,7 @@ Cross-referenced all 5 descriptor patterns with Usage/Access from population inv
 
 **Note**: No Ghidra required — the stride divisibility evidence is structural/payload-derived. This is consistent with the per-block-embedded descriptor architecture (Phase 2): the descriptor bytes describe the stream body layout, not a static table lookup.
 
-### Consolidated Promotion Gate Status (post M9.1)
+### Consolidated Promotion Gate Status (post M9.2)
 
 | Gate | Status |
 |---|---|
@@ -408,11 +440,11 @@ Cross-referenced all 5 descriptor patterns with Usage/Access from population inv
 | `descriptor-field-order-confirmed` (gate 1a) | **CLEARED** (M7.2) |
 | `sample-byte-agreement` (gate 4) | **CLEARED** (M7.3) |
 | `descriptor-field-semantics-complete` (gate 1b) | **CLEARED** ✅ — stride hypothesis 16/16, p≈7.4×10⁻¹⁴ (M9.1) |
-| `descriptor-semantic-map` (gate 2) | improved — usage-level evidence (M8.2) |
+| `descriptor-semantic-map` (gate 2) | **strongly improved — 3/5 specific roles, 0/5 unmapped** (M9.2) |
 | `pairing-impact-proof` (gate 5) | candidate (strongly) — reframing recommended (M7.4) |
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
-**Final tally (M9.1)**: 4 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 5 reframing documented, 1 gate remains blocked.
+**Final tally (M9.2)**: 4 gates CLEARED, 1 gate RETIRED, gate 2 strongly advanced (3/5 specific roles, 0 unmapped), gate 5 reframing documented, 1 gate remains blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
 See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.

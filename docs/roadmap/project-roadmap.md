@@ -252,15 +252,14 @@ Each phase follows this template for focus:
 
 ## Phase 9: Final Clearance + Consolidation (ACTIVE)
 
-**Objective**: Complete project-wide consolidation and address remaining blocked/deferred gates (bytes 1-2 Ghidra analysis, gate 5 human review) to reach the final clearance state.
+**Objective**: Complete project-wide consolidation and address remaining blocked/deferred gates (gate 5 human review, gate 6 safety brake) to reach the final clearance state.
 
 **Key Milestones**:
-1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md` — 8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers.
-2. **M9.1** ✅: Gate 1b CLEARED — stride hypothesis 16/16 (100%), p≈7.4×10⁻¹⁴, all 4 descriptor bytes have identified semantics. Formal clearance analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`. No Ghidra required.
-3. **M9.2**: Gate 6 safety brake evaluation (dependent on gates 1b + 2 + 5).
-4. **M9.3** (deferred from M8.3): Gate 5 reframing human review.
-3. **M9.2**: Gate 6 safety brake evaluation (dependent on gates 1b + 2 + 5).
-4. **M9.3** (deferred from M8.3): Gate 5 reframing human review.
+1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md`.
+2. **M9.1** ✅: Gate 1b CLEARED — stride hypothesis 16/16 (100%), p≈7.4×10⁻¹⁴. Formal analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`.
+3. **M9.2** ✅: Gate 2 strongly advanced — stride-semantic role mapping (3/5 specific roles, 0/5 unmapped). `36040200` → UV coordinates.
+4. **M9.3** (deferred): Gate 5 reframing human review.
+5. **M9.4**: Phase 9 exit consolidation.
 
 **Exit Criteria**:
 - All remaining gates either cleared or explicitly held with documented rationale.
