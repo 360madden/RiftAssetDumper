@@ -1,9 +1,9 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 5 ACTIVE — M5.1 COMPLETE: descriptor on pairing records; M5.2 COMPLETE: confidence adjustment; M5.4 COMPLETE: Usage/Access correlation; M5.5 planning)
+**Last Updated**: 2026-06 (Phase 5 ACTIVE — M5.1 COMPLETE: descriptor on pairing records; M5.2 COMPLETE: confidence adjustment; M5.5 EXITED — Phase 5 handoff created; Phase 6 planning)
 
 ## Current Phase
-**Phase 5: Descriptor-Guided Parser**
+**Phase 6: Descriptor-Validated Export** (planning)
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -46,6 +46,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.4** | **COMPLETE** | Console descriptor classification summary in `inventory-nif-stream-headers` output; 23/23 tests |
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
+| **M5.5** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md` |
 | **M5.4** | **COMPLETE** | Usage/Access enrichment in descriptor-role cross-check warnings; 41/41 tests |
 | **M5.3** | **COMPLETE** | Descriptor-based position stream pre-filter in decode-nif-geometry; 39/39 tests |
 | **M5.2** | **COMPLETE** | Descriptor-guided pairing confidence adjustment (AdjustConfidenceByDescriptor); 39/39 tests |
@@ -82,7 +83,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 3)
-**M5.5** — Phase 5 exit consolidation handoff (planning): add warning when byte-3 ≠ 0x00 in `AnalyzeNifDataStreamLayout`. Smallest possible behavioral change (~5 lines), uses best-proven Phase 2 evidence (byte-3=0x00 universal in 184/184 sampled blocks).
+**M6.1** — Phase 6 planning: descriptor-validated export: add warning when byte-3 ≠ 0x00 in `AnalyzeNifDataStreamLayout`. Smallest possible behavioral change (~5 lines), uses best-proven Phase 2 evidence (byte-3=0x00 universal in 184/184 sampled blocks).
 
 **Entry from Phase 2**: Phase 2 complete with mature descriptor & binding proof system: per-block-embedded (4 bytes at offset 24), 5 patterns, `37 04 03 00` = ror1-float, binding reuse proven cross-family, 3-way integrated mapping, 6 promotion gates evaluated (0 cleared), 7 core blockers characterized. Both promotion flags intentionally held false. See `docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`.
 
@@ -100,8 +101,10 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 
 **M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
 
-## Next Concrete Actions (Phase 5 M5.5)
-1. Create Phase 5 exit handoff to validate descriptor against Usage/Access fields
+## Next Concrete Actions (Phase 6)
+1. Create Phase 6 prep doc scoping descriptor-validated export
+2. Plan M6.1: first descriptor-validated export change
+3. Implement with targeted tests to validate descriptor against Usage/Access fields
 2. Add targeted tests
 3. Build, test, format, code-review
 
@@ -122,4 +125,4 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - **Phase 1 (COMPLETE)**: 5 milestones delivered — M1.1 (329 matrix 12/12), M1.2 (@304 classification 10/10), M1.3 (sibling-binding guards 12/12 PASS), M1.4 (305 comparison 15-feature), M1.5 (comprehensive Phase 1 exit handoff). All reports refreshed; validation suite 9/9; CI green throughout. See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`.
 - **Phase 2 (COMPLETE)**: All 5 milestones delivered — M2.1 (descriptor mapping: per-block-embedded, 5 patterns, `37 04 03 00`=ror1-float), M2.2 (binding proofs: 329: 12/12×6; 305: 4 bindings), M2.3 (unified 3-way integration, 4 confirmed, 4 gaps), M2.4 (promotion gate evaluation: 3 strengthened, 1 reclassified, 2 unchanged, 0 cleared), M2.5 (consolidation handoff). Both promotion flags false. Phase 2 EXITED. See `docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`.
 - **Phase 3 (EXITED)**: M3.1-M3.5 complete — descriptor propagation across all 6 NiDataStream record types. See `docs/handoffs/2026-06-m3.x-phase3-descriptor-propagation.md`.
-- **Phase 4 (ACTIVE)**: M4.1 COMPLETE (byte-3 integrity), M4.2 COMPLETE (byte-0 fallback), M4.3 COMPLETE (JSON distribution), M4.4 COMPLETE (console summary), M4.5 COMPLETE (descriptor-role cross-check), M4.6 COMPLETE (stream-body probe visibility), M5.1 COMPLETE (descriptor on pairing records), M5.2 COMPLETE (confidence adjustment), M5.4 COMPLETE (Usage/Access correlation). 41/41 tests. M5.5 planning. — scope first parser behavioral change consuming descriptor fields. (`docs/handoffs/2026-06-m3.1-parser-descriptor-read-decision.md`). Formal per-template evaluation: 6 promotion gates still blocked; both flags false. Scope: descriptor read + classification only — no behavioral change. Decision: candidate-only. Live status refreshed. Test plan: 5 targeted xUnit cases. Next: implement the change in `Program.cs`.
+- **Phase 4 (ACTIVE)**: M4.1 COMPLETE (byte-3 integrity), M4.2 COMPLETE (byte-0 fallback), M4.3 COMPLETE (JSON distribution), M4.4 COMPLETE (console summary), M4.5 COMPLETE (descriptor-role cross-check), M4.6 COMPLETE (stream-body probe visibility), M5.1 COMPLETE (descriptor on pairing records), M5.2 COMPLETE (confidence adjustment), M5.1-M5.4 COMPLETE, M5.5 handoff created. 41/41 tests. Phase 5 EXITED. Phase 6 planning. — scope first parser behavioral change consuming descriptor fields. (`docs/handoffs/2026-06-m3.1-parser-descriptor-read-decision.md`). Formal per-template evaluation: 6 promotion gates still blocked; both flags false. Scope: descriptor read + classification only — no behavioral change. Decision: candidate-only. Live status refreshed. Test plan: 5 targeted xUnit cases. Next: implement the change in `Program.cs`.

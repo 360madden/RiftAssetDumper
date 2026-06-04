@@ -156,7 +156,7 @@ Each phase follows this template for focus:
 - No promotion flag changes.
 - Every record type change must match existing field patterns.
 
-## Phase 4: Descriptor-Aware Parser (ACTIVE — M4.1-M4.5 COMPLETE, M4.6 ACTIVE)
+## Phase 4: Descriptor-Aware Parser (COMPLETE — M4.1-M4.6)
 
 **Objective**: Consume Phase 3 descriptor data for parser behavioral changes — integrity checks, classification coverage, console visibility, and role cross-checks — while maintaining the candidate-only safety boundary and promotion gate discipline.
 
@@ -182,6 +182,25 @@ Each phase follows this template for focus:
 - Every behavioral change must be narrow, tested, and guarded by proof-gate checks.
 - No parser/export promotion without completed decision record.
 - Both FieldOrderPromoted and ParserExportPromotionAllowed remain false.
+
+## Phase 5: Descriptor-Guided Parser (COMPLETE — M5.1-M5.4, M5.5 handoff)
+
+**Objective**: Extend Phase 4 observational consumption into guided routing — pairing confidence adjustment, position candidate pre-filtering, and Usage/Access-enriched validation — without changing decode/export behavior.
+
+**Key Milestones**:
+1. **M5.1**: Descriptor classification on NifMeshProbePairing and NifMeshBindingPairingSample records.
+2. **M5.2**: Descriptor-guided pairing confidence adjustment (AdjustConfidenceByDescriptor).
+3. **M5.3**: Descriptor-based position stream pre-filter in decode-nif-geometry (behind --experimental-position-source).
+4. **M5.4**: Usage/Access enrichment in descriptor-role cross-check warnings.
+5. **M5.5**: Exit handoff: docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md.
+
+**Shared Infrastructure**: IsFloatRole(), IsFloatDescriptor(), IsU16Descriptor() helpers.
+
+**Exit Criteria**:
+- 4 narrow, tested, descriptor-consuming behavioral changes delivered.
+- CI green: build 0 errors, 41/41 tests pass, format PASS.
+- Both promotion flags still false.
+- All changes behind gates or candidate-only.
 
 ## Phase 5: Stabilization, Documentation & Sustainable Operations
 
