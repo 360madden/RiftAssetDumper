@@ -41,7 +41,7 @@
 | 2 | **M11.2**: Run population-scale inventory + cross-reference analysis | ✅ Complete | 4,045/8,152 streams (49.6%) classified; cross-ref: only 134 float3-generic→position |
 | 3 | **M11.3**: Disambiguate float3-generic sub-roles + discover new position sources | ✅ Complete | **546 descriptor→role mismatches found** (458 float2→position, 88 float2→normal). M11.4 reframes: float2 positions are valid encoding, not errors. |
 | 4 | **M11.4**: Validate descriptor roles against existing OBJ exports | ✅ Complete | **82 OBJ IDs matched**. 63% of OBJ positions use `descriptor-float2-uv` (float2 encoding). 37% use `descriptor-float3-generic`. Descriptor correctly identifies stream element format; role disambiguation requires data inspection. |
-| 5 | **M11.5**: Exit handoff | ⏳ Pending | `docs/handoffs/` |
+| 5 | **M11.5**: Exit handoff | ✅ Complete | `docs/handoffs/2026-06-phase11-exit-descriptor-guided-role-classification.md` |
 
 ---
 
