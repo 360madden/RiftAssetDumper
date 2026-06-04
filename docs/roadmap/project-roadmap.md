@@ -218,7 +218,7 @@ Each phase follows this template for focus:
 - Both promotion flags still false; 0 gates cleared.
 - All changes are metadata, validation, or documentation — zero decode/export path changes.
 
-## Phase 7: Promotion Gate Clearance (PLANNING)
+## Phase 7: Promotion Gate Clearance (ACTIVE — M7.1-M7.2 COMPLETE)
 
 **Objective**: Convert accumulated Phase 2-6 descriptor evidence into explicit gate clearances — retire obsolete gates, split maturing gates, and clear the lowest-hanging blockers.
 
@@ -227,14 +227,14 @@ Each phase follows this template for focus:
 - Gate landscape characterized at 2 evaluation points (M2.4 + M6.2).
 - Both promotion flags intentionally false.
 
-**Key Milestones** (candidate):
-1. **M7.1**: Retire gate 3 (OBSOLETE); create replacement `descriptor-per-block-consistency` gate (would pass on current evidence).
-2. **M7.2**: Split gate 1 into `field-order-confirmed` (would pass) and `field-semantics-complete` (blocked by bytes 1-2).
-3. **M7.3**: Full-population descriptor inventory (31,777 blocks) to advance gate 4.
-4. **M7.4**: Formal decision record per `docs/nidatastream-parser-export-promotion-decision-template.md`.
+**Key Milestones**:
+1. **M7.1** ✅: Retire gate 3 (OBSOLETE); create replacement `descriptor-per-block-consistency` gate — **CLEARED** (first gate clearance in project history).
+2. **M7.2** ✅: Split gate 1 into `descriptor-field-order-confirmed` — **CLEARED** + `descriptor-field-semantics-complete` — BLOCKED (bytes 1-2).
+3. **M7.3** 🔜: Full-population descriptor inventory (31,777 blocks) to advance gate 4.
+4. **M7.4** 🔜: Formal decision record per `docs/nidatastream-parser-export-promotion-decision-template.md`.
 
 **Exit Criteria**:
-- At least 1 gate formally cleared or retired.
+- At least 1 gate formally cleared or retired (✅ 2 cleared, 1 retired in M7.1-M7.2).
 - Promotion readiness checklists updated with Phase 7 evidence.
 - Both promotion flags evaluated against updated gate states.
 

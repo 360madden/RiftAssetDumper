@@ -31,7 +31,7 @@ Current expected posture:
 | residual cluster complete binding | required for residual promotion | ❌ missing |
 | parser/export promotion allowed | must be explicitly true | ❌ false |
 
-> **Note**: NiDataStream-specific promotion gates (6 blockers: `descriptor-field-order-proof`, `descriptor-semantic-map`, `descriptor-table-sample-proof`, `sample-byte-agreement`, `pairing-impact-proof`, `narrow-parser-patch`) are tracked in `nidatastream-promotion-status`. See M2.4 handoff for per-gate evaluation. `FieldOrderPromoted` is tracked in `nidatastream-descriptor-proof-status`.
+> **Note**: NiDataStream-specific promotion gates (originally 6: `descriptor-field-order-proof`, `descriptor-semantic-map`, `descriptor-table-sample-proof`, `sample-byte-agreement`, `pairing-impact-proof`, `narrow-parser-patch`) were tracked in `nidatastream-promotion-status`. See M2.4 + M6.2 handoffs for per-gate evaluation history. **Updated in Phase 7 below** (gate 3 retired, gate 1 split into 2 sub-gates). `FieldOrderPromoted` is tracked in `nidatastream-descriptor-proof-status`.
 
 ## Promotion blockers that must be cleared
 
@@ -172,10 +172,96 @@ See comprehensive M6.2 handoff: `docs/handoffs/2026-06-m6.2-promotion-gate-reeva
 
 ---
 
+## Phase 7 Gate Clearance (M7.1-M7.2)
+
+Phase 7 (June 2026) is the first phase targeting explicit gate clearance. Two gates
+have been actioned based on M6.2 recommendations.
+
+### M7.1: Gate 3 Retirement — `descriptor-table-sample-proof` → RETIRED
+
+**Decision**: Formally retired. The static descriptor table premise at Ghidra addresses
+has been falsified at two independent levels: (a) Ghidra base-model review shows all-zero
+bytes at candidate addresses, and (b) the per-block-embedded model (4 bytes at offset 24)
+is the production parser architecture across 58 descriptor-consuming code lines, 6 record
+types, and all inventories/probes/exports. Keeping this gate tests a wrong model.
+
+**Evidence chain**:
+- M2.1: Ghidra base-model review — all static bytes zero at candidate addresses
+- M3.1: Per-block-embedded model operational — `DescriptorBytes` at offset 24 on `NifDataStreamLayout`
+- M3.2-M3.5: All 6 record types read per-block descriptors — zero static table code
+- M4.1-M6.3: 13 milestones, 58 code lines, 49 tests — all per-block-embedded
+
+**Replacement gate**: `descriptor-per-block-consistency`
+
+| Criterion | Required evidence | Status |
+|---|---|---|
+| All blocks have 4 readable bytes at offset 24 | 375/375 blocks verified (Phase 4) | ✅ PASS |
+| Byte-3 = 0x00 universal | 0/375 warnings (M4.1) | ✅ PASS |
+| 5 pattern families consistent | 100% classification coverage (M4.2) | ✅ PASS |
+| Cross-record validation | All 6 record types carry consistent descriptors (Phase 3) | ✅ PASS |
+| Per-block descriptor to stream role correlation | Descriptor-role cross-check (M4.5) | ✅ PASS |
+
+**Status**: `descriptor-per-block-consistency` = **CLEARED** ✅ (first gate clearance in project history)
+
+**Original gate 3**: RETIRED (OBSOLETE) — replaced by `descriptor-per-block-consistency`.
+
+### M7.2: Gate 1 Sub-Gate Split — `descriptor-field-order-proof` → SPLIT
+
+**Decision**: Gate 1 conflates two independent questions: (a) field order known? and
+(b) field semantics complete? These have diverged significantly across Phases 2-6.
+The field-order sub-question is provably answered; the semantics sub-question remains
+blocked by bytes 1-2.
+
+**Split result**:
+
+#### `descriptor-field-order-confirmed` (new sub-gate)
+
+| Criterion | Required evidence | Status |
+|---|---|---|
+| 4-byte descriptor block at offset 24 | Operational on 6 record types, 58 code lines | ✅ PASS |
+| Byte-3 = 0x00 (padding/reserved) | 0/375 warnings, universal invariant (M4.1) | ✅ PASS |
+| Byte-0 = stream data type family | 5 family labels, 100% coverage (M4.2) | ✅ PASS |
+| Field order consistent across all blocks | Cross-record validation, all inventories | ✅ PASS |
+
+**Status**: `descriptor-field-order-confirmed` = **CLEARED** ✅ (second gate clearance)
+
+#### `descriptor-field-semantics-complete` (new sub-gate, replacing original gate 1 hard requirement)
+
+| Criterion | Required evidence | Status |
+|---|---|---|
+| Byte-1 semantics verified | No code uses byte-1; no Ghidra evidence | ❌ BLOCKED |
+| Byte-2 semantics verified | No code uses byte-2; no Ghidra evidence | ❌ BLOCKED |
+
+**Status**: `descriptor-field-semantics-complete` = **BLOCKED** ❌ (bytes 1-2 unknown)
+
+**Original gate 1**: SPLIT into two sub-gates. `field-order-confirmed` cleared; `field-semantics-complete` blocked by bytes 1-2.
+
+### Updated Promotion Gate Status (post M7.1-M7.2)
+
+| Gate | Pre-Phase 7 State | M7.2 State | Change |
+|---:|---|---|---|
+| ~~`descriptor-table-sample-proof`~~ (gate 3) | OBSOLETE | **RETIRED** ✅ | ⟳ Replaced by `descriptor-per-block-consistency` |
+| `descriptor-per-block-consistency` (new) | — | **CLEARED** ✅ | 🆕 First gate clearance |
+| `descriptor-field-order-confirmed` (gate 1a, new) | — | **CLEARED** ✅ | 🆕 Split from original gate 1 |
+| `descriptor-field-semantics-complete` (gate 1b, new) | — | **BLOCKED** ❌ | 🆕 Bytes 1-2 unknown |
+| `descriptor-semantic-map` (gate 2) | blocked (improved) | blocked (improved) | — |
+| `sample-byte-agreement` (gate 4) | candidate (substantially) | candidate (substantially) | — |
+| `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
+| `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
+
+**Final tally (M7.2)**: 2 gates CLEARED ✅, 1 gate RETIRED ✅, 1 new sub-gate BLOCKED, 4 gates unchanged.
+`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
+
+---
+
 ## Current decision
 
-No parser/export promotion is allowed from the current evidence. Phases 1-6 are all
-complete or active. 0 promotion gates have been cleared across two formal evaluations
-(M2.4 and M6.2). Gate 3 (`descriptor-table-sample-proof`) is recommended for retirement
-as obsolete (per-block-embedded is the production architecture). Both promotion flags
-must remain false.
+Two gates have been formally cleared in Phase 7 (M7.1-M7.2): `descriptor-per-block-consistency`
+(replacing retired gate 3) and `descriptor-field-order-confirmed` (split from gate 1). These
+are the first gate clearances in project history.
+
+The remaining gates (1b field-semantics-complete, 2 semantic-map, 4 sample-byte-agreement,
+5 pairing-impact-proof, 6 narrow-parser-patch) remain blocked or candidate-only. Both
+promotion flags must remain false.
+
+See Phase 7 prep: `docs/roadmap/phase7-prep.md`.
