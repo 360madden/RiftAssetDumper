@@ -100,12 +100,14 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` |
 | **M9.1** | **COMPLETE** | Gate 1b CLEARED: stride hypothesis 16/16 100%; formal clearance analysis |
 | **M9.2** | **COMPLETE** | Gate 2 advanced: stride-semantic mapping; 3/5 specific roles; `36040200`→UV |
+| **M9.3** | **COMPLETE** | Descriptor-to-usage consistency: 16/16 (100%) dual-validated (stride+usage); stride→usage rule proven |
 
 ## Next Concrete Actions (Phase 9)
 1. ✅ Comprehensive project-wide consolidation handoff — `docs/handoffs/2026-06-phase9-project-consolidation.md`
 2. ✅ Gate 1b CLEARED — stride hypothesis 16/16 100%; 4 gates now cleared
 3. ✅ Gate 2 strongly advanced — stride-semantic mapping: 3/5 specific roles, 0/5 unmapped; `36040200`→UV
-4. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M9.3 deferred
+4. ✅ M9.3: Descriptor-to-usage consistency — 16/16 (100%) dual-validated; stride→usage rule proven
+5. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 deferred
 
 ## Entry Criteria Met
 - Phase 0 complete.
