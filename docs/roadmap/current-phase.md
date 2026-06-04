@@ -1,15 +1,15 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 10 COMPLETE — all 7 gates cleared; both promotion flags true)
+**Last Updated**: 2026-06 (Phase 11 ACTIVE — M11.1 ✅ M11.2 ✅; 4,045/8,152 streams classified; cross-reference ready for M11.3 disambiguation)
 
 ---
 
 ## Current State
 
-**Phase 9: Final Clearance + Consolidation** — **EXITED** ✅  
-**Phase 10: Human Review Gates + Final Promotion** — **COMPLETE** ✅
+**Phase 10: Human Review Gates + Final Promotion** — **COMPLETE** ✅  
+**Phase 11: Descriptor-Guided Stream Role Classification** — **ACTIVE** 🔄
 
-### Gate Landscape (ALL 7 CLEARED)
+### Gate Landscape (ALL 7 CLEARED — from Phase 10)
 
 | Gate | Status | Cleared By |
 |---|---|---|
@@ -33,40 +33,29 @@
 
 ---
 
-## Completed Actions (Phase 10)
+## Next Actions (Phase 11)
 
 | # | Action | Status | Reference |
 |---|---|---|---|
-| 1 | **Gate 5 review** | ✅ CLEARED (M10.1) | `docs/handoffs/2026-06-gate5-review-brief.md` |
-| 2 | **Gate 6 safety brake** | ✅ CLEARED (M10.2) | All 6 other gates cleared; 13 milestones, 0 regressions |
-| 3 | **Promotion flags** | ✅ TRUE (M10.2) | `FieldOrderPromoted=true`, `ParserExportPromotionAllowed=true` |
-
----
-
-## Key References
-
-| Document | Path |
-|---|---|
-| **Final project completion** | `docs/handoffs/2026-06-project-completion-final-handoff.md` |
-| Project roadmap | `docs/roadmap/project-roadmap.md` |
-| Gate 5 review brief | `docs/handoffs/2026-06-gate5-review-brief.md` |
-| Phase 9 exit handoff | `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md` |
-| Gate 1b clearance | `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md` |
-| Gate 2 clearance | `docs/handoffs/2026-06-m9.3-gate2-semantic-map-clearance.md` |
-| Promotion readiness | `docs/post50-parser-export-promotion-readiness-checklist.md` |
-| M7.4 decision record | `docs/handoffs/2026-06-m7.4-formal-decision-record.md` |
+| 1 | **M11.1**: Extend inventory to emit descriptor-classified roles | ✅ Complete | Commit `2b848c9` + `291ffe4` (tests) — `ClassifyNifDescriptorRole` + `DescriptorGuidedRole` wired |
+| 2 | **M11.2**: Run population-scale inventory + cross-reference analysis | ✅ Complete | 4,045/8,152 streams (49.6%) classified; cross-ref: only 134 float3-generic→position |
+| 3 | **M11.3**: Disambiguate float3-generic sub-roles + discover new position sources | ⏳ Pending | Target: 1,180 normals + 614 UVs with float3 descriptors are disambiguation candidates |
+| 4 | **M11.4**: Validate descriptor roles against existing OBJ exports | ⏳ Pending | 94 OBJs, 65 faced |
+| 5 | **M11.5**: Exit handoff | ⏳ Pending | `docs/handoffs/` |
 
 ---
 
 ## Active Focus Rules
 
-- No autonomous lead pursuit — project complete at autonomous level
-- Both promotion flags are now true — parser/export code changes permitted but must remain narrow and tested
-- Safety brake has served its purpose — all gates cleared
+- Stay within stream role classification — no new export formats or archive format changes
+- Every C# change must be additive (new fields/reports, not behavioral changes to existing decode paths)
+- Heuristic classifier remains as fallback — descriptor-guided is supplementary
+- Both promotion flags remain true (already cleared)
+- One lead at a time per Aggressive Evidence Workflow
 
 ---
 
-## Phase History (All Phases Exited)
+## Phase History
 
 | Phase | Name | Milestones | Gates Cleared | Status |
 |---|---|---|---|---|
@@ -79,9 +68,9 @@
 | Phase 7 | Promotion Gate Clearance | M7.1-M7.5 | **3** | ✅ |
 | Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 | ✅ |
 | Phase 9 | Final Clearance + Consolidation | M9.0-M9.4 | **2** | ✅ EXITED |
-
 | Phase 10 | Human Review + Final Promotion | M10.1-M10.2 | **2** | ✅ COMPLETE |
+| **Phase 11** | **Descriptor-Guided Role Classification** | **M11.1-M11.5** | **0** | **🔄 ACTIVE** |
 
-**Project totals**: 10 phases, 35+ milestones, 7 gates cleared.
+**Project totals**: 10 phases complete, 7 gates cleared. Phase 11 in progress.
 
 See individual exit handoffs under `docs/handoffs/2026-06-m*.*-phase*-exit-consolidation.md`.
