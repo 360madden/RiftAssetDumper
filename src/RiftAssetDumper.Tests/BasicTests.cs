@@ -298,6 +298,21 @@ public class BasicTests
     Assert.Equal("bytexvec4 family (byte0=0x10, candidate)", Program.ClassifyNifDescriptorByByte0("10ffffff"));
     Assert.Equal("bytexvec4 family (byte0=0x3c, candidate)", Program.ClassifyNifDescriptorByByte0("3c000000"));
   }
+  [Fact]
+  public void ClassifyNifDescriptorRole_KnownPatternsAndEdgeCases()
+  {
+    // 5 proven descriptor patterns -> expected role strings
+    Assert.Equal("descriptor-float3-generic", Program.ClassifyNifDescriptorRole("37040300"));
+    Assert.Equal("descriptor-float2-uv", Program.ClassifyNifDescriptorRole("36040200"));
+    Assert.Equal("descriptor-uint16-index", Program.ClassifyNifDescriptorRole("15020100"));
+    Assert.Equal("descriptor-byte4-packed", Program.ClassifyNifDescriptorRole("10010400"));
+    Assert.Equal("descriptor-byte4-packed-variant", Program.ClassifyNifDescriptorRole("3c010400"));
+    // Edge cases: unknown, null, empty, too-short
+    Assert.Null(Program.ClassifyNifDescriptorRole("ffffffff"));
+    Assert.Null(Program.ClassifyNifDescriptorRole(null));
+    Assert.Null(Program.ClassifyNifDescriptorRole(""));
+    Assert.Null(Program.ClassifyNifDescriptorRole("123456"));
+  }
 
   [Fact]
   public void ClassifyNifDescriptorByByte0_UnknownByte0ReturnsNull()
