@@ -256,7 +256,9 @@ Each phase follows this template for focus:
 
 **Key Milestones**:
 1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md` — 8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers.
-2. **M9.1** (deferred from M8.1): Ghidra byte 1-2 semantic analysis on `rift_x64.exe`.
+2. **M9.1** ✅: Byte 1-2 stride hypothesis validated (16/16, 100%) — element width × component count; gate 1b advanced. No Ghidra required (structural/payload-derived evidence).
+3. **M9.2**: Gate 6 safety brake evaluation (dependent on gates 1b + 2 + 5).
+4. **M9.3** (deferred from M8.3): Gate 5 reframing human review.
 3. **M9.2**: Gate 6 safety brake evaluation (dependent on gates 1b + 2 + 5).
 4. **M9.3** (deferred from M8.3): Gate 5 reframing human review.
 

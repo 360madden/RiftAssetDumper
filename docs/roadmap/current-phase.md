@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 9 ACTIVE — project-wide consolidation handoff created; 8 phases complete; 3 gates cleared)
+**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.1 stride hypothesis validated; 16/16 100%; gate 1b advanced)
 
 ## Current Phase
 **Phase 9: Final Clearance + Consolidation** (ACTIVE)
@@ -95,15 +95,16 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 9)
-**M9.0** — Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md` (COMPLETE). Next: M9.1 (Ghidra byte 1-2, deferred from M8.1) or M9.3 (gate 5 human review, deferred from M8.3).
+**M9.1** — Byte 1-2 stride hypothesis validated (COMPLETE): 16/16 (100%) payloads evenly divisible by byte-1 × byte-2 stride. Gate 1b advanced — no Ghidra needed. Next: M9.2 gate 6 analysis, or M9.3 gate 5 human review.
 
 | **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` (8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers) |
+| **M9.1** | **COMPLETE** | Byte 1-2 stride validation: 16/16 100% divisibility; gate 1b advanced (see promotion checklist M9.1 section) |
 
 ## Next Concrete Actions (Phase 9)
 1. ✅ Comprehensive project-wide consolidation handoff (all 8 phases) — `docs/handoffs/2026-06-phase9-project-consolidation.md`
-2. Ghidra analysis session: byte 1-2 semantics on `rift_x64.exe` (M8.1/M9.1 deferred)
-3. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M8.3/M9.3 deferred
-4. Run `post50-validation-suite` + `generated-output-guard` on current state
+2. ✅ Byte 1-2 stride hypothesis validated (16/16, 100%) — gate 1b advanced; no Ghidra required
+3. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M9.3 deferred
+4. ✅ `post50-validation-suite` + `generated-output-guard` — 9/9 PASS, CLEAN
 
 ## Entry Criteria Met
 - Phase 0 complete.

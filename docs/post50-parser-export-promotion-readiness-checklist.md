@@ -314,9 +314,6 @@ The remaining gates (1b field-semantics-complete, 2 semantic-map at role-specifi
 5 pairing-impact-proof, 6 narrow-parser-patch) remain blocked or candidate-only. Both
 promotion flags must remain false.
 
-**Final tally (M8.2)**: 3 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 5 reframing documented, 3 gates remain blocked.
-`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
-
 ### M7.4: Formal Decision Record + Gate 5 Reframing
 
 **Decision**: Completed first formal decision record per the 11-part template
@@ -356,3 +353,66 @@ to human review. Gate 5 remains "candidate (strongly)" in autonomous tracking.
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
 See Phase 7 prep: `docs/roadmap/phase7-prep.md`, Phase 8 prep: `docs/roadmap/phase8-prep.md`, and formal decision record: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`.
+
+---
+
+## Phase 8 Role-Semantic Mapping (M8.2)
+
+### M8.2: Descriptor-to-Role Cross-Reference — Gate 2 Advanced
+
+Cross-referenced all 5 descriptor patterns with Usage/Access from population inventory (16 representative samples). Key finding: `15020100` = index stream descriptor (usage=0), corrected from "u16-vertex-data." All patterns have usage-level role evidence. Gate 2 advanced to "improved — usage-level evidence."
+
+---
+
+## Phase 9 Stride Hypothesis Validation (M9.1)
+
+### M9.1: Byte 1-2 Stride Divisibility — Gate 1b Advanced
+
+**Hypothesis**: Byte-1 = element width in bytes, Byte-2 = component count. Stride = byte-1 × byte-2. Declared payload must be evenly divisible by stride.
+
+**Validation**: Cross-referenced all 16 representative population-inventory samples (5 descriptor patterns) against this hypothesis.
+
+| Pattern | Byte-1 | Byte-2 | Stride | Interpretation | Samples | Pass |
+|---|---|---|---:|---|---:|---:|
+| `37040300` | 0x04 (4B) | 0x03 (3c) | 12 | float32 × vec3 | 8 | 8/8 ✅ |
+| `15020100` | 0x02 (2B) | 0x01 (1c) | 2 | uint16 × scalar | 3 | 3/3 ✅ |
+| `36040200` | 0x04 (4B) | 0x02 (2c) | 8 | float32 × vec2 | 2 | 2/2 ✅ |
+| `10010400` | 0x01 (1B) | 0x04 (4c) | 4 | byte × vec4 | 2 | 2/2 ✅ |
+| `3c010400` | 0x01 (1B) | 0x04 (4c) | 4 | byte × vec4 | 1 | 1/1 ✅ |
+
+**Result**: **16/16 (100%)** samples pass stride divisibility. Every DeclaredPayloadBytes is evenly divisible by the hypothesized byte-1 × byte-2 stride.
+
+**Element counts produced**:
+- `37040300`: 32, 137, 149 elements (stride=12) — all integer
+- `15020100`: 90, 810 elements (stride=2) — all integer (index stream, usage=0)
+- `36040200`: 137, 149 elements (stride=8) — all integer
+- `10010400`/`3c010400`: 32, 137, 149 elements (stride=4) — all integer
+
+**Gate 1b status update**:
+
+| Criterion | Pre-M9.1 | Post-M9.1 |
+|---|---|---|
+| Byte-1 semantics | Unknown | **Element width (bytes)**: 0x04=float32, 0x02=uint16, 0x01=byte → 5/5 patterns consistent |
+| Byte-2 semantics | Unknown | **Component count**: 0x03=vec3, 0x02=vec2, 0x01=scalar, 0x04=vec4 → 5/5 patterns consistent |
+| Stride divisibility | Untested | **16/16 (100%)** payloads evenly divisible by stride |
+
+**Assessment**: Gate 1b (`descriptor-field-semantics-complete`) advances from BLOCKED to **improved — stride hypothesis validated at sample scale (16/16, 100%)**. Not yet CLEARED: population-scale validation (31,777 blocks) not yet run; the hypothesis remains at sample scale (0.05% coverage).
+
+**Note**: No Ghidra required — the stride divisibility evidence is structural/payload-derived. This is consistent with the per-block-embedded descriptor architecture (Phase 2): the descriptor bytes describe the stream body layout, not a static table lookup.
+
+### Consolidated Promotion Gate Status (post M9.1)
+
+| Gate | Status |
+|---|---|
+| `descriptor-per-block-consistency` (replacing gate 3) | **CLEARED** (M7.1) |
+| `descriptor-field-order-confirmed` (gate 1a) | **CLEARED** (M7.2) |
+| `sample-byte-agreement` (gate 4) | **CLEARED** (M7.3) |
+| `descriptor-field-semantics-complete` (gate 1b) | **improved — stride hypothesis 16/16 (100%)** (M9.1) |
+| `descriptor-semantic-map` (gate 2) | improved — usage-level evidence (M8.2) |
+| `pairing-impact-proof` (gate 5) | candidate (strongly) — reframing recommended (M7.4) |
+| `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
+
+**Final tally (M9.1)**: 3 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 1b advanced (stride validated), gate 5 reframing documented, 1 gate remains blocked.
+`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
+
+See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.
