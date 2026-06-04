@@ -1,9 +1,11 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.3 gate 2 CLEARED; 5 gates cleared; semantic map complete)
+**Last Updated**: 2026-06 (Phase 9 EXITED — 5 gates cleared; descriptor subsystem proven; gates 5+6 pending human review)
 
 ## Current Phase
-**Phase 9: Final Clearance + Consolidation** (ACTIVE)
+**Phase 10: Human Review Gates + Final Promotion** (PLANNING)
+
+**Phase 9: Final Clearance + Consolidation** (EXITED ✅)
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -94,8 +96,10 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Every parser behavioral change → decision record + targeted tests + CI green.
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
-## Current Milestone (within Phase 9)
-**M9.2** — Gate 2 strongly advanced (stride-semantic role mapping): 3/5 specific roles (+ UV), 2/5 probable, 0/5 unmapped. `36040200` → UV coordinates mapped. Next: M9.3 gate 5 human review or M9.4 Phase 9 exit.
+## Current Milestone (within Phase 9 — EXITED)
+**M9.4** — Phase 9 exit consolidation. 5 gates cleared, descriptor subsystem proven complete. Gates 5+6 deferred to human review (Phase 10).
+
+| **M9.4** | **COMPLETE** | Phase 9 exit: `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md` |
 
 | **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` |
 | **M9.1** | **COMPLETE** | Gate 1b CLEARED: stride hypothesis 16/16 100%; formal clearance analysis |
@@ -107,7 +111,8 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 2. ✅ Gate 1b CLEARED — stride hypothesis 16/16 100%; 4 gates now cleared
 3. ✅ Gate 2 strongly advanced — stride-semantic mapping: 3/5 specific roles, 0/5 unmapped; `36040200`→UV
 4. ✅ M9.3: Gate 2 CLEARED — semantic map complete (5/5 patterns, 3 specific + 2 family-level, 0 unmapped); dual-validated stride+usage 16/16; 5th gate clearance
-5. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 deferred
+5. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 deferred (Phase 10)
+6. Gate 6 safety brake evaluation — depends on gate 5 resolution (Phase 10)
 
 ## Entry Criteria Met
 - Phase 0 complete.

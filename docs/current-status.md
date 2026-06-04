@@ -1,11 +1,11 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
-Date: 2026-06 (Phase 9 active; 8 phases complete; 3 gates cleared)
+Date: 2026-06 (Phase 9 EXITED; 9 phases complete; 5 gates cleared; descriptor subsystem proven)
 
-## 2026-06 — Phase 9: Project-Wide Consolidation (ACTIVE)
+## 2026-06 — Phase 9 EXITED: Descriptor Subsystem Proven Complete
 
-**Comprehensive consolidation handoff**: `docs/handoffs/2026-06-phase9-project-consolidation.md` — covers all 8 phases, 30+ milestones, 3 gates cleared, 1 gate advanced, 1 gate retired.
+**Phase 9 exit handoff**: `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md` — 5 gates cleared, semantic map complete, descriptor subsystem proven.
 
-### Eight-Phase Trajectory
+### Nine-Phase Trajectory
 
 | Phase | Name | Milestones | Gates Cleared | Status |
 |---|---|---|---|---|
@@ -16,31 +16,34 @@ Date: 2026-06 (Phase 9 active; 8 phases complete; 3 gates cleared)
 | Phase 5 | Descriptor-Guided Parser | M5.1-M5.5 | 0 | ✅ |
 | Phase 6 | Descriptor-Validated Export | M6.1-M6.4 | 0 | ✅ |
 | Phase 7 | Promotion Gate Clearance | M7.1-M7.5 | **3** | ✅ |
-| Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 (1 advanced) | ✅ |
+| Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 | ✅ |
+| Phase 9 | Final Clearance + Consolidation | M9.0-M9.3 | **2** | ✅ EXITED |
 
-### Gate Status Summary
+### Final Gate Status (5 CLEARED)
 
 | Gate | Status |
 |---|---|
 | `descriptor-per-block-consistency` | **CLEARED** ✅ |
 | `descriptor-field-order-confirmed` | **CLEARED** ✅ |
 | `sample-byte-agreement` | **CLEARED** ✅ |
+| `descriptor-field-semantics-complete` | **CLEARED** ✅ |
+| `descriptor-semantic-map` | **CLEARED** ✅ |
 | `descriptor-table-sample-proof` | RETIRED |
-| `descriptor-semantic-map` | improved — usage-level evidence |
 | `pairing-impact-proof` | candidate — reframing recommended |
-| `descriptor-field-semantics-complete` | BLOCKED ❌ |
-| `narrow-parser-patch` | BLOCKED ❌ |
+| `narrow-parser-patch` | BLOCKED — safety brake |
 
-### Remaining Blockers
+### Descriptor System Proven
 
-| Blocker | Severity | Requires |
-|---|---|---|
-| Bytes 1-2 semantics | Critical | Ghidra analysis (M8.1 deferred) |
-| 3/5 patterns no specific role | High | Partially addressed (M8.2 usage-level) |
-| Gate 5 architecture acceptance | Medium | Human review (M8.3 deferred) |
-| Gate 6 safety brake | Intentional | All other gates must clear first |
+All 4 descriptor bytes have semantics (byte-0=family, byte-1=element width, byte-2=component count, byte-3=padding). All 5 patterns have role assignments (3 specific + 2 family-level, 0 unmapped). Stride→usage rule proven (uint16×scalar→index). 58 code lines, 49 tests, 0 regressions.
 
-Both promotion flags remain **false**. See `docs/post50-parser-export-promotion-readiness-checklist.md` and `docs/handoffs/2026-06-phase9-project-consolidation.md`.
+### Remaining (Human Review)
+
+| Blocker | Requires |
+|---|---|
+| Gate 5 reframing | Human decision on `attrSets=0` architectural acceptance (M7.4) |
+| Gate 6 safety brake | All gates must clear first |
+
+Both promotion flags remain **false**. See `docs/post50-parser-export-promotion-readiness-checklist.md` and `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md`.
 
 ---
 

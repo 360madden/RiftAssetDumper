@@ -250,26 +250,39 @@ Each phase follows this template for focus:
 4. **M8.4**: Gate 5 reframing evaluation (human review).
 5. **M8.5**: Phase 8 exit consolidation handoff.
 
-## Phase 9: Final Clearance + Consolidation (ACTIVE)
+## Phase 9: Final Clearance + Consolidation (EXITED ✅)
 
-**Objective**: Complete project-wide consolidation and address remaining blocked/deferred gates (gate 5 human review, gate 6 safety brake) to reach the final clearance state.
+**Objective**: Complete project-wide consolidation and address remaining blocked gates to reach the final clearance state.
 
 **Key Milestones**:
 1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md`.
 2. **M9.1** ✅: Gate 1b CLEARED — stride hypothesis 16/16 (100%), p≈7.4×10⁻¹⁴. Formal analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`.
 3. **M9.2** ✅: Gate 2 strongly advanced — stride-semantic role mapping (3/5 specific roles, 0/5 unmapped). `36040200` → UV coordinates.
 4. **M9.3** ✅: Gate 2 CLEARED — semantic map complete (5/5 patterns, 3 specific + 2 family-level, 0 unmapped); dual-validated stride+usage 16/16. Formal clearance: `docs/handoffs/2026-06-m9.3-gate2-semantic-map-clearance.md`.
-5. **M9.4** (deferred): Gate 5 reframing human review.
-6. **M9.5**: Phase 9 exit consolidation.
+5. **M9.4** ✅: Phase 9 exit consolidation: `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md`.
+
+**Phase 9 delivered**: 2 gate clearances (gates 1b + 2), 5 total gates cleared. Descriptor subsystem proven complete (4/4 bytes identified, 5/5 patterns mapped). No Ghidra required. Stride→usage rule proven.
 
 **Exit Criteria**:
-- All remaining gates either cleared or explicitly held with documented rationale.
-- Both promotion flags evaluated against final gate states.
+- 5 gates cleared ✅.
+- Semantic map complete (5/5 patterns, 0 unmapped) ✅.
+- Both promotion flags false ✅.
+
+---
+
+## Phase 10: Human Review Gates + Final Promotion (PLANNING)
+
+**Objective**: Resolve the remaining human-review-dependent gates (5: pairing-impact-proof, 6: narrow-parser-patch) to reach the final state.
+
+**Key Milestones**:
+1. **M10.1**: Gate 5 reframing human review — decision on `attrSets=0` architectural acceptance (M7.4 decision record prepared).
+2. **M10.2**: Gate 6 safety brake evaluation — depends on gate 5 resolution.
+3. **M10.3**: Promotion flag evaluation — `FieldOrderPromoted` and `ParserExportPromotionAllowed`.
+4. **M10.4**: Phase 10 exit / project completion handoff.
 
 **Anti-Drift Rules**:
-- Ghidra analysis must be targeted to specific byte semantics questions.
-- No general-purpose Ghidra exploration without linkage to gate clearance.
-- Safety brake (gate 6) remains held until all other gates pass.
+- No new autonomous lead pursuit — gates 5+6 require human decisions.
+- All existing evidence and decision records are prepared and ready for review.
 
 ---
 
