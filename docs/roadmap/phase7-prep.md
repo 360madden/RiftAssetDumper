@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 7 Entry
-**Status**: **ACTIVE** — M7.3 COMPLETE: population inventory (100% coverage); 3 gates cleared; M7.4 planning
+**Status**: **ACTIVE** — M7.4 COMPLETE: formal decision record + gate 5 reframing; M7.5 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`
 **Entry**: Phase 6 EXITED — descriptor-validated export complete (M6.1-M6.3); 58 descriptor code lines, 49 tests, 6 record types, 0 decode/export changes across 13 milestones
 
@@ -51,11 +51,18 @@ Convert the 18-milestone cumulative evidence (Phases 2-6) into explicit promotio
 
 **Gate 4 now CLEARED** ✅ — third gate clearance in Phase 7.
 
-### M7.4 — Formal Decision Record (PLANNING)
-- Complete `docs/nidatastream-parser-export-promotion-decision-template.md`
-- Evaluate gate 5 reframing (accept attrSets=0 architecture)
-- Evaluate gate 2 last (role-level semantics — hardest gate)
-- Update all promotion readiness statuses
+### M7.4 — Formal Decision Record + Gate 5 Reframing
+- [x] Completed first formal decision record per 11-part template: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`
+- [x] 7 evidence gates evaluated against cumulative Phase 2-7 evidence (20 milestones)
+- [x] Gate 5 reframing recommendation documented: accept attrSets=0 as architectural norm
+- [x] If reframed, gate 5 would CLEAR on current evidence (3-level descriptor-guided pairing)
+- [x] Deliberate restraint: reframing not autonomously actioned — deferred to human review
+- [x] Both promotion flags confirmed false; all negative checks passed
+
+### M7.5 — Phase 7 Exit Consolidation (PLANNING)
+- Comprehensive handoff: 3 gates cleared, 1 retired, gate 5 reframing documented
+- Phase 8 entry assessment: semantic-level gates (1b bytes 1-2, 2 role semantics)
+- Cumulative 7-phase progression table
 
 ## Commands
 

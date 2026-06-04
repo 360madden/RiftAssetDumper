@@ -249,9 +249,6 @@ blocked by bytes 1-2.
 | `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
 | `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
 
-**Final tally (M7.3)**: 3 gates CLEARED (with M7.3), 1 gate RETIRED, 1 new sub-gate BLOCKED, 3 gates unchanged.
-`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
-
 ### M7.3: Gate 4 Population Inventory — `sample-byte-agreement` → ADVANCED
 
 **Decision**: Full-population descriptor inventory completed on all 31,777 NiDataStream blocks
@@ -303,19 +300,55 @@ with cross-record and cross-check validation. Byte-3=0x00 is a universal invaria
 | `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
 | `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
 
----
+---## Current decision
 
-## Current decision
+Three gates have been formally cleared in Phase 7 (M7.1-M7.3): `descriptor-per-block-consistency`
+(replacing retired gate 3), `descriptor-field-order-confirmed` (split from gate 1), and
+`sample-byte-agreement` (gate 4, population-validated at 100% coverage). Gate 5 reframing
+has been documented as a recommendation in the formal decision record (M7.4).
 
-Two gates have been formally cleared in Phase 7 (M7.1-M7.2): `descriptor-per-block-consistency`
-(replacing retired gate 3) and `descriptor-field-order-confirmed` (split from gate 1). These
-are the first gate clearances in project history.
+The remaining gates (1b field-semantics-complete, 2 semantic-map, 5 pairing-impact-proof,
+6 narrow-parser-patch) remain blocked or candidate-only. Both promotion flags must remain false.
 
-The remaining gates (1b field-semantics-complete, 2 semantic-map, 4 sample-byte-agreement,
-5 pairing-impact-proof, 6 narrow-parser-patch) remain blocked or candidate-only. Both
-promotion flags must remain false.
-
-**Final tally (M7.3)**: 3 gates CLEARED (M7.1-M7.3), 1 gate RETIRED, 1 sub-gate BLOCKED, 3 gates unchanged.
+**Final tally (M7.4)**: 3 gates CLEARED, 1 gate RETIRED, gate 5 reframing documented, 3 gates remain blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
-See Phase 7 prep: `docs/roadmap/phase7-prep.md`.
+### M7.4: Formal Decision Record + Gate 5 Reframing
+
+**Decision**: Completed first formal decision record per the 11-part template
+(`docs/handoffs/2026-06-m7.4-formal-decision-record.md`). Evaluated all 7 evidence gates
+from the template against cumulative Phase 2-7 evidence. Recommended reframing gate 5.
+
+**Gate 5 reframing recommendation**:
+
+| Current criterion | Proposed reframing |
+|---|---|
+| "Improves complete position+normal+UV evidence" | "Improves available geometry evidence given the architectural constraint" |
+| Requires complete geometry groups (attrSets>=1 with all 4 attributes) | Accepts that attrSets=0 is architectural — partial bindings are the game's design |
+
+**Reframing evidence**:
+- attrSets=0 confirmed on 12/12 329-family pairs and 3/3 305-family pairs — not a gap, it's the architecture
+- Descriptor-guided pairing at 3 levels (confidence +5/-10, candidate ordering, validation warnings) — M5.2-M5.4
+- Export validated with descriptor metadata + pre-checks — M6.1, M6.3
+- 13 code milestones, 49 tests, 58 descriptor lines — zero decode/export changes
+- All 94 OBJ exports work with partial bindings — complete groups aren't needed
+
+**If reframed**: Gate 5 would CLEAR on current evidence (4th clearance).
+
+**Deliberate restraint**: This decision record documents the recommendation but does NOT
+autonomously clear gate 5. The reframing is a significant architectural decision deferred
+to human review. Gate 5 remains "candidate (strongly)" in autonomous tracking.
+
+### Updated Promotion Gate Status (post M7.4)
+
+| Gate | Status |
+|---|---|
+| `descriptor-per-block-consistency` (replacing gate 3) | **CLEARED** (M7.1) |
+| `descriptor-field-order-confirmed` (gate 1a) | **CLEARED** (M7.2) |
+| `sample-byte-agreement` (gate 4) | **CLEARED** (M7.3) |
+| `pairing-impact-proof` (gate 5) | candidate (strongly) — **reframing recommended** (M7.4) |
+| `descriptor-field-semantics-complete` (gate 1b) | **BLOCKED** — bytes 1-2 unknown |
+| `descriptor-semantic-map` (gate 2) | blocked (improved) — 3/5 patterns no role |
+| `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
+
+See Phase 7 prep: `docs/roadmap/phase7-prep.md` and formal decision record: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`.
