@@ -115,6 +115,7 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 # Imports (deferred so path setup happens first)
 # ---------------------------------------------------------------------------
 
+from scripts.phase1_m12_304_magic_analysis import phase1_m12_304_magic_analysis  # noqa: E402
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
@@ -130,6 +131,7 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     discovery_workbench,
     ghidra_attribute_candidate_report,
     ghidra_pairing_review_report,
+    mesh329_family_attribute_role_matrix,
     position_source_gap_report,
     position_source_sibling_extra_position_report,
     position_source_sibling_family_report,
@@ -139,14 +141,12 @@ from scripts.rift_workflow_reports import (  # noqa: E402
     post50_mesh34_complete_binding_negative_proof,
     post50_mesh329_family_proof_report,
     post50_mesh329_source_binding_compare,
-    mesh329_family_attribute_role_matrix,
     post50_residual_strict_threshold_delta_report,
     residual_position_classifier_report,
     residual_position_cluster_probe_report,
     semantic_hint_cross_tab,
     show_report_summary,
 )
-from scripts.phase1_m12_304_magic_analysis import phase1_m12_304_magic_analysis  # noqa: E402
 from scripts.rift_workflow_utils import (  # noqa: E402
     checked_run,
     format_markdown_cell,

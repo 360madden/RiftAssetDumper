@@ -29,7 +29,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "Exports"
@@ -343,7 +343,8 @@ def phase1_m12_304_magic_analysis(
     if not per_id:
         md_lines.append("| (no processed rows) | - | - | - | - | - |")
 
-    top4 = list(aggregates["Prefix4ByteCounts"].items())[:8]
+    prefix_counts_4: dict[str, int] = cast("dict[str, int]", aggregates["Prefix4ByteCounts"])
+    top4 = list(prefix_counts_4.items())[:8]
     if top4:
         md_lines += ["", "## Top 4-byte @304 prefixes (frequency)", "", "| prefix | count |", "|---|---:|"]
         for prefix, count in top4:

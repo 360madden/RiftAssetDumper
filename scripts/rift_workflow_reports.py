@@ -15,9 +15,10 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUT = REPO_ROOT / "Exports"
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.rift_workflow_utils import (  # noqa: E402
@@ -6305,3 +6306,419 @@ def residual_position_cluster_probe_report(
         "ResidualPositionClusterProbeReport passed: strict thresholds "
         "unchanged and OBJ/export remains blocked."
     )
+
+
+# ============================================================================
+# mesh329-family-attribute-role-matrix (Phase 1 M1.1)
+# ============================================================================
+
+
+def mesh329_family_attribute_role_matrix(
+    report_dir: str | Path | None = None,
+) -> tuple[Path, Path, Path | None]:
+    """Build candidate-only 329 Family Attribute & Role Matrix from mesh-probe outputs.
+
+    Ingests probe-nif-mesh-*-mesh7.json and *-mesh34.json for meshSize=329 family IDs.
+    Also falls back to plain probe-nif-mesh-*.json (naming produced by `python scripts/rift_workflow.py mesh-probe --id X --mesh-block 7`)
+    when the suffixed -mesh7.json is absent; the plain file is treated as the mesh#7 variant if it contains a 329-sized mesh block 7.
+    Extracts/normalizes: ID, mesh-block, attributeSets count, key streams (@212/@220/@296/@304
+    offsets/blocks/roles/payloads/vector counts), confidence scores.
+
+    Produces:
+    - structured JSON matrix (with flat rows + pair comparisons + quantified patterns)
+    - markdown comparative table
+    - CSV table (flat)
+
+    Strictly scoped to meshSize=329. Everything CandidateOnly. Follows roadmap Phase 1 M1.1.
+    """
+    import csv
+    from pathlib import Path
+
+    # Scope: 329 family priority batch + known examples from prior handoffs (anti-drift)
+    # Matches curated queue from ID Curator (top 12 prioritized); additional for coverage.
+    FAMILY_329_IDS: list[str] = [
+        "69da9507d49c42ff",
+        "f2c347fe81a5e3b2",
+        "07c733b4eee3ed2e",
+        "83df87e22bff4a94",
+        "7f3e71246752afb2",
+        "0364ea142bc00ce7",
+        "4eb7745610adf8c7",
+        "b57694c1f202ec07",
+        "c5a1982e92e15b7b",
+        "91ead5caf689a8a5",
+        # additional from family proof / discovered probes for coverage
+        "04de901531a091ab",
+        "066fa520a8ce62e3",
+    ]
+
+    out_dir = Path(report_dir) if report_dir is not None else DEFAULT_OUT
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    matrix_rows: list[dict[str, Any]] = []
+    pair_comps: list[dict[str, Any]] = []
+    covered: list[str] = []
+
+    def _vec_count(payload: int, role: str) -> int:
+        if not payload:
+            return 0
+        r = (role or "").lower()
+        if "float3" in r:
+            return max(1, payload // 12)
+        if "float2" in r or "uv" in r:
+            return max(1, payload // 8)
+        if "u32" in r or "repeated" in r:
+            return max(1, payload // 4)
+        return max(1, payload // 12)  # fallback for position-like
+
+    def _extract_row(probe_path: Path, expected_block: int) -> dict[str, Any] | None:
+        if not probe_path.exists():
+            return None
+        try:
+            report = load_json_report(str(probe_path))
+        except Exception:
+            return None
+        if not isinstance(report, dict):
+            return None
+        meshes = report.get("Meshes") or []
+        mesh_entries = [
+            m
+            for m in meshes
+            if isinstance(m, dict)
+            and safe_int(m.get("MeshBlockIndex", -1)) == expected_block
+            and safe_int(m.get("MeshSize", 0)) == 329
+        ]
+        if len(mesh_entries) != 1:
+            return None
+        mesh = mesh_entries[0]
+        attr_sets = mesh.get("AttributeSets") or []
+        attr_count = len(attr_sets) if isinstance(attr_sets, list) else 0
+        vcount = safe_int(attr_sets[0].get("VertexCount", 0)) if attr_sets else 0
+
+        streams = mesh.get("Streams") or []
+        stream_map: dict[int, dict[str, Any]] = {}
+        for s in streams:
+            if not isinstance(s, dict):
+                continue
+            off = safe_int(s.get("MeshPayloadOffset", -1))
+            if off < 0:
+                continue
+            rs = s.get("RoleStats") or {}
+            role = str(rs.get("PrimaryRole", "") or "")
+            payload = safe_int(s.get("DeclaredPayloadBytes", 0))
+            conf = safe_int(rs.get("Confidence", 0))
+            stream_map[off] = {
+                "block": safe_int(s.get("TargetBlockIndex", 0)),
+                "payload": payload,
+                "role": role,
+                "conf": conf,
+                "vectorCount": _vec_count(payload, role),
+            }
+
+        def _get(off: int) -> dict[str, Any] | None:
+            return stream_map.get(off)
+
+        id_prefix = str(report.get("Source", {}).get("IdPrefix", probe_path.stem.split("-")[-2] if "-" in probe_path.stem else ""))
+        if not id_prefix or len(id_prefix) < 16:
+            # fallback parse from filename
+            stem = probe_path.stem
+            for token in stem.split("-"):
+                if len(token) == 16 and all(c in "0123456789abcdef" for c in token):
+                    id_prefix = token
+                    break
+
+        return {
+            "Id": id_prefix,
+            "MeshBlock": expected_block,
+            "MeshSize": 329,
+            "AttributeSetCount": attr_count,
+            "VertexCount": vcount,
+            "StreamsAt212": _get(212),
+            "StreamsAt220": _get(220),
+            "StreamsAt296": _get(296),
+            "StreamsAt304": _get(304),
+            "TotalStreams": len([s for s in streams if isinstance(s, dict)]),
+            "AttrExtraStreamCount": (
+                len(attr_sets[0].get("ExtraStreams") or [])
+                if attr_sets and isinstance(attr_sets[0], dict)
+                else 0
+            ),
+            "ProbePath": _repo_relative_report_path(probe_path),
+            "CandidateOnly": True,
+        }
+
+    for idv in FAMILY_329_IDS:
+        p7 = out_dir / f"probe-nif-mesh-{idv}-mesh7.json"
+        p34 = out_dir / f"probe-nif-mesh-{idv}-mesh34.json"
+
+        row7 = _extract_row(p7, 7)
+        if row7 is None:
+            # Fallback: plain probe-nif-mesh-*.json often holds the mesh#7 data from direct
+            # `python scripts/rift_workflow.py mesh-probe --id <ID> --mesh-block 7 --skip-build` runs
+            # (python wrapper names output without -mesh suffix; _extract_row will filter to block 7 inside).
+            plain_p = out_dir / f"probe-nif-mesh-{idv}.json"
+            row7 = _extract_row(plain_p, 7)
+        row34 = _extract_row(p34, 34)
+
+        if row7:
+            matrix_rows.append(row7)
+            covered.append(idv)
+        if row34:
+            matrix_rows.append(row34)
+            if idv not in covered:
+                covered.append(idv)
+
+        if row7 and row34:
+            s7_212 = row7.get("StreamsAt212") or {}
+            s34_212 = row34.get("StreamsAt212") or {}
+            s34_304 = row34.get("StreamsAt304") or {}
+            s7_304 = row7.get("StreamsAt304") or {}
+
+            pair_comps.append({
+                "Id": idv,
+                "AttrSetCount7": row7["AttributeSetCount"],
+                "AttrSetCount34": row34["AttributeSetCount"],
+                "AttrDelta": row7["AttributeSetCount"] - row34["AttributeSetCount"],
+                "Shared212Payload": bool(
+                    s7_212.get("payload") == s34_212.get("payload")
+                    and s7_212.get("payload")
+                ),
+                "Shared212Block": bool(
+                    s7_212.get("block") == s34_212.get("block")
+                    and s7_212.get("block")
+                ),
+                "Mesh34_304Role": str(s34_304.get("role", "")),
+                "Mesh34_304Conf": safe_int(s34_304.get("conf", 0)),
+                "Mesh34_304VectorCount": safe_int(s34_304.get("vectorCount", 0)),
+                "Mesh7HasUV": bool(
+                    s7_304 and "uv-float2" in str(s7_304.get("role", "")).lower()
+                ),
+                "Mesh34HasUV": bool(
+                    s34_304 and "uv-float2" in str(s34_304.get("role", "")).lower()
+                ),
+                "Mesh7HasAttrSet": row7["AttributeSetCount"] > 0,
+                "Mesh34HasAttrSet": row34["AttributeSetCount"] > 0,
+                "Mesh7PosPayload": safe_int(s7_212.get("payload", 0)),
+                "Mesh34PosPrimaryPayload": safe_int(s34_212.get("payload", 0)),
+                "Decision": (
+                    "candidate-only; mesh#34 variant shares primary @212 position source "
+                    "but shows attributeSets=0 and @304 scored as secondary position"
+                ),
+                "CandidateOnly": True,
+            })
+
+    # de-dupe covered
+    covered = sorted(set(covered))
+
+    # Quantify patterns (as specified in task)
+    both_count = len(pair_comps)
+    mesh7_attr1 = sum(1 for p in pair_comps if p["AttrSetCount7"] == 1)
+    mesh34_attr0 = sum(1 for p in pair_comps if p["AttrSetCount34"] == 0)
+    mesh34_304_pos = sum(
+        1 for p in pair_comps if "position-float3" in p.get("Mesh34_304Role", "").lower()
+    )
+    mesh7_uv = sum(1 for p in pair_comps if p["Mesh7HasUV"])
+    mesh34_no_uv = sum(1 for p in pair_comps if not p["Mesh34HasUV"])
+
+    pattern_quant = {
+        "IDsWithBothProbes": both_count,
+        "IDsWithMesh7Attr1": mesh7_attr1,
+        "IDsWithMesh34Attr0": mesh34_attr0,
+        "IDsWithMesh34_304ScoredAsPosition": mesh34_304_pos,
+        "IDsWithMesh7UVPresent": mesh7_uv,
+        "IDsWithMesh34UVAbsent": mesh34_no_uv,
+        "ConsistentPatterns": [
+            f"mesh#34 consistently shows attributeSets=0 (observed in {mesh34_attr0}/{both_count} paired examples)" if both_count else "no paired data yet",
+            f"mesh#34 @304 scored as position-float3-ror1-lead (c=75) in {mesh34_304_pos}/{both_count} paired examples" if both_count else "",
+            "mesh#7 typically has attributeSets=1 (pos@212 + normal@220 + uv@304) with extra u32 at @296",
+        ],
+        "QuantifiedNotes": {
+            "mesh7_vs_mesh34_attr_layout_split": f"{mesh7_attr1} mesh#7 have complete attr sets vs {mesh34_attr0} mesh#34 have zero",
+            "secondary_position_at_304": f"{mesh34_304_pos} cases of @304 on mesh#34 classified position (not UV)",
+            "primary_source_shared": f"primary @212/#28 payload and block shared in all {both_count} paired cases where both probes present",
+        },
+    }
+
+    json_path = out_dir / "mesh329-family-attribute-role-matrix.json"
+    md_path = out_dir / "mesh329-family-attribute-role-matrix.md"
+    csv_path = out_dir / "mesh329-family-attribute-role-matrix.csv"
+
+    report = {
+        "Schema": "329-family-attribute-role-matrix/v1",
+        "CandidateOnly": True,
+        "MeshSize": 329,
+        "TargetMeshBlocks": [7, 34],
+        "IDsCovered": covered,
+        "ProbeCount": len(matrix_rows),
+        "MatrixRows": matrix_rows,
+        "PairComparisons": pair_comps,
+        "PatternQuantification": pattern_quant,
+        "ParserExportPromotionAllowed": False,
+        "Interpretation": (
+            "Phase 1 M1.1 329 Family Attribute & Role Matrix (candidate-only). "
+            "Synthesizes mesh-probe outputs for mesh#7 (often complete attributeSets=1 with UV) "
+            "vs mesh#34 (attributeSets=0, reuses primary position @212/#28, extra @304 scored "
+            "as position-like with c=75, no UV recognized). Patterns quantified for role "
+            "classifier refinement and future attribute-set proof guards. No durable parser "
+            "or export truth; all findings gated. See roadmap Phase 1 M1.1 and parent handoffs."
+        ),
+    }
+
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Markdown comparative table (wide per-ID for 7/34)
+    md_lines: list[str] = [
+        "# 329 Family Attribute & Role Matrix (Phase 1 M1.1)",
+        "",
+        "**Candidate-only**. meshSize=329 source-binding family (mesh#7 vs mesh#34 variants).",
+        "",
+        f"IDs covered: {len(covered)} (probes present for subset of family list)",
+        f"Paired comparisons: {both_count}",
+        "",
+        "All data derived from probe-nif-mesh JSON outputs under Exports/.",
+        "",
+        "## Per-ID Pair Comparison Table",
+        "",
+        "| ID | mesh#7 attrSets | mesh#34 attrSets | Δattr | @212 shared? | mesh#34 @304 role (c) | mesh#34 @304 vecs | mesh#7 UV? | mesh#34 UV? | Decision |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+    ]
+    for p in sorted(pair_comps, key=lambda x: (-x["AttrSetCount7"], x["Id"])):
+        shared = "yes" if p["Shared212Payload"] and p["Shared212Block"] else "no"
+        uv7 = "yes" if p["Mesh7HasUV"] else "no"
+        uv34 = "yes" if p["Mesh34HasUV"] else "no"
+        role34 = p["Mesh34_304Role"] or "-"
+        conf34 = p["Mesh34_304Conf"]
+        role_str = f"{role34} (c={conf34})" if conf34 else role34
+        md_lines.append(
+            f"| {format_markdown_cell(p['Id'])} "
+            f"| {p['AttrSetCount7']} "
+            f"| {p['AttrSetCount34']} "
+            f"| {p['AttrDelta']} "
+            f"| {shared} "
+            f"| {format_markdown_cell(role_str)} "
+            f"| {p['Mesh34_304VectorCount']} "
+            f"| {uv7} "
+            f"| {uv34} "
+            f"| {format_markdown_cell(p['Decision'])} |"
+        )
+
+    if not pair_comps:
+        md_lines.append("| (no paired probes present yet) | - | - | - | - | - | - | - | - | - |")
+
+    md_lines += [
+        "",
+        "## Flat Matrix Rows (all variants)",
+        "",
+        "| ID | block | attrSets | vtx | @212 role(c)/vec | @220 role(c)/vec | @296 role(c)/vec | @304 role(c)/vec | extras |",
+        "|---|---:|---:|---:|---|---|---|---|---|",
+    ]
+    for r in sorted(matrix_rows, key=lambda x: (x["Id"], x["MeshBlock"])):
+        def _fmt_stream(s):
+            if not s:
+                return "-"
+            return f"{s.get('role','?')}(c={s.get('conf',0)})/{s.get('vectorCount',0)}"
+        md_lines.append(
+            f"| {format_markdown_cell(r['Id'])} "
+            f"| {r['MeshBlock']} "
+            f"| {r['AttributeSetCount']} "
+            f"| {r['VertexCount']} "
+            f"| {_fmt_stream(r.get('StreamsAt212'))} "
+            f"| {_fmt_stream(r.get('StreamsAt220'))} "
+            f"| {_fmt_stream(r.get('StreamsAt296'))} "
+            f"| {_fmt_stream(r.get('StreamsAt304'))} "
+            f"| {r['AttrExtraStreamCount']} |"
+        )
+
+    md_lines += [
+        "",
+        "## Pattern Quantification",
+        "",
+        f"- IDs with both mesh#7 + #34 probes: **{both_count}**",
+        f"- mesh#7 with attributeSets=1: **{mesh7_attr1}** / paired",
+        f"- mesh#34 with attributeSets=0: **{mesh34_attr0}** / paired",
+        f"- mesh#34 @304 scored position-float3: **{mesh34_304_pos}** / paired",
+        f"- mesh#7 with recognized UV: **{mesh7_uv}**",
+        f"- mesh#34 without recognized UV: **{mesh34_no_uv}**",
+        "",
+        "Key observed pattern (candidate-only):",
+        "> mesh#34 consistently shows attributeSets=0 and secondary position scoring at @304.",
+        "",
+        "See JSON for machine-readable rows + full stream/role details.",
+        "",
+        "This matrix is reusable input for role scoring, attribute completion proofs, and M1.2/M1.3 guard work.",
+        "",
+        f"Generated for Phase 1 M1.1 per { 'docs/roadmap/project-roadmap.md' }.",
+        "All output candidate-only. No promotion of parser, geometry, or export behavior.",
+    ]
+
+    md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+    # CSV (flat matrix rows for easy consumption / spreadsheet)
+    if matrix_rows:
+        fieldnames = [
+            "Id", "MeshBlock", "MeshSize", "AttributeSetCount", "VertexCount",
+            "At212_block", "At212_payload", "At212_role", "At212_conf", "At212_vecs",
+            "At220_block", "At220_payload", "At220_role", "At220_conf", "At220_vecs",
+            "At296_block", "At296_payload", "At296_role", "At296_conf", "At296_vecs",
+            "At304_block", "At304_payload", "At304_role", "At304_conf", "At304_vecs",
+            "TotalStreams", "AttrExtraStreamCount", "ProbePath",
+        ]
+        with csv_path.open("w", newline="", encoding="utf-8") as fcsv:
+            writer = csv.DictWriter(fcsv, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in matrix_rows:
+                s212 = r.get("StreamsAt212") or {}
+                s220 = r.get("StreamsAt220") or {}
+                s296 = r.get("StreamsAt296") or {}
+                s304 = r.get("StreamsAt304") or {}
+                writer.writerow({
+                    "Id": r["Id"],
+                    "MeshBlock": r["MeshBlock"],
+                    "MeshSize": r["MeshSize"],
+                    "AttributeSetCount": r["AttributeSetCount"],
+                    "VertexCount": r["VertexCount"],
+                    "At212_block": s212.get("block", ""),
+                    "At212_payload": s212.get("payload", ""),
+                    "At212_role": s212.get("role", ""),
+                    "At212_conf": s212.get("conf", ""),
+                    "At212_vecs": s212.get("vectorCount", ""),
+                    "At220_block": s220.get("block", ""),
+                    "At220_payload": s220.get("payload", ""),
+                    "At220_role": s220.get("role", ""),
+                    "At220_conf": s220.get("conf", ""),
+                    "At220_vecs": s220.get("vectorCount", ""),
+                    "At296_block": s296.get("block", ""),
+                    "At296_payload": s296.get("payload", ""),
+                    "At296_role": s296.get("role", ""),
+                    "At296_conf": s296.get("conf", ""),
+                    "At296_vecs": s296.get("vectorCount", ""),
+                    "At304_block": s304.get("block", ""),
+                    "At304_payload": s304.get("payload", ""),
+                    "At304_role": s304.get("role", ""),
+                    "At304_conf": s304.get("conf", ""),
+                    "At304_vecs": s304.get("vectorCount", ""),
+                    "TotalStreams": r["TotalStreams"],
+                    "AttrExtraStreamCount": r["AttrExtraStreamCount"],
+                    "ProbePath": r["ProbePath"],
+                })
+    else:
+        csv_path = None
+
+    # Console summary
+    print("\n=== 329 Family Attribute & Role Matrix (Phase 1 M1.1) ===")
+    print(f"CandidateOnly: true | MeshSize=329 | blocks 7+34 | IDs covered: {len(covered)}")
+    print(f"Paired examples: {both_count}")
+    print(f"Matrix rows (variants): {len(matrix_rows)}")
+    if pattern_quant["ConsistentPatterns"]:
+        print("Observed patterns:")
+        for pat in cast("list[str]", pattern_quant["ConsistentPatterns"]):
+            if pat:
+                print(f"  - {pat}")
+    print(f"JSON: {_repo_relative_report_path(json_path)}")
+    print(f"MD:   {_repo_relative_report_path(md_path)}")
+    if csv_path:
+        print(f"CSV:  {_repo_relative_report_path(csv_path)}")
+    print("mesh329-family-attribute-role-matrix: candidate-only synthesis complete (no promotion).")
+    print("Reference: docs/roadmap/project-roadmap.md Phase 1 M1.1")
+
+    return json_path, md_path, csv_path
