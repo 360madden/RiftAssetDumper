@@ -67,7 +67,8 @@ public class BasicTests
         DataStreamUsage: null,
         DataStreamAccess: null,
         Role: "position-float3-ror1-lead",
-        FirstFloat3: "000000000000803f00000000");
+        FirstFloat3: "000000000000803f00000000",
+        DescriptorClassification: null);
 
     Assert.Equal(188, candidate.MeshPayloadOffset);
     Assert.Equal(21, candidate.BlockIndex);
@@ -101,7 +102,8 @@ public class BasicTests
                         DataStreamUsage: null,
                         DataStreamAccess: null,
                         Role: "position-float3-ror1-lead",
-                        FirstFloat3: "00000000"),
+                        FirstFloat3: "00000000",
+                        DescriptorClassification: null),
                 ])
         };
 

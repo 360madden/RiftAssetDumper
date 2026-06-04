@@ -2068,11 +2068,17 @@ internal static class Program
           Console.WriteLine($"    float32 position candidates: {float32Candidates.Count}");
           foreach (var candidate in float32Candidates.Take(4))
           {
-            Console.WriteLine($"      #{candidate.BlockIndex} offset=@{candidate.MeshPayloadOffset} type={candidate.PositionType} vertexCount={candidate.VertexCount} role={candidate.Role}");
+            Console.WriteLine($"      #{candidate.BlockIndex} offset=@{candidate.MeshPayloadOffset} type={candidate.PositionType} vertexCount={candidate.VertexCount} role={candidate.Role}{FormatNifDescriptorClassificationInline(candidate.DescriptorClassification)}");
           }
 
           // Decode positions from the first float32 candidate
-          var leadCandidate = float32Candidates[0];
+          // Sort candidates: prefer those with float-family descriptors (M5.3)
+          var orderedCandidates = float32Candidates
+              .Select(c => new { Candidate = c, Boost = IsFloatDescriptor(c.DescriptorClassification) ? 1 : 0 })
+              .OrderByDescending(x => x.Boost)
+              .Select(x => x.Candidate)
+              .ToList();
+          var leadCandidate = orderedCandidates[0];
           var vertexCount = leadCandidate.VertexCount;
           var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
           var positionSamples = BuildNifAttributeFloatVertexSamples(
@@ -3387,7 +3393,8 @@ internal static class Program
                 DataStreamUsage: stream.DataStreamUsage,
                 DataStreamAccess: stream.DataStreamAccess,
                 Role: roleStats.PrimaryRole,
-                FirstFloat3: ToHex(body[..Math.Min(12, body.Length)])));
+                FirstFloat3: ToHex(body[..Math.Min(12, body.Length)]),
+    DescriptorClassification: stream.DescriptorClassification));
             continue;
           }
         }
@@ -3415,7 +3422,8 @@ internal static class Program
                 DataStreamUsage: stream.DataStreamUsage,
                 DataStreamAccess: stream.DataStreamAccess,
                 Role: roleStats.PrimaryRole,
-                FirstFloat3: ToHex(body[..Math.Min(12, body.Length)])));
+                FirstFloat3: ToHex(body[..Math.Min(12, body.Length)]),
+    DescriptorClassification: stream.DescriptorClassification));
           }
         }
       }
@@ -16190,7 +16198,8 @@ internal sealed record NifLinkedStreamPositionCandidate(
     string? DataStreamUsage,
     string? DataStreamAccess,
     string Role,
-    string FirstFloat3);
+    string FirstFloat3,
+    string? DescriptorClassification);
 
 internal sealed record NifPositionSourceMeshProbe(
     int MeshBlockIndex,
