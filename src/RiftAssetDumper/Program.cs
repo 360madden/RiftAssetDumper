@@ -4393,7 +4393,8 @@ internal static class Program
                   RoleStats: roleStats,
                   GhidraRoleStats: ghidraRoleStats,
                   DescriptorBytes: layout.DescriptorBytes,
-                  DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes));
+                  DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes),
+    DescriptorGuidedRole: ClassifyNifDescriptorRole(layout.DescriptorBytes));
               streamSummaries.Add(summary);
 
               var usageAccessKey = FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess);
@@ -5992,7 +5993,6 @@ internal static class Program
                 Stats: stats,
                 DescriptorBytes: layout.DescriptorBytes,
                 DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes));
-
             if (!sizeGroups.TryGetValue(declaredPayloadBytes, out var sizeGroup))
             {
               sizeGroup = new NifStreamBodySizeAccumulator(declaredPayloadBytes);
@@ -10920,14 +10920,37 @@ internal static class Program
   private static bool IsFloatDescriptor(string? descriptor)
   {
     return descriptor is not null && (
-        descriptor.Contains("ror1-float", StringComparison.OrdinalIgnoreCase)
-        || descriptor.Contains("float-vertex-data", StringComparison.OrdinalIgnoreCase));
+        descriptor.Contains("float32xvec3", StringComparison.OrdinalIgnoreCase)
+        || descriptor.Contains("float32xvec2", StringComparison.OrdinalIgnoreCase));
   }
 
   private static bool IsU16Descriptor(string? descriptor)
   {
     return descriptor is not null
-        && descriptor.Contains("u16-vertex-data", StringComparison.OrdinalIgnoreCase);
+        && descriptor.Contains("uint16xscalar", StringComparison.OrdinalIgnoreCase);
+  }
+
+  /// <summary>
+  /// Maps a descriptor byte pattern to a predicted stream role based on the proven
+  /// semantic map (Phase 9: 4/4 bytes identified, 5/5 patterns, stride->usage rule).
+  /// Returns null when the descriptor is unknown or unmapped.
+  /// </summary>
+  internal static string? ClassifyNifDescriptorRole(string? descriptorBytes)
+  {
+    if (string.IsNullOrWhiteSpace(descriptorBytes) || descriptorBytes.Length < 8)
+    {
+      return null;
+    }
+
+    return descriptorBytes switch
+    {
+      "37040300" => "descriptor-float3-generic",    // float32xvec3 -> position/normal/UV (role-agnostic (position, normal, or UV))
+      "36040200" => "descriptor-float2-uv",          // float32xvec2 -> UV coordinates
+      "15020100" => "descriptor-uint16-index",       // uint16xscalar -> index stream
+      "10010400" => "descriptor-byte4-packed",       // bytexvec4 -> packed vertex attribute
+      "3c010400" => "descriptor-byte4-packed-variant", // bytexvec4 variant
+      _ => null
+    };
   }
 
   internal static string? CheckDescriptorRoleConsistency(string? primaryRole, string? descriptorClassification, string? dataStreamUsage = null, string? dataStreamAccess = null)
@@ -10994,11 +11017,11 @@ internal static class Program
     var byte0 = descriptorBytes[..2];
     return byte0 switch
     {
-      "37" => "ror1-float family (byte0=0x37)",
-      "36" => "float-vertex-data family (byte0=0x36)",
-      "15" => "u16-vertex-data family (byte0=0x15, candidate)",
-      "10" => "unknown family (byte0=0x10, candidate)",
-      "3c" => "unknown family (byte0=0x3c, candidate)",
+      "37" => "float32xvec3 family (byte0=0x37)",
+      "36" => "float32xvec2 family (byte0=0x36)",
+      "15" => "uint16xscalar family (byte0=0x15, candidate)",
+      "10" => "bytexvec4 family (byte0=0x10, candidate)",
+      "3c" => "bytexvec4 family (byte0=0x3c, candidate)",
       _ => null
     };
   }
@@ -11012,11 +11035,11 @@ internal static class Program
 
     return descriptorBytes switch
     {
-      "37040300" => "ror1-float (generic float vertex data)",
-      "36040200" => "float-vertex-data (encoding variant)",
-      "15020100" => "unknown-role (candidate)",
-      "10010400" => "unknown-role (candidate)",
-      "3c010400" => "unknown-role (candidate)",
+      "37040300" => "float32xvec3 (position/normal/UV vertex data)",
+      "36040200" => "float32xvec2 (UV coordinates)",
+      "15020100" => "uint16xscalar (index stream)",
+      "10010400" => "bytexvec4 (packed vertex attribute)",
+      "3c010400" => "bytexvec4 (packed vertex attribute, variant)",
       _ => ClassifyNifDescriptorByByte0(descriptorBytes)
     };
   }
@@ -11311,7 +11334,8 @@ internal static class Program
           RoleStats: roleStats,
           GhidraRoleStats: ghidraRoleStats,
           DescriptorBytes: layout.DescriptorBytes,
-          DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes)));
+          DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes),
+          DescriptorGuidedRole: ClassifyNifDescriptorRole(layout.DescriptorBytes)));
     }
 
     return streamSummaries;
@@ -16613,7 +16637,8 @@ internal sealed record NifMeshBoundStreamSummary(
     NifMeshStreamRoleStats RoleStats,
     NifMeshStreamRoleStats? GhidraRoleStats,
     string? DescriptorBytes,
-    string? DescriptorClassification);
+    string? DescriptorClassification,
+    string? DescriptorGuidedRole);
 
 internal sealed record NifMeshBindingPairingSample(
     string ArchiveName,

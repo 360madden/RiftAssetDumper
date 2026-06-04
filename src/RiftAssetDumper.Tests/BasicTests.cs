@@ -278,25 +278,25 @@ public class BasicTests
   public void ClassifyNifDescriptor_KnownPatterns()
   {
     // 37 04 03 00 = ror1-float
-    Assert.Equal("ror1-float (generic float vertex data)", Program.ClassifyNifDescriptor("37040300"));
+    Assert.Equal("float32xvec3 (position/normal/UV vertex data)", Program.ClassifyNifDescriptor("37040300"));
     // 36 04 02 00 = float-vertex-data encoding variant
-    Assert.Equal("float-vertex-data (encoding variant)", Program.ClassifyNifDescriptor("36040200"));
+    Assert.Equal("float32xvec2 (UV coordinates)", Program.ClassifyNifDescriptor("36040200"));
     // 15 02 01 00 = unknown-role candidate
-    Assert.Equal("unknown-role (candidate)", Program.ClassifyNifDescriptor("15020100"));
+    Assert.Equal("uint16xscalar (index stream)", Program.ClassifyNifDescriptor("15020100"));
     // 10 01 04 00 = unknown-role candidate
-    Assert.Equal("unknown-role (candidate)", Program.ClassifyNifDescriptor("10010400"));
+    Assert.Equal("bytexvec4 (packed vertex attribute)", Program.ClassifyNifDescriptor("10010400"));
     // 3c 01 04 00 = unknown-role candidate
-    Assert.Equal("unknown-role (candidate)", Program.ClassifyNifDescriptor("3c010400"));
+    Assert.Equal("bytexvec4 (packed vertex attribute, variant)", Program.ClassifyNifDescriptor("3c010400"));
   }
 
   [Fact]
   public void ClassifyNifDescriptorByByte0_KnownByte0()
   {
-    Assert.Equal("ror1-float family (byte0=0x37)", Program.ClassifyNifDescriptorByByte0("37ffffff"));
-    Assert.Equal("float-vertex-data family (byte0=0x36)", Program.ClassifyNifDescriptorByByte0("36000000"));
-    Assert.Equal("u16-vertex-data family (byte0=0x15, candidate)", Program.ClassifyNifDescriptorByByte0("15abcdef"));
-    Assert.Equal("unknown family (byte0=0x10, candidate)", Program.ClassifyNifDescriptorByByte0("10ffffff"));
-    Assert.Equal("unknown family (byte0=0x3c, candidate)", Program.ClassifyNifDescriptorByByte0("3c000000"));
+    Assert.Equal("float32xvec3 family (byte0=0x37)", Program.ClassifyNifDescriptorByByte0("37ffffff"));
+    Assert.Equal("float32xvec2 family (byte0=0x36)", Program.ClassifyNifDescriptorByByte0("36000000"));
+    Assert.Equal("uint16xscalar family (byte0=0x15, candidate)", Program.ClassifyNifDescriptorByByte0("15abcdef"));
+    Assert.Equal("bytexvec4 family (byte0=0x10, candidate)", Program.ClassifyNifDescriptorByByte0("10ffffff"));
+    Assert.Equal("bytexvec4 family (byte0=0x3c, candidate)", Program.ClassifyNifDescriptorByByte0("3c000000"));
   }
 
   [Fact]
@@ -329,9 +329,9 @@ public class BasicTests
   public void ClassifyNifDescriptor_FallsBackToByte0ForUnknownFullPattern()
   {
     // Full pattern not in known set, but byte-0 matches
-    Assert.Equal("ror1-float family (byte0=0x37)", Program.ClassifyNifDescriptor("37ffffff"));
-    Assert.Equal("float-vertex-data family (byte0=0x36)", Program.ClassifyNifDescriptor("36000000"));
-    Assert.Equal("u16-vertex-data family (byte0=0x15, candidate)", Program.ClassifyNifDescriptor("15abcdef"));
+    Assert.Equal("float32xvec3 family (byte0=0x37)", Program.ClassifyNifDescriptor("37ffffff"));
+    Assert.Equal("float32xvec2 family (byte0=0x36)", Program.ClassifyNifDescriptor("36000000"));
+    Assert.Equal("uint16xscalar family (byte0=0x15, candidate)", Program.ClassifyNifDescriptor("15abcdef"));
   }
 
   [Fact]
@@ -507,14 +507,14 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_FloatRoleFloatDescriptor_ReturnsNull()
   {
-    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "ror1-float family (byte0=0x37)");
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "float32xvec3 family (byte0=0x37)");
     Assert.Null(result);
   }
 
   [Fact]
   public void CheckDescriptorRoleConsistency_IndexRoleFloatDescriptor_ReturnsWarning()
   {
-    var result = Program.CheckDescriptorRoleConsistency("index-u16be-strip-lead", "ror1-float family (byte0=0x37)");
+    var result = Program.CheckDescriptorRoleConsistency("index-u16be-strip-lead", "float32xvec3 family (byte0=0x37)");
     Assert.NotNull(result);
     Assert.Contains("descriptor-role-mismatch", result);
     Assert.Contains("index", result);
@@ -524,7 +524,7 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_FloatRoleU16Descriptor_ReturnsWarning()
   {
-    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "u16-vertex-data family (byte0=0x15, candidate)");
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "uint16xscalar family (byte0=0x15, candidate)");
     Assert.NotNull(result);
     Assert.Contains("descriptor-role-mismatch", result);
     Assert.Contains("float role", result);
@@ -534,7 +534,7 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_NullRole_ReturnsNull()
   {
-    var result = Program.CheckDescriptorRoleConsistency(null, "ror1-float family (byte0=0x37)");
+    var result = Program.CheckDescriptorRoleConsistency(null, "float32xvec3 family (byte0=0x37)");
     Assert.Null(result);
   }
 
@@ -548,15 +548,15 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_UnknownDescriptor_ReturnsNull()
   {
-    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "unknown family (byte0=0x10, candidate)");
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "bytexvec4 family (byte0=0x10, candidate)");
     Assert.Null(result);
   }
 
 
   [Theory]
-  [InlineData(80, "ror1-float family (byte0=0x37)", "position-float3-ror1-lead", 85)]
-  [InlineData(95, "ror1-float family (byte0=0x37)", "normal-float3-ror1-lead", 100)]
-  [InlineData(50, "float-vertex-data family (byte0=0x36)", "uv-float2-ror1-lead", 55)]
+  [InlineData(80, "float32xvec3 family (byte0=0x37)", "position-float3-ror1-lead", 85)]
+  [InlineData(95, "float32xvec3 family (byte0=0x37)", "normal-float3-ror1-lead", 100)]
+  [InlineData(50, "float32xvec2 family (byte0=0x36)", "uv-float2-ror1-lead", 55)]
   public void AdjustConfidenceByDescriptor_FloatMatch_Boosts(int confidence, string descriptor, string role, int expected)
   {
     var result = Program.AdjustConfidenceByDescriptor(confidence, descriptor, role);
@@ -564,8 +564,8 @@ public class BasicTests
   }
 
   [Theory]
-  [InlineData(80, "u16-vertex-data family (byte0=0x15, candidate)", "position-float3-ror1-lead", 70)]
-  [InlineData(5, "u16-vertex-data family (byte0=0x15, candidate)", "normal-float3-ror1-lead", 0)]
+  [InlineData(80, "uint16xscalar family (byte0=0x15, candidate)", "position-float3-ror1-lead", 70)]
+  [InlineData(5, "uint16xscalar family (byte0=0x15, candidate)", "normal-float3-ror1-lead", 0)]
   public void AdjustConfidenceByDescriptor_FloatRoleU16Descriptor_Dampens(int confidence, string descriptor, string role, int expected)
   {
     var result = Program.AdjustConfidenceByDescriptor(confidence, descriptor, role);
@@ -582,28 +582,28 @@ public class BasicTests
   [Fact]
   public void AdjustConfidenceByDescriptor_UnknownDescriptor_NoChange()
   {
-    var result = Program.AdjustConfidenceByDescriptor(80, "unknown family (byte0=0x10, candidate)", "position-float3-ror1-lead");
+    var result = Program.AdjustConfidenceByDescriptor(80, "bytexvec4 family (byte0=0x10, candidate)", "position-float3-ror1-lead");
     Assert.Equal(80, result);
   }
 
   [Fact]
   public void AdjustConfidenceByDescriptor_IndexRole_NoChange()
   {
-    var result = Program.AdjustConfidenceByDescriptor(80, "u16-vertex-data family (byte0=0x15, candidate)", "index-u16be-strip-lead");
+    var result = Program.AdjustConfidenceByDescriptor(80, "uint16xscalar family (byte0=0x15, candidate)", "index-u16be-strip-lead");
     Assert.Equal(80, result);
   }
 
   [Fact]
   public void AdjustConfidenceByDescriptor_CapsAt100()
   {
-    var result = Program.AdjustConfidenceByDescriptor(98, "ror1-float family (byte0=0x37)", "position-float3-ror1-lead");
+    var result = Program.AdjustConfidenceByDescriptor(98, "float32xvec3 family (byte0=0x37)", "position-float3-ror1-lead");
     Assert.Equal(100, result);
   }
 
   [Fact]
   public void AdjustConfidenceByDescriptor_FloorsAt0()
   {
-    var result = Program.AdjustConfidenceByDescriptor(3, "u16-vertex-data family (byte0=0x15, candidate)", "position-float3-ror1-lead");
+    var result = Program.AdjustConfidenceByDescriptor(3, "uint16xscalar family (byte0=0x15, candidate)", "position-float3-ror1-lead");
     Assert.Equal(0, result);
   }
 
@@ -611,7 +611,7 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_IncludesUsageAccessInWarning()
   {
-    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "u16-vertex-data family (byte0=0x15, candidate)", "0", "3");
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "uint16xscalar family (byte0=0x15, candidate)", "0", "3");
     Assert.NotNull(result);
     Assert.Contains("usage=0", result);
     Assert.Contains("access=3", result);
@@ -620,7 +620,7 @@ public class BasicTests
   [Fact]
   public void CheckDescriptorRoleConsistency_OmitsUsageAccessWhenNull()
   {
-    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "u16-vertex-data family (byte0=0x15, candidate)");
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "uint16xscalar family (byte0=0x15, candidate)");
     Assert.NotNull(result);
     Assert.DoesNotContain("usage=", result);
   }
@@ -638,14 +638,14 @@ public class BasicTests
   [Fact]
   public void ValidateDescriptorExportPrechecks_ZeroFaces_ReturnsWarning()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 10, 0);
+    var warnings = Program.ValidateDescriptorExportPrechecks("float32xvec3 family (byte0=0x37)", 10, 0);
     Assert.Contains(warnings, w => w.Contains("Zero faces"));
   }
 
   [Fact]
   public void ValidateDescriptorExportPrechecks_LowVertexCount_ReturnsWarning()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 2, 1);
+    var warnings = Program.ValidateDescriptorExportPrechecks("float32xvec3 family (byte0=0x37)", 2, 1);
     Assert.Contains(warnings, w => w.Contains("Low vertex count"));
   }
 
@@ -659,28 +659,28 @@ public class BasicTests
   [Fact]
   public void ValidateDescriptorExportPrechecks_U16Descriptor_ReturnsWarning()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("u16-vertex-data family (byte0=0x15, candidate)", 10, 5);
+    var warnings = Program.ValidateDescriptorExportPrechecks("uint16xscalar family (byte0=0x15, candidate)", 10, 5);
     Assert.Contains(warnings, w => w.Contains("u16-family"));
   }
 
   [Fact]
   public void ValidateDescriptorExportPrechecks_FloatDescriptor_ReturnsClean()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 100, 50);
+    var warnings = Program.ValidateDescriptorExportPrechecks("float32xvec3 family (byte0=0x37)", 100, 50);
     Assert.Empty(warnings);
   }
 
   [Fact]
   public void ValidateDescriptorExportPrechecks_UnknownDescriptor_ReturnsWarning()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("unknown family (byte0=0x10, candidate)", 10, 5);
+    var warnings = Program.ValidateDescriptorExportPrechecks("bytexvec4 family (byte0=0x10, candidate)", 10, 5);
     Assert.Contains(warnings, w => w.Contains("unrecognized family"));
   }
 
   [Fact]
   public void ValidateDescriptorExportPrechecks_MultipleWarnings_Accumulates()
   {
-    var warnings = Program.ValidateDescriptorExportPrechecks("u16-vertex-data family (byte0=0x15, candidate)", 2, 0);
+    var warnings = Program.ValidateDescriptorExportPrechecks("uint16xscalar family (byte0=0x15, candidate)", 2, 0);
     Assert.True(warnings.Count >= 3); // low vertex + zero faces + u16 descriptor
   }
 
