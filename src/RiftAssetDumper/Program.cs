@@ -1973,7 +1973,7 @@ internal static class Program
       }
       foreach (var pairing in mesh.Pairings.Take(5))
       {
-        Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
+        Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} {FormatNifDescriptorClassificationInline(pairing.VertexDescriptorClassification)} confidence={pairing.Confidence}");
       }
 
       foreach (var pairing in mesh.GhidraPairings.Take(5))
@@ -10693,6 +10693,7 @@ internal static class Program
             IndexGhidraBodyFirst16: indexStream.GhidraBodyFirst16,
             IndexMax: maxIndex,
             IndexPairCount: indexStream.RoleStats.IndexPairCount,
+      IndexDescriptorClassification: indexStream.DescriptorClassification,
             VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
             VertexBlockIndex: vertexStream.TargetBlockIndex,
             VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
@@ -10702,6 +10703,7 @@ internal static class Program
             VertexTargetFirst16: vertexStream.TargetFirst16,
             VertexBodyFirst16: vertexStream.BodyFirst16,
             VertexGhidraBodyFirst16: vertexStream.GhidraBodyFirst16,
+            VertexDescriptorClassification: vertexStream.DescriptorClassification,
             VertexCount: compatibleVertexCount,
             IndexCoverageRatio: coverageRatio,
             DataStreamMetadataScore: dataStreamMetadataScore,
@@ -11232,6 +11234,7 @@ internal static class Program
             IndexRoleStats: indexStream.RoleStats,
             IndexMax: maxIndex,
             IndexPairCount: indexStream.RoleStats.IndexPairCount,
+      IndexDescriptorClassification: indexStream.DescriptorClassification,
             VertexMeshPayloadOffset: vertexStream.MeshPayloadOffset,
             VertexBlockIndex: vertexStream.TargetBlockIndex,
             VertexDeclaredPayloadBytes: vertexStream.DeclaredPayloadBytes,
@@ -11244,6 +11247,7 @@ internal static class Program
             VertexRoleStats: vertexStream.RoleStats,
             VertexPositionBoundsReview: BuildNifPositionBoundsReview(vertexStream.RoleStats),
             VertexNormalVectorReview: BuildNifNormalVectorReview(vertexStream.RoleStats),
+      VertexDescriptorClassification: vertexStream.DescriptorClassification,
             VertexUvRangeReview: BuildNifUvRangeReview(vertexStream.RoleStats),
             VertexCount: compatibleVertexCount,
             IndexCoverageRatio: compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4),
@@ -14836,6 +14840,7 @@ internal sealed record NifMeshProbePairing(
     NifMeshStreamRoleStats IndexRoleStats,
     ushort IndexMax,
     int? IndexPairCount,
+    string? IndexDescriptorClassification,
     int VertexMeshPayloadOffset,
     int VertexBlockIndex,
     uint? VertexDeclaredPayloadBytes,
@@ -14848,6 +14853,7 @@ internal sealed record NifMeshProbePairing(
     NifMeshStreamRoleStats VertexRoleStats,
     NifMeshProbePositionBoundsReview? VertexPositionBoundsReview,
     NifMeshProbeNormalVectorReview? VertexNormalVectorReview,
+    string? VertexDescriptorClassification,
     NifMeshProbeUvRangeReview? VertexUvRangeReview,
     int VertexCount,
     double IndexCoverageRatio,
@@ -16489,6 +16495,7 @@ internal sealed record NifMeshBindingPairingSample(
     string IndexGhidraBodyFirst16,
     ushort IndexMax,
     int? IndexPairCount,
+    string? IndexDescriptorClassification,
     int VertexMeshPayloadOffset,
     int VertexBlockIndex,
     uint? VertexDeclaredPayloadBytes,
@@ -16498,6 +16505,7 @@ internal sealed record NifMeshBindingPairingSample(
     string VertexTargetFirst16,
     string VertexBodyFirst16,
     string VertexGhidraBodyFirst16,
+    string? VertexDescriptorClassification,
     int VertexCount,
     double IndexCoverageRatio,
     int DataStreamMetadataScore,
