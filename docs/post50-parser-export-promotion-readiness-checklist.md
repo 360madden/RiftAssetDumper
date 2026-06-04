@@ -300,17 +300,21 @@ with cross-record and cross-check validation. Byte-3=0x00 is a universal invaria
 | `pairing-impact-proof` (gate 5) | candidate (strongly) | candidate (strongly) | — |
 | `narrow-parser-patch` (gate 6) | blocked (by design) | blocked (by design) | — |
 
----## Current decision
+---
 
-Three gates have been formally cleared in Phase 7 (M7.1-M7.3): `descriptor-per-block-consistency`
-(replacing retired gate 3), `descriptor-field-order-confirmed` (split from gate 1), and
-`sample-byte-agreement` (gate 4, population-validated at 100% coverage). Gate 5 reframing
-has been documented as a recommendation in the formal decision record (M7.4).
+## Current decision
 
-The remaining gates (1b field-semantics-complete, 2 semantic-map, 5 pairing-impact-proof,
-6 narrow-parser-patch) remain blocked or candidate-only. Both promotion flags must remain false.
+Three gates have been formally cleared in Phase 7 (M7.1-M7.3). Gate 2 (`descriptor-semantic-map`)
+has been advanced to usage-level evidence in M8.2 — all 5 descriptor patterns now have
+usage-level role evidence, including the key finding that `15020100` is an index stream
+descriptor (usage=0). Gate 5 reframing has been documented as a recommendation (M7.4) and
+is pending human review.
 
-**Final tally (M7.4)**: 3 gates CLEARED, 1 gate RETIRED, gate 5 reframing documented, 3 gates remain blocked.
+The remaining gates (1b field-semantics-complete, 2 semantic-map at role-specificity level,
+5 pairing-impact-proof, 6 narrow-parser-patch) remain blocked or candidate-only. Both
+promotion flags must remain false.
+
+**Final tally (M8.2)**: 3 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 5 reframing documented, 3 gates remain blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
 ### M7.4: Formal Decision Record + Gate 5 Reframing
@@ -351,4 +355,4 @@ to human review. Gate 5 remains "candidate (strongly)" in autonomous tracking.
 | `descriptor-semantic-map` (gate 2) | blocked (improved) — 3/5 patterns no role |
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
-See Phase 7 prep: `docs/roadmap/phase7-prep.md` and formal decision record: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`.
+See Phase 7 prep: `docs/roadmap/phase7-prep.md`, Phase 8 prep: `docs/roadmap/phase8-prep.md`, and formal decision record: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`.

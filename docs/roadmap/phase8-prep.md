@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 8 Entry
-**Status**: **ACTIVE** — M8.1 planning (Ghidra byte 1-2 analysis)
+**Status**: **ACTIVE** — M8.2 COMPLETE: role-semantic mapping; gate 2 advanced; M8.1/M8.3 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`
 **Entry**: Phase 7 EXITED — 3 gates CLEARED, 1 RETIRED, gate 5 reframing documented; 49 tests, 58 descriptor lines, 31,777-block population inventory
 
@@ -33,7 +33,7 @@ Resolve the remaining semantic blockers identified in Phase 7:
 | Gate | Status | Blocker | Phase 8 Target |
 |---|---|---|---|
 | `descriptor-field-semantics-complete` (1b) | BLOCKED | Bytes 1-2 unknown | M8.1: Ghidra analysis |
-| `descriptor-semantic-map` (2) | BLOCKED | 3/5 patterns no role | M8.2: Role-semantic mapping |
+| `descriptor-semantic-map` (2) | improved (usage-level) | 4/5 patterns no specific role | M8.2: Usage-level evidence (all 5) |
 | `pairing-impact-proof` (5) | CANDIDATE | attrSets=0 architecture | M8.3: Human review |
 | `narrow-parser-patch` (6) | BLOCKED | Safety brake | Not before M8.4 |
 
@@ -47,13 +47,15 @@ Resolve the remaining semantic blockers identified in Phase 7:
 - If successful: byte-1 and/or byte-2 semantics resolved → gate 1b advances
 - Tools required: Ghidra (`.tools.json` — JDK 21 + Ghidra 12.1 installed)
 
-### M8.2 — Role-Semantic Mapping for Remaining Patterns (PLANNING)
-- Target: map `15 02 01 00`, `10 01 04 00`, `3c 01 04 00` to verified stream roles
-- Approach: cross-reference descriptor patterns with stream Usage/Access values from population inventory
-- Population data available: 31,777 blocks with `DescriptorBytes`, `DescriptorClassification`, `DataStreamUsage`, `DataStreamAccess`
-- Known roles: `37 04 03 00` = position/normal/UV (ror1-float, role-agnostic), `36 04 02 00` = float-vertex-data variant (specific role unknown)
-- If successful: role-semantic gap reduced → gate 2 advances
-- May require: new CLI command or Python script to cross-reference descriptor ↔ stream role at population scale
+- [x] Cross-referenced descriptor patterns with Usage/Access values from population inventory (31,777 blocks aggregate, 16 rep samples)
+- [x] All 5 patterns now have usage-level role evidence:
+  - `37040300` → usage=1 → position/normal/UV (role-agnostic) — MAPPED
+  - `36040200` → usage=1 → float vertex data variant — family-mapped
+  - `15020100` → **usage=0** → index stream descriptor (ucorrected from "u16-vertex-data") — KEY FINDING
+  - `10010400` → usage=1 → vertex data descriptor — family-mapped
+  - `3c010400` → usage=1 → vertex data descriptor — family-mapped
+- [x] Gate 2 (`descriptor-semantic-map`) advanced from "blocked (improved)" to "improved — usage-level evidence for all 5 patterns"
+- [x] 3 patterns gain usage-level semantics (15020100=index, 10010400=vertex, 3c010400=vertex)
 
 ### M8.3 — Gate 5 Reframing Evaluation (PLANNING)
 - Human review of M7.4 recommendation: accept `attrSets=0` as architectural norm
