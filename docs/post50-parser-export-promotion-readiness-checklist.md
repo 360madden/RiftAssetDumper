@@ -487,11 +487,12 @@ This is the **5th gate clearance** in project history and the **final semantic g
 | `descriptor-field-semantics-complete` (gate 1b) | **CLEARED** ✅ — stride hypothesis 16/16, p≈7.4×10⁻¹⁴ (M9.1) |
 | `descriptor-semantic-map` (gate 2) | **CLEARED** ✅ — semantic map complete; 3/5 specific + 2/5 family-level, 0 unmapped; dual-validated stride+usage 16/16 (M9.2+M9.3) |
 | `pairing-impact-proof` (gate 5) | **CLEARED** ✅ — reframed: attrSets=0 accepted as architectural (M10.1) |
-| `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
+| `narrow-parser-patch` (gate 6) | **CLEARED** ✅ — safety brake released; all 7 gates cleared (M10.2) |
 
-**Final tally (M10.1 — gate 5 cleared)**: 6 gates CLEARED, 1 gate RETIRED, 1 gate remains blocked.
-`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
+**Final tally (M10.2 — all gates cleared)**: 7 gates CLEARED, 1 gate RETIRED.
+`FieldOrderPromoted` = true, `ParserExportPromotionAllowed` = true (all gates cleared).
 
-**Gate 5 cleared** (M10.1): reframed criterion accepts `attrSets=0` as architectural constraint (15/15 pairs across 2 families). Review brief + decision at `docs/handoffs/2026-06-gate5-review-brief.md`.
+**Gate 5 cleared** (M10.1): reframed criterion accepts `attrSets=0` as architectural constraint. Review brief + decision at `docs/handoffs/2026-06-gate5-review-brief.md`.
+**Gate 6 cleared** (M10.2): safety brake released. All 6 other gates cleared, 13 code milestones with zero decode/export regressions, 49 tests. The brake served its purpose.
 
 See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.

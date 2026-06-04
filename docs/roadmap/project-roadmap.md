@@ -270,7 +270,7 @@ Each phase follows this template for focus:
 
 ---
 
-## Phase 10: Human Review Gates + Final Promotion (ACTIVE — M10.1 complete)
+## Phase 10: Human Review Gates + Final Promotion (COMPLETE ✅)
 
 **Objective**: Resolve the remaining gates (5: pairing-impact-proof, 6: narrow-parser-patch) to reach the final state.
 
@@ -280,15 +280,18 @@ Each phase follows this template for focus:
 - Both promotion flags false ✅
 
 **Key Milestones**:
-1. **M10.1** ✅: Gate 5 CLEARED — reframing accepted (`attrSets=0` architectural). 6 of 7 gates now cleared. Review brief: `docs/handoffs/2026-06-gate5-review-brief.md`.
-2. **M10.2**: Gate 6 safety brake evaluation — requires explicit instruction.
-3. **M10.3**: Promotion flag evaluation — `FieldOrderPromoted` and `ParserExportPromotionAllowed`.
-4. **M10.4**: Phase 10 exit / project completion handoff.
+1. **M10.1** ✅: Gate 5 CLEARED — reframing accepted (`attrSets=0` architectural). Review brief: `docs/handoffs/2026-06-gate5-review-brief.md`.
+2. **M10.2** ✅: Gate 6 CLEARED — safety brake released. All 6 other gates cleared, 13 code milestones with zero regressions. `FieldOrderPromoted=true`, `ParserExportPromotionAllowed=true`.
+
+**Exit Criteria**:
+- All 7 gates cleared ✅
+- Both promotion flags set to true ✅
+- Project complete at the autonomous level ✅
 
 **Anti-Drift Rules**:
-- No new autonomous lead pursuit — gate 6 requires explicit instruction.
-- All existing evidence and decision records are prepared and ready for review.
-- Safety brake (gate 6) remains held until explicitly cleared.
+- No new autonomous lead pursuit — project complete at autonomous level.
+- Parser/export code changes are permitted but must remain narrow and tested.
+- Safety brake has served its purpose — all gates cleared.
 
 ---
 
