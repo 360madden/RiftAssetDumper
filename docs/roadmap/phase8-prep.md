@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 8 Entry
-**Status**: **ACTIVE** — M8.2 COMPLETE: role-semantic mapping; gate 2 advanced; M8.1/M8.3 planning
+**Status**: **COMPLETE** — Phase 8 EXITED; M8.2 delivered, M8.1/M8.3 deferred to Phase 9
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`
 **Entry**: Phase 7 EXITED — 3 gates CLEARED, 1 RETIRED, gate 5 reframing documented; 49 tests, 58 descriptor lines, 31,777-block population inventory
 
@@ -62,9 +62,10 @@ Resolve the remaining semantic blockers identified in Phase 7:
 - Decision: CLEAR gate 5 on reframed criterion OR explicitly hold gate 5 with documented rationale
 - If CLEARED: 4th gate clearance in Phase 8
 
-### M8.4 — Phase 8 Exit Consolidation (PLANNING)
-- Comprehensive handoff: gates advanced/cleared, semantic findings, Phase 9 entry assessment
-- Cumulative 8-phase progression table
+### M8.4 — Phase 8 Exit Consolidation
+- [x] Exit handoff: `docs/handoffs/2026-06-m8.4-phase8-exit-consolidation.md`
+- [x] Gate 2 advanced; M8.1 (Ghidra) and M8.3 (human review) deferred to Phase 9
+- [x] Phase 9 entry assessment with 6 recommendations
 
 ## Commands
 

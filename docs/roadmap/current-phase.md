@@ -1,9 +1,9 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 8 ACTIVE — M8.2 COMPLETE: role-semantic mapping; gate 2 advanced with usage-level evidence; M8.1/M8.3 planning)
+**Last Updated**: 2026-06 (Phase 8 EXITED — M8.4 handoff created; gate 2 advanced; Phase 9 planning)
 
 ## Current Phase
-**Phase 8: Semantic Gate Clearance**
+**Phase 9: Final Clearance + Consolidation** (planning)
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -46,7 +46,8 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.4** | **COMPLETE** | Console descriptor classification summary in `inventory-nif-stream-headers` output; 23/23 tests |
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
-| **M8.2** | **COMPLETE** | Role-semantic mapping: all 5 patterns have usage-level evidence; `15020100` = index stream; gate 2 advanced |
+| **M8.4** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m8.4-phase8-exit-consolidation.md` |
+| **M8.2** | **COMPLETE** | Role-semantic mapping: all 5 patterns have usage-level evidence |
 | **M7.5** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md` |
 | (prep) | **COMPLETE** | Phase 8 prep: `docs/roadmap/phase8-prep.md` |
 | **M7.4** | **COMPLETE** | Formal decision record; gate 5 reframing recommended |
@@ -94,7 +95,9 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 6)
-**M8.2** — Role-semantic mapping: cross-referenced descriptor patterns with Usage/Access values from 31,777-block population inventory. Key finding: `15020100` appears with usage=0 (index stream descriptor, corrected from "u16-vertex-data"). All 5 patterns now have usage-level role evidence. Gate 2 advanced. M8.1: Ghidra byte 1-2 analysis (planning). See `docs/roadmap/phase8-prep.md`.
+**M8.4** — Phase 8 exit consolidation handoff (`docs/handoffs/2026-06-m8.4-phase8-exit-consolidation.md`): gate 2 advanced, M8.1/M8.3 deferred to Phase 9. Phase 8 EXITED.
+
+**M8.2 complete**: Role-semantic mapping — all 5 patterns have usage-level evidence; `15020100` corrected to index stream descriptor.
 
 **Phase 7 EXITED**: 3 gates CLEARED, 1 RETIRED, gate 5 reframing documented. See `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`.
 
@@ -116,10 +119,11 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 
 **M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
 
-## Next Concrete Actions (Phase 8 M8.1/M8.3)
-1. M8.1: Run Ghidra dry-run to verify tooling; identify byte 1-2 consumption paths
-2. M8.3: Evaluate gate 5 reframing decision (human review of attrSets=0 acceptance)
-3. M8.4: Phase 8 exit consolidation handoff
+## Next Concrete Actions (Phase 9)
+1. Ghidra analysis session: byte 1-2 semantics on `rift_x64.exe` (M8.1 deferred)
+2. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M8.3 deferred
+3. Run `post50-validation-suite` + `generated-output-guard` on current state
+4. Comprehensive project-wide consolidation handoff (all 8 phases)
 
 ## Entry Criteria Met
 - Phase 0 complete.

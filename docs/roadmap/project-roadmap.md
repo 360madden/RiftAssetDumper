@@ -234,7 +234,7 @@ Each phase follows this template for focus:
 4. **M7.4** ✅: Formal decision record per template; gate 5 reframing recommended (accept attrSets=0 architecture).
 5. **M7.5** ✅: Exit handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`.
 
-## Phase 8: Semantic Gate Clearance (ACTIVE — M8.0 prep)
+## Phase 8: Semantic Gate Clearance (COMPLETE — M8.2, M8.4)
 
 **Objective**: Use Ghidra-level analysis and population-cross-referencing to resolve the remaining semantic blockers (bytes 1-2, role mapping for 3/5 patterns) while evaluating the gate 5 reframing decision.
 
@@ -249,6 +249,8 @@ Each phase follows this template for focus:
 3. **M8.3**: Descriptor-to-role population cross-reference (31,777 blocks).
 4. **M8.4**: Gate 5 reframing evaluation (human review).
 5. **M8.5**: Phase 8 exit consolidation handoff.
+
+## Phase 9: Final Clearance + Consolidation (PLANNING)
 
 **Exit Criteria**:
 - At least 1 semantic gate advanced (bytes 1-2 or role mapping).
