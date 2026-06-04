@@ -2047,6 +2047,7 @@ internal static class Program
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
 
     var objVertices = new List<string>();
+    string? positionDescriptor = null;
     var objNormals = new List<string>();
     var objTexCoords = new List<string>();
     var objFaces = new List<string>();
@@ -2079,6 +2080,7 @@ internal static class Program
               .Select(x => x.Candidate)
               .ToList();
           var leadCandidate = orderedCandidates[0];
+          positionDescriptor = leadCandidate.DescriptorClassification;
           var vertexCount = leadCandidate.VertexCount;
           var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
           var positionSamples = BuildNifAttributeFloatVertexSamples(
@@ -2294,6 +2296,7 @@ internal static class Program
       var set = attributeSets[setIndex];
       var vertexCount = set.VertexCount;
       var vertexIndices = Enumerable.Range(0, vertexCount).ToList();
+      positionDescriptor ??= streamSummaries.FirstOrDefault(s => s.TargetBlockIndex == set.PositionBlockIndex)?.DescriptorClassification;
 
       Console.WriteLine($"  Attribute set {setIndex}: vertexCount={vertexCount} confidence={set.Confidence}");
       Console.WriteLine($"    position @{set.PositionMeshPayloadOffset}/#{set.PositionBlockIndex} role={set.PositionRole}");
@@ -2523,6 +2526,10 @@ internal static class Program
       writer.WriteLine($"# Mesh block: #{meshBlock.Index}");
       writer.WriteLine($"# Positions: {objVertices.Count}  Normals: {objNormals.Count}  UVs: {objTexCoords.Count}");
       writer.WriteLine($"# Faces: {objFaces.Count}  (degenerate-bridge UInt16BE strip)");
+      if (positionDescriptor is not null)
+      {
+        writer.WriteLine($"# Position descriptor: {positionDescriptor}");
+      }
       writer.WriteLine();
       foreach (var v in objVertices)
         writer.WriteLine(v);
@@ -2543,6 +2550,10 @@ internal static class Program
       Console.WriteLine($"  Vertices: {objVertices.Count}");
       Console.WriteLine($"  Normals:  {objNormals.Count}");
       Console.WriteLine($"  TexCoords: {objTexCoords.Count}");
+      if (positionDescriptor is not null && !IsFloatDescriptor(positionDescriptor))
+      {
+        Console.WriteLine($"  WARNING: position descriptor is not float-family: {positionDescriptor}");
+      }
       Console.WriteLine($"  Faces: {objFaces.Count}");
     }
 
