@@ -1962,7 +1962,15 @@ internal static class Program
     Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} ghidraPairings={report.GhidraPairings:N0} attributeSets={report.AttributeSets:N0}");
     foreach (var mesh in meshes.Take(8))
     {
-      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}"))}");
+      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}{FormatNifDescriptorClassificationInline(s.DescriptorClassification)}"))}");
+      foreach (var stream in mesh.Streams)
+      {
+        var warning = CheckDescriptorRoleConsistency(stream.RoleStats.PrimaryRole, stream.DescriptorClassification);
+        if (warning is not null)
+        {
+          Console.WriteLine($"  WARNING: #{stream.TargetBlockIndex} @{stream.MeshPayloadOffset}: {warning}");
+        }
+      }
       foreach (var pairing in mesh.Pairings.Take(5))
       {
         Console.WriteLine($"  pairing index@{pairing.IndexMeshPayloadOffset}/#{pairing.IndexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.IndexDataStreamUsage, pairing.IndexDataStreamAccess)} {pairing.IndexRole} max={pairing.IndexMax} -> stream@{pairing.VertexMeshPayloadOffset}/#{pairing.VertexBlockIndex}{FormatNifDataStreamUsageAccessInline(pairing.VertexDataStreamUsage, pairing.VertexDataStreamAccess)} {pairing.VertexRole} vertexCount={pairing.VertexCount} coverage={pairing.IndexCoverageRatio:0.####} meta={pairing.DataStreamMetadataScore} confidence={pairing.Confidence}");
@@ -3501,7 +3509,9 @@ internal static class Program
                   .OrderBy(static c => PreferredStrideRank(c.Stride))
                   .ThenBy(static c => c.Stride)
                   .Take(12)
-                  .ToList()));
+                  .ToList(),
+          DescriptorBytes: layout.DescriptorBytes,
+          DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes)));
     }
 
     if (options.StreamBlockFilter is not null && streamBodies.Count == 0)
@@ -3529,7 +3539,7 @@ internal static class Program
       var strideText = stream.PreferredStrideCandidates.Count == 0
           ? "none"
           : FormatPreferredStrideSummary(stream.PreferredStrideCandidates, max: 6);
-      Console.WriteLine($"Stream #{stream.BlockIndex} size={stream.BlockSize:N0} payload={stream.DeclaredPayloadBytes} header={stream.HeaderBytes} prefix={stream.PayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} trailer={stream.PayloadTrailerBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} flag={stream.TrailingFlag?.ToString(CultureInfo.InvariantCulture) ?? "-"} shifted={stream.LegacyOffsetMinusPayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} class={stream.Stats?.Classification ?? "invalid"} ghidraClass={stream.GhidraStats?.Classification ?? "-"} strides={strideText}");
+      Console.WriteLine($"Stream #{stream.BlockIndex} size={stream.BlockSize:N0} payload={stream.DeclaredPayloadBytes} header={stream.HeaderBytes} prefix={stream.PayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} trailer={stream.PayloadTrailerBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} flag={stream.TrailingFlag?.ToString(CultureInfo.InvariantCulture) ?? "-"} shifted={stream.LegacyOffsetMinusPayloadPrefixBytes?.ToString(CultureInfo.InvariantCulture) ?? "-"} class={stream.Stats?.Classification ?? "invalid"} ghidraClass={stream.GhidraStats?.Classification ?? "-"}{FormatNifDescriptorClassificationInline(stream.DescriptorClassification)} strides={strideText}");
       Console.WriteLine($"  body first16={stream.BodyFirst128[..Math.Min(32, stream.BodyFirst128.Length)]}");
       Console.WriteLine($"  u16le={string.Join(",", stream.UInt16Prefix.Take(12))}");
       Console.WriteLine($"  u16be={string.Join(",", stream.UInt16BigEndianPrefix.Take(12))}");
@@ -4294,7 +4304,9 @@ internal static class Program
                   MaybeStringIndex: candidate.MaybeStringIndex,
                   StringValue: candidate.StringValue,
                   RoleStats: roleStats,
-                  GhidraRoleStats: ghidraRoleStats);
+                  GhidraRoleStats: ghidraRoleStats,
+                  DescriptorBytes: layout.DescriptorBytes,
+                  DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes));
               streamSummaries.Add(summary);
 
               var usageAccessKey = FormatNifDataStreamUsageAccessKey(summary.DataStreamUsage, summary.DataStreamAccess);
@@ -5553,6 +5565,9 @@ internal static class Program
             var declaredPayload = blockPayload.Slice(declaredPayloadOffset, checked((int)declaredPayloadBytes));
             var strideCandidates = FindWholeBlockStrideCandidates(declaredPayload.Length);
             var usageAccessKey = FormatNifDataStreamUsageAccessKey(block.DataStreamUsage, block.DataStreamAccess);
+            var descriptorBytes = blockPayload.Length >= 28
+                ? ToHex(blockPayload.Slice(24, 4))
+                : null;
             var sample = new NifStreamHeaderSample(
                 ArchiveName: archiveName,
                 EntryIndex: entry.Index,
@@ -5568,7 +5583,9 @@ internal static class Program
                 DeclaredPayloadBytes: declaredPayloadBytes,
                 HeaderBytes: headerBytes,
                 PayloadFirst16: ToHex(declaredPayload[..Math.Min(16, declaredPayload.Length)]),
-                PayloadStrideCandidates: strideCandidates);
+                PayloadStrideCandidates: strideCandidates,
+                DescriptorBytes: descriptorBytes,
+                DescriptorClassification: ClassifyNifDescriptor(descriptorBytes));
 
             if (!headerGroups.TryGetValue(headerBytes, out var headerGroup))
             {
@@ -5687,6 +5704,17 @@ internal static class Program
           Samples: family.Samples);
     }
 
+    var descriptorClassCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    foreach (var group in headerGroups.Values)
+    {
+      foreach (var sample in group.Samples)
+      {
+        var dc = sample.DescriptorClassification ?? "(unclassified)";
+        descriptorClassCounts.TryGetValue(dc, out var cur);
+        descriptorClassCounts[dc] = cur + 1;
+      }
+    }
+
     var report = new NifStreamHeaderInventoryReport(
         RootDirectory: rootDirectory,
         ManifestPath: manifestPath,
@@ -5715,6 +5743,11 @@ internal static class Program
             .ThenBy(static f => f.BlockSize)
             .ThenBy(static f => f.DeclaredPayloadBytes)
             .Take(options.Limit > 0 ? options.Limit : 100)
+            .ToList(),
+        DescriptorClassificationGroups: descriptorClassCounts
+            .OrderByDescending(static kvp => kvp.Value)
+            .ThenBy(static kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static kvp => new NifStringCount(kvp.Key, kvp.Value))
             .ToList());
 
     var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-stream-header-inventory.json");
@@ -5730,6 +5763,7 @@ internal static class Program
     Console.WriteLine($"Top usage/access: {string.Join(", ", report.UsageAccessGroups.Take(8).Select(static g => $"{FormatNifDataStreamUsageAccessKey(g.DataStreamUsage, g.DataStreamAccess)}={g.Count:N0}"))}");
     Console.WriteLine($"Top header byte counts: {string.Join(", ", report.HeaderGroups.Take(8).Select(static g => $"{g.HeaderBytes}={g.Count:N0}"))}");
     Console.WriteLine($"Top stream families: {string.Join(" | ", report.TopFamilies.Take(5).Select(static f => $"size={f.BlockSize}/payload={f.DeclaredPayloadBytes}/header={f.HeaderBytes}{FormatNifDataStreamUsageAccessInline(f.DataStreamUsage, f.DataStreamAccess)} count={f.Count:N0}"))}");
+    Console.WriteLine($"Descriptor classifications: {string.Join(", ", report.DescriptorClassificationGroups.Take(8).Select(static g => $"{g.Value}={g.Count:N0}"))}");
     Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
     return failed == 0 ? 0 : 2;
   }
@@ -5868,7 +5902,9 @@ internal static class Program
                 PayloadFirst16: stats.First16,
                 GhidraPayloadFirst16: ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]),
                 GhidraStats: ghidraStats,
-                Stats: stats);
+                Stats: stats,
+                DescriptorBytes: layout.DescriptorBytes,
+                DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes));
 
             if (!sizeGroups.TryGetValue(declaredPayloadBytes, out var sizeGroup))
             {
@@ -9653,7 +9689,8 @@ internal static class Program
           TrailingFlag: null,
           GhidraStyleLayoutValid: false,
           LegacyOffsetMinusPayloadPrefixBytes: null,
-          Warning: "stream-block-too-small");
+          Warning: "stream-block-too-small",
+          DescriptorBytes: null);
     }
 
     var declaredPayloadBytes = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload[..4]);
@@ -9671,7 +9708,8 @@ internal static class Program
           TrailingFlag: null,
           GhidraStyleLayoutValid: false,
           LegacyOffsetMinusPayloadPrefixBytes: null,
-          Warning: "declared-payload-past-block");
+          Warning: "declared-payload-past-block",
+          DescriptorBytes: null);
     }
 
     var legacyPayloadOffset = blockPayload.Length - checked((int)declaredPayloadBytes);
@@ -9739,6 +9777,16 @@ internal static class Program
     var ghidraStyleLayoutValid = payloadPrefixBytes is not null &&
         payloadTrailerBytes == 1 &&
         trailingFlag is 0 or 1;
+    var rawDescriptorBytes = blockPayload.Length >= 28
+        ? ToHex(blockPayload.Slice(24, 4))
+        : null;
+    if (blockPayload.Length >= 28 && blockPayload[27] != 0x00)
+    {
+      warning = warning is null
+          ? "descriptor-byte-3-nonzero"
+          : warning + "; descriptor-byte-3-nonzero";
+    }
+
     return new NifDataStreamLayout(
         DeclaredPayloadBytes: declaredPayloadBytes,
         ValidDeclaredPayload: true,
@@ -9751,7 +9799,8 @@ internal static class Program
         TrailingFlag: trailingFlag,
         GhidraStyleLayoutValid: ghidraStyleLayoutValid,
         LegacyOffsetMinusPayloadPrefixBytes: payloadPrefixBytes is null ? null : legacyPayloadOffset - payloadPrefixBytes.Value,
-        Warning: warning);
+        Warning: warning,
+        DescriptorBytes: rawDescriptorBytes);
   }
 
   private static ReadOnlySpan<byte> SliceNifDataStreamLegacyBody(ReadOnlySpan<byte> blockPayload, NifDataStreamLayout layout)
@@ -10758,6 +10807,81 @@ internal static class Program
     return "other";
   }
 
+
+  private static string FormatNifDescriptorClassificationInline(string? classification)
+  {
+    if (string.IsNullOrWhiteSpace(classification))
+    {
+      return string.Empty;
+    }
+
+    return $" desc={classification}";
+  }
+
+  internal static string? CheckDescriptorRoleConsistency(string? primaryRole, string? descriptorClassification)
+  {
+    if (string.IsNullOrWhiteSpace(primaryRole) || string.IsNullOrWhiteSpace(descriptorClassification))
+    {
+      return null;
+    }
+
+    var isFloatRole = primaryRole.StartsWith("position", StringComparison.OrdinalIgnoreCase)
+        || primaryRole.StartsWith("normal", StringComparison.OrdinalIgnoreCase)
+        || primaryRole.StartsWith("uv", StringComparison.OrdinalIgnoreCase);
+    var isIndexRole = primaryRole.StartsWith("index", StringComparison.OrdinalIgnoreCase);
+    var isFloatDescriptor = descriptorClassification.Contains("ror1-float", StringComparison.OrdinalIgnoreCase)
+        || descriptorClassification.Contains("float-vertex-data", StringComparison.OrdinalIgnoreCase);
+    var isU16Descriptor = descriptorClassification.Contains("u16-vertex-data", StringComparison.OrdinalIgnoreCase);
+
+    if (isFloatRole && isU16Descriptor)
+    {
+      return $"descriptor-role-mismatch: float role ({primaryRole}) with u16 descriptor ({descriptorClassification})";
+    }
+
+    if (isIndexRole && isFloatDescriptor)
+    {
+      return $"descriptor-role-mismatch: index role ({primaryRole}) with float descriptor ({descriptorClassification})";
+    }
+
+    return null;
+  }
+  internal static string? ClassifyNifDescriptorByByte0(string? descriptorBytes)
+  {
+    if (string.IsNullOrWhiteSpace(descriptorBytes) || descriptorBytes.Length < 2)
+    {
+      return null;
+    }
+
+    var byte0 = descriptorBytes[..2];
+    return byte0 switch
+    {
+      "37" => "ror1-float family (byte0=0x37)",
+      "36" => "float-vertex-data family (byte0=0x36)",
+      "15" => "u16-vertex-data family (byte0=0x15, candidate)",
+      "10" => "unknown family (byte0=0x10, candidate)",
+      "3c" => "unknown family (byte0=0x3c, candidate)",
+      _ => null
+    };
+  }
+
+  internal static string? ClassifyNifDescriptor(string? descriptorBytes)
+  {
+    if (string.IsNullOrWhiteSpace(descriptorBytes))
+    {
+      return null;
+    }
+
+    return descriptorBytes switch
+    {
+      "37040300" => "ror1-float (generic float vertex data)",
+      "36040200" => "float-vertex-data (encoding variant)",
+      "15020100" => "unknown-role (candidate)",
+      "10010400" => "unknown-role (candidate)",
+      "3c010400" => "unknown-role (candidate)",
+      _ => ClassifyNifDescriptorByByte0(descriptorBytes)
+    };
+  }
+
   private static string? GetNifGhidraPairingReviewKind(
       string status,
       NifMeshBindingPairingSample? legacyPairing,
@@ -11046,7 +11170,9 @@ internal static class Program
           MaybeStringIndex: candidate.MaybeStringIndex,
           StringValue: candidate.StringValue,
           RoleStats: roleStats,
-          GhidraRoleStats: ghidraRoleStats));
+          GhidraRoleStats: ghidraRoleStats,
+          DescriptorBytes: layout.DescriptorBytes,
+          DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes)));
     }
 
     return streamSummaries;
@@ -15093,7 +15219,8 @@ internal sealed record NifDataStreamLayout(
     byte? TrailingFlag,
     bool GhidraStyleLayoutValid,
     int? LegacyOffsetMinusPayloadPrefixBytes,
-    string? Warning);
+    string? Warning,
+    string? DescriptorBytes);
 
 internal sealed record NifStreamBodyProbe(
     int BlockIndex,
@@ -15123,7 +15250,9 @@ internal sealed record NifStreamBodyProbe(
     List<NifUInt16Triple> UInt16TriplesPrefix,
     List<NifUInt16Triple> UInt16BigEndianTriplesPrefix,
     NifUInt16TriplesStructure UInt16TriplesStructure,
-    List<StrideCandidate> PreferredStrideCandidates);
+    List<StrideCandidate> PreferredStrideCandidates,
+    string? DescriptorBytes,
+    string? DescriptorClassification);
 
 internal sealed record NifFloat2(int Index, float? X, float? Y);
 
@@ -16338,7 +16467,9 @@ internal sealed record NifMeshBoundStreamSummary(
     bool MaybeStringIndex,
     string? StringValue,
     NifMeshStreamRoleStats RoleStats,
-    NifMeshStreamRoleStats? GhidraRoleStats);
+    NifMeshStreamRoleStats? GhidraRoleStats,
+    string? DescriptorBytes,
+    string? DescriptorClassification);
 
 internal sealed record NifMeshBindingPairingSample(
     string ArchiveName,
@@ -16534,7 +16665,8 @@ internal sealed record NifStreamHeaderInventoryReport(
     int InvalidDeclaredPayloadBlocks,
     List<NifDataStreamUsageAccessGroup> UsageAccessGroups,
     List<NifStreamHeaderGroup> HeaderGroups,
-    List<NifStreamHeaderFamilyGroup> TopFamilies);
+    List<NifStreamHeaderFamilyGroup> TopFamilies,
+    List<NifStringCount> DescriptorClassificationGroups);
 
 internal sealed record NifStreamHeaderGroup(
     int HeaderBytes,
@@ -16579,7 +16711,9 @@ internal sealed record NifStreamHeaderSample(
     uint DeclaredPayloadBytes,
     int HeaderBytes,
     string PayloadFirst16,
-    List<StrideCandidate> PayloadStrideCandidates);
+    List<StrideCandidate> PayloadStrideCandidates,
+    string? DescriptorBytes,
+    string? DescriptorClassification);
 
 internal sealed class NifDataStreamUsageAccessAccumulator(string? dataStreamUsage, string? dataStreamAccess)
 {
@@ -16675,7 +16809,9 @@ internal sealed record NifStreamBodySample(
     string PayloadFirst16,
     string GhidraPayloadFirst16,
     NifStreamBodyStats? GhidraStats,
-    NifStreamBodyStats Stats);
+    NifStreamBodyStats Stats,
+    string? DescriptorBytes,
+    string? DescriptorClassification);
 
 internal sealed record NifStreamBodyStats(
     int ByteLength,
