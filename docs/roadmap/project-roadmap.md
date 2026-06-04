@@ -130,49 +130,58 @@ Each phase follows this template for focus:
 
 ---
 
-## Phase 3: Parser Component Implementation & Guard Hardening
+## Phase 3: NiDataStream Descriptor Propagation (COMPLETE)
 
-**Objective**: Convert proven evidence into working, guarded C# parser components (experimental first, then hardened).
+**Objective**: Propagate DescriptorBytes + DescriptorClassification fields across all 6 NiDataStream record types so every probe and inventory command emits descriptor data. No behavioral changes — classification is purely informational with both promotion flags held false.
 
 **Entry Criteria**:
-- Phase 2 has sufficient binding + descriptor truth for at least one core path (e.g., 329-family position sources).
+- Phase 2 exit complete with per-block-embedded descriptors, 5 patterns, binding reuse proven.
+- Both promotion flags intentionally false.
 
 **Key Milestones**:
-1. M3.1: Implement experimental position/normal/UV resolution using proven bindings.
-2. M3.2: Add strict proof guards that block promotion on unproven paths.
-3. M3.3: End-to-end validation on a growing set of verified meshes.
-4. M3.4: Topology validation (maxIndex < vertexCount, strip/list behavior).
+1. **M3.1**: Decision record + core implementation — NifDataStreamLayout.DescriptorBytes, ClassifyNifDescriptor(), NifMeshBoundStreamSummary fields; 5 xUnit tests; live-verified on mesh#7/#34.
+2. **M3.2**: NifStreamHeaderSample + inventory-nif-stream-headers descriptor propagation; 5-pattern distribution verified across 16 samples.
+3. **M3.3**: NifMeshBindingStreamSample auto-inherits descriptor fields from M3.1 (COVERED).
+4. **M3.4**: NifStreamBodySample + inventory-nif-stream-bodies descriptor propagation.
+5. **M3.5**: NifStreamBodyProbe + probe-nif-stream-body descriptor propagation.
 
 **Exit Criteria**:
-- Working decode path for at least the strongest families.
-- All promotion-sensitive code protected by guards.
-- Comprehensive test suite + negative fixtures.
+- All 6 NiDataStream record types carry DescriptorBytes + DescriptorClassification.
+- CI green: build 0 errors, 17/17 tests pass, format PASS.
+- Both promotion flags still false.
+- Exit handoff: docs/handoffs/2026-06-m3.5-phase3-exit-consolidation.md.
+
+**Anti-Drift Rules**:
+- No behavioral changes — classification is informational only.
+- No promotion flag changes.
+- Every record type change must match existing field patterns.
+
+## Phase 4: Descriptor-Aware Parser (ACTIVE — M4.1-M4.5 COMPLETE, M4.6 ACTIVE)
+
+**Objective**: Consume Phase 3 descriptor data for parser behavioral changes — integrity checks, classification coverage, console visibility, and role cross-checks — while maintaining the candidate-only safety boundary and promotion gate discipline.
+
+**Entry Criteria**:
+- Phase 3 exit complete with all 6 record types carrying descriptor fields.
+- Descriptor facts established: per-block embedded, 4-byte structure, byte-3=0x00, 5 patterns.
+
+**Key Milestones**:
+1. **M4.1**: Byte-3 != 0x00 integrity check in AnalyzeNifDataStreamLayout — warns on anomaly; verified at scale (0/375 warnings).
+2. **M4.2**: Byte-0 fallback classification (ClassifyNifDescriptorByByte0) — 5 family labels; verified 16/16 classified, 0 nulls.
+3. **M4.3**: DescriptorClassificationGroups distribution in inventory JSON report.
+4. **M4.4**: Console descriptor classification summary in inventory-nif-stream-headers output.
+5. **M4.5**: Descriptor-role cross-check in probe-nif-mesh — warns on float/u16 mismatches.
+6. **M4.6**: Descriptor classification in probe-nif-stream-body console output.
+
+**Exit Criteria**:
+- At least 6 narrow, tested, descriptor-consuming behavioral changes delivered.
+- CI green throughout: build 0 errors, 29/29 tests pass, format PASS.
+- Both promotion flags still false.
+- All changes are guarded, informational, or warning-only — no decode/export path changes.
 
 **Anti-Drift**:
-- No speculative OBJ export work until this phase's guards are green.
-- Every parser change must have a corresponding guard update or test.
-
----
-
-## Phase 4: Promotion Readiness & Controlled Release
-
-**Objective**: Pass the defined promotion gates and enable limited, documented parser/export behavior for verified geometry only.
-
-**Entry Criteria**:
-- Phase 3 complete with strong evidence on at least one major family.
-
-**Key Milestones**:
-1. M4.1: Execute full `nidatastream-promotion-preflight` + decision template for first candidate.
-2. M4.2: Controlled promotion for base geometry (position sources + bindings) on proven families only.
-3. M4.3: Update all downstream consumers and documentation.
-4. M4.4: Establish ongoing monitoring for drift/regression.
-
-**Exit Criteria**:
-- First parser/export promotion approved and documented via decision template.
-- Clear "what is promoted vs still candidate-only" boundaries.
-- Repo can safely produce verified geometry for a subset of assets.
-
----
+- Every behavioral change must be narrow, tested, and guarded by proof-gate checks.
+- No parser/export promotion without completed decision record.
+- Both FieldOrderPromoted and ParserExportPromotionAllowed remain false.
 
 ## Phase 5: Stabilization, Documentation & Sustainable Operations
 
