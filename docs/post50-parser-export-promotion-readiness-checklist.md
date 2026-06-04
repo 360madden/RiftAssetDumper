@@ -489,7 +489,9 @@ This is the **5th gate clearance** in project history and the **final semantic g
 | `pairing-impact-proof` (gate 5) | candidate (strongly) — reframing recommended (M7.4) |
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
-**Final tally (M9.3 — gate 2 cleared)**: 5 gates CLEARED, 1 gate RETIRED, gate 5 reframing documented, 1 gate remains blocked.
+**Final tally (M9.4 — Phase 9 exited)**: 5 gates CLEARED, 1 gate RETIRED, gate 5 reframing documented and awaiting human review, 1 gate remains blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
+
+**Gate 5 review brief** (awaiting human decision): `docs/handoffs/2026-06-gate5-review-brief.md` — concise standalone document with current 5-gate-cleared state, attrSets=0 architectural evidence, and decision options.
 
 See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.
