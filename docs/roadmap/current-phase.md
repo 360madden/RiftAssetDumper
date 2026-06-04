@@ -33,7 +33,7 @@
 
 ---
 
-## Next Actions (Phase 10)
+## Completed Actions (Phase 10)
 
 | # | Action | Status | Reference |
 |---|---|---|---|
@@ -47,6 +47,7 @@
 
 | Document | Path |
 |---|---|
+| **Final project completion** | `docs/handoffs/2026-06-project-completion-final-handoff.md` |
 | Project roadmap | `docs/roadmap/project-roadmap.md` |
 | Gate 5 review brief | `docs/handoffs/2026-06-gate5-review-brief.md` |
 | Phase 9 exit handoff | `docs/handoffs/2026-06-m9.4-phase9-exit-consolidation.md` |

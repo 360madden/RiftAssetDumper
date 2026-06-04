@@ -288,6 +288,9 @@ Each phase follows this template for focus:
 - Both promotion flags set to true ✅
 - Project complete at the autonomous level ✅
 
+**Required Artifacts**:
+- Final project completion handoff: `docs/handoffs/2026-06-project-completion-final-handoff.md` ✅
+
 **Anti-Drift Rules**:
 - No new autonomous lead pursuit — project complete at autonomous level.
 - Parser/export code changes are permitted but must remain narrow and tested.
