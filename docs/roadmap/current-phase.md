@@ -1,9 +1,9 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 7 EXITED — M7.5 handoff created; 3 gates cleared, 1 retired; Phase 8 planning)
+**Last Updated**: 2026-06 (Phase 8 ACTIVE — Phase 8 prep created; M8.1 planning: Ghidra byte 1-2 analysis)
 
 ## Current Phase
-**Phase 8: Semantic Gate Clearance** (planning)
+**Phase 8: Semantic Gate Clearance**
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -47,6 +47,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
 | **M7.5** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md` |
+| (prep) | **COMPLETE** | Phase 8 prep: `docs/roadmap/phase8-prep.md` |
 | **M7.4** | **COMPLETE** | Formal decision record; gate 5 reframing recommended |
 | **M7.3** | **COMPLETE** | Full-population inventory (100% coverage); gate 4 CLEARED |
 | **M7.2** | **COMPLETE** | Gate 1 split: `descriptor-field-order-confirmed` CLEARED, `descriptor-field-semantics-complete` BLOCKED |
@@ -92,9 +93,9 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 6)
-**M7.5** — Phase 7 exit consolidation handoff (`docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`): 7-part capstone; 3 gates cleared, 1 retired, gate 5 reframing documented. Phase 7 EXITED.
+**M8.1** — Ghidra-level byte 1-2 analysis (planning): target what descriptor bytes 1 and 2 encode (element width? component count? stride hint?). Uses existing Ghidra tooling (JDK 21 + Ghidra 12.1). See `docs/roadmap/phase8-prep.md`.
 
-**M7.4 complete**: Formal decision record + gate 5 reframing recommendation (not autonomously actioned).
+**Phase 7 EXITED**: 3 gates CLEARED, 1 RETIRED, gate 5 reframing documented. See `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`.
 
 **M6.2 complete**: Formal re-evaluation of all 6 promotion gates against Phase 3-6 evidence (10 descriptor-consuming milestones). 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), gate 6 safety brake held. **0 gates cleared**. Both flags false. See `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`.
 
@@ -114,11 +115,10 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 
 **M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
 
-## Next Concrete Actions (Phase 8)
-1. Create Phase 8 prep doc scoping semantic gate clearance (bytes 1-2, role mapping)
-2. Ghidra-level analysis of byte-1/byte-2 semantics (gate 1b)
-3. Role-semantic mapping for remaining 3/5 descriptor patterns (gate 2)
-4. Human review of gate 5 reframing (attrSets=0 acceptance)
+## Next Concrete Actions (Phase 8 M8.1)
+1. Run Ghidra dry-run to verify tooling: `python scripts/rift_workflow.py ghidra-dry-run`
+2. Identify NiDataStream registry/reading code paths in Ghidra for byte 1-2 consumption
+3. If byte 1-2 semantics resolved, advance gate 1b (`descriptor-field-semantics-complete`)
 
 ## Entry Criteria Met
 - Phase 0 complete.
