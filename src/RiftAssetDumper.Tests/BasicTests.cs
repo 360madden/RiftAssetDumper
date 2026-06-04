@@ -550,4 +550,59 @@ public class BasicTests
     Assert.Null(result);
   }
 
+
+  [Theory]
+  [InlineData(80, "ror1-float family (byte0=0x37)", "position-float3-ror1-lead", 85)]
+  [InlineData(95, "ror1-float family (byte0=0x37)", "normal-float3-ror1-lead", 100)]
+  [InlineData(50, "float-vertex-data family (byte0=0x36)", "uv-float2-ror1-lead", 55)]
+  public void AdjustConfidenceByDescriptor_FloatMatch_Boosts(int confidence, string descriptor, string role, int expected)
+  {
+    var result = Program.AdjustConfidenceByDescriptor(confidence, descriptor, role);
+    Assert.Equal(expected, result);
+  }
+
+  [Theory]
+  [InlineData(80, "u16-vertex-data family (byte0=0x15, candidate)", "position-float3-ror1-lead", 70)]
+  [InlineData(5, "u16-vertex-data family (byte0=0x15, candidate)", "normal-float3-ror1-lead", 0)]
+  public void AdjustConfidenceByDescriptor_FloatRoleU16Descriptor_Dampens(int confidence, string descriptor, string role, int expected)
+  {
+    var result = Program.AdjustConfidenceByDescriptor(confidence, descriptor, role);
+    Assert.Equal(expected, result);
+  }
+
+  [Fact]
+  public void AdjustConfidenceByDescriptor_NullDescriptor_NoChange()
+  {
+    var result = Program.AdjustConfidenceByDescriptor(80, null, "position-float3-ror1-lead");
+    Assert.Equal(80, result);
+  }
+
+  [Fact]
+  public void AdjustConfidenceByDescriptor_UnknownDescriptor_NoChange()
+  {
+    var result = Program.AdjustConfidenceByDescriptor(80, "unknown family (byte0=0x10, candidate)", "position-float3-ror1-lead");
+    Assert.Equal(80, result);
+  }
+
+  [Fact]
+  public void AdjustConfidenceByDescriptor_IndexRole_NoChange()
+  {
+    var result = Program.AdjustConfidenceByDescriptor(80, "u16-vertex-data family (byte0=0x15, candidate)", "index-u16be-strip-lead");
+    Assert.Equal(80, result);
+  }
+
+  [Fact]
+  public void AdjustConfidenceByDescriptor_CapsAt100()
+  {
+    var result = Program.AdjustConfidenceByDescriptor(98, "ror1-float family (byte0=0x37)", "position-float3-ror1-lead");
+    Assert.Equal(100, result);
+  }
+
+  [Fact]
+  public void AdjustConfidenceByDescriptor_FloorsAt0()
+  {
+    var result = Program.AdjustConfidenceByDescriptor(3, "u16-vertex-data family (byte0=0x15, candidate)", "position-float3-ror1-lead");
+    Assert.Equal(0, result);
+  }
+
 }

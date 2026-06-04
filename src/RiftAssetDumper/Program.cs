@@ -10673,6 +10673,8 @@ internal static class Program
           confidence = Math.Min(100, confidence + 10);
         }
 
+        confidence = AdjustConfidenceByDescriptor(confidence, vertexStream.DescriptorClassification, vertexStream.RoleStats.PrimaryRole);
+
         var dataStreamMetadataScore = GetNifDataStreamMetadataScore(indexStream, vertexStream);
         var coverageRatio = compatibleVertexCount == 0 ? 0 : Math.Round((maxIndex + 1) / (double)compatibleVertexCount, 4);
         pairings.Add(new NifMeshBindingPairingSample(
@@ -10820,6 +10822,27 @@ internal static class Program
     return $" desc={classification}";
   }
 
+  private static bool IsFloatRole(string? role)
+  {
+    return role is not null && (
+        role.StartsWith("position", StringComparison.OrdinalIgnoreCase)
+        || role.StartsWith("normal", StringComparison.OrdinalIgnoreCase)
+        || role.StartsWith("uv", StringComparison.OrdinalIgnoreCase));
+  }
+
+  private static bool IsFloatDescriptor(string? descriptor)
+  {
+    return descriptor is not null && (
+        descriptor.Contains("ror1-float", StringComparison.OrdinalIgnoreCase)
+        || descriptor.Contains("float-vertex-data", StringComparison.OrdinalIgnoreCase));
+  }
+
+  private static bool IsU16Descriptor(string? descriptor)
+  {
+    return descriptor is not null
+        && descriptor.Contains("u16-vertex-data", StringComparison.OrdinalIgnoreCase);
+  }
+
   internal static string? CheckDescriptorRoleConsistency(string? primaryRole, string? descriptorClassification)
   {
     if (string.IsNullOrWhiteSpace(primaryRole) || string.IsNullOrWhiteSpace(descriptorClassification))
@@ -10827,13 +10850,10 @@ internal static class Program
       return null;
     }
 
-    var isFloatRole = primaryRole.StartsWith("position", StringComparison.OrdinalIgnoreCase)
-        || primaryRole.StartsWith("normal", StringComparison.OrdinalIgnoreCase)
-        || primaryRole.StartsWith("uv", StringComparison.OrdinalIgnoreCase);
-    var isIndexRole = primaryRole.StartsWith("index", StringComparison.OrdinalIgnoreCase);
-    var isFloatDescriptor = descriptorClassification.Contains("ror1-float", StringComparison.OrdinalIgnoreCase)
-        || descriptorClassification.Contains("float-vertex-data", StringComparison.OrdinalIgnoreCase);
-    var isU16Descriptor = descriptorClassification.Contains("u16-vertex-data", StringComparison.OrdinalIgnoreCase);
+    var isFloatRole = IsFloatRole(primaryRole);
+    var isIndexRole = primaryRole is not null && primaryRole.StartsWith("index", StringComparison.OrdinalIgnoreCase);
+    var isFloatDescriptor = IsFloatDescriptor(descriptorClassification);
+    var isU16Descriptor = IsU16Descriptor(descriptorClassification);
 
     if (isFloatRole && isU16Descriptor)
     {
@@ -10846,6 +10866,30 @@ internal static class Program
     }
 
     return null;
+  }
+
+  internal static int AdjustConfidenceByDescriptor(int confidence, string? vertexDescriptor, string? vertexRole)
+  {
+    if (string.IsNullOrWhiteSpace(vertexDescriptor) || string.IsNullOrWhiteSpace(vertexRole))
+    {
+      return confidence;
+    }
+
+    var isFloatRole = IsFloatRole(vertexRole);
+    var isFloatDescriptor = IsFloatDescriptor(vertexDescriptor);
+    var isU16Descriptor = IsU16Descriptor(vertexDescriptor);
+
+    if (isFloatRole && isFloatDescriptor)
+    {
+      return Math.Min(100, confidence + 5);
+    }
+
+    if (isFloatRole && isU16Descriptor)
+    {
+      return Math.Max(0, confidence - 10);
+    }
+
+    return confidence;
   }
   internal static string? ClassifyNifDescriptorByByte0(string? descriptorBytes)
   {
