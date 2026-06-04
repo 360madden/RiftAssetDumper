@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 7 Entry
-**Status**: **ACTIVE** — M7.4 COMPLETE: formal decision record + gate 5 reframing; M7.5 planning
+**Status**: **COMPLETE** — Phase 7 EXITED; M7.1-M7.5 delivered; 3 gates cleared
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`
 **Entry**: Phase 6 EXITED — descriptor-validated export complete (M6.1-M6.3); 58 descriptor code lines, 49 tests, 6 record types, 0 decode/export changes across 13 milestones
 
@@ -59,10 +59,12 @@ Convert the 18-milestone cumulative evidence (Phases 2-6) into explicit promotio
 - [x] Deliberate restraint: reframing not autonomously actioned — deferred to human review
 - [x] Both promotion flags confirmed false; all negative checks passed
 
-### M7.5 — Phase 7 Exit Consolidation (PLANNING)
-- Comprehensive handoff: 3 gates cleared, 1 retired, gate 5 reframing documented
-- Phase 8 entry assessment: semantic-level gates (1b bytes 1-2, 2 role semantics)
-- Cumulative 7-phase progression table
+### M7.5 — Phase 7 Exit Consolidation
+- [x] Comprehensive 7-part handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`
+- [x] 3 gates cleared, 1 retired, gate 5 reframing documented
+- [x] Cumulative 7-phase progression table
+- [x] Phase 8 entry assessment with 6 concrete recommendations
+- Phase 8 entry: Semantic Gate Clearance (bytes 1-2, role mapping)
 
 ## Commands
 
@@ -79,7 +81,7 @@ dotnet format RiftAssetDumper.slnx --verify-no-changes
 - [ ] `dotnet format --verify-no-changes` clean
 - [ ] `FieldOrderPromoted` still false (gate 6 blocks)
 - [ ] `ParserExportPromotionAllowed` still false (gate 6 blocks)
-- [x] At least 1 gate formally retired or cleared (3 cleared + 1 retired in M7.1-M7.3)
+- [x] At least 1 gate formally retired or cleared (3 cleared + 1 retired in M7.1-M7.4)
 - [x] All gate changes traceable to specific Phase 2-6 evidence
 
 ## Gate Clearance Strategy

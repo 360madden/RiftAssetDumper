@@ -218,7 +218,7 @@ Each phase follows this template for focus:
 - Both promotion flags still false; 0 gates cleared.
 - All changes are metadata, validation, or documentation — zero decode/export path changes.
 
-## Phase 7: Promotion Gate Clearance (ACTIVE — M7.1-M7.4 COMPLETE)
+## Phase 7: Promotion Gate Clearance (COMPLETE — M7.1-M7.5)
 
 **Objective**: Convert accumulated Phase 2-6 descriptor evidence into explicit gate clearances — retire obsolete gates, split maturing gates, and clear the lowest-hanging blockers.
 
@@ -232,6 +232,33 @@ Each phase follows this template for focus:
 2. **M7.2** ✅: Split gate 1 into `descriptor-field-order-confirmed` — **CLEARED** + `descriptor-field-semantics-complete` — BLOCKED (bytes 1-2).
 3. **M7.3** ✅: Full-population descriptor inventory (31,777 blocks, 100% coverage); 0 byte-3 warnings; 5 patterns confirmed; gate 4 (`sample-byte-agreement`) CLEARED.
 4. **M7.4** ✅: Formal decision record per template; gate 5 reframing recommended (accept attrSets=0 architecture).
+5. **M7.5** ✅: Exit handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`.
+
+## Phase 8: Semantic Gate Clearance (PLANNING)
+
+**Objective**: Use Ghidra-level analysis and population-cross-referencing to resolve the remaining semantic blockers (bytes 1-2, role mapping for 3/5 patterns) while evaluating the gate 5 reframing decision.
+
+**Entry Criteria**:
+- Phase 7 exit complete with 3 gates cleared, 1 retired, gate 5 reframing documented.
+- 31,777-block population inventory available for cross-referencing.
+- Remaining blockers clearly characterized: bytes 1-2 (gate 1b), role semantics (gate 2), architecture (gate 5), safety brake (gate 6).
+
+**Key Milestones** (candidate):
+1. **M8.1**: Ghidra-level analysis of byte-1/byte-2 descriptor semantics.
+2. **M8.2**: Role-semantic mapping for remaining 3/5 descriptor patterns.
+3. **M8.3**: Descriptor-to-role population cross-reference (31,777 blocks).
+4. **M8.4**: Gate 5 reframing evaluation (human review).
+5. **M8.5**: Phase 8 exit consolidation handoff.
+
+**Exit Criteria**:
+- At least 1 semantic gate advanced (bytes 1-2 or role mapping).
+- Gate 5 reframing decision made (cleared or explicitly held).
+- Both promotion flags evaluated against updated gate states.
+
+**Anti-Drift Rules**:
+- Ghidra analysis must be targeted to specific byte semantics questions.
+- No general-purpose Ghidra exploration without linkage to gate clearance.
+- Safety brake (gate 6) remains held until all other gates pass.
 
 **Exit Criteria**:
 - At least 1 gate formally cleared or retired (✅ 2 cleared, 1 retired in M7.1-M7.2).

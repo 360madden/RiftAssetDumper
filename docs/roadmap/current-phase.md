@@ -1,9 +1,9 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 7 ACTIVE — M7.4 COMPLETE: formal decision record + gate 5 reframing; M7.5 planning)
+**Last Updated**: 2026-06 (Phase 7 EXITED — M7.5 handoff created; 3 gates cleared, 1 retired; Phase 8 planning)
 
 ## Current Phase
-**Phase 7: Promotion Gate Clearance**
+**Phase 8: Semantic Gate Clearance** (planning)
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -46,6 +46,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.4** | **COMPLETE** | Console descriptor classification summary in `inventory-nif-stream-headers` output; 23/23 tests |
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
+| **M7.5** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md` |
 | **M7.4** | **COMPLETE** | Formal decision record; gate 5 reframing recommended |
 | **M7.3** | **COMPLETE** | Full-population inventory (100% coverage); gate 4 CLEARED |
 | **M7.2** | **COMPLETE** | Gate 1 split: `descriptor-field-order-confirmed` CLEARED, `descriptor-field-semantics-complete` BLOCKED |
@@ -91,9 +92,9 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 6)
-**M7.4** — Formal decision record completed (`docs/handoffs/2026-06-m7.4-formal-decision-record.md`): 11-part template filled with Phase 2-7 evidence; gate 5 reframing recommended; 7 evidence gates evaluated; both flags confirmed false. M7.5: Phase 7 exit consolidation handoff (planning).
+**M7.5** — Phase 7 exit consolidation handoff (`docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`): 7-part capstone; 3 gates cleared, 1 retired, gate 5 reframing documented. Phase 7 EXITED.
 
-**M7.3 complete**: Full-population descriptor inventory: 31,777 blocks (100% coverage), 0 byte-3 warnings, 5 patterns confirmed. Gate 4 CLEARED.
+**M7.4 complete**: Formal decision record + gate 5 reframing recommendation (not autonomously actioned).
 
 **M6.2 complete**: Formal re-evaluation of all 6 promotion gates against Phase 3-6 evidence (10 descriptor-consuming milestones). 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), gate 6 safety brake held. **0 gates cleared**. Both flags false. See `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`.
 
@@ -113,10 +114,11 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 
 **M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
 
-## Next Concrete Actions (Phase 7 M7.5)
-1. Create Phase 7 exit consolidation handoff: 3 gates cleared, 1 retired, gate 5 reframing documented
-2. Phase 8 entry assessment: semantic-level gates (1b, 2) require Ghidra-level analysis
-3. Evaluate whether Phase 8 should target gate 5 clearance (if reframing accepted) or gate 2 semantics
+## Next Concrete Actions (Phase 8)
+1. Create Phase 8 prep doc scoping semantic gate clearance (bytes 1-2, role mapping)
+2. Ghidra-level analysis of byte-1/byte-2 semantics (gate 1b)
+3. Role-semantic mapping for remaining 3/5 descriptor patterns (gate 2)
+4. Human review of gate 5 reframing (attrSets=0 acceptance)
 
 ## Entry Criteria Met
 - Phase 0 complete.
