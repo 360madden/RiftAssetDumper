@@ -250,26 +250,23 @@ Each phase follows this template for focus:
 4. **M8.4**: Gate 5 reframing evaluation (human review).
 5. **M8.5**: Phase 8 exit consolidation handoff.
 
-## Phase 9: Final Clearance + Consolidation (PLANNING)
+## Phase 9: Final Clearance + Consolidation (ACTIVE)
+
+**Objective**: Complete project-wide consolidation and address remaining blocked/deferred gates (bytes 1-2 Ghidra analysis, gate 5 human review) to reach the final clearance state.
+
+**Key Milestones**:
+1. **M9.0** ✅: Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md` — 8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers.
+2. **M9.1** (deferred from M8.1): Ghidra byte 1-2 semantic analysis on `rift_x64.exe`.
+3. **M9.2**: Gate 6 safety brake evaluation (dependent on gates 1b + 2 + 5).
+4. **M9.3** (deferred from M8.3): Gate 5 reframing human review.
 
 **Exit Criteria**:
-- At least 1 semantic gate advanced (bytes 1-2 or role mapping).
-- Gate 5 reframing decision made (cleared or explicitly held).
-- Both promotion flags evaluated against updated gate states.
+- All remaining gates either cleared or explicitly held with documented rationale.
+- Both promotion flags evaluated against final gate states.
 
 **Anti-Drift Rules**:
 - Ghidra analysis must be targeted to specific byte semantics questions.
 - No general-purpose Ghidra exploration without linkage to gate clearance.
-- Safety brake (gate 6) remains held until all other gates pass.
-
-**Exit Criteria**:
-- At least 1 gate formally cleared or retired (✅ 2 cleared, 1 retired in M7.1-M7.2).
-- Promotion readiness checklists updated with Phase 7 evidence.
-- Both promotion flags evaluated against updated gate states.
-
-**Anti-Drift Rules**:
-- Every gate clearance must have a traceable evidence chain to specific Phase 2-6 milestones.
-- No clearance without formal documentation per decision template.
 - Safety brake (gate 6) remains held until all other gates pass.
 
 ---

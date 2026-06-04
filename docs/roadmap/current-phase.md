@@ -1,9 +1,9 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 8 EXITED — M8.4 handoff created; gate 2 advanced; Phase 9 planning)
+**Last Updated**: 2026-06 (Phase 9 ACTIVE — project-wide consolidation handoff created; 8 phases complete; 3 gates cleared)
 
 ## Current Phase
-**Phase 9: Final Clearance + Consolidation** (planning)
+**Phase 9: Final Clearance + Consolidation** (ACTIVE)
 
 ## Phase 2 Status: **COMPLETE** ✅ (June 2026)
 
@@ -94,36 +94,16 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Every parser behavioral change → decision record + targeted tests + CI green.
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
-## Current Milestone (within Phase 6)
-**M8.4** — Phase 8 exit consolidation handoff (`docs/handoffs/2026-06-m8.4-phase8-exit-consolidation.md`): gate 2 advanced, M8.1/M8.3 deferred to Phase 9. Phase 8 EXITED.
+## Current Milestone (within Phase 9)
+**M9.0** — Project-wide consolidation handoff: `docs/handoffs/2026-06-phase9-project-consolidation.md` (COMPLETE). Next: M9.1 (Ghidra byte 1-2, deferred from M8.1) or M9.3 (gate 5 human review, deferred from M8.3).
 
-**M8.2 complete**: Role-semantic mapping — all 5 patterns have usage-level evidence; `15020100` corrected to index stream descriptor.
-
-**Phase 7 EXITED**: 3 gates CLEARED, 1 RETIRED, gate 5 reframing documented. See `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`.
-
-**M6.2 complete**: Formal re-evaluation of all 6 promotion gates against Phase 3-6 evidence (10 descriptor-consuming milestones). 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), gate 6 safety brake held. **0 gates cleared**. Both flags false. See `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`.
-
-**Entry from Phase 2**: Phase 2 complete with mature descriptor & binding proof system: per-block-embedded (4 bytes at offset 24), 5 patterns, `37 04 03 00` = ror1-float, binding reuse proven cross-family, 3-way integrated mapping, 6 promotion gates evaluated (0 cleared), 7 core blockers characterized. Both promotion flags intentionally held false. See `docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`.
-
-**Phase 2 Exit Handoff**: `docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md` — comprehensive 7-part capstone; unified descriptor & binding tables; per-gate evaluation; blocker matrix; Phase 3 entry assessment.
-
-**Phase 3 Entry**: Phase 2 complete with mature descriptor & binding proof system: per-block-embedded (4 bytes at offset 24), 5 patterns, `37 04 03 00` = ror1-float, binding reuse proven cross-family, 3-way integrated mapping, 6 promotion gates evaluated (0 cleared), 7 core blockers characterized. Both promotion flags intentionally held false.
-
-**M2.1 Evidence Gathered**: NiDataStream layout report refreshed (184/184 blocks valid, 5 descriptor byte patterns, byte-3 always 0x00). Descriptor-sample-compare run (6/6 byte-counter, 7/7 byte-order, 10 blocking items documented). Base-model review reveals all static bytes zero at Ghidra addresses — the descriptor table is NOT statically allocated. Critical finding: descriptors are **per-block embedded** (4 bytes at offset 24 in each NiDataStream block header). `37 04 03 00` spans position (#28), normal (#29), AND UV (#36) blocks — a generic ror1-float-stream descriptor, not role-specific. Role differentiation comes from Usage/Access fields. M2.2 prep created for binding proofs at scale.
-
-**M2.2 Progress**: Handoff created (`docs/handoffs/draft-2026-06-m2.2-binding-proofs.md`) and **COMPLETE**: 329 binding proofs (12/12 IDs, 6 bindings per ID, source-binding reuse pattern), 305 binding proofs (4 bindings, same reuse pattern), cross-family 11-feature comparison, blocker status. Key findings: source-binding reuse confirmed; all ror1-float streams carry descriptor `37 04 03 00`; secondary streams diverge between siblings.
-
-**M2.3 Progress**: Prep + handoff created and **COMPLETE** (corrected per code review; updated June 2026 with `36 04 02 00` gap resolved). Unified 3-way mapping confirms `37 04 03 00` as role-agnostic (spans position/normal/UV). `36 04 02 00` resolved: Usage=1, Access=19 matches `37 04 03 00` → float-vertex-data category; appears in clustered groups of 3; byte-1=0x04 = float32 element width. Three remaining gaps: `15 02 01 00` (appears at blocks 23/26/35 — NOT at #57), `10`/`3c` patterns, blocks #55/#57 descriptors. Cross-family 305 confirms same pattern. Validation Performed section added per convention.
-
-**M2.4 Progress**: Handoff created (`docs/handoffs/draft-2026-06-m2.4-promotion-gate-evaluation.md`) and **COMPLETE**. 7 parts: refreshed live promotion status (6 blockers, both flags false), Phase 2 evidence summary, per-gate evaluation for all 6 gates, evaluation summary table, 7 core blockers documented, Phase 2 exit criteria assessment. Key finding: 3 strengthened, 1 reclassified, 2 unchanged, 0 cleared. Per-block-embedded finding drives descriptor-table-sample gate reclassification. Both promotion flags must remain false.
-
-**M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
+| **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` (8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers) |
 
 ## Next Concrete Actions (Phase 9)
-1. Ghidra analysis session: byte 1-2 semantics on `rift_x64.exe` (M8.1 deferred)
-2. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M8.3 deferred
-3. Run `post50-validation-suite` + `generated-output-guard` on current state
-4. Comprehensive project-wide consolidation handoff (all 8 phases)
+1. ✅ Comprehensive project-wide consolidation handoff (all 8 phases) — `docs/handoffs/2026-06-phase9-project-consolidation.md`
+2. Ghidra analysis session: byte 1-2 semantics on `rift_x64.exe` (M8.1/M9.1 deferred)
+3. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M8.3/M9.3 deferred
+4. Run `post50-validation-suite` + `generated-output-guard` on current state
 
 ## Entry Criteria Met
 - Phase 0 complete.

@@ -1,6 +1,48 @@
 # Current Status — High-impact RIFT asset discoveries 🚀
-Date: 2026-06-07 (updated 2026-06-07)
-Date: 2026-06-03 (updated 2026-05-22)
+Date: 2026-06 (Phase 9 active; 8 phases complete; 3 gates cleared)
+
+## 2026-06 — Phase 9: Project-Wide Consolidation (ACTIVE)
+
+**Comprehensive consolidation handoff**: `docs/handoffs/2026-06-phase9-project-consolidation.md` — covers all 8 phases, 30+ milestones, 3 gates cleared, 1 gate advanced, 1 gate retired.
+
+### Eight-Phase Trajectory
+
+| Phase | Name | Milestones | Gates Cleared | Status |
+|---|---|---|---|---|
+| Phase 1 | Position Source Family Proof | M1.1-M1.5 | N/A | ✅ |
+| Phase 2 | Descriptor & Binding Proof | M2.1-M2.5 | 0 | ✅ |
+| Phase 3 | Descriptor Propagation | M3.1-M3.5 | 0 | ✅ |
+| Phase 4 | Descriptor-Aware Parser | M4.1-M4.6 | 0 | ✅ |
+| Phase 5 | Descriptor-Guided Parser | M5.1-M5.5 | 0 | ✅ |
+| Phase 6 | Descriptor-Validated Export | M6.1-M6.4 | 0 | ✅ |
+| Phase 7 | Promotion Gate Clearance | M7.1-M7.5 | **3** | ✅ |
+| Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 (1 advanced) | ✅ |
+
+### Gate Status Summary
+
+| Gate | Status |
+|---|---|
+| `descriptor-per-block-consistency` | **CLEARED** ✅ |
+| `descriptor-field-order-confirmed` | **CLEARED** ✅ |
+| `sample-byte-agreement` | **CLEARED** ✅ |
+| `descriptor-table-sample-proof` | RETIRED |
+| `descriptor-semantic-map` | improved — usage-level evidence |
+| `pairing-impact-proof` | candidate — reframing recommended |
+| `descriptor-field-semantics-complete` | BLOCKED ❌ |
+| `narrow-parser-patch` | BLOCKED ❌ |
+
+### Remaining Blockers
+
+| Blocker | Severity | Requires |
+|---|---|---|
+| Bytes 1-2 semantics | Critical | Ghidra analysis (M8.1 deferred) |
+| 3/5 patterns no specific role | High | Partially addressed (M8.2 usage-level) |
+| Gate 5 architecture acceptance | Medium | Human review (M8.3 deferred) |
+| Gate 6 safety brake | Intentional | All other gates must clear first |
+
+Both promotion flags remain **false**. See `docs/post50-parser-export-promotion-readiness-checklist.md` and `docs/handoffs/2026-06-phase9-project-consolidation.md`.
+
+---
 
 ## 2026-05-26 — 50-step live-validation closure
 
