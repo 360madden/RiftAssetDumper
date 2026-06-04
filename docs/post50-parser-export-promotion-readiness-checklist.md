@@ -125,10 +125,57 @@ See comprehensive M2.4 handoff: `docs/handoffs/draft-2026-06-m2.4-promotion-gate
 
 ---
 
+---
+
+## Phase 3-6 Descriptor Evidence (M3.1-M6.2)
+
+Phases 3-6 (June 2026) have transformed the descriptor landscape from structural
+evidence (Phase 2) into an operational parser subsystem. 10 descriptor-consuming
+milestones delivered across Phases 3-6.
+
+### What Phases 3-6 proved (candidate-only level)
+- **Phase 3** (Descriptor Propagation): Descriptor fields on all 6 NiDataStream record types;
+  `ClassifyNifDescriptor()` maps 5 patterns; 100% classification coverage at sample scale.
+- **Phase 4** (Descriptor-Aware Parser): 6 behavioral changes — byte-3 integrity (0/375 warnings),
+  byte-0 fallback (5 family labels, 0 nulls), JSON distribution, console summary,
+  descriptor-role cross-check, stream-body probe visibility.
+- **Phase 5** (Descriptor-Guided Parser): Descriptor-guided routing — pairing confidence
+  adjustment (+5/-10), position stream pre-filter, Usage/Access-enriched warnings.
+  Shared helpers: `IsFloatRole()`, `IsFloatDescriptor()`, `IsU16Descriptor()`.
+- **M6.1**: Descriptor metadata + validation warning in OBJ export (both paths).
+- **M6.2**: Formal re-evaluation of all 6 promotion gates against Phase 3-6 evidence —
+  4 strengthened, 1 retired (gate 3 → OBSOLETE), 1 unchanged (gate 6 safety brake),
+  **0 cleared**. Both flags remain false.
+
+### Promotion Gate Status (from M6.2 handoff)
+
+| Gate | M2.4 State | M6.2 State | Change |
+|---:|---|---:|---|
+| `descriptor-field-order-proof` | candidate (enhanced) | candidate **(strongly enhanced)** | ⬆⬆ |
+| `descriptor-semantic-map` | blocked | blocked **(improved)** | ⬆ |
+| `descriptor-table-sample-proof` | candidate (reclassified) | **OBSOLETE** | ⟳ Retired |
+| `sample-byte-agreement` | candidate (scoped) | candidate **(substantially strengthened)** | ⬆⬆ |
+| `pairing-impact-proof` | candidate (strengthened) | candidate **(strongly strengthened)** | ⬆⬆ |
+| `narrow-parser-patch` | blocked (unchanged) | blocked **(unchanged, by design)** | — |
+
+**Final tally**: 4 strengthened, 1 improved, 1 retired, 1 unchanged, **0 cleared**.
+`FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false.
+
+### What Phases 3-6 did NOT achieve
+- Bytes 1-2 descriptor semantics remain unknown (no code uses them).
+- 3/5 patterns have family labels but no verified role.
+- Sample corpus at 1.18% (375/31,777) — still below 10% target.
+- No complete geometry groups exist (attrSets=0 structural limitation).
+- Safety brake (gate 6) intentionally held.
+
+See comprehensive M6.2 handoff: `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`.
+
+---
+
 ## Current decision
 
-No parser/export promotion is allowed from the current evidence. Phase 1 (discovery) and
-Phase 2 (NiDataStream descriptor & binding proof) are both complete. 0 promotion gates
-have been cleared. The next work is Phase 3: parser/export implementation, which must
-begin only after the identified gate blockers (bytes 1-2 semantics, 4/5 pattern role
-mapping, sample scale validation) are addressed.
+No parser/export promotion is allowed from the current evidence. Phases 1-6 are all
+complete or active. 0 promotion gates have been cleared across two formal evaluations
+(M2.4 and M6.2). Gate 3 (`descriptor-table-sample-proof`) is recommended for retirement
+as obsolete (per-block-embedded is the production architecture). Both promotion flags
+must remain false.

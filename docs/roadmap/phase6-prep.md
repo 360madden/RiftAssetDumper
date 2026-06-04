@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 6 Entry
-**Status**: **ACTIVE** — M6.1 COMPLETE, M6.2 planning
+**Status**: **ACTIVE** — M6.1 COMPLETE, M6.2 COMPLETE, M6.3 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md`
 **Entry**: Phase 5 EXITED — descriptor-guided parser complete (M5.1-M5.4); descriptor data now influences pairing confidence, candidate ordering, and Usage/Access-enriched warnings
 
@@ -32,10 +32,11 @@ Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata
 - [x] Console warning when descriptor is not float-family
 - [x] 41/41 tests pass
 
-### M6.2 — Promotion Gate Re-Evaluation (PLANNING)
-- Review all 6 promotion gates against Phase 3-5 evidence
-- Document which gates are closer to clearance
-- Update promotion-readiness-status
+### M6.2 — Promotion Gate Re-Evaluation
+- [x] Formal re-evaluation of all 6 gates against 10 Phase 3-6 milestones
+- [x] 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), 0 cleared
+- [x] Both flags confirmed false; promotion readiness checklist updated
+- [x] Handoff: `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`
 
 ### M6.3 — Descriptor-Aware Export Pre-Checks (PLANNING)
 - Validate vertex count against descriptor stride hints
