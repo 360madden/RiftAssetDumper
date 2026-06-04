@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 6 Entry
-**Status**: **ACTIVE** — M6.1 COMPLETE, M6.3 COMPLETE, M6.4 planning
+**Status**: **COMPLETE** — Phase 6 EXITED; M6.1-M6.4 delivered
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md`
 **Entry**: Phase 5 EXITED — descriptor-guided parser complete (M5.1-M5.4); descriptor data now influences pairing confidence, candidate ordering, and Usage/Access-enriched warnings
 
@@ -45,9 +45,12 @@ Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata
 - [x] 8 xUnit tests (49/49 pass); uses existing IsFloatDescriptor/IsU16Descriptor helpers
 - [x] Behind existing export gates; candidate-only; no decode/export behavior changed
 
-### M6.4 — Phase 6 Exit Consolidation (PLANNING)
-- Comprehensive handoff documenting M6.1-M6.3
-- Phase 7 entry assessment
+### M6.4 — Phase 6 Exit Consolidation
+- [x] Comprehensive 7-part handoff covering M6.1-M6.3: `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`
+- [x] Cumulative phase progression table (Phase 1-6)
+- [x] Phase 7 entry assessment with 6 concrete recommendations
+- [x] Code scale table (58 descriptor lines, 34 tests, 6 record types)
+- Phase 7 entry: Promotion Gate Clearance
 
 ## Commands
 
@@ -60,7 +63,7 @@ dotnet format RiftAssetDumper.slnx --verify-no-changes
 ## Validation Gates
 
 - [x] Build: 0 errors
-- [x] Tests: 41/41 pass
+- [x] Tests: 49/49 pass
 - [x] `dotnet format --verify-no-changes` clean
 - [ ] `FieldOrderPromoted` still false
 - [ ] `ParserExportPromotionAllowed` still false

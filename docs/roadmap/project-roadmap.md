@@ -202,16 +202,46 @@ Each phase follows this template for focus:
 - Both promotion flags still false.
 - All changes behind gates or candidate-only.
 
-## Phase 5: Stabilization, Documentation & Sustainable Operations
+## Phase 6: Descriptor-Validated Export (COMPLETE — M6.1-M6.4)
 
-**Objective**: Make the system maintainable and handoff-ready for future work or contributors.
+**Objective**: Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata comments, formal promotion gate re-evaluation, and pre-export validation checks — without changing decode/export behavior.
 
 **Key Milestones**:
-- Comprehensive user/developer docs.
-- Full schema registry + validation.
-- Automated promotion regression suite.
-- Final "state of the geometry understanding" comprehensive handoff.
-- Roadmap marked complete or transitioned to maintenance mode.
+1. **M6.1**: Descriptor metadata in OBJ export: `# Position descriptor:` comment + console warning; both export paths covered.
+2. **M6.2**: Promotion gate re-evaluation against Phase 3-6 evidence (10 milestones): 4 strengthened, 1 retired (OBSOLETE), 0 cleared.
+3. **M6.3**: `ValidateDescriptorExportPrechecks()`: structural + descriptor alignment warnings in OBJ comments and console.
+4. **M6.4**: Exit handoff: `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`.
+
+**Exit Criteria**:
+- 3 narrow, tested, descriptor-consuming export enrichments delivered.
+- CI green: build 0 errors, 49/49 tests pass, format PASS.
+- Both promotion flags still false; 0 gates cleared.
+- All changes are metadata, validation, or documentation — zero decode/export path changes.
+
+## Phase 7: Promotion Gate Clearance (PLANNING)
+
+**Objective**: Convert accumulated Phase 2-6 descriptor evidence into explicit gate clearances — retire obsolete gates, split maturing gates, and clear the lowest-hanging blockers.
+
+**Entry Criteria**:
+- Phase 6 exit complete with mature descriptor stack (58 code lines, 49 tests, 6 record types).
+- Gate landscape characterized at 2 evaluation points (M2.4 + M6.2).
+- Both promotion flags intentionally false.
+
+**Key Milestones** (candidate):
+1. **M7.1**: Retire gate 3 (OBSOLETE); create replacement `descriptor-per-block-consistency` gate (would pass on current evidence).
+2. **M7.2**: Split gate 1 into `field-order-confirmed` (would pass) and `field-semantics-complete` (blocked by bytes 1-2).
+3. **M7.3**: Full-population descriptor inventory (31,777 blocks) to advance gate 4.
+4. **M7.4**: Formal decision record per `docs/nidatastream-parser-export-promotion-decision-template.md`.
+
+**Exit Criteria**:
+- At least 1 gate formally cleared or retired.
+- Promotion readiness checklists updated with Phase 7 evidence.
+- Both promotion flags evaluated against updated gate states.
+
+**Anti-Drift Rules**:
+- Every gate clearance must have a traceable evidence chain to specific Phase 2-6 milestones.
+- No clearance without formal documentation per decision template.
+- Safety brake (gate 6) remains held until all other gates pass.
 
 ---
 
