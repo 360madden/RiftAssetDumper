@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 11 ACTIVE — M11.1 ✅ M11.2 ✅; 4,045/8,152 streams classified; cross-reference ready for M11.3 disambiguation)
+**Last Updated**: 2026-06 (Phase 11 ACTIVE — M11.1 ✅ M11.2 ✅ M11.3 ✅; 546 clear mismatches found; 458 float2→position classification errors)
 
 ---
 
@@ -39,7 +39,7 @@
 |---|---|---|---|
 | 1 | **M11.1**: Extend inventory to emit descriptor-classified roles | ✅ Complete | Commit `2b848c9` + `291ffe4` (tests) — `ClassifyNifDescriptorRole` + `DescriptorGuidedRole` wired |
 | 2 | **M11.2**: Run population-scale inventory + cross-reference analysis | ✅ Complete | 4,045/8,152 streams (49.6%) classified; cross-ref: only 134 float3-generic→position |
-| 3 | **M11.3**: Disambiguate float3-generic sub-roles + discover new position sources | ⏳ Pending | Target: 1,180 normals + 614 UVs with float3 descriptors are disambiguation candidates |
+| 3 | **M11.3**: Disambiguate float3-generic sub-roles + discover new position sources | ✅ Complete | **546 clear mismatches**: 458 float2→position (cannot be positions), 88 float2→normal (cannot be normals). 1,180 float3→normal + 614 float3→uv ambiguous (need data inspection). Descriptor as consistency check on heuristic. |
 | 4 | **M11.4**: Validate descriptor roles against existing OBJ exports | ⏳ Pending | 94 OBJs, 65 faced |
 | 5 | **M11.5**: Exit handoff | ⏳ Pending | `docs/handoffs/` |
 
