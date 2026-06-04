@@ -625,4 +625,63 @@ public class BasicTests
     Assert.DoesNotContain("usage=", result);
   }
 
+
+  // M6.3: ValidateDescriptorExportPrechecks tests
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_ZeroVertices_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks(null, 0, 0);
+    Assert.Single(warnings);
+    Assert.Contains("Zero vertices", warnings[0]);
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_ZeroFaces_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 10, 0);
+    Assert.Contains(warnings, w => w.Contains("Zero faces"));
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_LowVertexCount_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 2, 1);
+    Assert.Contains(warnings, w => w.Contains("Low vertex count"));
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_NullDescriptor_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks(null, 10, 5);
+    Assert.Contains(warnings, w => w.Contains("descriptor unknown"));
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_U16Descriptor_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("u16-vertex-data family (byte0=0x15, candidate)", 10, 5);
+    Assert.Contains(warnings, w => w.Contains("u16-family"));
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_FloatDescriptor_ReturnsClean()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("ror1-float family (byte0=0x37)", 100, 50);
+    Assert.Empty(warnings);
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_UnknownDescriptor_ReturnsWarning()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("unknown family (byte0=0x10, candidate)", 10, 5);
+    Assert.Contains(warnings, w => w.Contains("unrecognized family"));
+  }
+
+  [Fact]
+  public void ValidateDescriptorExportPrechecks_MultipleWarnings_Accumulates()
+  {
+    var warnings = Program.ValidateDescriptorExportPrechecks("u16-vertex-data family (byte0=0x15, candidate)", 2, 0);
+    Assert.True(warnings.Count >= 3); // low vertex + zero faces + u16 descriptor
+  }
+
 }

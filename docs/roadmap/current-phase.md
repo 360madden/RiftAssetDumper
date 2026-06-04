@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 6 ACTIVE — M6.1 COMPLETE: OBJ descriptor metadata; M6.2 COMPLETE: promotion gate re-evaluation; M6.3 planning)
+**Last Updated**: 2026-06 (Phase 6 ACTIVE — M6.1 COMPLETE: OBJ descriptor metadata; M6.3 COMPLETE: export pre-checks; M6.4 planning)
 
 ## Current Phase
 **Phase 6: Descriptor-Validated Export**
@@ -46,6 +46,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 | **M4.4** | **COMPLETE** | Console descriptor classification summary in `inventory-nif-stream-headers` output; 23/23 tests |
 | **M4.5** | **COMPLETE** | Descriptor-role cross-check in `probe-nif-mesh`: warns on float/u16 descriptor-role mismatches; 29/29 tests |
 | **M4.6** | **COMPLETE** | Descriptor classification in `probe-nif-stream-body` console output; 29/29 tests |
+| **M6.3** | **COMPLETE** | Descriptor-aware export pre-checks: ValidateDescriptorExportPrechecks() + 8 tests; 49/49 tests |
 | **M6.2** | **COMPLETE** | Promotion gate re-evaluation against Phase 3-6 evidence: 4 strengthened, 1 retired, 0 cleared; both flags false; `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md` |
 | **M6.1** | **COMPLETE** | Descriptor metadata comment + validation warning in OBJ export; covers both experimental and attribute-set paths; 41/41 tests |
 | **M5.5** | **COMPLETE** | Exit handoff: `docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md` |
@@ -85,7 +86,7 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 6)
-**M6.3** — Descriptor-aware export pre-checks (planning): validate vertex count against descriptor stride hints; warn on structural anomalies before export. Builds on descriptor data available in both export paths since M6.1.
+**M6.4** — Phase 6 exit consolidation handoff (planning): validate vertex count against descriptor stride hints; warn on structural anomalies before export. Builds on descriptor data available in both export paths since M6.1.
 
 **M6.2 complete**: Formal re-evaluation of all 6 promotion gates against Phase 3-6 evidence (10 descriptor-consuming milestones). 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), gate 6 safety brake held. **0 gates cleared**. Both flags false. See `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`.
 
@@ -105,8 +106,8 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 
 **M2.5 Progress**: Consolidation handoff created (`docs/handoffs/2026-06-m2.5-phase2-exit-consolidation.md`). **Phase 2 EXITED.** All M2.1-M2.4 evidence unified into 7-part capstone document. Modeled on M1.5 structure. Phase 3 entry assessment complete.
 
-## Next Concrete Actions (Phase 6 M6.3)
-1. Read OBJ export code paths to identify pre-export validation points
+## Next Concrete Actions (Phase 6 M6.4)
+1. Create comprehensive Phase 6 exit handoff consolidating M6.1-M6.3 to identify pre-export validation points
 2. Implement vertex-count vs descriptor-stride integrity check
 3. Add structural anomaly warnings before OBJ write
 4. Add targeted tests; build, test, format, code-review

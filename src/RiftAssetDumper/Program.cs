@@ -2014,6 +2014,50 @@ internal static class Program
     return header.Warnings.Count == 0 ? 0 : 2;
   }
 
+  /// <summary>
+  /// Pre-export validation: checks descriptor alignment, vertex/face integrity,
+  /// and structural anomalies against accumulated descriptor evidence (Phase 3-6).
+  /// Returns a list of warning strings (empty = clean). Candidate-only.
+  /// </summary>
+  internal static List<string> ValidateDescriptorExportPrechecks(
+    string? positionDescriptor, int vertexCount, int faceCount)
+  {
+    var warnings = new List<string>();
+
+    // Structural integrity checks
+    if (vertexCount == 0)
+    {
+      warnings.Add("Zero vertices — no geometry to export");
+      return warnings; // skip descriptor checks if no vertices
+    }
+
+    if (faceCount == 0)
+    {
+      warnings.Add("Zero faces — vertex-only export");
+    }
+
+    if (vertexCount < 3)
+    {
+      warnings.Add($"Low vertex count ({vertexCount}) — insufficient for triangle mesh");
+    }
+
+    // Descriptor-based checks
+    if (positionDescriptor is null)
+    {
+      warnings.Add("Position descriptor unknown — descriptor classification not available");
+    }
+    else if (IsU16Descriptor(positionDescriptor))
+    {
+      warnings.Add($"Position descriptor is u16-family ({positionDescriptor}) — vertex data may be integer, not float");
+    }
+    else if (!IsFloatDescriptor(positionDescriptor))
+    {
+      warnings.Add($"Position descriptor is unrecognized family ({positionDescriptor}) — structural anomaly");
+    }
+
+    return warnings;
+  }
+
   private static int DecodeNifGeometry(AppOptions options)
   {
     var rootDirectory = Path.GetFullPath(options.RootDirectory);
@@ -2530,6 +2574,21 @@ internal static class Program
       {
         writer.WriteLine($"# Position descriptor: {positionDescriptor}");
       }
+
+      // M6.3: Descriptor-aware export pre-checks
+      var precheckWarnings = ValidateDescriptorExportPrechecks(positionDescriptor, objVertices.Count, objFaces.Count);
+      if (precheckWarnings.Count > 0)
+      {
+        writer.WriteLine($"# Export validation warnings: {precheckWarnings.Count}");
+        foreach (var warning in precheckWarnings)
+        {
+          writer.WriteLine($"#   WARNING: {warning}");
+        }
+      }
+      else
+      {
+        writer.WriteLine("#   Export validation: CLEAN (no structural anomalies)");
+      }
       writer.WriteLine();
       foreach (var v in objVertices)
         writer.WriteLine(v);
@@ -2545,6 +2604,15 @@ internal static class Program
       }
       writer.WriteLine();
       writer.WriteLine($"# End of file. {objVertices.Count} vertices, {objFaces.Count} faces.");
+      // M6.3: Console pre-export validation summary (reuses OBJ precheckWarnings)
+      if (precheckWarnings.Count > 0)
+      {
+        Console.WriteLine($"  Pre-export validation ({precheckWarnings.Count} warning(s)):");
+        foreach (var warning in precheckWarnings)
+        {
+          Console.WriteLine($"    WARNING: {warning}");
+        }
+      }
       Console.WriteLine();
       Console.WriteLine($"OBJ written: {DisplayPath(options, objPath)}");
       Console.WriteLine($"  Vertices: {objVertices.Count}");

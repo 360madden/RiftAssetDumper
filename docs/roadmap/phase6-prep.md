@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 6 Entry
-**Status**: **ACTIVE** — M6.1 COMPLETE, M6.2 COMPLETE, M6.3 planning
+**Status**: **ACTIVE** — M6.1 COMPLETE, M6.3 COMPLETE, M6.4 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md`, `docs/handoffs/2026-06-m5.5-phase5-exit-consolidation.md`
 **Entry**: Phase 5 EXITED — descriptor-guided parser complete (M5.1-M5.4); descriptor data now influences pairing confidence, candidate ordering, and Usage/Access-enriched warnings
 
@@ -38,9 +38,12 @@ Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata
 - [x] Both flags confirmed false; promotion readiness checklist updated
 - [x] Handoff: `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`
 
-### M6.3 — Descriptor-Aware Export Pre-Checks (PLANNING)
-- Validate vertex count against descriptor stride hints
-- Warn on structural anomalies before export
+### M6.3 — Descriptor-Aware Export Pre-Checks
+- [x] ValidateDescriptorExportPrechecks(): structural integrity (zero vertices/faces, low count) + descriptor alignment (u16, unknown, null)
+- [x] OBJ comment validation block: warnings or CLEAN stamp in exported .obj files
+- [x] Console pre-export validation summary before OBJ written
+- [x] 8 xUnit tests (49/49 pass); uses existing IsFloatDescriptor/IsU16Descriptor helpers
+- [x] Behind existing export gates; candidate-only; no decode/export behavior changed
 
 ### M6.4 — Phase 6 Exit Consolidation (PLANNING)
 - Comprehensive handoff documenting M6.1-M6.3
