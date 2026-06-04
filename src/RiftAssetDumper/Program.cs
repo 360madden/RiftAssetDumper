@@ -1965,7 +1965,7 @@ internal static class Program
       Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}{FormatNifDescriptorClassificationInline(s.DescriptorClassification)}"))}");
       foreach (var stream in mesh.Streams)
       {
-        var warning = CheckDescriptorRoleConsistency(stream.RoleStats.PrimaryRole, stream.DescriptorClassification);
+        var warning = CheckDescriptorRoleConsistency(stream.RoleStats.PrimaryRole, stream.DescriptorClassification, stream.DataStreamUsage, stream.DataStreamAccess);
         if (warning is not null)
         {
           Console.WriteLine($"  WARNING: #{stream.TargetBlockIndex} @{stream.MeshPayloadOffset}: {warning}");
@@ -10851,7 +10851,7 @@ internal static class Program
         && descriptor.Contains("u16-vertex-data", StringComparison.OrdinalIgnoreCase);
   }
 
-  internal static string? CheckDescriptorRoleConsistency(string? primaryRole, string? descriptorClassification)
+  internal static string? CheckDescriptorRoleConsistency(string? primaryRole, string? descriptorClassification, string? dataStreamUsage = null, string? dataStreamAccess = null)
   {
     if (string.IsNullOrWhiteSpace(primaryRole) || string.IsNullOrWhiteSpace(descriptorClassification))
     {
@@ -10865,12 +10865,18 @@ internal static class Program
 
     if (isFloatRole && isU16Descriptor)
     {
-      return $"descriptor-role-mismatch: float role ({primaryRole}) with u16 descriptor ({descriptorClassification})";
+      var usageAccessSuffix = dataStreamUsage is not null || dataStreamAccess is not null
+          ? $" usage={dataStreamUsage ?? "-"} access={dataStreamAccess ?? "-"}"
+          : string.Empty;
+      return $"descriptor-role-mismatch: float role ({primaryRole}) with u16 descriptor ({descriptorClassification}){usageAccessSuffix}";
     }
 
     if (isIndexRole && isFloatDescriptor)
     {
-      return $"descriptor-role-mismatch: index role ({primaryRole}) with float descriptor ({descriptorClassification})";
+      var usageAccessSuffix = dataStreamUsage is not null || dataStreamAccess is not null
+          ? $" usage={dataStreamUsage ?? "-"} access={dataStreamAccess ?? "-"}"
+          : string.Empty;
+      return $"descriptor-role-mismatch: index role ({primaryRole}) with float descriptor ({descriptorClassification}){usageAccessSuffix}";
     }
 
     return null;

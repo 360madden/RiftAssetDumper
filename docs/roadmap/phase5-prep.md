@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Type**: Phase Prep — Phase 5 Entry
-**Status**: **ACTIVE** — M5.3 COMPLETE, M5.4 planning
+**Status**: **ACTIVE** — M5.4 COMPLETE, M5.5 planning
 **Parent(s)**: `docs/roadmap/project-roadmap.md` (Phase 5), `docs/handoffs/2026-06-m4.6-phase4-exit-consolidation.md` (Phase 4 exit)
 **Entry**: Phase 4 EXITED — descriptor-aware parser foundation complete (M4.1-M4.6); 6 narrow changes delivered; descriptor data now drives warnings and console/JSON output
 

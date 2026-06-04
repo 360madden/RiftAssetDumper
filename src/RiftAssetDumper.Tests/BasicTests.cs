@@ -607,4 +607,22 @@ public class BasicTests
     Assert.Equal(0, result);
   }
 
+
+  [Fact]
+  public void CheckDescriptorRoleConsistency_IncludesUsageAccessInWarning()
+  {
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "u16-vertex-data family (byte0=0x15, candidate)", "0", "3");
+    Assert.NotNull(result);
+    Assert.Contains("usage=0", result);
+    Assert.Contains("access=3", result);
+  }
+
+  [Fact]
+  public void CheckDescriptorRoleConsistency_OmitsUsageAccessWhenNull()
+  {
+    var result = Program.CheckDescriptorRoleConsistency("position-float3-ror1-lead", "u16-vertex-data family (byte0=0x15, candidate)");
+    Assert.NotNull(result);
+    Assert.DoesNotContain("usage=", result);
+  }
+
 }
