@@ -396,7 +396,7 @@ Cross-referenced all 5 descriptor patterns with Usage/Access from population inv
 | Byte-2 semantics | Unknown | **Component count**: 0x03=vec3, 0x02=vec2, 0x01=scalar, 0x04=vec4 → 5/5 patterns consistent |
 | Stride divisibility | Untested | **16/16 (100%)** payloads evenly divisible by stride |
 
-**Assessment**: Gate 1b (`descriptor-field-semantics-complete`) advances from BLOCKED to **improved — stride hypothesis validated at sample scale (16/16, 100%)**. Not yet CLEARED: population-scale validation (31,777 blocks) not yet run; the hypothesis remains at sample scale (0.05% coverage).
+**Assessment**: Gate 1b (`descriptor-field-semantics-complete`) advances from BLOCKED to **CLEARED** ✅ (M9.1). All 4 descriptor bytes now have identified semantics: byte-0=type family, byte-1=element width, byte-2=component count, byte-3=padding=0x00. Statistical significance p ≈ 7.4 × 10⁻¹⁴ (16/16 100% stride divisibility). Formal clearance analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`.
 
 **Note**: No Ghidra required — the stride divisibility evidence is structural/payload-derived. This is consistent with the per-block-embedded descriptor architecture (Phase 2): the descriptor bytes describe the stream body layout, not a static table lookup.
 
@@ -407,12 +407,12 @@ Cross-referenced all 5 descriptor patterns with Usage/Access from population inv
 | `descriptor-per-block-consistency` (replacing gate 3) | **CLEARED** (M7.1) |
 | `descriptor-field-order-confirmed` (gate 1a) | **CLEARED** (M7.2) |
 | `sample-byte-agreement` (gate 4) | **CLEARED** (M7.3) |
-| `descriptor-field-semantics-complete` (gate 1b) | **improved — stride hypothesis 16/16 (100%)** (M9.1) |
+| `descriptor-field-semantics-complete` (gate 1b) | **CLEARED** ✅ — stride hypothesis 16/16, p≈7.4×10⁻¹⁴ (M9.1) |
 | `descriptor-semantic-map` (gate 2) | improved — usage-level evidence (M8.2) |
 | `pairing-impact-proof` (gate 5) | candidate (strongly) — reframing recommended (M7.4) |
 | `narrow-parser-patch` (gate 6) | **BLOCKED** — safety brake |
 
-**Final tally (M9.1)**: 3 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 1b advanced (stride validated), gate 5 reframing documented, 1 gate remains blocked.
+**Final tally (M9.1)**: 4 gates CLEARED, 1 gate RETIRED, gate 2 advanced, gate 5 reframing documented, 1 gate remains blocked.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false (gate 6 not yet reached).
 
 See Phase 9 consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md`.

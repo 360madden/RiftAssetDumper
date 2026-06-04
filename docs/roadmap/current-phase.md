@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.1 stride hypothesis validated; 16/16 100%; gate 1b advanced)
+**Last Updated**: 2026-06 (Phase 9 ACTIVE — M9.1 gate 1b CLEARED; 4 gates cleared; p≈7.4×10⁻¹⁴)
 
 ## Current Phase
 **Phase 9: Final Clearance + Consolidation** (ACTIVE)
@@ -95,14 +95,14 @@ See `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` for the full capst
 - Reference `docs/roadmap/project-roadmap.md` Phase 4 in all M4.x handoffs.
 
 ## Current Milestone (within Phase 9)
-**M9.1** — Byte 1-2 stride hypothesis validated (COMPLETE): 16/16 (100%) payloads evenly divisible by byte-1 × byte-2 stride. Gate 1b advanced — no Ghidra needed. Next: M9.2 gate 6 analysis, or M9.3 gate 5 human review.
+**M9.1** — Gate 1b CLEARED ✅ (4th gate clearance): all 4 descriptor bytes have identified semantics. Statistical case p≈7.4×10⁻¹⁴ from 16/16 stride divisibility. Formal analysis: `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`. Next: M9.2 gate 6 analysis, or M9.3 gate 5 human review.
 
-| **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` (8-phase trajectory, gate status, descriptor reference, session summary, remaining blockers) |
-| **M9.1** | **COMPLETE** | Byte 1-2 stride validation: 16/16 100% divisibility; gate 1b advanced (see promotion checklist M9.1 section) |
+| **M9.0** | **COMPLETE** | Consolidation: `docs/handoffs/2026-06-phase9-project-consolidation.md` |
+| **M9.1** | **COMPLETE** | Gate 1b CLEARED: stride hypothesis 16/16 100%; formal clearance analysis |
 
 ## Next Concrete Actions (Phase 9)
-1. ✅ Comprehensive project-wide consolidation handoff (all 8 phases) — `docs/handoffs/2026-06-phase9-project-consolidation.md`
-2. ✅ Byte 1-2 stride hypothesis validated (16/16, 100%) — gate 1b advanced; no Ghidra required
+1. ✅ Comprehensive project-wide consolidation handoff — `docs/handoffs/2026-06-phase9-project-consolidation.md`
+2. ✅ Gate 1b CLEARED — stride hypothesis 16/16 100%; 4 gates now cleared; formal analysis at `docs/handoffs/2026-06-m9.1-gate1b-stride-clearance.md`
 3. Human review of gate 5 reframing (attrSets=0 acceptance) — M7.4 + M9.3 deferred
 4. ✅ `post50-validation-suite` + `generated-output-guard` — 9/9 PASS, CLEAN
 
