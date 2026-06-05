@@ -1219,7 +1219,7 @@ def attribute_extra_sibling_proof_guard(
             required_json_integer(body_stats, "UInt16Max", context) == 127,
             f"{context} BodyStats.UInt16Max changed.",
         )
-        # UInt16Max (127) < VertexCount (128) → index fits vertex range
+        # UInt16Max (127) < VertexCount (128) -> index fits vertex range
         assert_proof_guard(
             required_json_integer(body_stats, "UInt16Max", context) < 128,
             f"{context} BodyStats.UInt16Max ({required_json_integer(body_stats, 'UInt16Max', context)}) >= vertex count 128.",
@@ -2493,3 +2493,116 @@ def phase1_m13_329_variant_layout_guard(
     print(f"Phase1M13 guard markdown: {md_path}")
     print("Phase1M13_329VariantLayoutGuard passed: pilot layout remains candidate-only.")
     return json_path, md_path
+
+
+# ============================================================================
+# DescriptorConsistencyGuard  (inventory-level, Phase 13)
+# ============================================================================
+
+
+def descriptor_consistency_guard(report_path: str | Path) -> None:
+    """Validate descriptor-guided role consistency against known baselines.
+
+    Cross-references DescriptorGuidedRole against PrimaryRole in the
+    mesh-binding inventory to flag component-count contradictions.
+
+    Classification tiers:
+    - HARD ERROR: descriptor element count physically incompatible with role
+      (e.g., uint16-index -> float3 position — 1 component can't hold 3 floats)
+    - WARNING: suspicious but potentially valid (e.g., float2 -> float3 position
+      — valid float2 encoding discovered in Phase 11 M11.4)
+    - AMBIGUOUS: consistent component counts, needs data inspection
+
+    Baselines from Phase 11 population inventory (4,044 described streams).
+    Phase 12 extended to 6 known patterns (added 08010400).
+    """
+    report = load_json_report(report_path)
+
+    assert_proof_guard(
+        str(report.get("Schema", "")) == "descriptor-consistency-baseline/v1",
+        "Descriptor consistency report schema mismatch.",
+    )
+
+    total = required_json_integer(report, "total_described_streams", "descriptor-consistency")
+    hard_errors = required_json_integer(report, "hard_error_count", "descriptor-consistency")
+    warnings = required_json_integer(report, "warning_count", "descriptor-consistency")
+    ambiguous = required_json_integer(report, "ambiguous_count", "descriptor-consistency")
+
+    # Baselines from Phase 11+12 population inventory
+    # These are candidate-only reference values; guard fires if they shift significantly
+    assert_proof_guard(
+        total >= 4000,
+        f"Expected at least 4000 described streams, found {total}.",
+    )
+    assert_proof_guard(
+        hard_errors <= 600,
+        f"Hard error count {hard_errors} exceeds maximum 600.",
+    )
+    assert_proof_guard(
+        warnings >= 50,
+        f"Warning count {warnings} below minimum 50 (expected float2->position warnings).",
+    )
+
+    # Validate hard error categories exist
+    hard_error_map = report.get("hard_errors", {})
+    assert_proof_guard(
+        isinstance(hard_error_map, dict) and len(hard_error_map) >= 3,
+        "Expected at least 3 hard error categories.",
+    )
+
+    # uint16-index -> float2 UV is the largest hard error category
+    uint16_to_uv = sum(
+        v for k, v in hard_error_map.items()
+        if "uint16-index" in k and "uv-" in k
+    )
+    assert_proof_guard(
+        uint16_to_uv >= 200,
+        f"uint16-index -> uv-float2 hard error count {uint16_to_uv} below expected 200+.",
+    )
+
+    # float2-uv -> normal-float3 is a key hard error
+    float2_to_normal = sum(
+        v for k, v in hard_error_map.items()
+        if "float2-uv" in k and "normal" in k
+    )
+    assert_proof_guard(
+        float2_to_normal >= 150,
+        f"float2-uv -> normal-float3 hard error count {float2_to_normal} below expected 150+.",
+    )
+
+    # Validate ambiguous categories — the largest group
+    ambiguous_map = report.get("ambiguous", {})
+    float3_to_normal = sum(
+        v for k, v in ambiguous_map.items()
+        if "float3-generic" in k and "normal" in k
+    )
+    assert_proof_guard(
+        float3_to_normal >= 1000,
+        f"float3-generic -> normal count {float3_to_normal} below expected 1000+.",
+    )
+
+    # === Report ===
+    print("\n--- DescriptorConsistencyGuard descriptor->role consistency guard (Phase 13)")
+    print(f"Total described streams: {total}")
+    print(f"  Hard errors:  {hard_errors:5d}  (component count physically incompatible)")
+    print(f"  Warnings:     {warnings:5d}  (suspicious, e.g. float2->position)")
+    print(f"  Ambiguous:    {ambiguous:5d}  (consistent component counts)")
+    print()
+    print("Top hard error categories:")
+    for k, v in sorted(hard_error_map.items(), key=lambda x: -x[1])[:5]:
+        print(f"  {k}: {v}")
+    print()
+    print("Top warning categories:")
+    warning_map = report.get("warnings", {})
+    for k, v in sorted(warning_map.items(), key=lambda x: -x[1])[:5]:
+        print(f"  {k}: {v}")
+    print()
+    print("Top ambiguous categories:")
+    for k, v in sorted(ambiguous_map.items(), key=lambda x: -x[1])[:5]:
+        print(f"  {k}: {v}")
+    print()
+    print(
+        "DescriptorConsistencyGuard passed: descriptor->role consistency baselines intact. "
+        "Hard errors remain candidate-only classification flags; "
+        "no geometry truth or role promotion is asserted."
+    )

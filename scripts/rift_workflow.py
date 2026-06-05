@@ -119,6 +119,7 @@ from scripts.phase1_m12_304_magic_analysis import phase1_m12_304_magic_analysis 
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
+    descriptor_consistency_guard,
     ghidra_attribute_candidate_guard,
     ghidra_pairing_non_export_guard,
     nidatastream_parser_export_non_consumption_guard,
@@ -8393,6 +8394,7 @@ def _run_command(args: argparse.Namespace) -> None:
             ("residual-lead-guard", lambda: residual_lead_guard(str(inventory_path))),
             ("position-source-sibling-lead-guard", lambda: position_source_sibling_lead_guard(str(inventory_path))),
             ("ghidra-pairing-non-export-guard", ghidra_pairing_non_export_guard),
+    ("descriptor-consistency-guard", lambda: descriptor_consistency_guard(str(Path("Exports/phase13-descriptor-consistency-baseline.json")))),
         ]
         for guard_name, guard_fn in guard_tasks:
             try:
