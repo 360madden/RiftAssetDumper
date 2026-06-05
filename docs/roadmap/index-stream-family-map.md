@@ -18,6 +18,7 @@
 | 354 | 6 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 22f/24v, index stream present |
 | 301 | 6 | 24 | 0 | 100% | ✅ Yes | Canonical faced block (Phase 37: +6 IDs confirmed) |
 | 301 | 7 | 1 | 0 | 100% | ✅ Yes | Single asset, may be special case |
+| 301 | 25 | 1 | 0 | 100% | ✅ Yes | Phase 37; 3f/6v, index stream present |
 | 305 | 6 | 11 | 0 | 100% | ✅ Yes | Primary faced block for 305 |
 | 305 | 7 | 0 | 16 | 0% | ❌ No | Float2 sibling pair (no index; float3 MB=7 probe confirmed pos-only) |
 | 305 | 27 | 0 | 12 | 0% | ❌ No | Float3 sibling pair (no index) |
