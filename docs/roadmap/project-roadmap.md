@@ -477,4 +477,4 @@ float2+sibling Z mechanism.
 
 *This roadmap is the single source of truth for scope and sequencing. All autonomous or subagent work must be traceable to a specific phase + milestone.*
 
-**Last Updated**: 2026-06 (Phases 11-12 added; descriptor map complete at 6 patterns)
+**Last Updated**: 2026-06 (Phases 13-15.5 added; descriptor map complete at 6 patterns; float2 Z-source resolved as sibling pairing)
