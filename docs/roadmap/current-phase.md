@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 11 ACTIVE — M11.1 ✅ M11.2 ✅ M11.3 ✅ M11.4 ✅; float2 position encoding discovered; 63% of OBJ positions are float2)
+**Last Updated**: 2026-06 (Phase 11 ✅ Phase 12 ✅; descriptor map complete at 6 patterns; 08010400 discovered)
 
 ---
 
@@ -69,8 +69,9 @@
 | Phase 8 | Semantic Gate Clearance | M8.2, M8.4 | 0 | ✅ |
 | Phase 9 | Final Clearance + Consolidation | M9.0-M9.4 | **2** | ✅ EXITED |
 | Phase 10 | Human Review + Final Promotion | M10.1-M10.2 | **2** | ✅ COMPLETE |
-| **Phase 11** | **Descriptor-Guided Role Classification** | **M11.1-M11.5** | **0** | **🔄 ACTIVE** |
+| **Phase 11** | **Descriptor-Guided Role Classification** | **M11.1-M11.5** | **0** | **✅ COMPLETE** |
+| **Phase 12** | **Unknown Descriptor Discovery** | **M12.1-M12.3** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 10 phases complete, 7 gates cleared. Phase 11 in progress.
+**Project totals**: 12 phases complete, 7 gates cleared, 6 descriptor patterns proven.
 
 See individual exit handoffs under `docs/handoffs/2026-06-m*.*-phase*-exit-consolidation.md`.
