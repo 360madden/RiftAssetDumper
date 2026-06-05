@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 26 ✅; comprehensive manifest — 259 OBJs across all Exports/, per-MeshSize breakdown)
+**Last Updated**: 2026-06 (Phase 27 ✅; bidirectional MeshSize resolution — float3 + probe lookup, 8 more IDs resolved)
 
 ---
 
@@ -87,8 +87,9 @@
 | **Phase 24** | **Full Sibling Export Run** | **142/142 exports ✅ 127 unique OBJs, 0 structural issues** | **0** | **✅ COMPLETE** |
 | **Phase 25** | **Export Manifest** | **scripts/build_export_manifest.py — 142 OBJs catalogued: 94 faced, 48 position-only, 5,360 vertices, 6,682 faces** | **0** | **✅ COMPLETE** |
 | **Phase 26** | **Comprehensive Export Manifest** | **259 OBJs across all Exports/, per-MeshSize breakdown, export batch classification** | **0** | **✅ COMPLETE** |
+| **Phase 27** | **Bidirectional MeshSize Resolution** | **float3 + probe lookup; 8 IDs resolved; 4 new MeshSizes discovered** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 27 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 28 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 

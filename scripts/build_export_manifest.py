@@ -24,6 +24,7 @@ SEP = "=" * 80
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OBJ_ROOT = REPO_ROOT / "Exports"
 PAIRING_MAP_PATH = REPO_ROOT / "Exports" / "phase19-sibling-pairing-map.json"
+PROBE_LOOKUP_PATH = REPO_ROOT / "Exports" / "probe-meshsize-lookup.json"
 DEFAULT_OUT = REPO_ROOT / "Exports"
 
 # Known MeshSize for @264-indexed meshes
@@ -156,8 +157,9 @@ def main() -> int:
     obj_files = sorted(obj_root.rglob("*.obj"))
     print(f"\nFound {len(obj_files)} .obj files under {obj_root}")
 
-    # Load pairing map if available
-    pair_lookup: dict = {}  # asset_id -> pair info
+    # Load pairing map if available (bidirectional: float2 and float3)
+    pair_lookup: dict = {}  # asset_id -> pair info (float2)
+    float3_lookup: dict = {}  # asset_id -> pair info (float3)
     if PAIRING_MAP_PATH.exists():
         with open(PAIRING_MAP_PATH, encoding="utf-8") as f:
             pairs = json.load(f).get("pairs", [])
@@ -165,9 +167,21 @@ def main() -> int:
             f2_id = p.get("float2_id", "")
             if f2_id:
                 pair_lookup[f2_id] = p
-        print(f"Loaded {len(pairs)} sibling pairs for cross-reference")
+            f3_id = p.get("float3_id", "")
+            if f3_id and f3_id not in pair_lookup:
+                float3_lookup[f3_id] = p
+        print(f"Loaded {len(pairs)} sibling pairs ({len(pair_lookup)} f2 + {len(float3_lookup)} f3 unique)")
     else:
         print("(No pairing map found — skipping cross-reference)")
+
+    # Load probe-based MeshSize lookup if available
+    probe_lookup: dict = {}
+    if PROBE_LOOKUP_PATH.exists():
+        with open(PROBE_LOOKUP_PATH, encoding="utf-8") as f:
+            probe_data = json.load(f).get("entries", {})
+            for aid, info in probe_data.items():
+                probe_lookup[aid] = info.get("meshsize")
+        print(f"Loaded {len(probe_lookup)} probe-based MeshSize entries")
 
     # Scan each OBJ
     entries: list[dict] = []
@@ -200,9 +214,11 @@ def main() -> int:
         batch_counts[batch] += 1
 
         # Determine MeshSize:
-        # 1. Check pairing map (sibling-paired OBJs)
-        # 2. Check if it's a @264 export (MeshSize 297)
-        # 3. Otherwise unknown
+        # 1. Check pairing map (float2 side)
+        # 2. Check pairing map (float3 side)
+        # 3. Check probe lookup
+        # 4. Check if it's a @264 export (MeshSize 297)
+        # 5. Otherwise unknown
         ms = None
         if asset_id and asset_id in pair_lookup:
             pair_info = pair_lookup[asset_id]
@@ -213,6 +229,23 @@ def main() -> int:
                 "float3_mb": pair_info.get("float3_mb"),
                 "archive": pair_info.get("archive"),
                 "mesh_size": ms,
+            }
+        elif asset_id and asset_id in float3_lookup:
+            pair_info = float3_lookup[asset_id]
+            ms = pair_info.get("meshsize")
+            meta["sibling_pair"] = {
+                "distance": pair_info.get("distance"),
+                "float2_id": pair_info.get("float2_id"),
+                "float2_mb": pair_info.get("float2_mb"),
+                "archive": pair_info.get("archive"),
+                "mesh_size": ms,
+                "note": "resolved via float3_id in pairing map",
+            }
+        elif asset_id and asset_id in probe_lookup:
+            ms = probe_lookup[asset_id]
+            meta["sibling_pair"] = {
+                "mesh_size": ms,
+                "note": "resolved via probe lookup",
             }
         elif batch.startswith("batch-264-"):
             ms = MESHSIZE_264
