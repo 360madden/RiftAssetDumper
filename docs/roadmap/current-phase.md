@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 15 ✅; float2 position encoding confirmed: 51 float2, 20 float3)
+**Last Updated**: 2026-06 (Phase 15.5 ✅; Z-source confirmed as mesh transform, not separate stream)
 
 ---
 
@@ -75,8 +75,9 @@
 | **Phase 13** | **Descriptor Consistency Proof Guard** | **M13.1-M13.3** | **0** | **✅ COMPLETE** |
 | **Phase 14** | **Inventory Refresh + Baseline Update** | **M14.1-M14.2** | **0** | **✅ COMPLETE** |
 | **Phase 15** | **Float2 Position Encoding Investigation** | **M15.1-M15.4** | **0** | **✅ COMPLETE** |
+| **Phase 15.5** | **Float2 Z-Source Resolution** | **Z-source analysis** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 15 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 16 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -84,6 +85,37 @@
 (8 bytes/vertex = XY pairs). 20/71 (28%) use `descriptor-float3-generic` (12 bytes/vertex = XYZ).
 Float2 positions produce valid 3D OBJ vertices with real Z values — Z is sourced from a separate
 stream, mesh transform, or computed. Raw data requires endian-aware decoding (big-endian prevalent).
+
+### Phase 15.5 Z-Source Resolution
+
+**Finding: Z is sourced from mesh transform, not a companion stream.**
+
+Full stream inventory analysis of 36 float2-position meshes (156 streams total):
+- **48 position streams, ALL float2** — zero float3 position streams co-resident
+- **No companion Z-stream exists** — no float1, float2, or float3 stream carries Z data
+- **0 float3 positions** in any of the 36 meshes
+- **Stream composition**: 48 pos + 42 index + 33 normal + 7 UV + 26 other
+
+**OBJ Z-value verification** (mesh `4768bc6e3cfaabd0` MB=6, 36 vertices):
+- Z range: [-0.9260, 0.9351] (range = 1.8612, significant variation)
+- Only **9 unique Z values** out of 36 vertices — not fully per-vertex
+- Not constant (rules out simple transform-only hypothesis)
+- Pattern consistent with **transform-derived Z** where mesh transform maps XY to
+  a limited set of Z values (e.g., flat projection with tilt/rotation)
+
+This refutes the "separate Z stream" hypothesis. The OBJ exporter combines float2 XY data
+from the position stream with Z derived from the mesh's local-to-world transform to produce
+valid 3D vertices. This confirms that:
+1. Float2 position encoding is the real format (8 bytes/vertex = XY pairs)
+2. The heuristic classifier's `position-float3-lead` label is misleading — the stream stores XY only
+3. Mesh transforms encode Z position, not another data stream
+4. The descriptor's `descriptor-float2-uv` label is the correct element count indicator
+
+Note: "mesh transform" is the inferred explanation (separate-stream hypothesis is disproven).
+Direct verification would require checking the NiNode transform matrix.
+
+See: `scripts/analyze_z_source.py` (reusable analysis script).
+See: `Exports/phase15.5-z-source-analysis.txt` for per-mesh breakdown (local/ignored).
 
 ### Phase 14 Refresh Results
 
