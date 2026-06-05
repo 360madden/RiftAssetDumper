@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 34 ✅; project summary — 34-phase comprehensive overview with export stats, key discoveries, remaining work)
+**Last Updated**: 2026-06 (Phase 35 ✅; targeted probe cluster analysis — MS=321 and MS=325 confirmed via 3 probes; unknowns reduced 101→98)
 
 ---
 
@@ -95,8 +95,9 @@
 | **Phase 32** | **Final Coverage Audit** | **34/34 float3 IDs exported (8 faced + 26 pos-only); pairing map coverage 100% complete** | **0** | **✅ COMPLETE** |
 | **Phase 33** | **Full Project Health Sweep** | **ruff ✅ mypy ✅ build 0 errors tests 50/50 ✅ manifest 268 OBJs clean** | **0** | **✅ COMPLETE** |
 | **Phase 34** | **Project Summary Document** | **docs/roadmap/project-summary.md — comprehensive overview of all 34 phases** | **0** | **✅ COMPLETE** |
+| **Phase 35** | **Targeted Probe Cluster Analysis** | **3 probes resolved MS=321 (414f), MS=325 (318f + 18f); 37 cluster IDs identified** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 35 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 36 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
