@@ -52,7 +52,7 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 267 | 10 | 1 | New! Cluster probe (Phase 37) |
 | 276 | 17 | 1 | New! Cluster probe (Phase 36) |
 | 297 | 6 | 2 | New! Cluster probe (Phase 37) |
-| 301 | 6, 7 | 25 | Canonical faced family |
+| 301 | 6, 7, 25 | 25 | Canonical faced family (MB=25 added Phase 37) |
 | 305 | 6, 45, 46 | 16 | Mixed family |
 | 309 | 6 | 16 |
 | 321 | 6 | 16 | Expanded via 414-face cluster |
