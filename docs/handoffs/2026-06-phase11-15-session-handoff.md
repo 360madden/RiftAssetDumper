@@ -1,8 +1,8 @@
-# Session Handoff: Phases 11-14 — Descriptor-Guided Classification at Scale
+# Session Handoff: Phases 11-15 — Descriptor-Guided Classification at Scale
 
 **Date**: 2026-06-04
 **Session**: Autonomous research — descriptor application at population scale
-**Status**: COMPLETE ✅ (14 phases total, 16+ commits)
+**Status**: COMPLETE ✅ (15 phases total, 14 commits)
 **Living pointer**: `docs/roadmap/current-phase.md`
 
 ---
@@ -21,7 +21,8 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 | **12** | M12.1-M12.3 | Only 1 new pattern (08010400); descriptor map complete at 6 | 3 |
 | **13** | M13.1-M13.3 | Descriptor consistency proof guard (8th guard) | 1 |
 | **14** | M14.1-M14.2 | Inventory refresh with 08010400 coverage; baseline updated | 1 |
-| **Total** | 13 milestones | 4 phases, 14 phases project-wide | 10 |
+| **15** | M15.1-M15.4 | Float2 position encoding confirmed (51 float2, 20 float3); Z-source TBD | 1 |
+| **Total** | 17 milestones | 5 phases, 15 phases project-wide | 13 |
 
 ---
 
@@ -151,6 +152,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 ## Commit History (Session)
 
 ```
+efeb6a5 docs(phase15): float2 position encoding investigation — Phase 15 COMPLETE
 279eecb docs(phase14): inventory refresh — 4,076 streams classified, 08010400 coverage confirmed
 af6b055 feat(phase13): add descriptor consistency proof guard — Phase 13 COMPLETE
 e901989 docs(phase12): add Phase 12 to project roadmap — descriptor map complete at 6 patterns
@@ -178,9 +180,32 @@ d5a5251 docs(phase11): M11.3 descriptor→role mismatch analysis
 
 ---
 
-## What's Next (Phase 15+ Candidates)
+## Phase 15 — Float2 Position Encoding Investigation
 
-1. **Float2 position encoding investigation** — How are XY+Z stored? Separate Z stream? Computed Z?
+### Candidate Identification (M15.1)
+- Cross-referenced OBJ manifest against refreshed inventory
+- 51/71 OBJ-exported position streams use `descriptor-float2-uv` (72%)
+- 20/71 use `descriptor-float3-generic` (28%)
+
+### Mesh Probe Analysis (M15.2)
+- Probed float2-encoded position mesh (4768bc6e3cfaabd0): 36 vertices, payload=288, 288/8=36 confirms XY pairs
+- Float3 control (1601c1f75e0a6022): 30 vertices, payload=360, 360/12=30 confirms XYZ triplets
+
+### Encoding Pattern Analysis (M15.3)
+- Float2: 8 bytes/vertex = 2 floats (XY). Payload/8 always integer.
+- Float3: 12 bytes/vertex = 3 floats (XYZ). Payload/12 always integer.
+- Float2 positions produce valid 3D OBJ vertices with real Z values
+- Z is sourced from separate stream, mesh transform, or computed (not in the XY stream)
+- Raw data requires endian-aware decoding (big-endian prevalent in copied set)
+
+### Documentation (M15.4)
+- Finding documented in `current-phase.md`
+
+---
+
+## What's Next (Phase 16+ Candidates)
+
+1. **Find the Z source** — Investigate how Z is provided for float2 positions (separate stream? transform?)
 2. **Expand OBJ exports** — Use descriptor-guided candidate selection to export more than 94/5,507 meshes
 3. **Descriptor-validated export guard** — Add a C# pre-export check that validates stream roles against descriptors
 4. **50% unclassified frontier** — 4,076 streams without descriptor bytes — can the descriptor be inferred from other block data?
