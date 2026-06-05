@@ -1,8 +1,8 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06 (Phase 38)
+**Last Updated**: 2026-06 (Phase 41)
 
-**Purpose**: Comprehensive overview of all 40 completed phases, current state, key discoveries, and remaining work.
+**Purpose**: Comprehensive overview of all 43 completed phases, current state, key discoveries, and remaining work.
 
 ---
 
@@ -32,47 +32,32 @@ Reverse-engineering workspace for RIFT game asset archives. Focuses on decoding 
 
 ---
 
-## 2. Phase Summary (40 Phases)
+## 2. Phase Summary (43 Phases)
 
 ### Phase Group 1: Foundation (Phases 1-10)
 Descriptor subsystem, gate clearance, promotion, proof guards.
-
-**Key achievements:**
-- 7 gates cleared (100% promotion readiness)
-- 6 descriptor byte patterns proven (4/4 bytes identified)
-- Stride→usage rule: uint16×scalar→index, everything else→vertex
-- 58 C# code lines, 49 tests, 0 regressions, no Ghidra required
-- `FieldOrderPromoted=true`, `ParserExportPromotionAllowed=true`
+- 7 gates cleared, 6 descriptor patterns proven, 49 tests, 0 regressions
 
 ### Phase Group 2: Discovery & Classification (Phases 11-20)
 Population-scale inventory, sibling pairing maps, cross-type verification.
-
-**Key achievements:**
-- 142 sibling pairs identified across 10 MeshSize families
-- 9 cross-type NIF files confirmed (f2+f3 co-resident in same entry)
-- 22 DIST=0 (same-entry) pairs confirmed
-- Float2 Z-source mechanism resolved: **sibling position pairing**
-- 72% of OBJ positions use float2 encoding (8 bytes/vertex = XY)
+- 142 sibling pairs across 10 MeshSize families, 9 cross-type NIFs, float2 Z-source resolved
 
 ### Phase Group 3: Export Pipeline (Phases 21-34)
 Batch export scripts, manifest, index stream family map, coverage audit.
+- 4 export scripts, export manifest (schema v2), 100% pairing-map coverage
+
+### Phase Group 4: Cluster Probe Analysis (Phases 35-41)
+Targeted probes, cluster analysis, regex bug fix, pattern matching.
 
 **Key achievements:**
-- 4 batch export scripts created: `batch_export_sibling.py`, `batch_export_float3.py`, `batch_export_mb6.py`, `infer_meshsizes_from_clusters.py`
-- Export manifest system (`build_export_manifest.py`, schema v2)
-- Index stream family map (19 MeshSize families, per-MB breakdown)
-- 100% coverage of pairing-map reachable assets
-- Full project health sweep (all checks passing)
-
-### Phase Group 4: Cluster Probe Analysis (Phases 35-38)
-Targeted probes to resolve unknown MeshSizes from face-count clusters.
-
-**Key achievements:**
-- **Phase 35**: Probe cluster analysis — 3 probes confirmed MS=321 (414f) and MS=325 (318f), 37 cluster IDs identified
-- **Phase 35.5**: 13 cluster-inferred IDs added to probe lookup; unknowns 101→83
-- **Phase 36**: `infer_meshsizes_from_clusters.py` created; MS=276 and MS=354 discovered via probes; unknowns 83→79
-- **Phase 37**: 12 probes resolved 3 new families (MS=267, MS=297, MS=330); unknowns 79→66
-- **Phase 38**: **Regex bug fix in `build_export_manifest.py`** recovered **33 hidden IDs** that were always in Exports/ but couldn't be extracted (wrong regex pattern `-mesh\d+$` didn't account for `.obj` extension). 15 probes resolved 3 new families: MS=280, MS=367, MS=405 + 2 known matches. Unknowns 81→66.
+- **Phase 35**: 3 probes confirmed MS=321, 325; 37 cluster IDs identified
+- **Phase 35.5**: 13 inferred IDs; unknowns 101→83
+- **Phase 36**: `infer_meshsizes_from_clusters.py`; MS=276, 354 discovered; unknowns 83→79
+- **Phase 37**: 12 probes; 3 new families (MS=267, 297, 330); unknowns 79→66
+- **Phase 38**: Regex bug fix recovered **33 hidden IDs**; 15 probes; 3 new families (MS=280, 367, 405); unknowns 81→66
+- **Phase 39**: Project summary updated; health sweep (all clean)
+- **Phase 40**: 16 pos-only regex-recovered IDs probed; **8 new pos-only families** (MS=193, 197, 214, 272, 275, 307, 326, 337); unknowns 66→49
+- **Phase 41**: **Pattern-matching logic** added to `build_export_manifest.py` — resolves no-ID entries by (faces, verts, MB) matching against known probes with 10% tolerance; **32 entries resolved without probes**; unknowns 49→22
 
 ---
 
@@ -90,51 +75,38 @@ Targeted probes to resolve unknown MeshSizes from face-count clusters.
 | Total faces | ~20,350 |
 | Total bytes | ~2,200 KB |
 | Structural issues | 0 |
-| Probe lookup entries | 52 |
-| Resolved MeshSize IDs | 52 |
+| Probe lookup entries | 68 |
+| Resolved MeshSize IDs | 68 |
 
 ### Per-MeshSize Breakdown
 
 | MeshSize | Faced | PosOnly | Total | % Faced |
 |---|---|---|---|---|
-| 240 | 2 | 0 | 2 | 100% |
-| 276 | 7 | 0 | 7 | 100% |
+| 193 | 0 | 2 | 2 | 0% |
+| 197 | 0 | 1 | 1 | 0% |
+| 214 | 0 | 1 | 1 | 0% |
+| 240 | 4 | 0 | 4 | 100% |
+| 272 | 0 | 2 | 2 | 0% |
+| 275 | 0 | 3 | 3 | 0% |
+| 276 | 8 | 0 | 8 | 100% |
 | 280 | 4 | 0 | 4 | 100% |
-| 297 | 9 | 0 | 9 | 100% |
-| 301 | 19 | 0 | 19 | 100% |
-| 305 | 17 | 31 | 48 | 35% |
+| 297 | 6 | 0 | 6 | 100% |
+| 301 | 22 | 0 | 22 | 100% |
+| 305 | 17 | 34 | 51 | 33% |
+| 307 | 0 | 1 | 1 | 0% |
 | 309 | 19 | 0 | 19 | 100% |
 | 321 | 10 | 1 | 11 | 91% |
-| 325 | 53 | 0 | 53 | 100% |
-| 329 | 0 | 2 | 2 | 0% |
-| 345 | 1 | 0 | 1 | 100% |
-| 367 | 3 | 0 | 3 | 100% |
+| 325 | 61 | 0 | 61 | 100% |
+| 326 | 0 | 1 | 1 | 0% |
+| 329 | 0 | 5 | 5 | 0% |
+| 337 | 0 | 1 | 1 | 0% |
+| 345 | 5 | 0 | 5 | 100% |
+| 367 | 13 | 0 | 13 | 100% |
 | 389 | 0 | 2 | 2 | 0% |
 | 405 | 3 | 0 | 3 | 100% |
-| 465 | 1 | 18 | 19 | 5% |
-| unknown | 36 | 30 | 66 | 55% |
+| 465 | 1 | 19 | 20 | 5% |
+| unknown | 11 | 11 | 22 | 50% |
 | **(total)** | **184** | **84** | **268** | **69%** |
-
-### Probe Lookup Distribution (52 entries)
-
-| MeshSize | IDs | Source |
-|---|---|---|
-| 240 | 1 | Phase 27 probe |
-| 267 | 1 | Phase 37 probe |
-| 276 | 4 | Phase 36-38 probes |
-| 280 | 4 | Phase 38 regex recovery |
-| 297 | 2 | Phase 37 probes |
-| 301 | 8 | Phase 37-38 probes |
-| 321 | 13 | Phase 35.5-38 probes + inference |
-| 325 | 7 | Phase 35-37 probes + inference |
-| 330 | 1 | Phase 37 probe |
-| 354 | 1 | Phase 36 probe |
-| 361 | 1 | Phase 27 probe |
-| 365 | 1 | Phase 27 probe |
-| 367 | 3 | Phase 38 regex recovery |
-| 370 | 1 | Phase 27 probe |
-| 405 | 3 | Phase 38 regex recovery |
-| 465 | 1 | Phase 27 probe |
 
 ### Quality Metrics
 
@@ -152,28 +124,28 @@ Targeted probes to resolve unknown MeshSizes from face-count clusters.
 ## 4. Key Discoveries
 
 ### Sibling Position Pairing (Phase 15.5-17)
-Z is sourced through sibling position pairing. Float2 meshes store XY-only (8 bytes/vertex). A paired float3 sibling in the same archive entry provides full XYZ data. The `NifPositionSourceSiblingAccumulator` handles cross-mesh pairing in the C# exporter.
+Z is sourced through sibling position pairing. Float2 meshes store XY-only (8 bytes/vertex). A paired float3 sibling provides full XYZ data.
 
 ### Index Stream Family Map (Phase 28-29)
-Faced vs position-only is determined by **which mesh block you export**, not by asset. MB=6 is the canonical faced geometry block for MeshSizes 240-405. MB=7 and MB=27 are sister blocks for sibling pairing (position-only).
+Faced vs position-only is determined by **which mesh block you export**. MB=6 is the canonical faced geometry block for MeshSizes 240-405. MB=7 and MB=27 are sister blocks for sibling pairing.
 
-### 19 MeshSize Families Identified (Phases 27-38)
-Through systematic probes and cluster analysis:
-- **Canonical faced families**: 240, 267, 276, 280, 297, 301, 309, 321, 325, 330, 345, 354, 361, 365, 367, 405, 465 (MB=7)
-- **Position-only families**: 329, 370, 389
-- **Mixed family**: 305 (faced at MB=6,45,46; pos-only at MB=7,27)
+### 29 MeshSize Families Identified (Phases 27-41)
+Through systematic probes, cluster analysis, and pattern matching:
+- **17 faced-capable families**: 240, 267, 276, 280, 297, 301, 309, 321, 325, 330, 345, 354, 361, 365, 367, 405, 465 (MB=7)
+- **1 mixed family**: 305 (faced at MB=6,45,46; pos-only at MB=7,27)
+- **11 position-only families**: 193, 197, 214, 272, 275, 307, 326, 329, 337, 370, 389
 
 ### Regex Bug Discovery (Phase 38)
-The `extract_asset_id()` function in `build_export_manifest.py` had a regex bug: `r"-mesh\d+$"` was supposed to strip `-mesh{N}` from OBJ filenames, but since filenames end with `.obj`, the regex never matched. This caused **33 IDs** to remain permanently unresolved. Fixed by changing the regex to `r"-mesh\d+\..*$"` (accounts for `.obj` extension).
+`extract_asset_id()` had a regex bug: `r"-mesh\d+$"` never matched `.obj` extension. Fixed to `r"-mesh\d+\..*$"`. Recovered **33 hidden IDs**.
+
+### Pattern-Matching Resolution (Phase 41)
+`build_export_manifest.py` now resolves no-ID entries by matching (faces, vertices, mesh_block, faced) patterns against known probe entries with 10% tolerance. **32 entries resolved without probes** in the first run.
 
 ### Batch Export Scripts
-- **batch_export_sibling.py**: 142 sibling pairs exported (127 unique OBJs)
-- **batch_export_float3.py**: 9 float3 IDs exported, 6 faced + 3 pos-only
+- **batch_export_sibling.py**: 142 sibling pairs exported
+- **batch_export_float3.py**: 9 IDs, 6 faced + 3 pos-only
 - **batch_export_mb6.py**: 36 float2 IDs confirmed position-only
-- **infer_meshsizes_from_clusters.py**: Automates cluster inference from probe lookup
-
-### Float3 Batch Export (Phase 30)
-34 float3 IDs in the pairing map. 8 produce faced OBJs (have index streams), 26 are position-only. All 34 have been exported (100% coverage).
+- **infer_meshsizes_from_clusters.py**: Cluster inference automation
 
 ---
 
@@ -181,50 +153,40 @@ The `extract_asset_id()` function in `build_export_manifest.py` had a regex bug:
 
 ### Open Questions
 
-1. **66 unknown MeshSize entries**: 36 faced + 30 position-only. 17 of these are IDs recovered by the Phase 38 regex fix that haven't been probed yet (these are position-only). The remaining 49 lack asset IDs entirely (from batch-264, fallback exports). Prior probes have resolved all IDs in Exports/ that have probe-accessible identifiers.
+1. **22 unknown MeshSize entries**: 11 faced + 11 position-only. These are individual-export OBJs without asset IDs that didn't match any probe pattern. Likely edge cases (very small meshes, 0-face OBJs, one large NIF not in Source/).
 
 2. **Auto-face reconstruction**: 84 position-only OBJs have valid vertex data but no index streams. Could faces be generated algorithmically from vertex adjacency or strip topology?
 
-3. **@264 mesh variants**: 5 batch-264-* OBJs exist (v128, v64, v80, v95) but only 1 faced (v128). The other variants are position-only — likely different vertex-count encoding attempts.
+3. **No probe targets remain**: All IDs in Exports/ that have probe-accessible identifiers have been resolved. The remaining unknowns cannot be resolved via probes.
 
 ### Known Limitations
 
-- **No faces for float2-paired meshes**: Meshes that require sibling pairing for Z-sourcing will never have index streams. This is a fundamental encoding decision in the game engine.
-- **MeshSize not in OBJ headers**: OBJ files don't include MeshSize in their comments. MeshSize must be determined via probe or cross-reference with the pairing map.
-- **Inventory file too large (219MB)**: Full cross-referencing with the population inventory requires the streaming parser from Phase 15.5.
-- **No asset ID in OBJ files**: Asset ID is only in the OBJ filename path, not in the file contents. This makes ID recovery fragile — dependent on directory structure.
+- **No faces for float2-paired meshes**: These fundamentally lack index streams.
+- **MeshSize not in OBJ headers**: Must be determined via probe or cross-reference.
+- **No asset ID in OBJ files**: ID recovery depends on directory structure.
+- **Multiple MBs for same family**: Future probe work may need to target new MB variants.
 
 ---
 
 ## 6. Script & Document Reference
 
-### Batch Export Scripts
-
-| Script | Purpose | Output Dir |
-|---|---|---|
-| `scripts/batch_export_sibling.py` | Export float2 meshes with --include-close | `Exports/obj-exports/` |
-| `scripts/batch_export_float3.py` | Export unexported float3 meshes | `Exports/float3-exports/` |
-| `scripts/batch_export_mb6.py` | Export MB=6 for float2 IDs | `Exports/mb6-exports/` |
-
-### Utility & Analysis Scripts
+### Key Scripts
 
 | Script | Purpose |
 |---|---|
-| `scripts/build_export_manifest.py` | Generate comprehensive OBJ catalog |
-| `scripts/infer_meshsizes_from_clusters.py` | Automate MeshSize inference from face-count clusters |
-| `scripts/analyze_z_source.py` | Streaming JSON parser for inventory analysis |
-| `scripts/build_sibling_pairing_v2.py` | Build comprehensive pairing database |
-| `scripts/verify_cross_type_nifs.py` | Verify cross-type NIF files |
-| `scripts/batch_sweep.py` | 4-phase OBJ integrity + candidate discovery |
+| `scripts/build_export_manifest.py` | Export manifest with ID extraction + pattern matching |
+| `scripts/infer_meshsizes_from_clusters.py` | Cluster-based MeshSize inference |
+| `scripts/analyze_z_source.py` | Streaming JSON parser |
+| `scripts/build_sibling_pairing_v2.py` | Comprehensive pairing database |
+| `scripts/batch_sweep.py` | 4-phase OBJ integrity + discovery |
 
 ### Reference Documents
 
 | Document | Contents |
 |---|---|
-| `docs/roadmap/project-roadmap.md` | Original phase roadmap (Phases 0-17) |
-| `docs/roadmap/current-phase.md` | Living phase pointer + full history (40 phases) |
-| `docs/roadmap/index-stream-family-map.md` | Per-MeshSize per-MB index stream reference (19 families) |
-| `docs/roadmap/project-summary.md` | This document — comprehensive overview |
+| `docs/roadmap/current-phase.md` | Living phase pointer + full history (43 phases) |
+| `docs/roadmap/index-stream-family-map.md` | Per-MeshSize per-MB index stream reference |
+| `docs/roadmap/project-summary.md` | This document |
 
 ---
 
@@ -232,20 +194,15 @@ The `extract_asset_id()` function in `build_export_manifest.py` had a regex bug:
 
 | Metric | Value |
 |---|---|
-| Total phases | 40 |
+| Total phases | 43 |
 | Gates cleared | 7 |
-| Descriptor patterns proven | 6 |
 | Proof guards | 8 |
-| C# tests | 50 |
-| Python tests | ~49 |
-| Batch/utility scripts | 8 |
-| MeshSize families mapped | 19 (16 faced, 3 pos-only) |
-| Float3 IDs tracked | 34 |
+| C# tests | 50 (all pass) |
+| Python tests | ~49 (all pass) |
+| MeshSize families mapped | 29 (17 faced + 1 mixed + 11 pos-only) |
 | Sibling pairs | 142 |
-| Probe lookup entries | 52 |
+| Probe lookup entries | 68 |
 | Faced OBJs | 184 |
 | Position-only OBJs | 84 |
-| Total vertices exported | ~19,800 |
-| Total faces exported | ~20,350 |
-| Unknown MeshSize | 66 (36 faced, 30 pos-only) |
+| Unknown MeshSize | 22 (11 faced, 11 pos-only) |
 | Structural issues | 0 |
