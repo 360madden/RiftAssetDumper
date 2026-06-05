@@ -13,6 +13,7 @@ Usage:
     python scripts/build_export_manifest.py [--out DIR] [--obj-root PATH]
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -48,9 +49,17 @@ def _parse_int_header(line: str, split_idx: int = 2) -> int | None:
 
 def parse_obj_header(path: Path) -> dict:
     """Parse comment lines from an OBJ header to extract metadata."""
+    # Compute SHA256 hash of file contents (integrity verification)
+    sha256 = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(65536):
+            sha256.update(chunk)
+    file_hash = sha256.hexdigest()
+
     meta: dict = {
         "path": str(path),
         "file_size": path.stat().st_size,
+        "sha256": file_hash,
         "nif_version": None,
         "mesh_block": None,
         "positions": None,
@@ -129,6 +138,31 @@ def extract_asset_id(filepath: Path) -> str | None:
     return None
 
 
+def detect_provenance(obj_path: Path) -> str:
+    """Detect whether an OBJ came from copied-source or live archives.
+
+    Live-archive OBJs are in decode-nif-geometry directories from
+    assets probed against the live root (C:/Program Files/.../RIFT/Live).
+    We detect this by checking if the decode directory contains live-probe
+    artifacts or by checking known live-exported asset IDs.
+    """
+    path_str = str(obj_path).lower()
+    # Known live-exported asset IDs (from live_family_scanner discoveries)
+    live_ids = {
+        "cf54e712ff57eaac",  # meshSize=362, 357
+        "1ecdbaf5a2576ba5",  # meshSize=349
+    }
+    # Check if path contains a known live asset ID
+    for aid in live_ids:
+        if aid in path_str:
+            return "live"
+    # Check for live-archive specific path patterns
+    if "live-" in path_str:
+        return "live"
+    # Default: copied source
+    return "copied"
+
+
 def classify_export_batch(obj_path: Path) -> str:
     """Classify which batch/phase exported this OBJ based on its path."""
     parts = obj_path.parts
@@ -205,6 +239,8 @@ def main() -> int:
     ms_breakdown: dict[str, dict] = {}
     # Per-export-batch breakdown
     batch_counts: Counter = Counter()
+    # Per-provenance breakdown
+    provenance_counts: Counter = Counter()
 
     start = time.time()
 
@@ -216,10 +252,11 @@ def main() -> int:
             meta["asset_id"] = asset_id
             asset_ids_found.add(asset_id)
 
-        # Classify export batch
+        # Classify export batch and provenance
         batch = classify_export_batch(obj_path)
         meta["export_batch"] = batch
         batch_counts[batch] += 1
+        meta["provenance"] = detect_provenance(obj_path)
 
         # Determine MeshSize:
         # 1. Check pairing map (float2 side)
@@ -275,6 +312,8 @@ def main() -> int:
         else:
             ms_breakdown[ms_key]["position_only"] += 1
             position_only_count += 1
+
+        provenance_counts[meta.get("provenance", "unknown")] += 1
 
         total_vertices += meta.get("vertex_count", 0)
         total_faces += meta.get("faces", 0) or 0
@@ -423,7 +462,7 @@ def main() -> int:
 
     # Build manifest
     manifest = {
-        "schema": "export-manifest-v2",
+        "schema": "export-manifest-v3",
         "generated_output_notice": "Generated from local copied RIFT assets. Keep under ignored Exports/.",
         "scan_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "scan_duration_s": round(elapsed, 1),
@@ -439,6 +478,7 @@ def main() -> int:
             "descriptors": descriptors,
             "mesh_size_breakdown": ms_breakdown,
             "export_batch_breakdown": dict(batch_counts.most_common()),
+            "provenance_breakdown": dict(provenance_counts.most_common()),
         },
         "entries": entries,
     }
@@ -474,6 +514,10 @@ def main() -> int:
     print("\n  Export Batch Breakdown:")
     for batch, count in batch_counts.most_common():
         print(f"    {batch}: {count}")
+
+    print("\n  Provenance Breakdown:")
+    for prov, count in provenance_counts.most_common():
+        print(f"    {prov}: {count}")
 
     if descriptors:
         print("\n  Position descriptors:")
