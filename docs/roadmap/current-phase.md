@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 18 ✅; comprehensive sibling pairing database — 142 pairs, 10 shared MeshSizes)
+**Last Updated**: 2026-06 (Phase 19 ✅; sibling pairing improved — 22 DIST=0 pairs, JSON output)
 
 ---
 
@@ -79,8 +79,9 @@
 | **Phase 16** | **Sibling Pairing Map** | **Pairing map** | **0** | **✅ COMPLETE** |
 | **Phase 17** | **Sibling Pair Verification** | **Probe confirmation** | **0** | **✅ COMPLETE** |
 | **Phase 18** | **Comprehensive Sibling Pairing Database** | **Full-inventory scan** | **0** | **✅ COMPLETE** |
+| **Phase 19** | **Sibling Pairing Improvements** | **DIST=0 tracking + JSON output** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 19 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 20 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -174,6 +175,26 @@ The heuristic uses greedy nearest-entry matching (distance < 100 entries within 
 so some float3 meshes may be 1:N paired with multiple float2 meshes.
 
 See: `scripts/build_sibling_pairing_v2.py` for the comprehensive database builder.
+
+### Phase 19: Sibling Pairing Improvements
+
+**Finding: 22 DIST=0 (same-entry) pairs confirmed across 3 MeshSizes — 7x expansion from Phase 17.**
+
+| Metric | Phase 18 | Phase 19 |
+|---|---|---|
+| Total archive-close pairs | 142 | **142** (same) |
+| DIST=0 (same entry) pairs | not tracked | **22** |
+| MeshSizes with DIST=0 pairs | 3 (305, 309, 465) | **3** (expanded: 305=9, 329=2, 465=11) |
+| JSON output | none | **Exports/phase19-sibling-pairing-map.json** |
+
+**New finding**: MeshSize 329 now has 2 DIST=0 pairs (was 0 in Phase 16 analysis). This means
+sibling pairing within the same archive entry extends to the meshSize=329 family.
+
+**Improvements**:
+- DIST=0 pairs tracked and annotated with `(SAME ENTRY)` in output
+- Structured JSON output written to `Exports/phase19-sibling-pairing-map.json`
+- Per-MeshSize DIST=0 counts in summary
+- `int()` casts now use `or "0"` fallback to prevent ValueError
 
 ### Phase 17: Concrete Sibling Pair Verification
 

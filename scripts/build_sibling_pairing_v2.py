@@ -1,5 +1,5 @@
 """
-Phase 18: Comprehensive Sibling Pairing Database
+Phase 19: Comprehensive Sibling Pairing Database
 
 Builds a comprehensive sibling pairing database by:
 1. Scanning ALL position streams (not just OBJ-exported ones)
@@ -7,18 +7,24 @@ Builds a comprehensive sibling pairing database by:
 3. Detecting float3 positions via DescriptorGuidedRole or role naming
 4. Building archive-proximity sibling pairs for ALL shared MeshSizes
 5. Cross-referencing pairings across the full copied set
+6. Writing structured JSON output to Exports/ for reuse
 
-Extends the Phase 16 archive-proximity approach (which only used OBJ IDs)
-to the full inventory. Archive proximity is a heuristic: greedy nearest-entry
-matching within each archive, so some float3 meshes may be paired with
-multiple float2 meshes (1:N).
+Archive proximity is a heuristic: greedy nearest-entry matching within each
+archive, so some float3 meshes may be paired with multiple float2 meshes (1:N).
+DIST=0 pairs (same archive entry) are the strongest evidence.
+
+Usage: python scripts/build_sibling_pairing_v2.py
+Output: stdout analysis + Exports/phase19-sibling-pairing-map.json
 """
 
+import json
+import os
+import sys
 from collections import defaultdict
 
 SEP = "=" * 80
-
 INVENTORY_PATH = "Exports/phase14-refreshed-inventory.jsonl"
+OUTPUT_PATH = "Exports/phase19-sibling-pairing-map.json"
 
 
 def extract_str_val(line: str) -> str | None:
@@ -39,7 +45,7 @@ def extract_int_val(line: str) -> str | None:
 
 def main() -> int:
     print(SEP)
-    print("PHASE 18: COMPREHENSIVE SIBLING PAIRING DATABASE")
+    print("PHASE 18/19: COMPREHENSIVE SIBLING PAIRING DATABASE")
     print(SEP)
 
     # State machine
@@ -53,7 +59,6 @@ def main() -> int:
     current_archive = ""
     current_entry = ""
 
-    # Group ALL position streams by MeshSize (not just OBJ IDs)
     all_position_streams: dict[str, list[dict]] = defaultdict(list)
 
     with open(INVENTORY_PATH, "rb") as f:
@@ -105,11 +110,9 @@ def main() -> int:
             if val:
                 current_entry = val
 
-        # Replicate the proven Phase 16 logic: capture position streams
         if current_id and "position" in current_role and current_meshsize:
             is_f2 = "float2" in current_dgr
             is_f3 = "float3" in current_dgr
-
             all_position_streams[current_meshsize].append({
                 "id": current_id,
                 "mb": current_mb,
@@ -122,7 +125,6 @@ def main() -> int:
                 "entry": current_entry,
                 "pos_type": "float2" if is_f2 else ("float3" if is_f3 else "other"),
             })
-            # Reset role to avoid double-counting within same record
             current_role = ""
 
     print()
@@ -140,9 +142,7 @@ def main() -> int:
 
     print(f"\n  TOTALS: {len(all_position_streams)} MeshSizes, {total_f2} float2, {total_f3} float3")
 
-    # ============================================================
-    # PASS 2: Find shared MeshSizes (have BOTH float2 and float3)
-    # ============================================================
+    # PASS 2: Shared MeshSizes
     shared_sizes = [
         ms for ms in all_position_streams
         if any(s["pos_type"] == "float2" for s in all_position_streams[ms])
@@ -155,23 +155,23 @@ def main() -> int:
         f3 = sum(1 for s in streams if s["pos_type"] == "float3")
         print(f"  MeshSize {ms}: {f2} float2, {f3} float3")
 
-    # ============================================================
-    # PASS 3: Build sibling pairing map for shared MeshSizes
-    # ============================================================
+    # PASS 3: Build sibling pairing map
     print(f"\n{SEP}")
     print("COMPREHENSIVE SIBLING PAIRING MAP (FULL INVENTORY)")
     print(SEP)
 
     total_pairs = 0
+    dist0_pairs = 0
     total_f2_meshes = 0
     total_f3_meshes = 0
+    all_pairs: list[dict] = []
 
     for ms in sorted(shared_sizes, key=lambda x: int(x) if x.isdigit() else 0):
         streams = all_position_streams[ms]
         f2_meshes = [s for s in streams if s["pos_type"] == "float2"]
         f3_meshes = [s for s in streams if s["pos_type"] == "float3"]
 
-        # Deduplicate by (archive, entry, mb) - a mesh may have multiple records
+        # Deduplicate
         seen_f2: set[tuple[str, str, str]] = set()
         unique_f2: list[dict] = []
         for s in f2_meshes:
@@ -192,19 +192,17 @@ def main() -> int:
         total_f2_meshes += len(unique_f2)
         total_f3_meshes += len(unique_f3)
 
-        # Group by archive for proximity analysis
         archive_groups: dict[str, dict[str, list]] = defaultdict(lambda: {"float2": [], "float3": []})
         for m in unique_f2:
             archive_groups[m["archive"] or "unknown"]["float2"].append(m)
         for m in unique_f3:
             archive_groups[m["archive"] or "unknown"]["float3"].append(m)
 
-        # For each archive, find possible sibling pairs
         ms_pairs = 0
+        ms_dist0 = 0
         for arch, groups in sorted(archive_groups.items()):
             f2_in_arch = groups["float2"]
             f3_in_arch = groups["float3"]
-
             if not f2_in_arch or not f3_in_arch:
                 continue
 
@@ -226,7 +224,13 @@ def main() -> int:
                     ms_pairs += 1
                     total_pairs += 1
                     f3_entry = int(best_f3["entry"] or "0")
-                    print(f"  Pair #{ms_pairs}:")
+                    is_dist0 = best_dist == 0
+                    if is_dist0:
+                        ms_dist0 += 1
+                        dist0_pairs += 1
+
+                    tag = " (SAME ENTRY)" if is_dist0 else ""
+                    print(f"  Pair #{ms_pairs}:{tag}")
                     print(f"    FLOAT2: {f2_m['id'][:16]} MB={f2_m['mb']} entry={f2_entry}")
                     print(f"    FLOAT3: {best_f3['id'][:16]} MB={best_f3['mb']} entry={f3_entry}")
                     print(f"    Archive: {arch}, distance={best_dist}")
@@ -235,9 +239,24 @@ def main() -> int:
                     if best_f3.get("body16"):
                         print(f"    F3 first16: {best_f3['body16'][:40]}")
 
+                    all_pairs.append({
+                        "meshsize": int(ms),
+                        "archive": arch,
+                        "distance": best_dist,
+                        "float2_id": f2_m["id"][:16],
+                        "float2_mb": int(f2_m["mb"] or "0"),
+                        "float2_entry": f2_entry,
+                        "float2_payload": f2_m.get("payload", ""),
+                        "float2_body16": (f2_m.get("body16", "") or "")[:40],
+                        "float3_id": best_f3["id"][:16],
+                        "float3_mb": int(best_f3["mb"] or "0"),
+                        "float3_entry": f3_entry,
+                        "float3_payload": best_f3.get("payload", ""),
+                        "float3_body16": (best_f3.get("body16", "") or "")[:40],
+                    })
+
         if ms_pairs == 0:
             print("  No archive-close pairs found")
-            # Show what archives have float2 vs float3
             for arch, groups in sorted(archive_groups.items()):
                 f2_in_arch = groups["float2"]
                 f3_in_arch = groups["float3"]
@@ -245,48 +264,71 @@ def main() -> int:
                     print(f"  Float2 only in {arch}: {len(f2_in_arch)} meshes")
                 if f3_in_arch and not f2_in_arch:
                     print(f"  Float3 only in {arch}: {len(f3_in_arch)} meshes")
+        else:
+            print(f"  [{ms_pairs} pairs, {ms_dist0} DIST=0 (same entry)]")
 
-    # ============================================================
-    # PASS 4: NIF-level sibling groups (same NIF, different mesh blocks)
-    # ============================================================
+    # PASS 4: NIF-level sibling groups
     print(f"\n{SEP}")
     print("NIF-LEVEL SIBLING GROUP ANALYSIS")
     print(SEP)
 
-    # Group by NIF ID: id -> [(mb, role, dgr, ms, pos_type)]
     nif_groups: dict[str, list[dict]] = defaultdict(list)
     for _ms, streams in all_position_streams.items():
         for s in streams:
             nif_groups[s["id"]].append(s)
 
-    # For each NIF, find groups of mesh blocks sharing the same position role pattern
     multi_mesh_nifs = 0
     cross_type_nifs = 0
+    cross_type_details: list[dict] = []
+
     for nif_id, records in nif_groups.items():
         if len(records) < 2:
             continue
-
-        # Check if this NIF has multiple mesh blocks with position streams
         mesh_blocks = set(r["mb"] for r in records)
         if len(mesh_blocks) < 2:
             continue
-
         multi_mesh_nifs += 1
-
-        # Check if this NIF has BOTH float2 and float3 positions
         types_in_nif = set(r["pos_type"] for r in records)
         if "float2" in types_in_nif and "float3" in types_in_nif:
             cross_type_nifs += 1
+            entries = [
+                {"mb": r["mb"], "pos_type": r["pos_type"], "role": r["role"][:30],
+                 "dgr": r["dgr"], "meshsize": r["meshsize"]}
+                for r in sorted(records, key=lambda x: int(x["mb"] or "0"))
+            ]
+            cross_type_details.append({"nif_id": nif_id[:16], "entries": entries})
             print(f"\n  NIF={nif_id[:16]} has BOTH float2 and float3 position streams:")
-            for r in sorted(records, key=lambda x: int(x["mb"] or "0")):
-                print(f"    MB={r['mb']} type={r['pos_type']} role={r['role'][:30]} dgr={r['dgr']} ms={r['meshsize']}")
+            for e in entries:
+                print(f"    MB={e['mb']} type={e['pos_type']} role={e['role'][:30]} dgr={e['dgr']} ms={e['meshsize']}")
 
     print(f"\n  NIF files with multiple position-stream mesh blocks: {multi_mesh_nifs}")
     print(f"  NIF files with BOTH float2 and float3: {cross_type_nifs}")
 
-    # ============================================================
+    # Write JSON output
+    output = {
+        "schema": "phase19-sibling-pairing-map-v1",
+        "generated_output_notice": "Generated from local copied RIFT assets. Keep under ignored Exports/.",
+        "summary": {
+            "mesh_sizes_scanned": len(all_position_streams),
+            "shared_mesh_sizes": len(shared_sizes),
+            "shared_mesh_sizes_list": sorted(shared_sizes, key=lambda x: int(x) if x.isdigit() else 0),
+            "total_float2_meshes": total_f2_meshes,
+            "total_float3_meshes": total_f3_meshes,
+            "total_archive_close_pairs": total_pairs,
+            "total_dist0_pairs": dist0_pairs,
+            "nif_multi_block_meshes": multi_mesh_nifs,
+            "nif_cross_type_meshes": cross_type_nifs,
+        },
+        "pairs": all_pairs,
+        "cross_type_nifs": cross_type_details,
+    }
+
+    os.makedirs(os.path.dirname(OUTPUT_PATH) or ".", exist_ok=True)
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2)
+    print(f"\n  Wrote JSON output: {OUTPUT_PATH}")
+
     # SUMMARY
-    # ============================================================
     print(f"\n{SEP}")
     print("SUMMARY")
     print(SEP)
@@ -295,8 +337,11 @@ def main() -> int:
     print(f"  Total float2 position meshes: {total_f2_meshes}")
     print(f"  Total float3 position meshes: {total_f3_meshes}")
     print(f"  Total archive-close sibling pairs: {total_pairs}")
+    print(f"    DIST=0 (same entry): {dist0_pairs}")
+    print(f"    DIST=1-99 (archive-close): {total_pairs - dist0_pairs}")
     print(f"  NIF files with multiple position mesh blocks: {multi_mesh_nifs}")
     print(f"  NIF files with cross-type (f2+f3): {cross_type_nifs}")
+    print(f"  JSON output: {OUTPUT_PATH}")
     print(SEP)
     print("DONE")
 
@@ -304,5 +349,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())
