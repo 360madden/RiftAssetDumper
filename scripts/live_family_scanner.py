@@ -18,6 +18,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,7 @@ DEFAULT_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.cspro
 DEFAULT_LIVE_ROOT = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
 DEFAULT_INVENTORY = REPO_ROOT / "Exports" / "live-mesh-inventory-500.json"
 DEFAULT_OUT = REPO_ROOT / "Exports"
+LIVE_REGISTRY_PATH = REPO_ROOT / "scripts" / "live-exported-ids.json"
 
 
 def load_live_inventory(path: Path) -> dict[str, Any]:
@@ -65,12 +67,10 @@ def extract_new_families(data: dict[str, Any]) -> dict[int, dict[str, Any]]:
     """Extract mesh-size families not in the known copied set.
 
     Returns dict mapping mesh_size -> family info with:
-        - id: asset ID prefix
-        - mesh_block: mesh block index
-        - archive: archive name
-        - entry: entry index
+        - mesh_size: int
         - roles: set of observed roles
         - priority: best role priority score
+        - candidates: list of {id, mb, archive, entry} — ALL unique (id, mb) pairs
     """
     families: dict[int, dict[str, Any]] = {}
     role_groups = data.get("RoleGroups", [])
@@ -110,18 +110,31 @@ def extract_new_families(data: dict[str, Any]) -> dict[int, dict[str, Any]]:
             if ms_int not in families:
                 families[ms_int] = {
                     "mesh_size": ms_int,
-                    "id": aid,
-                    "mesh_block": mb,
-                    "archive": archive,
-                    "entry": entry,
                     "roles": set(),
                     "priority": 0,
+                    "candidates": [],
+                    "seen": set(),  # dedup (id, mb) pairs
                 }
 
             families[ms_int]["roles"].add(role)
             role_score = ROLE_PRIORITY.get(role, 0)
             if role_score > families[ms_int]["priority"]:
                 families[ms_int]["priority"] = role_score
+
+            # Deduplicate candidates by (id, mb)
+            candidate_key = (aid, mb)
+            if candidate_key not in families[ms_int]["seen"]:
+                families[ms_int]["seen"].add(candidate_key)
+                families[ms_int]["candidates"].append({
+                    "id": aid,
+                    "mb": mb,
+                    "archive": archive,
+                    "entry": entry,
+                })
+
+    # Clean up internal tracking
+    for fam in families.values():
+        del fam["seen"]
 
     return families
 
@@ -364,23 +377,113 @@ def export_family(
     return result
 
 
+def _load_live_registry() -> dict[str, Any]:
+    """Load the live-exported-ids.json registry. Returns empty dict if missing."""
+    if not LIVE_REGISTRY_PATH.exists():
+        return {"ids": {}}
+    try:
+        with open(LIVE_REGISTRY_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {"ids": {}}
+
+
+def _update_live_registry(aid: str, mesh_size: int, archive: str = "", entry: Any = None) -> None:
+    """Add a successfully exported asset ID to the live-exported-ids.json registry.
+
+    Idempotent: if the ID already exists, appends the mesh size if new.
+    Preserves existing schema/description fields from the registry.
+    """
+    registry = _load_live_registry()
+    ids = registry.get("ids", {})
+    if not isinstance(ids, dict):
+        ids = {}
+
+    if aid not in ids:
+        ids[aid] = {"mesh_sizes": [mesh_size], "archive": archive, "entry": entry}
+    else:
+        existing_sizes = ids[aid].get("mesh_sizes", [])
+        if mesh_size not in existing_sizes:
+            existing_sizes.append(mesh_size)
+            existing_sizes.sort()
+            ids[aid]["mesh_sizes"] = existing_sizes
+
+    registry["ids"] = ids
+    registry["generated_at"] = datetime.now().strftime("%Y-%m-%d")
+    LIVE_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LIVE_REGISTRY_PATH.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+
+
+def batch_probe_family(
+    family: dict[str, Any],
+    live_root: str,
+    skip_build: bool = False,
+) -> dict[str, Any]:
+    """Exhaustively probe ALL mesh-block candidates for a family.
+
+    Tries each (id, mb) candidate sequentially until position data is found
+    or all candidates are exhausted. Returns the first viable probe result,
+    or the last probe result if none are viable.
+    """
+    candidates = family.get("candidates", [])
+    results: list[dict[str, Any]] = []
+
+    for i, cand in enumerate(candidates):
+        aid = cand["id"]
+        mb = cand["mb"]
+        print(f"      [{i+1}/{len(candidates)}] id={aid[:16]} mb={mb} ...")
+
+        probe_info = {
+            "mesh_size": family["mesh_size"],
+            "id": aid,
+            "mesh_block": mb,
+            "archive": cand.get("archive", ""),
+            "entry": cand.get("entry"),
+            "roles": sorted(family["roles"]),
+            "priority": family["priority"],
+        }
+        result = probe_family(probe_info, live_root=live_root, skip_build=skip_build)
+        results.append(result)
+
+        status = "VIABLE" if result["viable"] else "no-position"
+        print(f"        -> {status} v={result['vertex_count']} pos={result['has_position']}")
+
+        if result["viable"]:
+            # Return with batch metadata
+            result["candidates_tried"] = i + 1
+            result["total_candidates"] = len(candidates)
+            result["all_results"] = results
+            return result
+
+    # No viable candidate found — return last result with batch metadata
+    last = results[-1] if results else {"viable": False, "mesh_size": family["mesh_size"], "error": "no candidates"}
+    last["candidates_tried"] = len(results)
+    last["total_candidates"] = len(candidates)
+    last["all_results"] = results
+    return last
+
+
 def print_family_table(
     families: list[dict[str, Any]],
     title: str = "New Live-Only Mesh-Size Families",
 ) -> None:
-    """Print a formatted table of families."""
+    """Print a formatted table of families with candidate counts."""
     print(f"\n{'=' * 90}")
     print(f"  {title}")
     print(f"  {len(families)} families found")
     print(f"{'=' * 90}")
-    print(f"  {'MS':>5}  {'AssetID':<18}  {'MB':>4}  {'Archive':<12}  {'Entry':>5}  {'Priority':>8}  {'Best Role':<35}")
-    print(f"  {'-'*5}  {'-'*18}  {'-'*4}  {'-'*12}  {'-'*5}  {'-'*8}  {'-'*35}")
+    print(f"  {'MS':>5}  {'Candidates':>10}  {'Priority':>8}  {'Best Role':<35}  Sample IDs")
+    print(f"  {'-'*5}  {'-'*10}  {'-'*8}  {'-'*35}  {'-'*30}")
     for f in families:
         best_role = sorted(f["roles"], key=lambda r: ROLE_PRIORITY.get(r, 0), reverse=True)
         role_str = best_role[0] if best_role else "unknown"
+        cands = f.get("candidates", [])
+        n_cands = len(cands)
+        sample_ids = ",".join(c["id"][:8] for c in cands[:3])
+        if len(cands) > 3:
+            sample_ids += f"...+{len(cands)-3}"
         print(
-            f"  {f['mesh_size']:>5}  {f['id'][:16]:<18}  {f.get('mesh_block','?'):>4}  "
-            f"{f['archive']:<12}  {str(f.get('entry','?')):>5}  {f['priority']:>8}  {role_str:<35}"
+            f"  {f['mesh_size']:>5}  {n_cands:>10}  {f['priority']:>8}  {role_str:<35}  {sample_ids}"
         )
 
 
@@ -467,6 +570,11 @@ def main() -> None:
         default=False,
         help="Skip dotnet build before each probe/export (use after initial build for faster repeated runs)",
     )
+    parser.add_argument(
+        "--exhaustive",
+        action="store_true",
+        help="Exhaustively probe ALL mesh blocks per family (not just first candidate). Implies --probe.",
+    )
     args = parser.parse_args()
 
     if not args.inventory.exists():
@@ -490,21 +598,45 @@ def main() -> None:
 
     # Step 2: Probe (if requested)
     probe_results: list[dict[str, Any]] = []
+    exhaustive = args.exhaustive
+    if args.exhaustive:
+        args.probe = True  # --exhaustive implies --probe
+
     if args.probe or args.export:
         print("\nProbing families...")
         for i, family in enumerate(ranked):
-            print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} id={family['id'][:16]} mb={family['mesh_block']} ...")
-            result = probe_family(family, live_root=args.live_root, skip_build=args.skip_build)
-            probe_results.append(result)
-            status = "VIABLE" if result["viable"] else ("probed" if result["probed"] else "FAILED")
-            print(f"    -> {status} v={result['vertex_count']} pos={result['has_position']} norm={result['has_normal']} uv={result['has_uv']}")
+            candidates = family.get("candidates", [])
+            n_cands = len(candidates)
+            if exhaustive and n_cands > 1:
+                print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} ({n_cands} candidates) — exhaustive batch probe...")
+                result = batch_probe_family(family, live_root=args.live_root, skip_build=args.skip_build)
+                probe_results.append(result)
+                status = "VIABLE" if result.get("viable") else "all-exhausted"
+                print(f"    -> {status} (tried {result.get('candidates_tried', 0)}/{result.get('total_candidates', n_cands)} candidates)")
+            else:
+                # Single-candidate probe (original behavior or fallback)
+                cand = candidates[0] if candidates else {"id": "?", "mb": "?"}
+                print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} id={cand['id'][:16]} mb={cand['mb']} ...")
+                probe_info = {
+                    "mesh_size": family["mesh_size"],
+                    "id": cand["id"],
+                    "mesh_block": cand["mb"],
+                    "archive": cand.get("archive", ""),
+                    "entry": cand.get("entry"),
+                    "roles": sorted(family["roles"]),
+                    "priority": family["priority"],
+                }
+                result = probe_family(probe_info, live_root=args.live_root, skip_build=args.skip_build)
+                probe_results.append(result)
+                status = "VIABLE" if result["viable"] else ("probed" if result["probed"] else "FAILED")
+                print(f"    -> {status} v={result['vertex_count']} pos={result['has_position']} norm={result['has_normal']} uv={result['has_uv']}")
 
         print_probe_results(probe_results)
 
     # Step 3: Export (if requested)
     export_results: list[dict[str, Any]] = []
     if args.export:
-        viable = [r for r in probe_results if r["viable"]]
+        viable = [r for r in probe_results if r.get("viable")]
         if not viable:
             print("\nNo viable families to export.")
         else:
@@ -521,6 +653,13 @@ def main() -> None:
                 status = "OK" if result["exported"] else "FAIL"
                 print(f"    -> {status} v={result['vertices']} f={result['faces']} size={result['file_size']}")
 
+                # Auto-update live-exported-ids.json on successful export
+                if result["exported"]:
+                    archive = pr.get("archive", "")
+                    entry = pr.get("entry")
+                    _update_live_registry(pr["id"], pr["mesh_size"], archive, entry)
+                    print(f"      Registry updated: {pr['id'][:16]} meshSize={pr['mesh_size']}")
+
             print_export_results(export_results)
 
     # Write JSON output
@@ -533,12 +672,10 @@ def main() -> None:
             "families": [
                 {
                     "mesh_size": f["mesh_size"],
-                    "id": f["id"],
-                    "mesh_block": f["mesh_block"],
-                    "archive": f["archive"],
-                    "entry": f["entry"],
                     "roles": sorted(f["roles"]),
                     "priority": f["priority"],
+                    "n_candidates": len(f.get("candidates", [])),
+                    "candidates": f.get("candidates", []),
                 }
                 for f in ranked
             ],
