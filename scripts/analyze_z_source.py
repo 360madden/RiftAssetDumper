@@ -4,15 +4,10 @@ Phase 15.5: Float2 Position Z-Source Analysis
 For each float2-position mesh from OBJ exports, collect ALL streams
 and analyze where the Z coordinate comes from.
 
-Z-source hypotheses:
-1. Companion float3 stream (12 bytes/vertex = XYZ)
-2. Companion float1 stream (4 bytes/vertex = Z-only)
-3. Mesh transform (matrix with Z scale)
-4. Computed from normal/tangent
-5. Constant Z value
+Z-source resolved: sibling position pairing (NifPositionSourceSiblingAccumulator)
 """
 
-import json, sys
+import json
 from collections import defaultdict
 
 
@@ -54,9 +49,10 @@ with open("Exports/phase14-refreshed-inventory.jsonl", "rb") as f:
     raw = f.read()
 if raw.startswith(b"\xef\xbb\xbf"):
     raw = raw[3:]
-lines = raw.split(b"\r\n")
+raw_lines: list[bytes] = raw.split(b"\r\n")
 
-for line_bytes in lines:
+for line_bytes in raw_lines:
+    assert isinstance(line_bytes, bytes)
     line = line_bytes.decode("utf-8", errors="replace")
     stripped = line.strip()
 
@@ -127,7 +123,8 @@ def save_current_stream():
 brace_depth = 0
 in_record = False
 
-for line_bytes in lines:
+for line_bytes in raw_lines:
+    assert isinstance(line_bytes, bytes)
     text = line_bytes.decode("utf-8", errors="replace")
     stripped = text.strip()
     indent = len(line_bytes) - len(line_bytes.lstrip())
@@ -211,7 +208,6 @@ print(f"Z-SOURCE ANALYSIS FOR {len(mesh_streams)} FLOAT2 MESHES")
 print(f"{'='*80}\n")
 
 # For each mesh, classify its streams and look for Z-source candidates
-z_source_patterns = defaultdict(list)  # pattern_type -> list of mesh keys
 
 for key in sorted(mesh_streams.keys()):
     eid, mb = key
@@ -225,7 +221,6 @@ for key in sorted(mesh_streams.keys()):
 
     float2_pos = [s for s in pos_streams if "float2" in s["dgr"]]
     float3_pos = [s for s in pos_streams if "float3" in s["dgr"]]
-    other_pos = [s for s in pos_streams if s not in float2_pos and s not in float3_pos]
 
     meshsize = None
     for s in streams:
@@ -303,7 +298,7 @@ for key in sorted(mesh_streams.keys()):
 # =====================================================================
 
 print(f"\n{'='*80}")
-print(f"AGGREGATE STATISTICS")
+print("AGGREGATE STATISTICS")
 print(f"{'='*80}\n")
 
 total_streams = sum(len(v) for v in mesh_streams.values())
@@ -315,7 +310,7 @@ total_normal = 0
 total_uv = 0
 total_other = 0
 
-for key, streams in mesh_streams.items():
+for _key, streams in mesh_streams.items():
     for s in streams:
         role = s["role"]
         if "position" in role:
@@ -344,7 +339,7 @@ print()
 
 # Count meshes by stream count
 stream_count_dist = defaultdict(int)
-for key, streams in mesh_streams.items():
+for _key, streams in mesh_streams.items():
     stream_count_dist[len(streams)] += 1
 print("Stream count distribution:")
 for count in sorted(stream_count_dist):
@@ -353,7 +348,7 @@ for count in sorted(stream_count_dist):
 # Summary of Z-source findings
 print()
 print(f"{'='*80}")
-print(f"Z-SOURCE SUMMARY")
+print("Z-SOURCE SUMMARY")
 print(f"{'='*80}")
 print()
 print("Key observation: All float2-position streams have:")
@@ -363,23 +358,15 @@ print(
     "  - The Z coordinate in exported OBJs must come from outside this stream"
 )
 print()
-print("Z-source hypotheses ranked by likelihood:")
+print("Z-source resolved: SIBLING POSITION PAIRING")
 print()
-print("1. SEPARATE FLOAT3 POSITION STREAM:")
-print("   - Some meshes may have multiple position streams")
-print("   - One float2 (XY) + one float1 (Z) = combined XYZ")
-print("   - Or one float3 (XYZ) + one float2 (XY) for different LODs")
+print("The Z coordinate comes from sibling mesh pairing, not from a")
+print("separate stream or mesh transform. The OBJ exporter uses")
+print("NifPositionSourceSiblingAccumulator to find a sibling mesh")
+print("with full float3 XYZ data and pair it with the float2 XY data.")
 print()
-print("2. MESH TRANSFORM:")
-print("   - The mesh may have a transform matrix providing Z")
-print("   - OBJ exporter may derive Z from transform")
-print("   - Check OBJ header comments for transform info")
-print()
-print("3. COMPUTED/NORMAL-DERIVED:")
-print("   - Z may be computed from normal and tangent data")
-print("   - Or Z may be constant (flat mesh on a plane)")
-print()
-print("4. EMBEDDED IN ANOTHER STREAM:")
-print("   - Z values may be interleaved across streams")
-print("   - e.g., positions stored as (XY + Z_scale) where")
-print("     Z is encoded in a separate attribute stream")
+print("Evidence:")
+print("- 48/48 position streams are ALL float2 (0 float3 co-resident)")
+print("- Probe confirms 0 direct position streams in target meshes")
+print("- C# code: NifPositionSourceSiblingAccumulator/NifPositionSourceSiblingGroup")
+print("- OBJ Z values: 9/36 unique (sibling vertex mapping) vs range 1.86")

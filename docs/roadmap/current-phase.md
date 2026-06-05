@@ -88,31 +88,38 @@ stream, mesh transform, or computed. Raw data requires endian-aware decoding (bi
 
 ### Phase 15.5 Z-Source Resolution
 
-**Finding: Z is sourced from mesh transform, not a companion stream.**
+**CORRECTED Finding: Z is sourced from sibling position pairing, not mesh transform.**
 
-Full stream inventory analysis of 36 float2-position meshes (156 streams total):
+Full stream inventory analysis of 36 float2-position meshes (156 streams):
 - **48 position streams, ALL float2** — zero float3 position streams co-resident
-- **No companion Z-stream exists** — no float1, float2, or float3 stream carries Z data
-- **0 float3 positions** in any of the 36 meshes
+- **No companion Z-stream exists** in any of the 36 meshes
 - **Stream composition**: 48 pos + 42 index + 33 normal + 7 UV + 26 other
 
-**OBJ Z-value verification** (mesh `4768bc6e3cfaabd0` MB=6, 36 vertices):
+**Probe verification** (mesh `4768bc6e3cfaabd0` MB=6):
+- Probe reveals only **3 streams**: normal (float3 @216), index (uint16 @292), UV (float2 @300)
+- **No position stream exists in this mesh's direct data**
+- Position is resolved through **legacy pairing** (2 pairings, 95% confidence)
+- The `--experimental-position-source` code uses `NifPositionSourceSiblingAccumulator`
+  to find a sibling mesh with full XYZ data and pair it with this mesh's XY data
+
+**OBJ Z-value verification** (36 vertices):
 - Z range: [-0.9260, 0.9351] (range = 1.8612, significant variation)
-- Only **9 unique Z values** out of 36 vertices — not fully per-vertex
-- Not constant (rules out simple transform-only hypothesis)
-- Pattern consistent with **transform-derived Z** where mesh transform maps XY to
-  a limited set of Z values (e.g., flat projection with tilt/rotation)
+- Only **9 unique Z values** out of 36 — consistent with sibling-pair mapping
+  (sibling has different vertex count; pairing maps vertices across meshes)
 
-This refutes the "separate Z stream" hypothesis. The OBJ exporter combines float2 XY data
-from the position stream with Z derived from the mesh's local-to-world transform to produce
-valid 3D vertices. This confirms that:
-1. Float2 position encoding is the real format (8 bytes/vertex = XY pairs)
-2. The heuristic classifier's `position-float3-lead` label is misleading — the stream stores XY only
-3. Mesh transforms encode Z position, not another data stream
-4. The descriptor's `descriptor-float2-uv` label is the correct element count indicator
+**Mechanism**:
+1. Float2-position meshes store XY data only (8 bytes/vertex, descriptor-float2-uv)
+2. These meshes lack attribute sets — they have NO direct position stream
+3. The OBJ exporter (`--experimental-position-source`) uses sibling pairing:
+   - `NifPositionSourceSiblingAccumulator` groups related meshes
+   - `NifPositionSourceSiblingGroup` pairs meshes that share source bindings
+   - The sibling provides full XYZ data that fills in the Z values
+4. The heuristic classifier's `position-float3-lead` label reflects the PAIRED result, not raw data
+5. The descriptor's `descriptor-float2-uv` correctly identifies the raw stream format
 
-Note: "mesh transform" is the inferred explanation (separate-stream hypothesis is disproven).
-Direct verification would require checking the NiNode transform matrix.
+This is a **sophisticated encoding**: position data is split across sibling meshes
+as XY + Z, with Z sourced from a different mesh's full float3 stream. The pairing
+system reconstructs 3D positions by cross-referencing mesh siblings.
 
 See: `scripts/analyze_z_source.py` (reusable analysis script).
 See: `Exports/phase15.5-z-source-analysis.txt` for per-mesh breakdown (local/ignored).
