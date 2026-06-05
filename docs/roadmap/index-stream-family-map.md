@@ -1,6 +1,6 @@
 # Index Stream Family Map
 
-**Last Updated**: 2026-06 (Phase 37 — 12 probes resolved 3 new families: MS=267, MS=297, MS=330; unknowns 79→66)
+**Last Updated**: 2026-06 (Phase 38 — regex bug fix recovered 33 hidden IDs; 15 probes resolved 3 new families: MS=280, MS=367, MS=405; unknowns 81→66)
 
 **Purpose**: Reference table mapping which mesh blocks in each MeshSize family carry index streams (producing faced OBJs) vs those that only carry vertex data (producing position-only OBJs via sibling pairing).
 
@@ -12,6 +12,10 @@
 |---|---|---|---|---|---|---|
 | 240 | 6 | 1 | 0 | 100% | ✅ Yes | @264-indexed, 80v/78f |
 | 267 | 10 | 1 | 0 | 100% | ✅ Yes | New family (Phase 37); 2f/5v, index stream present |
+| 280 | 6, 7 | 4 | 0 | 100% | ✅ Yes | New family (Phase 38); 3 IDs at MB=6, 2 at MB=7 |
+| 367 | 6 | 3 | 0 | 100% | ✅ Yes | New family (Phase 38); streams @212=1589, @288=1217, @296=1589 |
+| 405 | 6 | 3 | 0 | 100% | ✅ Yes | New family (Phase 38); probed at MB=6, index stream present |
+| 276 | 6 | 1 | 0 | 100% | ✅ Yes | Phase 38; 084c1e91726a2aea, MS=276 at MB=6 |
 | 276 | 17 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 71f/50v, index stream present |
 | 297 | 6 | 2 | 0 | 100% | ✅ Yes | New family (Phase 37); 82f/64v + 118f/95v, index stream present |
 | 330 | 6 | 1 | 0 | 100% | ✅ Yes | New family (Phase 37); 14f/16v, index stream present |
@@ -50,7 +54,7 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 |---|---|---|
 | 240 | 6 | 1 |
 | 267 | 10 | 1 | New! Cluster probe (Phase 37) |
-| 276 | 17 | 1 | New! Cluster probe (Phase 36) |
+| 276 | 6, 17 | 2 | Phase 36+38: MB=6 and MB=17 |
 | 297 | 6 | 2 | New! Cluster probe (Phase 37) |
 | 301 | 6, 7, 25 | 25 | Canonical faced family (MB=25 added Phase 37) |
 | 305 | 6, 45, 46 | 16 | Mixed family |
@@ -89,7 +93,7 @@ The only MeshSize with both faced and position-only mesh blocks:
 ### Root Cause: MB=6 is the canonical geometry block
 MB=6 carries index streams for MeshSizes **240-361** but stops at **329 and 389**:
 
-- **Index stream present**: MB=6 in MeshSize 240, 267, 276, 297, 301, 305, 309, 321, 325, 330, 345, 354, 361, 365
+- **Index stream present**: MB=6 in MeshSize 240, 267, 276, 280, 297, 301, 305, 309, 321, 325, 330, 345, 354, 361, 365, 367, 405
 - **No index stream**: MB=6 in MeshSize 329, 389
 
 This suggests a transition point around MeshSize 329+ where mesh blocks switch from explicit-indexed geometry to float2+float3 sibling-paired encoding.

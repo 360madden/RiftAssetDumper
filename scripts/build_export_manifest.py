@@ -110,12 +110,19 @@ def parse_obj_header(path: Path) -> dict:
 
 
 def extract_asset_id(filepath: Path) -> str | None:
-    """Extract the 16-char hex asset ID from a decode-nif-geometry-{id} path."""
+    """Extract the 16-char hex asset ID from a decode-nif-geometry-{id} path.
+
+    Handles filenames like:
+      - decode-nif-geometry-{ID}-mesh{N}.obj
+      - decode-nif-geometry-{ID}-mesh{N}.obj (inside subdirectory)
+    """
     for part in filepath.parts:
         if part.startswith("decode-nif-geometry-"):
             candidate = part.replace("decode-nif-geometry-", "")
-            # Handle suffix like -mesh6 by stripping it
-            candidate = re.sub(r"-mesh\d+$", "", candidate)
+            # Strip mesh suffix and any remaining extension (e.g. -mesh6.obj, -mesh31.obj)
+            candidate = re.sub(r"-mesh\d+\..*$", "", candidate)
+            # Also handle case where file has no mesh suffix (just .obj)
+            candidate = re.sub(r"\..*$", "", candidate)
             if len(candidate) == 16:
                 return candidate
     return None
