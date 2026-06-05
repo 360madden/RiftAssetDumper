@@ -293,6 +293,85 @@ def main() -> int:
 
     elapsed = time.time() - start
 
+    # PHASE 41: Pattern-match no-ID entries to known MeshSizes
+    # Build a pattern lookup from entries that have resolved MeshSizes
+    # Key: (faces, vertex_count, mesh_block, faced) -> mesh_size
+    pattern_lookup: dict[tuple, int] = {}
+    for e in entries:
+        ms_entry = e.get("sibling_pair") or {}
+        ms_val = ms_entry.get("mesh_size") if isinstance(ms_entry, dict) else None
+        if ms_val:
+            key = (e.get("faces", 0) or 0, e.get("vertex_count", 0), e.get("mesh_block"), e.get("faced"))
+            if key not in pattern_lookup:
+                pattern_lookup[key] = ms_val
+
+    # Use tolerance matching for entries that don't exactly match
+    # (face/vertex counts may differ by a few due to export variations)
+    resolved_from_pattern = 0
+    for e in entries:
+        # Skip entries that already have a MeshSize
+        ms_entry = e.get("sibling_pair") or {}
+        if isinstance(ms_entry, dict) and ms_entry.get("mesh_size"):
+            continue
+
+        # Skip entries with asset_id (they should use pairing map or probe lookup)
+        if e.get("asset_id"):
+            continue
+
+        e_faces = e.get("faces", 0) or 0
+        e_verts = e.get("vertex_count", 0)
+        e_mb = e.get("mesh_block")
+        e_faced = e.get("faced")
+
+        if e_faces == 0 and not e_faced:
+            # Position-only zero-face entries are harder to match
+            # Try matching by (verts, MB) alone
+            for (pf, pv, pmb, pfaced), pms in pattern_lookup.items():
+                if not pfaced and pv == e_verts and pmb == e_mb and abs(pf - e_faces) <= 5:
+                    e["sibling_pair"] = {"mesh_size": pms, "note": "resolved via pattern match (pos-only)"}
+                    resolved_from_pattern += 1
+                    break
+        else:
+            # Try exact match first
+            exact_key = (e_faces, e_verts, e_mb, e_faced)
+            if exact_key in pattern_lookup:
+                pms = pattern_lookup[exact_key]
+                # Check this isn't a self-match (identical to the source probe entry)
+                e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb})"}
+                resolved_from_pattern += 1
+            else:
+                # Try tolerance match (±2% for faces, ±2% for verts)
+                for (pf, pv, pmb, pfaced), pms in pattern_lookup.items():
+                    if pmb == e_mb and pfaced == e_faced:
+                        face_diff = abs(pf - e_faces) / max(pf, 1)
+                        vert_diff = abs(pv - e_verts) / max(pv, 1)
+                        if face_diff <= 0.10 and vert_diff <= 0.10:
+                            e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via fuzzy pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb}) match={pf}f/{pv}v"}
+                            resolved_from_pattern += 1
+                            break
+
+    if resolved_from_pattern > 0:
+        print(f"\n  Resolved {resolved_from_pattern} entries via face/vertex/MB pattern matching")
+
+    # Recalculate per-MeshSize breakdown after pattern matching
+    # (Reset and recount with resolved MeshSizes)
+    ms_breakdown.clear()
+    faced_count = 0
+    position_only_count = 0
+    for e in entries:
+        ms_entry = e.get("sibling_pair") or {}
+        ms_val = ms_entry.get("mesh_size") if isinstance(ms_entry, dict) else None
+        has_faces = e.get("faced", False)
+        ms_key = str(ms_val) if ms_val else "unknown"
+        if ms_key not in ms_breakdown:
+            ms_breakdown[ms_key] = {"faced": 0, "position_only": 0}
+        if has_faces:
+            ms_breakdown[ms_key]["faced"] += 1
+            faced_count += 1
+        else:
+            ms_breakdown[ms_key]["position_only"] += 1
+            position_only_count += 1
+
     # Build manifest
     manifest = {
         "schema": "export-manifest-v2",
