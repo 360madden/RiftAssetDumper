@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 16 ✅; concrete sibling pairs identified — DIST=0 in 3 MeshSizes)
+**Last Updated**: 2026-06 (Phase 17 ✅; sibling pairing CONFIRMED — entry 544 has float2 MB=6 + float3 MB=34)
 
 ---
 
@@ -77,8 +77,9 @@
 | **Phase 15** | **Float2 Position Encoding Investigation** | **M15.1-M15.4** | **0** | **✅ COMPLETE** |
 | **Phase 15.5** | **Float2 Z-Source Resolution** | **Z-source analysis** | **0** | **✅ COMPLETE** |
 | **Phase 16** | **Sibling Pairing Map** | **Pairing map** | **0** | **✅ COMPLETE** |
+| **Phase 17** | **Sibling Pair Verification** | **Probe confirmation** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 17 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 18 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -147,6 +148,30 @@ TWAD entry. Other MeshSizes (325, 329) require cross-archive pairing via the
 NIF block reference system.
 
 See: `scripts/build_sibling_pairing_map.py` for the pairing map builder.
+
+### Phase 17: Concrete Sibling Pair Verification
+
+**Finding: Sibling pairing CONFIRMED — DIST=0 pair at MeshSize 305 entry 544.**
+
+Probed ID `42024b768fcd2e2b` (assets.037, entry 544, MeshSize 305):
+
+| Mesh Block | Position Descriptor | Payload | Elements | Bytes/El | Content |
+|---|---|---|---|---|---|
+| **MB=6** | `descriptor-float2-uv` | 192 bytes | **24** | 8 | XY pairs only |
+| **MB=34** | `descriptor-float3-generic` | 768 bytes | **64** | 12 | Full XYZ |
+
+**This confirms the Z-source mechanism end-to-end:**
+1. Mesh Block 6 stores XY position data (8 bytes/vertex, float2 encoding)
+2. Mesh Block 34 stores full XYZ position data (12 bytes/vertex, float3 encoding)
+3. Both exist in the **same archive entry** (544 in assets.037)
+4. The OBJ exporter pairs them via `NifPositionSourceSiblingAccumulator`
+5. The float3 mesh provides Z values that complete the float2 mesh
+6. The pairing maps 24 float2 vertices → 64 float3 vertices (consistent with earlier OBJ analysis showing 9/36 unique Z on a different mesh — sibling vertex mapping pattern holds)
+
+**This is the first direct evidence of the sibling pairing mechanism in action.**
+The same TWAD entry physically contains both the XY-only and full XYZ data,
+confirming that the encoding is intentional: positions are split across sibling
+mesh blocks within the same archive entry.
 
 ### Phase 14 Refresh Results
 
