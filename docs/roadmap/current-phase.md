@@ -1,27 +1,18 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 45 ✅ — **0 unknowns remaining** 🎉; all 268 OBJs fully classified)
+**Last Updated**: 2026-06 (Phase 47 ✅ — MS=280 MB=25 index-stream anomaly investigated; expected sibling-pairing behavior confirmed)
 
 ---
 
 ## Current State
 
-**Phase 45 complete** — **0 unknowns remaining** 🎉
+**Phase 47 complete** — MS=280 MB=25 anomaly investigated.
 
-All 268 OBJ files are now fully classified:
-- 214 unique asset IDs
-- 184 faced + 84 position-only
-- 29 MeshSize families mapped
-- 71 probe lookup entries
+**Finding**: `0bdc8bc6c684ad17` MB=25 has `index-u16be-list-lead` (80 elements) at @184, float32 normals at @192, but **no position stream**. Position data lives in MB=7 (`position-float3-lead`). The OBJ exporter exported MB=25 independently with fallback position data (flat `0 1 0` vertices). This is **expected sibling-pairing behavior**: index and position data are split across mesh blocks within the same NIF, and the exporter cannot produce faced OBJs without sibling pairing.
 
-**Final 3 unknowns resolved in Phase 45:**
-- `0bdc8bc6c684ad17` MB=25 36v → **MS=280** (has index stream!)
-- `96616acc5854775a` MB=27 114v → **MS=305** (float2 sibling pair)
-- `fedf45d1500a61ea` MB=47 4v → **MS=305** (edge case)
+**Implication**: MS=280 now has 3 MB variants: MB=6,7 (faced) and MB=25 (index-only → pos-only export). This is consistent with the sibling-pairing architecture.
 
-**Two bugs fixed:**
-1. `extract_asset_id` regex: `-mesh\d+\.*$` → `-mesh\d+(\..*)?$` to handle nested directories
-2. Pattern matching guard: removed aggressive skip for unresolved asset IDs
+**No code changes needed** — the system is working as designed.
 
 ---
 
@@ -99,8 +90,10 @@ All 268 OBJ files are now fully classified:
 | **Phase 43** | **Probe Lookup Pattern Matching** | **build_export_manifest.py: added secondary probe lookup from probe-meshsize-lookup.json for IDs probed but never OBJ-exported; resolved 18 more entries; unknowns 22→4** | **0** | **✅ COMPLETE** |
 | **Phase 44** | **Project Summary Update** | **Updated docs/roadmap/project-summary.md through Phase 43; health sweep: ruff ✅, mypy ✅, build 0, tests 50/50 ✅** | **0** | **✅ COMPLETE** |
 | **Phase 45** | **Zero Unknowns** | **Two bug fixes (regex + guard) + 3 final probes; all 268 OBJs now fully classified; unknowns 4→0** | **0** | **✅ COMPLETE** |
+| **Phase 46** | **Documentation Update** | **Updated all docs with 0 unknowns milestone; accurate Per-MeshSize table from live manifest** | **0** | **✅ COMPLETE** |
+| **Phase 47** | **MS=280 MB=25 Investigation** | **Investigated index-stream anomaly: MB=25 has index but no position data; expected sibling-pairing behavior** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 47 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 49 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
