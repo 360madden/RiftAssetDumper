@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 23 ✅; extended export with --include-close; 142 pairs; 0-face root cause documented)
+**Last Updated**: 2026-06 (Phase 24 ✅; full sibling export run — 142/142 exports, 127 unique OBJs, 0 structural issues)
 
 ---
 
