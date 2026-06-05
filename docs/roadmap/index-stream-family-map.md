@@ -1,6 +1,6 @@
 # Index Stream Family Map
 
-**Last Updated**: 2026-06 (Phase 30 — float3 batch export results incorporated)
+**Last Updated**: 2026-06 (Phase 36 — MS=276 and MS=354 discovered via cluster probes; MS=321 and MS=325 expanded)
 
 **Purpose**: Reference table mapping which mesh blocks in each MeshSize family carry index streams (producing faced OBJs) vs those that only carry vertex data (producing position-only OBJs via sibling pairing).
 
@@ -11,6 +11,8 @@
 | MeshSize | MB | Faced | PosOnly | %Faced | Index Stream? | Notes |
 |---|---|---|---|---|---|---|
 | 240 | 6 | 1 | 0 | 100% | ✅ Yes | @264-indexed, 80v/78f |
+| 276 | 17 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 71f/50v, index stream present |
+| 354 | 6 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 22f/24v, index stream present |
 | 301 | 6 | 18 | 0 | 100% | ✅ Yes | Canonical faced block |
 | 301 | 7 | 1 | 0 | 100% | ✅ Yes | Single asset, may be special case |
 | 305 | 6 | 11 | 0 | 100% | ✅ Yes | Primary faced block for 305 |
@@ -19,14 +21,16 @@
 | 305 | 45 | 4 | 3 | 57% | ⚠️ Mixed | Faced=10-18v; pos=5v (degenerate) |
 | 305 | 46 | 1 | 0 | 100% | ✅ Yes | Single asset with index stream |
 | 309 | 6 | 16 | 0 | 100% | ✅ Yes | Canonical faced block (float3 probe added 1) |
-| 321 | 6 | 7 | 0 | 100% | ✅ Yes | Canonical faced block (float3 probe added 1) |
+| 321 | 6 | 16 | 0 | 100% | ✅ Yes | Expanded via 414-face cluster (9 inferred IDs, Phase 35.5) |
 | 321 | 7 | 0 | 1 | 0% | ❌ No | MB=7 has NO index stream (Phase 30) |
-| 325 | 6 | 42 | 0 | 100% | ✅ Yes | Canonical faced block (float3 probes added 2) |
+| 325 | 6 | 44 | 0 | 100% | ✅ Yes | Canonical faced block (318-face cluster, 22 IDs inferred — Phase 35.5) |
+| 325 | 31 | 2 | 0 | 100% | ✅ Yes | New MB data point (Phase 35); 18f/20v, 2 IDs, index stream present |
 | 329 | 6 | 0 | 2 | 0% | ❌ No | **No index stream at any MB** |
 | 345 | 6 | 3 | 0 | 100% | ✅ Yes | 2 unique IDs, all faced |
 | 361 | 6 | 1 | 0 | 100% | ✅ Yes | New family (from probe) |
 | 365 | 9 | 1 | 0 | 100% | ✅ Yes | MB=9 has index (464 faces) |
 | 370 | 66 | 0 | 1 | 0% | ❌ No | Position-only (6v, no index) |
+
 | 389 | 6 | 0 | 2 | 0% | ❌ No | **No index stream at any MB** (float3 probe confirmed) |
 | 465 | 7 | 1 | 0 | 100% | ✅ Yes | **MB=7 IS faced** (69 faces, 23v — Phase 30!) |
 | 465 | 8 | 0 | 17 | 0% | ❌ No | No index stream at MB=8 |
@@ -44,8 +48,10 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 301 | 6, 7 | 19 |
 | 305 | 6, 45, 46 | 16 |
 | 309 | 6 | 16 |
-| 321 | 6 | 7 |
-| 325 | 6 | 42 |
+| 276 | 17 | 1 | ✅ Yes | New! Cluster probe (Phase 36)
+| 321 | 6 | 16 |
+| 325 | 6 | 44 |
+| 325 | 31 | 2 |
 | 345 | 6 | 3 |
 | 361 | 6 | 1 |
 | 365 | 9 | 1 |

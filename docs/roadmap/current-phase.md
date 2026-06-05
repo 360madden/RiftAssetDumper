@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 35 ✅; targeted probe cluster analysis — MS=321 and MS=325 confirmed via 3 probes; unknowns reduced 101→98)
+**Last Updated**: 2026-06 (Phase 36 ✅; inference script + remaining probes — MS=276 and MS=354 discovered; unknowns 98→79)
 
 ---
 
@@ -97,8 +97,9 @@
 | **Phase 34** | **Project Summary Document** | **docs/roadmap/project-summary.md — comprehensive overview of all 34 phases** | **0** | **✅ COMPLETE** |
 | **Phase 35** | **Targeted Probe Cluster Analysis** | **3 probes resolved MS=321 (414f), MS=325 (318f + 18f); 37 cluster IDs identified** | **0** | **✅ COMPLETE** |
 | **Phase 35.5** | **Cluster Inference Resolution** | **13 inferred IDs added to probe lookup; unknowns 101→83 (53 faced, 30 pos-only)** | **0** | **✅ COMPLETE** |
+| **Phase 36** | **Inference Script + Remaining Probes** | **scripts/infer_meshsizes_from_clusters.py; MS=276, 354 discovered; unknowns 98→79** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 37 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 38 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
