@@ -55,6 +55,7 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 240 | 6 | 1 |
 | 267 | 10 | 1 | New! Cluster probe (Phase 37) |
 | 276 | 6, 17 | 2 | Phase 36+38: MB=6 and MB=17 |
+| 280 | 6, 7 | 4 | New! Regex recovery (Phase 38) |
 | 297 | 6 | 2 | New! Cluster probe (Phase 37) |
 | 301 | 6, 7, 25 | 25 | Canonical faced family (MB=25 added Phase 37) |
 | 305 | 6, 45, 46 | 16 | Mixed family |
@@ -66,6 +67,8 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 354 | 6 | 1 | New! Cluster probe (Phase 36) |
 | 361 | 6 | 1 |
 | 365 | 9 | 1 |
+| 367 | 6 | 3 | New! Regex recovery (Phase 38) |
+| 405 | 6 | 3 | New! Regex recovery (Phase 38) |
 | 465 | 7 | 1 | MB=7 IS faced (69f, 23v) |
 
 ### Families with 0% faced OBJs (no index streams)
