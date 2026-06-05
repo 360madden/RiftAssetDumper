@@ -1,6 +1,6 @@
 # Index Stream Family Map
 
-**Last Updated**: 2026-06 (Phase 40 — 16 pos-only regex-recovered IDs resolved; 8 new pos-only families: MS=193, 197, 214, 272, 275, 307, 326, 337; unknowns 66→49)
+**Last Updated**: 2026-06 (Phase 45 — **0 unknowns remaining** 🎉; all 268 OBJs fully classified; 71 probe entries; 3 new probes added for MS=280 MB=25, MS=305 MB=27, MS=305 MB=47)
 
 **Purpose**: Reference table mapping which mesh blocks in each MeshSize family carry index streams (producing faced OBJs) vs those that only carry vertex data (producing position-only OBJs via sibling pairing).
 
@@ -13,6 +13,7 @@
 | 240 | 6 | 1 | 0 | 100% | ✅ Yes | @264-indexed, 80v/78f |
 | 267 | 10 | 1 | 0 | 100% | ✅ Yes | New family (Phase 37); 2f/5v, index stream present |
 | 280 | 6, 7 | 4 | 0 | 100% | ✅ Yes | New family (Phase 38); 3 IDs at MB=6, 2 at MB=7 |
+| 280 | 25 | 0 | 1 | 0% | ✅ Yes | MB=25 has index-u16be-list-lead (80el, c=80) but OBJ export is 0f/36v (Phase 45 probe) |
 | 367 | 6 | 3 | 0 | 100% | ✅ Yes | New family (Phase 38); streams @212=1589, @288=1217, @296=1589 |
 | 405 | 6 | 3 | 0 | 100% | ✅ Yes | New family (Phase 38); probed at MB=6, index stream present |
 | 276 | 6 | 1 | 0 | 100% | ✅ Yes | Phase 38; 084c1e91726a2aea, MS=276 at MB=6 |
@@ -65,7 +66,7 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 240 | 6 | 1 |
 | 267 | 10 | 1 | New! Cluster probe (Phase 37) |
 | 276 | 6, 17 | 2 | Phase 36+38: MB=6 and MB=17 |
-| 280 | 6, 7 | 4 | New! Regex recovery (Phase 38) |
+| 280 | 6, 7 | 4 | Mostly faced; MB=25 has index stream but OBJ export is 0f/36v (Phase 45) |
 | 297 | 6 | 2 | New! Cluster probe (Phase 37) |
 | 301 | 6, 7, 25 | 25 | Canonical faced family (MB=25 added Phase 37) |
 | 305 | 6, 45, 46 | 16 | Mixed family |
@@ -87,9 +88,9 @@ These MeshSizes lack index streams entirely — all OBJs are position-only:
 | MeshSize | MBs | Total PosOnly | Notes |
 |---|---|---|---|
 | 193 | 7 | 2 | New pos-only family (Phase 40) |
-| 197 | 17 | 1 | New pos-only family (Phase 40) |
+| 197 | 17 | 2 | Expanded via Phase 45 pattern matching |
 | 214 | 12 | 1 | New pos-only family (Phase 40) |
-| 272 | 6 | 1 | New pos-only family (Phase 40) |
+| 272 | 6 | 6 | Expanded via Phase 41-43 pattern matching |
 | 275 | 7 | 3 | New pos-only family (Phase 40) |
 | 307 | 35 | 1 | New pos-only family (Phase 40) |
 | 321 | 7 | 1 | MB=7 has no index stream (Phase 30) |
@@ -109,6 +110,8 @@ The only MeshSize with both faced and position-only mesh blocks:
 | MB=45 | 57% faced (4/7) | 3 pos-only have only 5v (degenerate) |
 | MB=46 | Always faced (1/1) | Has index stream |
 | MB=7 | Always pos-only (15/15) | Float2 sibling pair, no index |
+| MB=27 | Always pos-only (12/12) | Float3 sibling pair, no index |
+| MB=47 | Always pos-only (1/1) | 4v edge case (Phase 45 probe) |
 | MB=27 | Always pos-only (12/12) | Float3 sibling pair, no index |
 
 ### Root Cause: MB=6 is the canonical geometry block
@@ -132,7 +135,7 @@ This means not all MB=7 blocks carry index streams — it depends on the MeshSiz
 ## Probe Methodology
 
 The findings are based on:
-1. Export manifest data (268 OBJs, 182 unique asset IDs)
+1. Export manifest data (268 OBJs, 214 unique asset IDs, 0 unknowns)
 2. Direct `probe-nif-mesh` on representative assets at specific mesh blocks
 3. Phase 19 sibling pairing map cross-reference
 4. Phase 30 float3 batch export (9 IDs exported, 6 produced faced OBJs)
@@ -144,4 +147,7 @@ Assets probed or batch-exported:
 - `7fc596b8c4f6f643` MB=9 (MeshSize 365, 464-face family)
 - `3720e6179d344ae0` MB=8 (MeshSize 465, position-only)
 - `b2691b19bc1886f3` MB=66 (MeshSize 370, position-only)
+- `0bdc8bc6c684ad17` MB=25 (MeshSize 280, pos-only, Phase 45)
+- `96616acc5854775a` MB=27 (MeshSize 305, pos-only, Phase 45)
+- `fedf45d1500a61ea` MB=47 (MeshSize 305, pos-only, Phase 45)
 - Float3 batch (Phase 30): 9 IDs, 6 faced + 3 pos-only

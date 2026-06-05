@@ -1,8 +1,8 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06 (Phase 43)
+**Last Updated**: 2026-06 (Phase 45 — **0 unknowns remaining** 🎉)
 
-**Purpose**: Comprehensive overview of all 45 completed phases, current state, key discoveries, and remaining work.
+**Purpose**: Comprehensive overview of all 47 completed phases, current state, key discoveries, and remaining work.
 
 ---
 
@@ -32,7 +32,7 @@ Reverse-engineering workspace for RIFT game asset archives. Focuses on decoding 
 
 ---
 
-## 2. Phase Summary (45 Phases)
+## 2. Phase Summary (47 Phases)
 
 ### Phase Group 1: Foundation (Phases 1-10)
 Descriptor subsystem, gate clearance, promotion, proof guards.
@@ -60,6 +60,8 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 - **Phase 41**: **Pattern-matching logic** added to `build_export_manifest.py` — resolves no-ID entries by (faces, verts, MB) matching against known probes with 10% tolerance; **32 entries resolved without probes**; unknowns 49→22
 - **Phase 42**: Project summary updated; health sweep (all clean); family counts fixed to 29 total
 - **Phase 43**: **Probe lookup pattern matching** added — secondary lookup from `probe-meshsize-lookup.json` for IDs probed but never OBJ-exported; **18 more entries resolved**; unknowns 22→4
+- **Phase 44**: Project summary updated through Phase 43; health sweep (all clean)
+- **Phase 45**: **0 unknowns remaining!** 🎉 Two bug fixes (regex `-mesh\d+(\.*)?$` fix for nested directories + guard removal for unresolved asset IDs) and 3 final probes resolved last edge cases. All 268 OBJs now fully classified.
 
 ---
 
@@ -70,45 +72,50 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 | Metric | Value |
 |---|---|
 | Total OBJ files | 268 |
-| Unique asset IDs | 180 |
+| Unique asset IDs | 214 |
 | **Faced** | **184** (68.7%) |
 | **Position-only** | **84** (31.3%) |
-| Total vertices | ~19,800 |
-| Total faces | ~20,350 |
-| Total bytes | ~2,200 KB |
+| Total vertices | 19,797 |
+| Total faces | 20,354 |
+| Total bytes | 2,201 KB |
 | Structural issues | 0 |
-| Probe lookup entries | 68 |
-| Resolved MeshSize IDs | 68 |
-| Remaining unknowns | 4 (all pos-only) |
+| Probe lookup entries | 71 |
+| Resolved MeshSize IDs | 71 |
+| Remaining unknowns | **0** 🎉 |
 
 ### Per-MeshSize Breakdown
 
 | MeshSize | Faced | PosOnly | Total | % Faced |
 |---|---|---|---|---|
 | 193 | 0 | 2 | 2 | 0% |
-| 197 | 0 | 1 | 1 | 0% |
+| 197 | 0 | 2 | 2 | 0% |
 | 214 | 0 | 1 | 1 | 0% |
-| 240 | 4 | 0 | 4 | 100% |
-| 272 | 0 | 2 | 2 | 0% |
+| 240 | 3 | 0 | 3 | 100% |
+| 267 | 1 | 0 | 1 | 100% |
+| 272 | 0 | 6 | 6 | 0% |
 | 275 | 0 | 3 | 3 | 0% |
-| 276 | 8 | 0 | 8 | 100% |
-| 280 | 4 | 0 | 4 | 100% |
+| 276 | 7 | 0 | 7 | 100% |
+| 280 | 4 | 1 | 5 | 80% |
 | 297 | 6 | 0 | 6 | 100% |
-| 301 | 22 | 0 | 22 | 100% |
-| 305 | 17 | 34 | 51 | 33% |
+| 301 | 30 | 0 | 30 | 100% |
+| 305 | 17 | 36 | 53 | 32% |
 | 307 | 0 | 1 | 1 | 0% |
 | 309 | 19 | 0 | 19 | 100% |
-| 321 | 10 | 1 | 11 | 91% |
-| 325 | 61 | 0 | 61 | 100% |
+| 321 | 20 | 1 | 21 | 95% |
+| 325 | 63 | 0 | 63 | 100% |
 | 326 | 0 | 1 | 1 | 0% |
 | 329 | 0 | 5 | 5 | 0% |
+| 330 | 1 | 0 | 1 | 100% |
 | 337 | 0 | 1 | 1 | 0% |
-| 345 | 5 | 0 | 5 | 100% |
-| 367 | 13 | 0 | 13 | 100% |
+| 345 | 3 | 0 | 3 | 100% |
+| 354 | 1 | 0 | 1 | 100% |
+| 361 | 1 | 0 | 1 | 100% |
+| 365 | 1 | 0 | 1 | 100% |
+| 367 | 3 | 0 | 3 | 100% |
+| 370 | 0 | 1 | 1 | 0% |
 | 389 | 0 | 2 | 2 | 0% |
 | 405 | 3 | 0 | 3 | 100% |
-| 465 | 1 | 19 | 20 | 5% |
-| unknown | 0 | 4 | 4 | 0% |
+| 465 | 1 | 21 | 22 | 5% |
 | **(total)** | **184** | **84** | **268** | **69%** |
 
 ### Quality Metrics
@@ -156,21 +163,17 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 ### Open Questions
 
-1. **4 unknown MeshSize entries**: All position-only edge cases that cannot be resolved via probes:
-   - `0f/36v/MB=25` — no probe coverage at MB=25
-   - `0f/114v/MB=27` — no probe coverage at MB=27
-   - `0f/6489v/MB=6` — NIF not found in Source/ (6489 vertices, extremely large)
-   - `0f/4v/MB=47` — no probe coverage at MB=47
+1. **0 unknown MeshSize entries** 🎉 — All 268 OBJs are now fully classified with no unknowns.
 
 2. **Auto-face reconstruction**: 84 position-only OBJs have valid vertex data but no index streams. Could faces be generated algorithmically from vertex adjacency or strip topology?
 
-3. **No probe targets remain**: All IDs in Exports/ that have probe-accessible identifiers have been resolved. The remaining unknowns cannot be resolved via probes.
+3. **No probe targets remain**: All IDs in Exports/ with probe-accessible identifiers have been resolved. 71 entries in probe lookup, 29 MeshSize families mapped.
 
 ### Known Limitations
 
 - **No faces for float2-paired meshes**: These fundamentally lack index streams.
 - **MeshSize not in OBJ headers**: Must be determined via probe or cross-reference.
-- **No asset ID in OBJ files**: ID recovery depends on directory structure.
+- **No asset ID in OBJ files**: ID recovery depends on directory structure. Regex now handles all known directory structures (Phase 45).
 - **Multiple MBs for same family**: Future probe work may need to target new MB variants.
 
 ---
@@ -191,7 +194,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Document | Contents |
 |---|---|
-| `docs/roadmap/current-phase.md` | Living phase pointer + full history (45 phases) |
+| `docs/roadmap/current-phase.md` | Living phase pointer + full history (47 phases) |
 | `docs/roadmap/index-stream-family-map.md` | Per-MeshSize per-MB index stream reference |
 | `docs/roadmap/project-summary.md` | This document |
 
@@ -201,15 +204,15 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Metric | Value |
 |---|---|
-| Total phases | 45 |
+| Total phases | 47 |
 | Gates cleared | 7 |
 | Proof guards | 8 |
 | C# tests | 50 (all pass) |
 | Python tests | ~49 (all pass) |
 | MeshSize families mapped | 29 (17 faced + 1 mixed + 11 pos-only) |
 | Sibling pairs | 142 |
-| Probe lookup entries | 68 |
+| Probe lookup entries | 71 |
 | Faced OBJs | 184 |
 | Position-only OBJs | 84 |
-| Unknown MeshSize | 4 (all pos-only) |
+| Unknown MeshSize | **0** 🎉 |
 | Structural issues | 0 |

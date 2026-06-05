@@ -1,18 +1,27 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 43 ✅; probe lookup pattern matching resolved last resolvable unknowns; unknowns 22→4)
+**Last Updated**: 2026-06 (Phase 45 ✅ — **0 unknowns remaining** 🎉; all 268 OBJs fully classified)
 
 ---
 
 ## Current State
 
-**Phase 43 complete** — 4 unknowns remain (all pos-only, unresolvable edge cases).
+**Phase 45 complete** — **0 unknowns remaining** 🎉
 
-**Final unknowns:**
-- `0f/36v/MB=25` — pos-only, no probe at MB=25
-- `0f/114v/MB=27` — pos-only, no probe at MB=27
-- `0f/6489v/MB=6` — huge mesh, NIF not found in Source/
-- `0f/4v/MB=47` — pos-only, no probe at MB=47
+All 268 OBJ files are now fully classified:
+- 214 unique asset IDs
+- 184 faced + 84 position-only
+- 29 MeshSize families mapped
+- 71 probe lookup entries
+
+**Final 3 unknowns resolved in Phase 45:**
+- `0bdc8bc6c684ad17` MB=25 36v → **MS=280** (has index stream!)
+- `96616acc5854775a` MB=27 114v → **MS=305** (float2 sibling pair)
+- `fedf45d1500a61ea` MB=47 4v → **MS=305** (edge case)
+
+**Two bugs fixed:**
+1. `extract_asset_id` regex: `-mesh\d+\.*$` → `-mesh\d+(\..*)?$` to handle nested directories
+2. Pattern matching guard: removed aggressive skip for unresolved asset IDs
 
 ---
 
@@ -88,8 +97,10 @@
 | **Phase 41** | **Pattern-Matching Resolution** | **build_export_manifest.py: added face/vertex/MB pattern matching for no-ID entries; resolved 32 entries without probes; unknowns 49→22 (11 faced + 11 pos-only)** | **0** | **✅ COMPLETE** |
 | **Phase 42** | **Project Summary Update** | **Updated docs/roadmap/project-summary.md through Phase 41; fixed family counts to 29 (17 faced + 1 mixed + 11 pos-only); health sweep: ruff ✅, mypy ✅, build 0, tests 50/50 ✅** | **0** | **✅ COMPLETE** |
 | **Phase 43** | **Probe Lookup Pattern Matching** | **build_export_manifest.py: added secondary probe lookup from probe-meshsize-lookup.json for IDs probed but never OBJ-exported; resolved 18 more entries; unknowns 22→4** | **0** | **✅ COMPLETE** |
+| **Phase 44** | **Project Summary Update** | **Updated docs/roadmap/project-summary.md through Phase 43; health sweep: ruff ✅, mypy ✅, build 0, tests 50/50 ✅** | **0** | **✅ COMPLETE** |
+| **Phase 45** | **Zero Unknowns** | **Two bug fixes (regex + guard) + 3 final probes; all 268 OBJs now fully classified; unknowns 4→0** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 45 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 47 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
