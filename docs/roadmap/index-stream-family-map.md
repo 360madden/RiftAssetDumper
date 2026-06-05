@@ -1,6 +1,6 @@
 # Index Stream Family Map
 
-**Last Updated**: 2026-06 (Phase 36 — MS=276 and MS=354 discovered via cluster probes; MS=321 and MS=325 expanded)
+**Last Updated**: 2026-06 (Phase 37 — 12 probes resolved 3 new families: MS=267, MS=297, MS=330; unknowns 79→66)
 
 **Purpose**: Reference table mapping which mesh blocks in each MeshSize family carry index streams (producing faced OBJs) vs those that only carry vertex data (producing position-only OBJs via sibling pairing).
 
@@ -11,9 +11,12 @@
 | MeshSize | MB | Faced | PosOnly | %Faced | Index Stream? | Notes |
 |---|---|---|---|---|---|---|
 | 240 | 6 | 1 | 0 | 100% | ✅ Yes | @264-indexed, 80v/78f |
+| 267 | 10 | 1 | 0 | 100% | ✅ Yes | New family (Phase 37); 2f/5v, index stream present |
 | 276 | 17 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 71f/50v, index stream present |
+| 297 | 6 | 2 | 0 | 100% | ✅ Yes | New family (Phase 37); 82f/64v + 118f/95v, index stream present |
+| 330 | 6 | 1 | 0 | 100% | ✅ Yes | New family (Phase 37); 14f/16v, index stream present |
 | 354 | 6 | 1 | 0 | 100% | ✅ Yes | New family (Phase 36); 22f/24v, index stream present |
-| 301 | 6 | 18 | 0 | 100% | ✅ Yes | Canonical faced block |
+| 301 | 6 | 24 | 0 | 100% | ✅ Yes | Canonical faced block (Phase 37: +6 IDs confirmed) |
 | 301 | 7 | 1 | 0 | 100% | ✅ Yes | Single asset, may be special case |
 | 305 | 6 | 11 | 0 | 100% | ✅ Yes | Primary faced block for 305 |
 | 305 | 7 | 0 | 16 | 0% | ❌ No | Float2 sibling pair (no index; float3 MB=7 probe confirmed pos-only) |
@@ -23,7 +26,7 @@
 | 309 | 6 | 16 | 0 | 100% | ✅ Yes | Canonical faced block (float3 probe added 1) |
 | 321 | 6 | 16 | 0 | 100% | ✅ Yes | Expanded via 414-face cluster (9 inferred IDs, Phase 35.5) |
 | 321 | 7 | 0 | 1 | 0% | ❌ No | MB=7 has NO index stream (Phase 30) |
-| 325 | 6 | 44 | 0 | 100% | ✅ Yes | Canonical faced block (318-face cluster, 22 IDs inferred — Phase 35.5) |
+| 325 | 6 | 45 | 0 | 100% | ✅ Yes | Canonical faced block (Phase 37: +1 ID confirmed) |
 | 325 | 31 | 2 | 0 | 100% | ✅ Yes | New MB data point (Phase 35); 18f/20v, 2 IDs, index stream present |
 | 329 | 6 | 0 | 2 | 0% | ❌ No | **No index stream at any MB** |
 | 345 | 6 | 3 | 0 | 100% | ✅ Yes | 2 unique IDs, all faced |
@@ -45,17 +48,20 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | MeshSize | Faced MBs | Total Faced |
 |---|---|---|
 | 240 | 6 | 1 |
-| 301 | 6, 7 | 19 |
-| 305 | 6, 45, 46 | 16 |
+| 267 | 10 | 1 | New! Cluster probe (Phase 37) |
+| 276 | 17 | 1 | New! Cluster probe (Phase 36) |
+| 297 | 6 | 2 | New! Cluster probe (Phase 37) |
+| 301 | 6, 7 | 25 | Canonical faced family |
+| 305 | 6, 45, 46 | 16 | Mixed family |
 | 309 | 6 | 16 |
-| 276 | 17 | 1 | ✅ Yes | New! Cluster probe (Phase 36)
-| 321 | 6 | 16 |
-| 325 | 6 | 44 |
-| 325 | 31 | 2 |
+| 321 | 6 | 16 | Expanded via 414-face cluster |
+| 325 | 6, 31 | 47 | Canonical faced + new MB=31 |
+| 330 | 6 | 1 | New! Cluster probe (Phase 37) |
 | 345 | 6 | 3 |
+| 354 | 6 | 1 | New! Cluster probe (Phase 36) |
 | 361 | 6 | 1 |
 | 365 | 9 | 1 |
-| 465 | 7 | 1 | **New!** MB=7 at MS=465 IS faced (69f, 23v) |
+| 465 | 7 | 1 | MB=7 IS faced (69f, 23v) |
 
 ### Families with 0% faced OBJs (no index streams)
 These MeshSizes lack index streams entirely — all OBJs are position-only:
@@ -82,7 +88,7 @@ The only MeshSize with both faced and position-only mesh blocks:
 ### Root Cause: MB=6 is the canonical geometry block
 MB=6 carries index streams for MeshSizes **240-361** but stops at **329 and 389**:
 
-- **Index stream present**: MB=6 in MeshSize 240, 301, 305, 309, 321, 325, 345, 361
+- **Index stream present**: MB=6 in MeshSize 240, 267, 276, 297, 301, 305, 309, 321, 325, 330, 345, 354, 361, 365
 - **No index stream**: MB=6 in MeshSize 329, 389
 
 This suggests a transition point around MeshSize 329+ where mesh blocks switch from explicit-indexed geometry to float2+float3 sibling-paired encoding.
