@@ -1,8 +1,8 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06 (Phase 41)
+**Last Updated**: 2026-06 (Phase 43)
 
-**Purpose**: Comprehensive overview of all 43 completed phases, current state, key discoveries, and remaining work.
+**Purpose**: Comprehensive overview of all 45 completed phases, current state, key discoveries, and remaining work.
 
 ---
 
@@ -32,7 +32,7 @@ Reverse-engineering workspace for RIFT game asset archives. Focuses on decoding 
 
 ---
 
-## 2. Phase Summary (43 Phases)
+## 2. Phase Summary (45 Phases)
 
 ### Phase Group 1: Foundation (Phases 1-10)
 Descriptor subsystem, gate clearance, promotion, proof guards.
@@ -58,6 +58,8 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 - **Phase 39**: Project summary updated; health sweep (all clean)
 - **Phase 40**: 16 pos-only regex-recovered IDs probed; **8 new pos-only families** (MS=193, 197, 214, 272, 275, 307, 326, 337); unknowns 66→49
 - **Phase 41**: **Pattern-matching logic** added to `build_export_manifest.py` — resolves no-ID entries by (faces, verts, MB) matching against known probes with 10% tolerance; **32 entries resolved without probes**; unknowns 49→22
+- **Phase 42**: Project summary updated; health sweep (all clean); family counts fixed to 29 total
+- **Phase 43**: **Probe lookup pattern matching** added — secondary lookup from `probe-meshsize-lookup.json` for IDs probed but never OBJ-exported; **18 more entries resolved**; unknowns 22→4
 
 ---
 
@@ -77,6 +79,7 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 | Structural issues | 0 |
 | Probe lookup entries | 68 |
 | Resolved MeshSize IDs | 68 |
+| Remaining unknowns | 4 (all pos-only) |
 
 ### Per-MeshSize Breakdown
 
@@ -105,7 +108,7 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 | 389 | 0 | 2 | 2 | 0% |
 | 405 | 3 | 0 | 3 | 100% |
 | 465 | 1 | 19 | 20 | 5% |
-| unknown | 11 | 11 | 22 | 50% |
+| unknown | 0 | 4 | 4 | 0% |
 | **(total)** | **184** | **84** | **268** | **69%** |
 
 ### Quality Metrics
@@ -153,7 +156,11 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 ### Open Questions
 
-1. **22 unknown MeshSize entries**: 11 faced + 11 position-only. These are individual-export OBJs without asset IDs that didn't match any probe pattern. Likely edge cases (very small meshes, 0-face OBJs, one large NIF not in Source/).
+1. **4 unknown MeshSize entries**: All position-only edge cases that cannot be resolved via probes:
+   - `0f/36v/MB=25` — no probe coverage at MB=25
+   - `0f/114v/MB=27` — no probe coverage at MB=27
+   - `0f/6489v/MB=6` — NIF not found in Source/ (6489 vertices, extremely large)
+   - `0f/4v/MB=47` — no probe coverage at MB=47
 
 2. **Auto-face reconstruction**: 84 position-only OBJs have valid vertex data but no index streams. Could faces be generated algorithmically from vertex adjacency or strip topology?
 
@@ -184,7 +191,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Document | Contents |
 |---|---|
-| `docs/roadmap/current-phase.md` | Living phase pointer + full history (43 phases) |
+| `docs/roadmap/current-phase.md` | Living phase pointer + full history (45 phases) |
 | `docs/roadmap/index-stream-family-map.md` | Per-MeshSize per-MB index stream reference |
 | `docs/roadmap/project-summary.md` | This document |
 
@@ -194,7 +201,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Metric | Value |
 |---|---|
-| Total phases | 43 |
+| Total phases | 45 |
 | Gates cleared | 7 |
 | Proof guards | 8 |
 | C# tests | 50 (all pass) |
@@ -204,5 +211,5 @@ Through systematic probes, cluster analysis, and pattern matching:
 | Probe lookup entries | 68 |
 | Faced OBJs | 184 |
 | Position-only OBJs | 84 |
-| Unknown MeshSize | 22 (11 faced, 11 pos-only) |
+| Unknown MeshSize | 4 (all pos-only) |
 | Structural issues | 0 |
