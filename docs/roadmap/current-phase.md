@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 13 ✅; descriptor consistency guard added; 13 phases complete)
+**Last Updated**: 2026-06 (Phase 14 refreshed; inventory regenerated with 08010400; 4,076/8,152 classified; guard PASS)
 
 ---
 
@@ -73,7 +73,22 @@
 | **Phase 12** | **Unknown Descriptor Discovery** | **M12.1-M12.3** | **0** | **✅ COMPLETE** |
 
 | **Phase 13** | **Descriptor Consistency Proof Guard** | **M13.1-M13.3** | **0** | **✅ COMPLETE** |
+| **Phase 14** | **Inventory Refresh + Baseline Update** | **M14.1-M14.2** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 13 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 14 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+
+### Phase 14 Refresh Results
+
+| Metric | Before (Phase 11) | After (Phase 14) | Delta |
+|---|---|---|---|
+| DescriptorGuidedRole count | 4,045 | **4,076** | +31 (08010400) |
+| Hard errors | 530 | 530 | 0 |
+| Warnings | 107 | 107 | 0 |
+| Ambiguous | 3,407 | **7,515** | +4,108 (improved counting) |
+| Total described streams | 4,044 | **8,152** | +4,108 |
+
+Note: The Phase 11 baseline only counted streams with BOTH DescriptorGuidedRole AND PrimaryRole. 
+The Phase 14 baseline counts ALL PrimaryRole entries, including those without descriptors. 
+The 08010400 addition correctly captures all 31 previously unknown streams.
 
 See individual exit handoffs under `docs/handoffs/2026-06-m*.*-phase*-exit-consolidation.md`.
