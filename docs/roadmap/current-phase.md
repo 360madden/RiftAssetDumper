@@ -84,8 +84,9 @@
 | **Phase 21** | **Sibling-Aware Batch OBJ Export** | **22 DIST=0 pairs exportable via batch-export-sibling** | **0** | **✅ COMPLETE** |
 | **Phase 22** | **Sibling Export Validation** | **22/22 exports ✅ 1,020 vertices, 0 structural issues** | **0** | **✅ COMPLETE** |
 | **Phase 23** | **Extended Sibling Export** | **--include-close flag; 142 pairs total; 0-face root cause documented** | **0** | **✅ COMPLETE** |
+| **Phase 24** | **Full Sibling Export Run** | **142/142 exports ✅ 127 unique OBJs, 0 structural issues** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 24 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 25 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
