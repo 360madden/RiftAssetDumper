@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 14 refreshed; inventory regenerated with 08010400; 4,076/8,152 classified; guard PASS)
+**Last Updated**: 2026-06 (Phase 15 ✅; float2 position encoding confirmed: 51 float2, 20 float3)
 
 ---
 
@@ -74,8 +74,16 @@
 
 | **Phase 13** | **Descriptor Consistency Proof Guard** | **M13.1-M13.3** | **0** | **✅ COMPLETE** |
 | **Phase 14** | **Inventory Refresh + Baseline Update** | **M14.1-M14.2** | **0** | **✅ COMPLETE** |
+| **Phase 15** | **Float2 Position Encoding Investigation** | **M15.1-M15.4** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 14 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 15 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+
+### Phase 15 Key Finding
+
+**Float2 position encoding confirmed.** 51/71 (72%) OBJ-exported position streams use `descriptor-float2-uv`
+(8 bytes/vertex = XY pairs). 20/71 (28%) use `descriptor-float3-generic` (12 bytes/vertex = XYZ).
+Float2 positions produce valid 3D OBJ vertices with real Z values — Z is sourced from a separate
+stream, mesh transform, or computed. Raw data requires endian-aware decoding (big-endian prevalent).
 
 ### Phase 14 Refresh Results
 
