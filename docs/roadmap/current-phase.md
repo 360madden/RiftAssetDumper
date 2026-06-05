@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 24 ✅; full sibling export run — 142/142 exports, 127 unique OBJs, 0 structural issues)
+**Last Updated**: 2026-06 (Phase 25 ✅; export manifest — 142 OBJs catalogued: 94 faced, 48 position-only, 5,360 vertices, 6,682 faces)
 
 ---
 
@@ -85,8 +85,9 @@
 | **Phase 22** | **Sibling Export Validation** | **22/22 exports ✅ 1,020 vertices, 0 structural issues** | **0** | **✅ COMPLETE** |
 | **Phase 23** | **Extended Sibling Export** | **--include-close flag; 142 pairs total; 0-face root cause documented** | **0** | **✅ COMPLETE** |
 | **Phase 24** | **Full Sibling Export Run** | **142/142 exports ✅ 127 unique OBJs, 0 structural issues** | **0** | **✅ COMPLETE** |
+| **Phase 25** | **Export Manifest** | **scripts/build_export_manifest.py — 142 OBJs catalogued: 94 faced, 48 position-only, 5,360 vertices, 6,682 faces** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 25 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 26 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
