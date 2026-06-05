@@ -16,10 +16,12 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 SEP = "=" * 80
+REPO_ROOT = Path(__file__).resolve().parents[1]
 PAIRING_MAP_PATH = "Exports/phase19-sibling-pairing-map.json"
-SOLUTION = "RiftAssetDumper.slnx"
+SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 
 
 def build_project(skip_build: bool) -> bool:
@@ -46,6 +48,8 @@ def run_decode_geometry(
     dry_run: bool = False,
 ) -> dict:
     """Run decode-nif-geometry with experimental-position-source for one mesh."""
+    # Use unique per-asset output directory to avoid overwrites (matches batch-export-264 convention)
+    asset_out = os.path.join(out_dir, f"decode-nif-geometry-{asset_id}")
     cmd = [
         "dotnet", "run", "--project", "src/RiftAssetDumper/RiftAssetDumper.csproj",
         "--no-build", "--",
@@ -55,7 +59,7 @@ def run_decode_geometry(
         "--experimental-position-source",
         "--export-obj",
         "--root", project_root,
-        "--out", out_dir,
+        "--out", asset_out,
     ]
 
     if dry_run:
@@ -83,15 +87,17 @@ def run_decode_geometry(
 
 def main() -> int:
     print(SEP)
-    print("PHASE 21: SIBLING-AWARE BATCH OBJ EXPORT")
+    print("PHASE 22: SIBLING-AWARE BATCH OBJ EXPORT")
     print(SEP)
 
     # Parse args
     skip_build = "--skip-build" in sys.argv
     dry_run = "--dry-run" in sys.argv
-    project_root = "."
+    project_root = str(REPO_ROOT / "Source")
     out_dir = "Exports/obj-exports"
     for i, arg in enumerate(sys.argv):
+        if arg == "--root" and i + 1 < len(sys.argv):
+            project_root = sys.argv[i + 1]
         if arg == "--output-dir" and i + 1 < len(sys.argv):
             out_dir = sys.argv[i + 1]
 
@@ -101,7 +107,7 @@ def main() -> int:
         print("Run build_sibling_pairing_v2.py first to generate it.")
         return 1
 
-    with open(PAIRING_MAP_PATH, encoding="utf-8") as f:
+    with open(str(REPO_ROOT / PAIRING_MAP_PATH), encoding="utf-8") as f:
         pairing_map = json.load(f)
 
     pairs = pairing_map.get("pairs", [])
