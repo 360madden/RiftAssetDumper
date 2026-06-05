@@ -287,6 +287,7 @@ public class BasicTests
     Assert.Equal("bytexvec4 (packed vertex attribute)", Program.ClassifyNifDescriptor("10010400"));
     // 3c 01 04 00 = unknown-role candidate
     Assert.Equal("bytexvec4 (packed vertex attribute, variant)", Program.ClassifyNifDescriptor("3c010400"));
+    Assert.Equal("bytexvec4 (auxiliary/sentinel, candidate)", Program.ClassifyNifDescriptor("08010400"));
   }
 
   [Fact]
@@ -307,6 +308,7 @@ public class BasicTests
     Assert.Equal("descriptor-uint16-index", Program.ClassifyNifDescriptorRole("15020100"));
     Assert.Equal("descriptor-byte4-packed", Program.ClassifyNifDescriptorRole("10010400"));
     Assert.Equal("descriptor-byte4-packed-variant", Program.ClassifyNifDescriptorRole("3c010400"));
+    Assert.Equal("descriptor-byte4-aux", Program.ClassifyNifDescriptorRole("08010400"));
     // Edge cases: unknown, null, empty, too-short
     Assert.Null(Program.ClassifyNifDescriptorRole("ffffffff"));
     Assert.Null(Program.ClassifyNifDescriptorRole(null));

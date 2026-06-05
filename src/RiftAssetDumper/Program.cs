@@ -10949,6 +10949,7 @@ internal static class Program
       "15020100" => "descriptor-uint16-index",       // uint16xscalar -> index stream
       "10010400" => "descriptor-byte4-packed",       // bytexvec4 -> packed vertex attribute
       "3c010400" => "descriptor-byte4-packed-variant", // bytexvec4 variant
+      "08010400" => "descriptor-byte4-aux",            // bytexvec4 auxiliary/sentinel (candidate)
       _ => null
     };
   }
@@ -11021,6 +11022,7 @@ internal static class Program
       "36" => "float32xvec2 family (byte0=0x36)",
       "15" => "uint16xscalar family (byte0=0x15, candidate)",
       "10" => "bytexvec4 family (byte0=0x10, candidate)",
+      "08" => "bytexvec4 family (byte0=0x08, candidate)",
       "3c" => "bytexvec4 family (byte0=0x3c, candidate)",
       _ => null
     };
@@ -11040,6 +11042,7 @@ internal static class Program
       "15020100" => "uint16xscalar (index stream)",
       "10010400" => "bytexvec4 (packed vertex attribute)",
       "3c010400" => "bytexvec4 (packed vertex attribute, variant)",
+      "08010400" => "bytexvec4 (auxiliary/sentinel, candidate)",
       _ => ClassifyNifDescriptorByByte0(descriptorBytes)
     };
   }
