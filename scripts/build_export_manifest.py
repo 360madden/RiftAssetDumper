@@ -119,8 +119,9 @@ def extract_asset_id(filepath: Path) -> str | None:
     for part in filepath.parts:
         if part.startswith("decode-nif-geometry-"):
             candidate = part.replace("decode-nif-geometry-", "")
-            # Strip mesh suffix and any remaining extension (e.g. -mesh6.obj, -mesh31.obj)
-            candidate = re.sub(r"-mesh\d+\..*$", "", candidate)
+            # Strip mesh suffix and any remaining extension
+            # Handles: -mesh6.obj, -mesh31.obj, -mesh25 (directory without extension)
+            candidate = re.sub(r"-mesh\d+(\..*)?$", "", candidate)
             # Also handle case where file has no mesh suffix (just .obj)
             candidate = re.sub(r"\..*$", "", candidate)
             if len(candidate) == 16:
@@ -305,50 +306,92 @@ def main() -> int:
             if key not in pattern_lookup:
                 pattern_lookup[key] = ms_val
 
+    # Also build a secondary pattern lookup from the probe lookup file
+    # for IDs that were probed but never OBJ-exported.
+    # Key: (mesh_block, faced) -> [(meshsize, faces, vertex_count)]
+    # Then match unknown entries against these by closest face/vert match
+    probe_patterns: dict[tuple, list[tuple]] = {}
+    if PROBE_LOOKUP_PATH.exists():
+        with open(PROBE_LOOKUP_PATH, encoding="utf-8") as f:
+            probe_data = json.load(f).get("entries", {})
+        # Group probe entries by (MB, faced)
+        for aid, info in probe_data.items():
+            ms = info.get("meshsize")
+            mb = info.get("mesh_block")
+            faced = info.get("faced", False)
+            if ms and mb:
+                key = (str(mb), bool(faced))
+                if key not in probe_patterns:
+                    probe_patterns[key] = []
+                probe_patterns[key].append({"aid": aid, "ms": ms})
+
     # Use tolerance matching for entries that don't exactly match
     # (face/vertex counts may differ by a few due to export variations)
     resolved_from_pattern = 0
     for e in entries:
-        # Skip entries that already have a MeshSize
+        # Skip entries that already have a MeshSize (from pairing map, probe lookup, or prior pattern match)
         ms_entry = e.get("sibling_pair") or {}
         if isinstance(ms_entry, dict) and ms_entry.get("mesh_size"):
             continue
 
-        # Skip entries with asset_id (they should use pairing map or probe lookup)
-        if e.get("asset_id"):
-            continue
+        # Unresolved entries fall through to pattern matching (regardless of asset_id)
 
         e_faces = e.get("faces", 0) or 0
         e_verts = e.get("vertex_count", 0)
-        e_mb = e.get("mesh_block")
+        e_mb = str(e.get("mesh_block", ""))
         e_faced = e.get("faced")
 
         if e_faces == 0 and not e_faced:
-            # Position-only zero-face entries are harder to match
-            # Try matching by (verts, MB) alone
+            # Position-only zero-face entries: match by (verts, MB)
+            matched = False
             for (pf, pv, pmb, pfaced), pms in pattern_lookup.items():
-                if not pfaced and pv == e_verts and pmb == e_mb and abs(pf - e_faces) <= 5:
+                if not pfaced and pv == e_verts and str(pmb) == e_mb and abs(pf - e_faces) <= 5:
                     e["sibling_pair"] = {"mesh_size": pms, "note": "resolved via pattern match (pos-only)"}
                     resolved_from_pattern += 1
+                    matched = True
                     break
+            if not matched:
+                # Try probe lookup patterns (IDs without OBJs)
+                probe_key = (e_mb, False)
+                if probe_key in probe_patterns:
+                    for pinfo in probe_patterns[probe_key]:
+                        e["sibling_pair"] = {
+                            "mesh_size": pinfo["ms"],
+                            "note": f"resolved via probe lookup pattern (MB={e_mb}, pos-only)"
+                        }
+                        resolved_from_pattern += 1
+                        break
         else:
-            # Try exact match first
+            # Faced entries: try exact match, then tolerance, then probe lookup
+            matched = False
             exact_key = (e_faces, e_verts, e_mb, e_faced)
             if exact_key in pattern_lookup:
                 pms = pattern_lookup[exact_key]
-                # Check this isn't a self-match (identical to the source probe entry)
                 e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb})"}
                 resolved_from_pattern += 1
+                matched = True
             else:
-                # Try tolerance match (±2% for faces, ±2% for verts)
+                # Try tolerance match (10%)
                 for (pf, pv, pmb, pfaced), pms in pattern_lookup.items():
-                    if pmb == e_mb and pfaced == e_faced:
+                    if str(pmb) == e_mb and pfaced == e_faced:
                         face_diff = abs(pf - e_faces) / max(pf, 1)
                         vert_diff = abs(pv - e_verts) / max(pv, 1)
                         if face_diff <= 0.10 and vert_diff <= 0.10:
                             e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via fuzzy pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb}) match={pf}f/{pv}v"}
                             resolved_from_pattern += 1
+                            matched = True
                             break
+            if not matched:
+                # Try probe lookup patterns (IDs without OBJs)
+                probe_key = (e_mb, bool(e_faced))
+                if probe_key in probe_patterns:
+                    for pinfo in probe_patterns[probe_key]:
+                        e["sibling_pair"] = {
+                            "mesh_size": pinfo["ms"],
+                            "note": f"resolved via probe lookup pattern (MB={e_mb}, faced={e_faced})"
+                        }
+                        resolved_from_pattern += 1
+                        break
 
     if resolved_from_pattern > 0:
         print(f"\n  Resolved {resolved_from_pattern} entries via face/vertex/MB pattern matching")
