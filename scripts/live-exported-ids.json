@@ -1,0 +1,27 @@
+{
+  "schema": "live-exported-ids/v1",
+  "generated_at": "2026-06-11",
+  "description": "Asset IDs exported from live RIFT archives. Manually maintained; add new live-exported IDs here for provenance detection.",
+  "ids": {
+    "cf54e712ff57eaac": {
+      "mesh_sizes": [357, 362],
+      "archive": "assets.002",
+      "entry": 1191
+    },
+    "1ecdbaf5a2576ba5": {
+      "mesh_sizes": [349],
+      "archive": "assets.002",
+      "entry": 1190
+    },
+    "838831f8fb617ecc": {
+      "mesh_sizes": [417],
+      "archive": "assets.003",
+      "entry": 108
+    },
+    "95d9b14a964e67c8": {
+      "mesh_sizes": [423],
+      "archive": "assets.002",
+      "entry": 1282
+    }
+  }
+}

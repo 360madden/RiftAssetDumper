@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OBJ_ROOT = REPO_ROOT / "Exports"
 PAIRING_MAP_PATH = REPO_ROOT / "Exports" / "phase19-sibling-pairing-map.json"
 PROBE_LOOKUP_PATH = REPO_ROOT / "Exports" / "probe-meshsize-lookup.json"
+LIVE_EXPORTED_IDS_PATH = REPO_ROOT / "scripts" / "live-exported-ids.json"
 DEFAULT_OUT = REPO_ROOT / "Exports"
 
 # Known MeshSize for @264-indexed meshes
@@ -138,28 +139,36 @@ def extract_asset_id(filepath: Path) -> str | None:
     return None
 
 
-def detect_provenance(obj_path: Path) -> str:
+def _load_live_exported_ids() -> set[str]:
+    """Load live-exported asset IDs from the data-driven registry.
+
+    Falls back to empty set if the registry file doesn't exist or is malformed.
+    """
+    if not LIVE_EXPORTED_IDS_PATH.exists():
+        return set()
+    try:
+        with open(LIVE_EXPORTED_IDS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        ids = data.get("ids", {})
+        return set(ids.keys())
+    except (json.JSONDecodeError, TypeError):
+        return set()
+
+
+def detect_provenance(obj_path: Path, live_ids: set[str] | None = None) -> str:
     """Detect whether an OBJ came from copied-source or live archives.
 
     Live-archive OBJs are in decode-nif-geometry directories from
     assets probed against the live root (C:/Program Files/.../RIFT/Live).
-    We detect this by checking if the decode directory contains live-probe
-    artifacts or by checking known live-exported asset IDs.
+    Detection uses a data-driven registry (Exports/live-exported-ids.json)
+    rather than hardcoded IDs.
     """
+    if live_ids is None:
+        live_ids = _load_live_exported_ids()
     path_str = str(obj_path).lower()
-    # Known live-exported asset IDs (from live_family_scanner discoveries)
-    live_ids = {
-        "cf54e712ff57eaac",  # meshSize=362, 357
-        "1ecdbaf5a2576ba5",  # meshSize=349
-    }
-    # Check if path contains a known live asset ID
     for aid in live_ids:
         if aid in path_str:
             return "live"
-    # Check for live-archive specific path patterns
-    if "live-" in path_str:
-        return "live"
-    # Default: copied source
     return "copied"
 
 
@@ -242,6 +251,11 @@ def main() -> int:
     # Per-provenance breakdown
     provenance_counts: Counter = Counter()
 
+    # Load live-exported IDs for provenance detection (data-driven, not hardcoded)
+    live_ids = _load_live_exported_ids()
+    if live_ids:
+        print(f"Loaded {len(live_ids)} live-exported asset IDs for provenance detection")
+
     start = time.time()
 
     for i, obj_path in enumerate(obj_files):
@@ -256,7 +270,7 @@ def main() -> int:
         batch = classify_export_batch(obj_path)
         meta["export_batch"] = batch
         batch_counts[batch] += 1
-        meta["provenance"] = detect_provenance(obj_path)
+        meta["provenance"] = detect_provenance(obj_path, live_ids)
 
         # Determine MeshSize:
         # 1. Check pairing map (float2 side)
