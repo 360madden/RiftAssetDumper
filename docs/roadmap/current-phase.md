@@ -1,18 +1,19 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 47 ✅ — MS=280 MB=25 index-stream anomaly investigated; expected sibling-pairing behavior confirmed)
+**Last Updated**: 2026-06 (Phase 48 ✅ — pos-only OBJ cross-MB pairing audit; 0 recoverable faced candidates found)
 
 ---
 
 ## Current State
 
-**Phase 47 complete** — MS=280 MB=25 anomaly investigated.
+**Phase 48 complete** — audited all 81 pos-only OBJs for recoverable faced candidates.
 
-**Finding**: `0bdc8bc6c684ad17` MB=25 has `index-u16be-list-lead` (80 elements) at @184, float32 normals at @192, but **no position stream**. Position data lives in MB=7 (`position-float3-lead`). The OBJ exporter exported MB=25 independently with fallback position data (flat `0 1 0` vertices). This is **expected sibling-pairing behavior**: index and position data are split across mesh blocks within the same NIF, and the exporter cannot produce faced OBJs without sibling pairing.
+**Findings**:
+- **5 NIFs** have both faced and pos-only exports — all MS=305 (MB=45 faced, MB=7/27 pos-only sibling pairs)
+- **0 pos-only NIFs** have hidden index streams at other MBs that could produce new faced OBJs
+- **81 pos-only OBJs** are genuinely position-limited (no index stream in the same NIF, or index resides in a different MB without position data)
 
-**Implication**: MS=280 now has 3 MB variants: MB=6,7 (faced) and MB=25 (index-only → pos-only export). This is consistent with the sibling-pairing architecture.
-
-**No code changes needed** — the system is working as designed.
+**Conclusion**: No recoverable faced OBJs from existing pos-only exports. The sibling-pairing architecture is working as designed — all recoverable faced OBJs have already been exported.
 
 ---
 
@@ -92,8 +93,9 @@
 | **Phase 45** | **Zero Unknowns** | **Two bug fixes (regex + guard) + 3 final probes; all 268 OBJs now fully classified; unknowns 4→0** | **0** | **✅ COMPLETE** |
 | **Phase 46** | **Documentation Update** | **Updated all docs with 0 unknowns milestone; accurate Per-MeshSize table from live manifest** | **0** | **✅ COMPLETE** |
 | **Phase 47** | **MS=280 MB=25 Investigation** | **Investigated index-stream anomaly: MB=25 has index but no position data; expected sibling-pairing behavior** | **0** | **✅ COMPLETE** |
+| **Phase 48** | **Pos-Only Cross-MB Audit** | **Audited 81 pos-only OBJs for recoverable faced candidates; 0 found; all genuinely pos-only** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 49 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 50 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
