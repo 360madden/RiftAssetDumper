@@ -1,6 +1,6 @@
 # Index Stream Family Map
 
-**Last Updated**: 2026-06 (Phase 38 — regex bug fix recovered 33 hidden IDs; 15 probes resolved 3 new families: MS=280, MS=367, MS=405; unknowns 81→66)
+**Last Updated**: 2026-06 (Phase 40 — 16 pos-only regex-recovered IDs resolved; 8 new pos-only families: MS=193, 197, 214, 272, 275, 307, 326, 337; unknowns 66→49)
 
 **Purpose**: Reference table mapping which mesh blocks in each MeshSize family carry index streams (producing faced OBJs) vs those that only carry vertex data (producing position-only OBJs via sibling pairing).
 
@@ -76,8 +76,16 @@ These MeshSizes lack index streams entirely — all OBJs are position-only:
 
 | MeshSize | MBs | Total PosOnly | Notes |
 |---|---|---|---|
+| 193 | 7 | 2 | New pos-only family (Phase 40) |
+| 197 | 17 | 1 | New pos-only family (Phase 40) |
+| 214 | 12 | 1 | New pos-only family (Phase 40) |
+| 272 | 6 | 1 | New pos-only family (Phase 40) |
+| 275 | 7 | 3 | New pos-only family (Phase 40) |
+| 307 | 35 | 1 | New pos-only family (Phase 40) |
 | 321 | 7 | 1 | MB=7 has no index stream (Phase 30) |
-| 329 | 6 | 2 | Float2 sibling pair |
+| 326 | 6 | 1 | New pos-only family (Phase 40) |
+| 329 | 6, 7, 31 | 5 | Expanded via Phase 40 (+3 IDs) |
+| 337 | 33 | 1 | New pos-only family (Phase 40) |
 | 370 | 66 | 1 | 6 vertices, auxiliary? |
 | 389 | 6 | 2 | Single entry (float3 probe confirmed) |
 | 465 | 8 | 17 | Largest pos-only family (but MB=7 IS faced!) |
