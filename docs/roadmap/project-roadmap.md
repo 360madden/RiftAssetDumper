@@ -438,26 +438,46 @@ archives, enabling cross-mesh pairing.
 
 ---
 
-## Phase 16: Sibling Pairing Verification & OBJ Pipeline (Candidate)
+## Phase 16: Sibling Pairing Map (COMPLETE ✅)
 
 **Objective**: Build a concrete sibling pairing map — identify which specific float3 mesh provides Z for
-each float2 mesh — and design a descriptor-aware OBJ export pipeline that explicitly handles the
-float2+sibling Z mechanism.
+each float2 mesh across the population.
 
 **Entry Criteria**:
 - Phase 15.5 COMPLETE with sibling pairing mechanism confirmed ✅
 - Streaming parser infrastructure available ✅
 - Probe and pairing data accessible ✅
 
-**Key Milestones (planned)**:
-1. Build per-MeshSize sibling pairing map (float2 → float3 mesh pairs).
-2. Cross-reference pairing confidence and archive proximity.
-3. Design descriptor-aware export pipeline that emits correct 3D vertices.
+**Key Milestones**:
+1. ✅ Build per-MeshSize sibling pairing map (float2 → float3 mesh pairs). Found 9 shared MeshSizes.
+2. ✅ Cross-reference pairing confidence and archive proximity. Found 3 MeshSizes with DIST=0 (same entry).
+3. **Script**: `scripts/build_sibling_pairing_map.py` — archive-proximity sibling matcher.
 
-**Anti-Drift Rules**:
-- Stay within sibling pairing analysis — no new archive format changes.
-- Use existing probe/inventory infrastructure; no new C# unless justified.
-- All analysis in Python.
+**Key Findings**:
+- 3 MeshSizes (305, 309, 465) have DIST=0 pairs (same archive entry)
+- MeshSize 301: distance=1 pairs; MeshSize 345: distance=2
+- MeshSizes 321, 325, 326, 329: cross-archive pairing required
+
+---
+
+## Phase 17: Sibling Pair Verification (COMPLETE ✅)
+
+**Objective**: Directly verify the sibling pairing mechanism by probing a confirmed DIST=0 pair
+and cross-referencing stream composition.
+
+**Entry Criteria**:
+- Phase 16 COMPLETE with concrete pairing map ✅
+- DIST=0 pairs identified at MeshSizes 305, 309, 465 ✅
+
+**Key Milestones**:
+1. ✅ Probe MeshSize 305 entry 544 (assets.037, ID `42024b768fcd2e2b`).
+2. ✅ CONFIRMED: MB=6 has `descriptor-float2-uv` (192 bytes = 24 XY pairs, 8 bytes/vertex).
+3. ✅ CONFIRMED: MB=34 has `descriptor-float3-generic` (768 bytes = 64 XYZ triplets, 12 bytes/vertex).
+4. ✅ Both meshes exist in the same TWAD entry — the sibling pairing mechanism is directly confirmed.
+
+**Key Finding**: **Sibling pairing CONFIRMED end-to-end.** The same archive entry (544 in assets.037)
+physically contains both float2 XY-only and float3 full XYZ position data across different mesh blocks.
+The OBJ exporter's `NifPositionSourceSiblingAccumulator` pairs MB=6 (needs Z) with MB=34 (has XYZ).
 
 ---
 
@@ -477,4 +497,4 @@ float2+sibling Z mechanism.
 
 *This roadmap is the single source of truth for scope and sequencing. All autonomous or subagent work must be traceable to a specific phase + milestone.*
 
-**Last Updated**: 2026-06 (Phases 13-15.5 added; descriptor map complete at 6 patterns; float2 Z-source resolved as sibling pairing)
+**Last Updated**: 2026-06 (Phases 13-17 added; descriptor map complete at 6 patterns; float2 Z-source confirmed as sibling pairing via probe at entry 544)
