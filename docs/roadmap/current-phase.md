@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 20 ✅; cross-type NIF verification — 9 NIFs with f2+f3 in same entry)
+**Last Updated**: 2026-06 (Phase 21 ✅; sibling-aware batch OBJ export — 22 DIST=0 pairs via batch-export-sibling)
 
 ---
 
@@ -81,8 +81,9 @@
 | **Phase 18** | **Comprehensive Sibling Pairing Database** | **Full-inventory scan** | **0** | **✅ COMPLETE** |
 | **Phase 19** | **Sibling Pairing Improvements** | **DIST=0 tracking + JSON output** | **0** | **✅ COMPLETE** |
 | **Phase 20** | **Cross-Type NIF Verification** | **9 cross-type NIFs analyzed** | **0** | **✅ COMPLETE** |
+| **Phase 21** | **Sibling-Aware Batch OBJ Export** | **22 DIST=0 pairs exportable via batch-export-sibling** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 21 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 22 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 

@@ -46,6 +46,7 @@ Commands (kebab-case):
     stream-bodies                — inventory-nif-stream-bodies + summary
     decode-geometry              — decode-nif-geometry + summary (needs --id --mesh-block; supports --experimental-position-source)
     batch-export-264             — batch export all 5 known @264-indexed meshes via --export-obj
+    batch-export-sibling         — batch export sibling-paired float2 position meshes via --experimental-position-source
     tools-status                 — show configured third-party reverse-engineering tools
     fifty-step-plan-status       — show current position in docs/discovery-plan-50.md
     post50-position-source-status — rank the next offline proof lane from ignored post-50 reports
@@ -318,6 +319,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "batch-export-sibling": {
+        "dotnet": "",
+        "base": "",
+    },
     "tools-status": {
         "dotnet": "",
         "base": "",
@@ -504,6 +509,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "StreamBodies": "stream-bodies",
     "DecodeGeometry": "decode-geometry",
     "BatchExport264": "batch-export-264",
+    "BatchExportSibling": "batch-export-sibling",
     "ToolsStatus": "tools-status",
     "FiftyStepPlanStatus": "fifty-step-plan-status",
     "Post50PositionSourceStatus": "post50-position-source-status",
@@ -8709,6 +8715,25 @@ def _run_command(args: argparse.Namespace) -> None:
             print(f"  {marker} {sid}  v={sv}  status={sstatus}  obj={sobj:,}B")
         print()
         return
+
+    # --- batch-export-sibling: export sibling-paired float2 position meshes ---
+
+    if command == "batch-export-sibling":
+        import subprocess as _sp
+        import sys as _sys
+
+        _SCRIPT = SCRIPT_DIR / "batch_export_sibling.py"
+        if not _SCRIPT.exists():
+            print(f"ERROR: batch_export_sibling.py not found at {_SCRIPT}", file=_sys.stderr)
+            _sys.exit(1)
+
+        _cmd = [_sys.executable, str(_SCRIPT)]
+        if args.skip_build:
+            _cmd.append("--skip-build")
+
+        print(f"Running: {' '.join(_cmd)}")
+        _result = _sp.run(_cmd, cwd=str(REPO_ROOT))
+        _sys.exit(_result.returncode)
 
     # Validate required args
     if entry.get("needs_id") and not args.id:
