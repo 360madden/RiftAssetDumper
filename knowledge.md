@@ -134,15 +134,17 @@ Two parallel jobs on `windows-latest`:
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Phase 49)
+### Current project state (latest — Phase 49 + Live Expansion)
 
-- **268 OBJs (214 unique), 184 faced, 84 position-only, 23,201 faces, 19,797 vertices across 29 MeshSize families. 0 structural issues. 0 unknowns remaining.**
+- **269 OBJs (215 unique), 184 faced, 85 position-only, 29,688 faces, 26,286 vertices across 30 MeshSize families. 0 structural issues. 0 unknowns remaining in copied set.**
+- **🔴 LIVE ARCHIVE BREAKTHROUGH: First OBJ exported from live RIFT archives** — meshSize=362 (`cf54e712ff57eaac` block 6, assets.002 entry 1191). 6,489 vertices, 6,487 fan faces, 776 KB, 0 NaN, clean structure. This is a **completely new MeshSize family** not present in the copied Source set.
+- **Live archive stats**: 244 archives (9× Source's 27), ~2.4M estimated entries, 19+ unique mesh sizes (max 417), 3 new families discovered (341, 357, 362)
 - `batch_sweep.py` — 4-phase tool for OBJ integrity (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, manifest building
 - All 8 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Cross-MB audit (Phase 48): no recoverable faced candidates found across 84 pos-only OBJs
-- CI green: build 0 errors, tests 50/50 (C#) + 49 (Python), ruff 0, mypy 0
+- CI green: build 0 errors, tests 50/50 (C#) + 50 (Python), ruff 0, mypy 0
 
 ## Conventions
 
