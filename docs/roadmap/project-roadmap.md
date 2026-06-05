@@ -298,6 +298,60 @@ Each phase follows this template for focus:
 
 ---
 
+## Phase 11: Descriptor-Guided Stream Role Classification at Population Scale
+
+**Objective**: Apply the proven descriptor semantic map (4/4 bytes identified, 5/5 patterns mapped, stride→usage rule proven) to classify all 31,777 NiDataStream blocks by role. Replace or augment the heuristic role classifier with descriptor-driven classification. Discover new position sources, normal sources, and UV sources that the heuristic classifier missed.
+
+**Entry Criteria**:
+- Phase 10 COMPLETE — all 7 gates cleared, both promotion flags true ✅
+- Descriptor semantic map proven: 4/4 bytes, 5/5 patterns, stride→usage rule (uint16×scalar→index, rest→vertex) ✅
+- 31,777-block population inventory available ✅
+- Existing heuristic role classifier producing roles for all streams ✅
+
+**Key Milestones**:
+1. **M11.1**: Extend `inventory-nif-mesh-bindings` (or create new command) to emit descriptor-classified roles alongside existing heuristic-classified roles for all 31,777 streams. Produce role delta report comparing descriptor-driven vs heuristic classification.
+2. **M11.2**: Classify all `37040300` (float32×vec3) streams into position vs normal vs UV sub-roles using stream context (vertex count, pairing patterns, offset conventions). This is the largest remaining ambiguity — 37040300 is role-agnostic.
+3. **M11.3**: Discover new position sources — streams classified as position by descriptor but missed by the heuristic classifier. Target: expand from the ~210 known position streams.
+4. **M11.4**: Validate descriptor-guided roles against existing OBJ exports (94 OBJs, 65 faced). Confirm descriptor predictions match ground truth.
+5. **M11.5**: Produce comprehensive role inventory + exit handoff. Update proof guards with descriptor-guided baselines.
+
+**Exit Criteria**:
+- Full population role classification using descriptor as primary signal
+- Role delta report showing agreement/disagreement between descriptor-guided and heuristic classifiers
+- New position/normal/UV source discoveries (quantified)
+- Proof guards updated with descriptor-guided baselines
+- Exit handoff committed
+
+**Anti-Drift Rules**:
+- Stay within stream role classification — do not pursue new export formats, texture work, or archive format changes
+- Every C# change must be additive (new fields/reports, not behavioral changes to existing decode paths)
+- Heuristic classifier must remain as fallback — descriptor-guided classification is supplementary, not replacement
+- Both promotion flags remain true (already cleared)
+
+---
+
+## Phase 12: Unknown Descriptor Pattern Discovery (COMPLETE ✅)
+
+**Objective**: Analyze the 50.4% of streams without `DescriptorGuidedRole` to discover new descriptor byte patterns beyond the 5 proven in Phase 9. Extend the semantic map.
+
+**Entry Criteria**:
+- Phase 11 COMPLETE with population-scale inventory ✅
+- 4,107/8,152 streams have unrecognized or missing descriptors ✅
+
+**Key Milestones**:
+1. **M12.1** ✅: Extract descriptor bytes from streams without `DescriptorGuidedRole`. Analyze byte0 family distribution. Discovered only ONE new pattern: `08010400` (31 streams, 0.4%).
+2. **M12.2** ✅: Analyze `08010400` — pattern is `08 01 04 00` (byte×4 components, 4 bytes/element). All 31 streams have non-geometry roles (uint16-compatible-body, all-zero-stream, u32-repeated-pattern-body). Small payloads (60-600 bytes), very low bytes-per-vertex ratios (0.1-0.7). Likely auxiliary/sentinel data, not vertex geometry.
+3. **M12.3** ✅: Add `08010400` to `ClassifyNifDescriptor` ("bytexvec4 (auxiliary/sentinel, candidate)"), `ClassifyNifDescriptorRole` ("descriptor-byte4-aux"), `ClassifyNifDescriptorByByte0` ("bytexvec4 family (byte0=0x08, candidate)"). Tests updated (50/50 pass).
+
+**Exit Criteria**:
+- 0 remaining unknown descriptor patterns in the copied set ✅
+- Descriptor semantic map complete at 6 patterns (5 original + 08010400) ✅
+- All patterns classified and tested ✅
+
+**Key Finding**: The 5 original patterns cover essentially all meaningful descriptors. The copied set is descriptor-complete — no further pattern discovery is needed.
+
+---
+
 ## Anti-Drift & Focus Mechanisms (Apply to All Phases)
 
 1. **Always reference the current phase** in every handoff and major commit.
@@ -316,4 +370,4 @@ Each phase follows this template for focus:
 
 *This roadmap is the single source of truth for scope and sequencing. All autonomous or subagent work must be traceable to a specific phase + milestone.*
 
-**Last Updated**: 2026-06 (initial creation during autonomous planning session)
+**Last Updated**: 2026-06 (Phases 11-12 added; descriptor map complete at 6 patterns)
