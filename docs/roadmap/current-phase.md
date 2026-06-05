@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 15.5 ✅; Z-source confirmed as mesh transform, not separate stream)
+**Last Updated**: 2026-06 (Phase 16 ✅; concrete sibling pairs identified — DIST=0 in 3 MeshSizes)
 
 ---
 
@@ -76,8 +76,9 @@
 | **Phase 14** | **Inventory Refresh + Baseline Update** | **M14.1-M14.2** | **0** | **✅ COMPLETE** |
 | **Phase 15** | **Float2 Position Encoding Investigation** | **M15.1-M15.4** | **0** | **✅ COMPLETE** |
 | **Phase 15.5** | **Float2 Z-Source Resolution** | **Z-source analysis** | **0** | **✅ COMPLETE** |
+| **Phase 16** | **Sibling Pairing Map** | **Pairing map** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 16 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 17 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -123,6 +124,29 @@ system reconstructs 3D positions by cross-referencing mesh siblings.
 
 See: `scripts/analyze_z_source.py` (reusable analysis script).
 See: `Exports/phase15.5-z-source-analysis.txt` for per-mesh breakdown (local/ignored).
+
+### Phase 16: Concrete Sibling Pairing Map
+
+**Finding: Concrete float2→float3 sibling pairs confirmed across 9 MeshSize families.**
+
+Key sibling pairs (by archive proximity, distance = entry index difference):
+
+| MeshSize | Archive | Float2 Entry | Float3 Entry | Dist | Strength |
+|---|---|---|---|---|---|
+| 305 | assets.037 | 544 | 544 | **0** | 🟢 Same entry |
+| 309 | assets.040 | 1412 | 1412 | **0** | 🟢 Same entry |
+| 465 | assets.050 | 861-864 | 864 | **0** | 🟢 Same entry |
+| 301 | assets.037 | 819 | 818 | 1 | 🟡 Adjacent |
+| 345 | assets.032 | 213 | 211 | 2 | 🟡 Near |
+| 325 | — | Unpaired | — | — | ⚪ Cross-archive |
+| 329 | — | Unpaired | — | — | ⚪ Cross-archive |
+
+**Key insight**: 3 MeshSizes (305, 309, 465) have DIST=0 pairs — float2 and float3 data
+live in the SAME archive entry. The OBJ exporter pairs them directly within the same
+TWAD entry. Other MeshSizes (325, 329) require cross-archive pairing via the
+NIF block reference system.
+
+See: `scripts/build_sibling_pairing_map.py` for the pairing map builder.
 
 ### Phase 14 Refresh Results
 
