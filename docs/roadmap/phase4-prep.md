@@ -38,14 +38,17 @@ Scope the Phase 4 descriptor-aware parser implementation using Phase 3 propagate
 ## Proposed First Behavioral Change: Descriptor Byte-3 Integrity Check
 
 ### What
+
 In `AnalyzeNifDataStreamLayout`, add a warning when byte-3 of the descriptor (at offset 27 of block payload) is not 0x00. This is the smallest possible behavioral change that consumes descriptor data.
 
 ### Scope (~5 lines in Program.cs)
+
 - After extracting `rawDescriptorBytes`, check `blockPayload[27] != 0x00`
 - If non-zero, add a warning to the layout return
 - Warning text: `"descriptor-byte-3-nonzero"` (or append to existing warning)
 
 ### Why this is the right first step
+
 1. **Smallest possible behavioral change** — single byte check, single warning
 2. **Best-proven evidence** — byte-3 = 0x00 universal across 184/184 sampled blocks (Phase 2)
 3. **Safety-first** — warns on unexpected data without blocking processing
@@ -53,6 +56,7 @@ In `AnalyzeNifDataStreamLayout`, add a warning when byte-3 of the descriptor (at
 5. **Foundation for future** — establishes pattern for descriptor-aware safety checks
 
 ### NOT in scope
+
 - No blocking of processing (warning only, no error)
 - No change to promotion flags
 - No change to decode/export behavior
@@ -78,6 +82,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ## Decision Record Requirements
 
 Per `docs/nidatastream-parser-export-promotion-decision-template.md`:
+
 1. Exact `nidatastream-promotion-status --list-json` summary
 2. Before/after explanation of behavior change
 3. Generated-output safety statement
@@ -97,29 +102,35 @@ Per `docs/nidatastream-parser-export-promotion-decision-template.md`:
 - [x] Updated current-phase.md
 
 ### M4.2 Deliverables
+
 - [x] `ClassifyNifDescriptorByByte0()` method (5 family labels)
 - [x] `_ => ClassifyNifDescriptorByByte0(descriptorBytes)` fallback in `ClassifyNifDescriptor`
 - [x] 4 xUnit tests (23/23 pass)
 - [x] Scale verification: 16/16 classified, 0 nulls
 
 ### M4.3 Deliverables
+
 - [x] `DescriptorClassificationGroups` field on `NifStreamHeaderInventoryReport`
 - [x] Aggregation loop in `InventoryNifStreamHeaders`
 - [x] 23/23 tests pass
 
 ### M4.4 Deliverables
+
 - [x] Console descriptor classification summary line in `inventory-nif-stream-headers` output (23/23 tests)
 
 ### M4.5 Deliverables
+
 - [x] `CheckDescriptorRoleConsistency()` cross-check helper (internal static)
 - [x] Warning loop in `ProbeNifMesh` after stream refs line
 - [x] 6 xUnit tests (29/29 pass)
 
 ### M4.6 Deliverables
+
 - [x] Descriptor classification in `probe-nif-stream-body` console output (one-line addition)
 - [x] 29/29 tests pass
 
 ### M4.7 Deliverables (PLANNING)
+
 - [ ] Next descriptor-aware parser behavioral change
 
 ## Validation Gates

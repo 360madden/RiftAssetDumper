@@ -52,10 +52,7 @@ def sample(id_prefix: str, mesh_block: int, payload: int) -> dict[str, Any]:
 
 def sibling_row(id_prefix: str, payload: int) -> dict[str, Any]:
     return {
-        "Pattern": (
-            f"id={id_prefix}|target=#28|payload={payload}:usage=1 "
-            "access=19|role=position-float3-ror1-lead"
-        ),
+        "Pattern": (f"id={id_prefix}|target=#28|payload={payload}:usage=1 access=19|role=position-float3-ror1-lead"),
         "IdPrefix": id_prefix,
         "TargetBlockIndex": 28,
         "DeclaredPayloadBytes": payload,

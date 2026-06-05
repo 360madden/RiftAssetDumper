@@ -77,6 +77,7 @@ Phase 1 tells us exactly what the streams ARE. We can work backward: given a str
 ### Step 1: Extract Phase 1 stream metadata for anchor IDs
 
 For each matrix ID (prioritize 3 pilots: 0364ea142bc00ce7, 04de901531a091ab, 066fa520a8ce62e3):
+
 - Known stream roles, payload sizes, vector counts
 - BodyFirst16 / header bytes for each stream
 - Block assignments (block index, offset within mesh)
@@ -85,6 +86,7 @@ For each matrix ID (prioritize 3 pilots: 0364ea142bc00ce7, 04de901531a091ab, 066
 ### Step 2: Cross-reference with Ghidra descriptor evidence
 
 For each anchor stream:
+
 - Map the Phase 1 stream to a NiDataStream block index
 - Extract the descriptor record bytes from the NIF binary at that block
 - Compare descriptor byte patterns against Ghidra's static table hypothesis
@@ -93,6 +95,7 @@ For each anchor stream:
 ### Step 3: Re-sampling with Phase 1 constraints
 
 Instead of blind stride-12 sampling across all 256 byte indices:
+
 - Use Phase 1 stream payload sizes to constrain stride candidates
 - Use Phase 1 body classification (ror1-float3 vs u16 vs mixed) to constrain format/component fields
 - Target the specific descriptor bytes for Phase 1 anchor streams
@@ -101,6 +104,7 @@ Instead of blind stride-12 sampling across all 256 byte indices:
 ### Step 4: Field-order documentation
 
 Produce a candidate field-order table mapping:
+
 - Descriptor byte offset → candidate semantic (count, format, component, stride, usage, access)
 - Evidence source: Ghidra decompile + Phase 1 stream classification + sample bytes
 - Confidence level per field
@@ -108,6 +112,7 @@ Produce a candidate field-order table mapping:
 ### Step 5: Semantic feasibility check
 
 For each candidate field assignment:
+
 - Does the assigned semantic produce consistent values across all anchor streams?
 - Does the Phase 1 stream role match the Ghidra-derived descriptor field?
 - Are there contradictions (e.g., a stream classified as position but whose descriptor says UV)?

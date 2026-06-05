@@ -1,0 +1,32 @@
+# Gitleaks configuration for RIFT Asset Dumper
+# Run: ..\Tools\gitleaks\gitleaks.exe detect --source . --verbose
+
+title = "RIFT Asset Dumper gitleaks config"
+
+[allowlist]
+  description = "Allow known RIFT project paths and patterns"
+  paths = [
+    # Game install path is expected to appear in docs and README
+    '''docs/.*\.md$''',
+    '''README\.md$''',
+    '''knowledge\.md$''',
+    # Tools directory paths are not secrets
+    '''\.tools\.json$''',
+    # .NET generated files
+    '''\.csproj$''',
+    '''\.slnx$''',
+  ]
+
+  # Known RIFT-specific strings that look like paths but are safe
+  regexTarget = "match"
+  regexes = [
+    # Game install path (intentionally documented)
+    '''C:\\Program Files \(x86\)\\Glyph\\Games\\RIFT''',
+    # Local modding workspace (intentional)
+    '''C:\\RIFT MODDING''',
+    # Environment variable placeholders (safe)
+    '''%USERPROFILE%''',
+    '''%USERNAME%''',
+    # NIF asset hex IDs (not secrets)
+    '''[0-9a-f]{16}''',
+  ]

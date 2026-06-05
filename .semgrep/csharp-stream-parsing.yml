@@ -1,0 +1,123 @@
+# Semgrep rules for RIFT Asset Dumper — C# stream parsing safety
+# Run: ..\Tools\semgrep\semgrep.cmd --config .semgrep/ src/
+#
+# These rules target the binary stream parsing patterns in Program.cs
+# that decode NiDataStream blocks, TWAD archives, and NIF payloads.
+# A wrong byte offset or endianness assumption silently produces garbage.
+
+rules:
+  # ── ReadUInt16 without explicit endianness ──────────────────────
+  # The Stage 9 endian-analysis root cause was ReadUInt16BigEndian
+  # being used where ReadUInt16LittleEndian was correct (line 9322).
+  # Flag any BinaryReader.ReadUInt16() call that doesn't go through
+  # the project's endian-aware helpers.
+  - id: raw-readuint16-without-endian
+    patterns:
+      - pattern: $BR.ReadUInt16()
+    message: >
+      Raw BinaryReader.ReadUInt16() without explicit endianness.
+      This project has big-endian, little-endian, and byte-rotated streams.
+      Use the endian-aware read method or document the expected byte order.
+      (Stage 9 root cause: wrong endianness silently corrupted PairCompatibleMeshes)
+    languages: [csharp]
+    severity: WARNING
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs
+    metadata:
+      category: correctness
+      subcategory: binary-parsing
+      cwe: "CWE-195: Signed to Unsigned Conversion Error"
+
+  - id: raw-readuint32-without-endian
+    patterns:
+      - pattern: $BR.ReadUInt32()
+    message: >
+      Raw BinaryReader.ReadUInt32() without explicit endianness.
+      NiDataStream headers use declared payload bytes that must be read correctly.
+    languages: [csharp]
+    severity: WARNING
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs
+
+  # ── Block size arithmetic without bounds check ──────────────────
+  # NiDataStream header invariant: blockSize - payload == 29.
+  # Flag subtraction on blockSize without a preceding bounds check.
+  - id: blocksize-arithmetic-no-bounds
+    patterns:
+      - pattern: $BLOCK_SIZE - $PAYLOAD
+      - pattern-not-inside: |
+          if ($BLOCK_SIZE >= $PAYLOAD) { ... }
+    message: >
+      Block size arithmetic without bounds check. NiDataStream blocks must
+      satisfy blockSize - payload == 29 (31,777/31,777 invariant).
+      Verify the subtraction won't underflow.
+    languages: [csharp]
+    severity: WARNING
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs
+    metadata:
+      category: correctness
+      subcategory: binary-parsing
+
+  # ── Stream offset calculation without overflow guard ────────────
+  - id: stream-offset-no-overflow-guard
+    patterns:
+      - pattern: $BASE + $OFFSET
+      - pattern-not-inside: |
+          if ($BASE + $OFFSET <= $LIMIT) { ... }
+      - pattern-not-inside: |
+          if (checked(...) ...) { ... }
+      - metavariable-regex:
+          metavariable: $OFFSET
+          regex: ".*[Ss]tream.*|.*[Oo]ffset.*|.*[Pp]ayload.*"
+    message: >
+      Stream offset addition without overflow/bounds guard.
+      Binary stream parsing should validate offsets before seeking.
+    languages: [csharp]
+    severity: WARNING
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs
+
+  # ── Magic number comparison without named constant ──────────────
+  # The NiDataStream header invariant (29 bytes) and magic constants
+  # like 0xAA56 should be named constants, not inline magic numbers.
+  - id: unnamed-magic-constant-in-condition
+    patterns:
+      - pattern: if ($X == 29) { ... }
+    message: >
+      Magic number 29 in condition. This is the NiDataStream header size
+      invariant. Consider using a named constant (e.g., NiDataStreamHeaderSize).
+    languages: [csharp]
+    severity: INFO
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs
+    metadata:
+      category: maintainability
+
+  # ── Stream payload access without length check ───────────────────
+  # Narrowed to stream/payload/buffer variables only to reduce noise.
+  - id: stream-access-no-length-check
+    patterns:
+      - pattern: $BUF[$INDEX]
+      - metavariable-regex:
+          metavariable: $BUF
+          regex: "(?i).*stream.*|.*payload.*|.*buffer.*|.*body.*|.*data.*"
+      - pattern-not-inside: |
+          if ($INDEX < $BUF.Length) { ... }
+      - pattern-not-inside: |
+          if ($INDEX < $BUF.Count) { ... }
+      - pattern-not-inside: |
+          for (...; $INDEX < ...; ...) { ... }
+    message: >
+      Stream/payload buffer access without length check. Binary stream parsing
+      should validate indices against buffer length before access.
+    languages: [csharp]
+    severity: WARNING
+    paths:
+      include:
+        - src/RiftAssetDumper/Program.cs

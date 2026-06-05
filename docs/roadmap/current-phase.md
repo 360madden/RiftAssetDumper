@@ -1,31 +1,33 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 48 ✅ — pos-only OBJ cross-MB pairing audit; 0 recoverable faced candidates found)
+**Last Updated**: 2026-06 (Phase 49 ✅ — triangle fan fallback batch export; 76/77 pos-only OBJs exported with 2,847 fan faces)
 
 ---
 
 ## Current State
 
-**Phase 48 complete** — audited all 81 pos-only OBJs for recoverable faced candidates.
+**Phase 49 complete** — triangle fan fallback batch export for all pos-only OBJs.
 
-**Findings**:
-- **5 NIFs** have both faced and pos-only exports — all MS=305 (MB=45 faced, MB=7/27 pos-only sibling pairs)
-- **0 pos-only NIFs** have hidden index streams at other MBs that could produce new faced OBJs
-- **81 pos-only OBJs** are genuinely position-limited (no index stream in the same NIF, or index resides in a different MB without position data)
+**Results**:
 
-**Conclusion**: No recoverable faced OBJs from existing pos-only exports. The sibling-pairing architecture is working as designed — all recoverable faced OBJs have already been exported.
+- **76/77** pos-only OBJs exported with **2,847** approximate fan faces
+- **15 families** covered: MS=193, 197, 214, 272, 275, 280, 305, 307, 321, 326, 329, 337, 370, 389, 465
+- **1 failure**: `cf54e712ff57eaac` (MS=272, MB=6) — missing from copied archives (known issue)
+- Fan fallback now works for **both** `--experimental-position-source` (0-attribute-set) and `--export-obj` (attribute-set) paths
+- Dynamic OBJ header annotation: accurately reports "fallback triangle fan (approximate)" in OBJ header
+
+**Conclusion**: All recoverable pos-only OBJs now have approximate faces for visual inspection.
 
 ---
 
-## Next Actions (Phase 11)
+## Next Actions
 
 | # | Action | Status | Reference |
 |---|---|---|---|
-| 1 | **M11.1**: Extend inventory to emit descriptor-classified roles | ✅ Complete | Commit `2b848c9` + `291ffe4` (tests) — `ClassifyNifDescriptorRole` + `DescriptorGuidedRole` wired |
-| 2 | **M11.2**: Run population-scale inventory + cross-reference analysis | ✅ Complete | 4,045/8,152 streams (49.6%) classified; cross-ref: only 134 float3-generic→position |
-| 3 | **M11.3**: Disambiguate float3-generic sub-roles + discover new position sources | ✅ Complete | **546 descriptor→role mismatches found** (458 float2→position, 88 float2→normal). M11.4 reframes: float2 positions are valid encoding, not errors. |
-| 4 | **M11.4**: Validate descriptor roles against existing OBJ exports | ✅ Complete | **82 OBJ IDs matched**. 63% of OBJ positions use `descriptor-float2-uv` (float2 encoding). 37% use `descriptor-float3-generic`. Descriptor correctly identifies stream element format; role disambiguation requires data inspection. |
-| 5 | **M11.5**: Exit handoff | ✅ Complete | `docs/handoffs/2026-06-phase11-exit-descriptor-guided-role-classification.md` |
+| 1 | **Auto-face reconstruction**: triangle fan fallback batch export | ✅ Complete | 76/77 pos-only OBJs exported; 2,847 fan faces across 15 families |
+| 2 | **Cross-MB pairing audit** (Phase 48) | ✅ Complete | All 84 pos-only OBJs audited; 0 recoverable faced candidates found |
+| 3 | **Ghidra/NiDataStream proof-guard lane** | 🔬 Active | Ghidra evidence stays candidate-only until parser/export promotion gates are executable |
+| 4 | **Parser/export promotion** | 🚫 Blocked | All promotion gates remain locked; no decoder behavior changes pending Ghidra proof |
 
 ---
 
@@ -94,8 +96,9 @@
 | **Phase 46** | **Documentation Update** | **Updated all docs with 0 unknowns milestone; accurate Per-MeshSize table from live manifest** | **0** | **✅ COMPLETE** |
 | **Phase 47** | **MS=280 MB=25 Investigation** | **Investigated index-stream anomaly: MB=25 has index but no position data; expected sibling-pairing behavior** | **0** | **✅ COMPLETE** |
 | **Phase 48** | **Pos-Only Cross-MB Audit** | **Audited 81 pos-only OBJs for recoverable faced candidates; 0 found; all genuinely pos-only** | **0** | **✅ COMPLETE** |
+| **Phase 49** | **Triangle Fan Fallback Batch Export** | **Fan fallback extended to --export-obj path; batch export 76/77 pos-only OBJs with 2,847 fan faces across 15 families** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 50 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 51 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -109,11 +112,13 @@ stream, mesh transform, or computed. Raw data requires endian-aware decoding (bi
 **CORRECTED Finding: Z is sourced from sibling position pairing, not mesh transform.**
 
 Full stream inventory analysis of 36 float2-position meshes (156 streams):
+
 - **48 position streams, ALL float2** — zero float3 position streams co-resident
 - **No companion Z-stream exists** in any of the 36 meshes
 - **Stream composition**: 48 pos + 42 index + 33 normal + 7 UV + 26 other
 
 **Probe verification** (mesh `4768bc6e3cfaabd0` MB=6):
+
 - Probe reveals only **3 streams**: normal (float3 @216), index (uint16 @292), UV (float2 @300)
 - **No position stream exists in this mesh's direct data**
 - Position is resolved through **legacy pairing** (2 pairings, 95% confidence)
@@ -121,11 +126,13 @@ Full stream inventory analysis of 36 float2-position meshes (156 streams):
   to find a sibling mesh with full XYZ data and pair it with this mesh's XY data
 
 **OBJ Z-value verification** (36 vertices):
+
 - Z range: [-0.9260, 0.9351] (range = 1.8612, significant variation)
 - Only **9 unique Z values** out of 36 — consistent with sibling-pair mapping
   (sibling has different vertex count; pairing maps vertices across meshes)
 
 **Mechanism**:
+
 1. Float2-position meshes store XY data only (8 bytes/vertex, descriptor-float2-uv)
 2. These meshes lack attribute sets — they have NO direct position stream
 3. The OBJ exporter (`--experimental-position-source`) uses sibling pairing:
@@ -207,6 +214,7 @@ sibling pairing infrastructure. MB=7 is the canonical float2 position block,
 paired with MB=7 or MB=27 for float3 Z-source.
 
 **3 NIF groups** (shared MBs = same mesh block has both f2+f3 roles):
+
 - Group 1 (6 NIFs): MB=7 has both float2 (descriptor-float2-uv) and float3 (descriptor-float3-generic)
 - Group 3 (2 NIFs): MB=27 has both
 - Group 2 (1 NIF): separate MBs for f2 vs f3
@@ -231,6 +239,7 @@ See: `scripts/verify_cross_type_nifs.py`
 sibling pairing within the same archive entry extends to the meshSize=329 family.
 
 **Improvements**:
+
 - DIST=0 pairs tracked and annotated with `(SAME ENTRY)` in output
 - Structured JSON output written to `Exports/phase19-sibling-pairing-map.json`
 - Per-MeshSize DIST=0 counts in summary
@@ -248,6 +257,7 @@ Probed ID `42024b768fcd2e2b` (assets.037, entry 544, MeshSize 305):
 | **MB=34** | `descriptor-float3-generic` | 768 bytes | **64** | 12 | Full XYZ |
 
 **This confirms the Z-source mechanism end-to-end:**
+
 1. Mesh Block 6 stores XY position data (8 bytes/vertex, float2 encoding)
 2. Mesh Block 34 stores full XYZ position data (12 bytes/vertex, float3 encoding)
 3. Both exist in the **same archive entry** (544 in assets.037)
@@ -270,8 +280,8 @@ mesh blocks within the same archive entry.
 | Ambiguous | 3,407 | **7,515** | +4,108 (improved counting) |
 | Total described streams | 4,044 | **8,152** | +4,108 |
 
-Note: The Phase 11 baseline only counted streams with BOTH DescriptorGuidedRole AND PrimaryRole. 
-The Phase 14 baseline counts ALL PrimaryRole entries, including those without descriptors. 
+Note: The Phase 11 baseline only counted streams with BOTH DescriptorGuidedRole AND PrimaryRole.
+The Phase 14 baseline counts ALL PrimaryRole entries, including those without descriptors.
 The 08010400 addition correctly captures all 31 previously unknown streams.
 
 See individual exit handoffs under `docs/handoffs/2026-06-m*.*-phase*-exit-consolidation.md`.

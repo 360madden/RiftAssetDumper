@@ -84,6 +84,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ```
 
 ## Deliverables
+
 - [ ] `docs/roadmap/phase2-m2.3-prep.md` (this file)
 - [ ] `docs/handoffs/draft-2026-06-m2.3-role-descriptor-integration.md`
 - [ ] Unified role↔descriptor↔block table
@@ -91,6 +92,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 - [ ] Updated current-phase.md
 
 ## Validation Gates
+
 - [ ] All 5 descriptor patterns mapped to at least one known role
 - [ ] All 12/12 matrix bindings cross-referenced with descriptor patterns
 - [ ] Gaps explicitly documented (blocks #55, #57; index streams; `3c 01 04 00`)

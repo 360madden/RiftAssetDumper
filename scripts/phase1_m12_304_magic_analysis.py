@@ -129,7 +129,7 @@ def _extract_mesh34_streams(probe_path: Path) -> dict[str, Any] | None:
         return None
     try:
         report = json.loads(probe_path.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return None
     if not isinstance(report, dict):
         return None
@@ -237,20 +237,10 @@ def phase1_m12_304_magic_analysis(
         "SharedPrefixBytes4": _shared_prefix_byte_length(body304_hex, 4),
         "SharedPrefixBytes8": _shared_prefix_byte_length(body304_hex, 8),
         "SharedPrefixBytes16": _shared_prefix_byte_length(body304_hex, 16),
-        "SharedPrefixHex4": (
-            body304_hex[0][:8]
-            if per_id and _shared_prefix_byte_length(body304_hex, 4) == 4
-            else ""
-        ),
-        "SharedPrefixHex8": (
-            body304_hex[0][:16]
-            if per_id and _shared_prefix_byte_length(body304_hex, 8) == 8
-            else ""
-        ),
+        "SharedPrefixHex4": (body304_hex[0][:8] if per_id and _shared_prefix_byte_length(body304_hex, 4) == 4 else ""),
+        "SharedPrefixHex8": (body304_hex[0][:16] if per_id and _shared_prefix_byte_length(body304_hex, 8) == 8 else ""),
         "SharedPrefixHex16": (
-            body304_hex[0][:32]
-            if per_id and _shared_prefix_byte_length(body304_hex, 16) == 16
-            else ""
+            body304_hex[0][:32] if per_id and _shared_prefix_byte_length(body304_hex, 16) == 16 else ""
         ),
     }
 

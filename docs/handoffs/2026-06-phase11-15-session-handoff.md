@@ -29,6 +29,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 ## Phase 11 — Descriptor-Guided Stream Role Classification
 
 ### C# Implementation (M11.1)
+
 - `ClassifyNifDescriptorRole` — new helper mapping 5 descriptor patterns to predicted role strings
 - `DescriptorGuidedRole` field on `NifMeshBoundStreamSummary`, wired at both call sites
 - Updated `ClassifyNifDescriptor` labels from generic strings to proven semantic map
@@ -38,6 +39,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 - 50/50 tests pass
 
 ### Population Inventory (M11.2)
+
 - Full copied set: 40,203 payloads, 5,111 NIFs, 5,507 NiMesh blocks
 - 8,152 total streams; 4,045 (49.6%) with recognized descriptors → `DescriptorGuidedRole`
 
@@ -50,17 +52,20 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 | `descriptor-byte4-packed` | 6 | byte×4 packed attribute |
 
 ### Descriptor→Role Cross-Reference (M11.3)
+
 - 4,044 cross-referenced pairs
 - 546 descriptor→role mismatches found (458 float2→position, 88 float2→normal)
 - 1,180 float3-generic→normal, 614 float3-generic→uv — ambiguous
 
 ### OBJ Export Validation (M11.4) — KEY DISCOVERY
+
 - Cross-referenced 94 OBJ exports against inventory (82 IDs matched)
 - **63% of OBJ position streams have `descriptor-float2-uv`** — float2 position encoding exists!
 - 37% have `descriptor-float3-generic`
 - This reframes the M11.3 "mismatches": float2→position is a valid encoding, not an error
 
 ### Exit Handoff (M11.5)
+
 - `docs/handoffs/2026-06-phase11-exit-descriptor-guided-role-classification.md`
 
 ---
@@ -68,17 +73,20 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 ## Phase 12 — Unknown Descriptor Discovery
 
 ### Discovery (M12.1)
+
 - Analyzed 4,107 streams without `DescriptorGuidedRole`
 - Found only ONE new pattern: `08010400` (31 streams, 0.4% of population)
 - All other "unknown" streams simply lack descriptor bytes entirely
 
 ### Pattern Analysis (M12.2)
+
 - `08 01 04 00` = byte×4 components (1 byte × 4 = 4 bytes/element)
 - All 31 streams: non-geometry roles (uint16-compatible-body, all-zero-stream, u32-repeated-pattern-body)
 - Small payloads (60-600 bytes), very low bytes-per-vertex ratios (0.1-0.7)
 - Likely auxiliary/sentinel data, not vertex geometry
 
 ### Code Addition (M12.3)
+
 - Added to `ClassifyNifDescriptor`: `"bytexvec4 (auxiliary/sentinel, candidate)"`
 - Added to `ClassifyNifDescriptorRole`: `"descriptor-byte4-aux"`
 - Added to `ClassifyNifDescriptorByByte0`: `"bytexvec4 family (byte0=0x08, candidate)"`
@@ -90,6 +98,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 ## Phase 13 — Descriptor Consistency Proof Guard
 
 ### Guard Implementation (M13.1-M13.2)
+
 - `descriptor_consistency_guard(report_path)` — 113 lines in `rift_workflow_guards.py`
 - Tiered classification:
   - **HARD ERROR**: Component count physically impossible (e.g., uint16→float3)
@@ -99,6 +108,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 - Wired into `rift_workflow.py` guard_tasks dispatch (8th guard)
 
 ### Baseline (M13.3)
+
 - `Exports/phase13-descriptor-consistency-baseline.json`
 - 530 hard errors, 107 warnings, 7,515 ambiguous
 - Guard PASS ✅
@@ -108,11 +118,13 @@ Applied the proven 4-byte NiDataStream descriptor semantic map at population sca
 ## Phase 14 — Inventory Refresh
 
 ### Regeneration (M14.1)
+
 - Rebuilt inventory after 08010400 addition
 - 4,076/8,152 streams classified (+31 from 08010400)
 - All 31 previously unknown streams now classified as `descriptor-byte4-aux`
 
 ### Baseline Update (M14.2)
+
 - Updated consistency baseline against refreshed inventory
 - Guard PASS with refreshed data ✅
 
@@ -183,15 +195,18 @@ d5a5251 docs(phase11): M11.3 descriptor→role mismatch analysis
 ## Phase 15 — Float2 Position Encoding Investigation
 
 ### Candidate Identification (M15.1)
+
 - Cross-referenced OBJ manifest against refreshed inventory
 - 51/71 OBJ-exported position streams use `descriptor-float2-uv` (72%)
 - 20/71 use `descriptor-float3-generic` (28%)
 
 ### Mesh Probe Analysis (M15.2)
+
 - Probed float2-encoded position mesh (4768bc6e3cfaabd0): 36 vertices, payload=288, 288/8=36 confirms XY pairs
 - Float3 control (1601c1f75e0a6022): 30 vertices, payload=360, 360/12=30 confirms XYZ triplets
 
 ### Encoding Pattern Analysis (M15.3)
+
 - Float2: 8 bytes/vertex = 2 floats (XY). Payload/8 always integer.
 - Float3: 12 bytes/vertex = 3 floats (XYZ). Payload/12 always integer.
 - Float2 positions produce valid 3D OBJ vertices with real Z values
@@ -199,6 +214,7 @@ d5a5251 docs(phase11): M11.3 descriptor→role mismatch analysis
 - Raw data requires endian-aware decoding (big-endian prevalent in copied set)
 
 ### Documentation (M15.4)
+
 - Finding documented in `current-phase.md`
 
 ---

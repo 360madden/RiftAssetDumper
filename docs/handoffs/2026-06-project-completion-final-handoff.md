@@ -23,12 +23,14 @@ The RiftAssetDumper NiDataStream descriptor subsystem is **fully proven and prom
 ## Part 1: The Complete Journey — 10 Phases
 
 ### Phase 1: Position Source Family Proof (M1.1-M1.5) ✅ EXITED
+
 - 329 family: 12/12 paired matrix with quantified attrSets=1/#7 vs attrSets=0/#34 pattern
 - @304: 10/10 deep classification — role c=75 but low plaus, ~0.4× size, distinct bodies
 - 305 family: Cross-family validation of attrSets=1/0 pattern
 - Guards: 12/12 PASS on sibling source-binding + variant attr layout
 
 ### Phase 2: Descriptor & Binding Proof (M2.1-M2.5) ✅ EXITED
+
 - NiDataStream descriptors are **per-block embedded** (4 bytes at offset 24), not a static table
 - 5 descriptor byte patterns documented; `37 04 03 00` = generic ror1-float descriptor
 - Byte-3 = 0x00 universal across sampled blocks
@@ -36,26 +38,31 @@ The RiftAssetDumper NiDataStream descriptor subsystem is **fully proven and prom
 - 0 gates cleared, 3 strengthened, 1 reclassified
 
 ### Phase 3: Descriptor Propagation (M3.1-M3.5) ✅ EXITED
+
 - Descriptor fields on all 6 NiDataStream record types
 - `ClassifyNifDescriptor()` maps 5 patterns; 100% classification coverage
 - ~20 code lines, 17 tests
 
 ### Phase 4: Descriptor-Aware Parser (M4.1-M4.6) ✅ EXITED
+
 - 6 behavioral changes: byte-3 integrity, byte-0 fallback, JSON distribution, console summary
 - Descriptor-role cross-check, stream-body probe visibility
 - ~25 code lines, 29 tests
 
 ### Phase 5: Descriptor-Guided Parser (M5.1-M5.5) ✅ EXITED
+
 - Descriptor-guided routing: pairing confidence +5/-10, position stream pre-filter
 - Shared helpers: `IsFloatRole()`, `IsFloatDescriptor()`, `IsU16Descriptor()`
 - ~10 code lines, 41 tests
 
 ### Phase 6: Descriptor-Validated Export (M6.1-M6.4) ✅ EXITED
+
 - Descriptor metadata + validation warning in OBJ export (both paths)
 - M6.2: Formal re-evaluation of all 6 promotion gates — 4 strengthened, 1 retired, 0 cleared
 - ~3 code lines, 49 tests
 
 ### Phase 7: Promotion Gate Clearance (M7.1-M7.5) ✅ EXITED — **3 gates cleared**
+
 - **M7.1**: Gate 3 retired → replaced by `descriptor-per-block-consistency` (CLEARED)
 - **M7.2**: Gate 1 split → `descriptor-field-order-confirmed` (CLEARED), `field-semantics-complete` (BLOCKED)
 - **M7.3**: Gate 4 population-validated — 31,777 blocks, 100% coverage (CLEARED)
@@ -63,10 +70,12 @@ The RiftAssetDumper NiDataStream descriptor subsystem is **fully proven and prom
 - **First 3 gate clearances in project history**
 
 ### Phase 8: Semantic Gate Clearance (M8.2, M8.4) ✅ EXITED
+
 - M8.2: Descriptor-to-usage cross-reference — gate 2 advanced to usage-level evidence
 - `15020100` confirmed as index stream descriptor (usage=0)
 
 ### Phase 9: Final Clearance + Consolidation (M9.0-M9.4) ✅ EXITED — **2 gates cleared**
+
 - **M9.1**: Byte 1-2 stride hypothesis validated — 16/16 stride divisibility, p≈7.4×10⁻¹⁴
 - Gate 1b CLEARED: all 4 bytes have semantics (4th clearance)
 - **M9.2-M9.3**: Stride-semantic role mapping + usage consistency 16/16 (0 conflicts)
@@ -74,6 +83,7 @@ The RiftAssetDumper NiDataStream descriptor subsystem is **fully proven and prom
 - M9.4: Phase 9 exit consolidation — all evidence documented
 
 ### Phase 10: Human Review + Final Promotion (M10.1-M10.2) ✅ COMPLETE — **2 gates cleared**
+
 - **M10.1**: Gate 5 CLEARED — attrSets=0 accepted as architectural (6th clearance)
 - **M10.2**: Gate 6 CLEARED — safety brake released, both flags true (7th clearance)
 
@@ -124,32 +134,39 @@ All 4 descriptor bytes have proven semantics; all 5 patterns have role assignmen
 The autonomous research also delivered major discoveries across the broader project:
 
 ### Compression Truth
+
 - Full live TWAD entries: only compression 0 and 1; compression 2 is manifest/PAK-layer only
 - 263,957 non-null entries across 244 archives
 
 ### Gamebryo NIF Format
+
 - 5,111 NIF payloads, dominant version 20.6.0.0
 - 31,777 NiDataStream blocks, 5,507 NiMesh blocks
 - 29-byte stream header invariant proven at population scale
 
 ### Stream Roles & Endianness
+
 - Top roles: uv-float2-ror1-lead (4,633), normal-float3-ror1-lead (4,167), index-u16be-strip-lead (2,101)
 - Endian-analysis root-cause fix: `ReadUInt16BigEndian` → `ReadUInt16LittleEndian` restored pair-compatible meshes to 1,949
 - 5,551 big-endian u16 lead bodies after fix
 
 ### Attribute-Set Topology
+
 - 52 attribute-compatible meshes, strongest family v=16 implicit-strip-or-quad
 - @264 explicit-index extra streams: 5 meshes, degenerate-bridge strip structure, raw-zero-based mapping preferred (5/5)
 
 ### OBJ Export
+
 - 94 OBJs, 65 faced, 10,795 faces, 6,079 vertices across 18+ families
 - 0 structural issues, 0 unexported candidates
 
 ### Filename Recovery
+
 - 2,567 high-confidence manifest filename matches via FNV1 hashing
 - NIF string tables as source-art/texture reference mines
 
 ### Model→Texture Graph
+
 - 3,224 unique NIF models linked to 2,514 unique texture assets
 - Live-read-only archive planner: 132 archive chunks to complete all 3,218 bundles
 
@@ -158,13 +175,16 @@ The autonomous research also delivered major discoveries across the broader proj
 ## Part 5: What Was NOT Done (and Why)
 
 ### Deferred Refinements
+
 1. **`10010400`/`3c010400` sub-family distinction**: Both mapped as "packed vertex attributes" at family level. Specific attribute type requires data-level probing — a refinement, not a blocker.
 2. **Population-scale stride validation (31,777 blocks)**: Sample-scale proof (16/16, p≈7.4×10⁻¹⁴) is statistically overwhelming. Full population validation would be conclusive but is not gating.
 
 ### Architecturally Impossible (by Design)
+
 3. **Complete geometry groups (position+normal+UV+index)**: `attrSets=0` on 5,455/5,507 meshes (99%) means complete geometry binding groups don't exist — it's the game's architecture, not a discovery gap.
 
 ### Not Required
+
 4. **Ghidra analysis**: The stride hypothesis and semantic map were both proven without Ghidra. Evidence is purely structural/payload-derived, validating the per-block-embedded descriptor architecture.
 
 ---
@@ -184,6 +204,7 @@ The autonomous research also delivered major discoveries across the broader proj
 | Code regressions | 0 across 13 descriptor-consuming milestones |
 
 ### CI Pipeline (all green)
+
 | Check | Result |
 |---|---|
 | Build | ✅ 0 errors |
@@ -199,6 +220,7 @@ The autonomous research also delivered major discoveries across the broader proj
 ## Part 7: Artifact Index
 
 ### Handoffs (docs/handoffs/)
+
 | Document | Purpose |
 |---|---|
 | `2026-06-project-completion-final-handoff.md` | **This document** — final project capstone |
@@ -212,6 +234,7 @@ The autonomous research also delivered major discoveries across the broader proj
 | `draft-2026-06-m1.3-sibling-source-binding-guard.md` | M1.3 sibling guard |
 
 ### Living Documents
+
 | Document | Purpose |
 |---|---|
 | `docs/roadmap/current-phase.md` | Current active phase pointer |
@@ -220,6 +243,7 @@ The autonomous research also delivered major discoveries across the broader proj
 | `docs/post50-parser-export-promotion-readiness-checklist.md` | Gate tracking & promotion readiness |
 
 ### Schema Registry
+
 - `docs/schemas/` — 35+ JSON schemas for all report/inventory/proof types
 
 ---

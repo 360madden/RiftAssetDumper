@@ -27,6 +27,9 @@ coverage/
 # local environment/secrets
 .env
 
+# tool caches
+.pre-commit-hooks.yaml
+
 # local logs/temp files
 *.log
 *.tmp

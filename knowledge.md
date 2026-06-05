@@ -1,6 +1,7 @@
 # Project knowledge
 
 ## What this project is
+
 Read-only **RIFT** game asset archive research workspace. Reverse-engineers the game's custom binary archive format (`TWAM` manifests + `TWAD` archives) to extract and decode assets — textures (DDS), models (Gamebryo NIF v20.6.0.0), audio (OGG/RIFF), XML data, etc. The primary goal is geometry/model export (OBJ) from NIF meshes via `NiMesh` → `NiDataStream` binding analysis.
 
 The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-discovery-workflow.md`) — small focused probes → smoke runs → full copied-set inventory → ranked evidence → documented truth → commit → next lead. All task routing follows a safety policy (see `docs/task-routing-safety-policy.md`) that reserves high/extra-high reasoning for truth, proof, guards, runtime, and commit decisions.
@@ -55,6 +56,7 @@ All complex modes have been ported to Python.
 ## Architecture
 
 ### .NET CLI (`src/RiftAssetDumper/`)
+
 - **Target:** .NET 9.0, C# with nullable enabled, implicit usings
 - **Key dependency:** `SharpCompress` v0.41.0 (XZ/LZMA2 decompression)
 - **Single-file entry point:** `Program.cs` (~15K lines, contains ALL command handlers inline)
@@ -67,6 +69,7 @@ All complex modes have been ported to Python.
 - **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (6 tests, all pass)
 
 ### Python scripts (`scripts/`)
+
 - **Target:** Python 3.14 (ruff + mypy strict)
 - **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports, batch sweep
 - **Entry point:** `scripts/rift_workflow.py` — kebab-case command dispatch with 30+ commands
@@ -86,9 +89,14 @@ All complex modes have been ported to Python.
 | `usage_access_correlation_guard` | Validates 5 roles + 0 pairing exceptions | ✅ PASSED |
 | `position_source_sibling_lead_guard` | Validates guarded leads intact for sibling families | ✅ PASSED |
 | `residual_lead_guard` | Validates residual position classifier baselines (meshSize=305: 119 residuals, 5 @188 candidates) | ✅ PASSED |
+| `ghidra_function_site_target_guard` | Fails closed on unsafe/duplicated FunctionSiteSurvey report paths | ✅ PASSED |
+| `ghidra_pairing_non_export_guard` | Fails closed if Ghidra evidence enters decode/export paths | ✅ PASSED |
+| `ghidra_attribute_candidate_guard` | Locks the current incomplete-group baseline for Ghidra attribute candidates | ✅ PASSED |
 
 ### Discovery suite (`discovery-suite` command)
+
 A unified 7-step pipeline orchestrator in `rift_workflow.py`:
+
 1. Mesh-binding inventory (or reuse via `--quick`)
 2. Position-source gap report
 3. Position-source sibling family report
@@ -100,6 +108,7 @@ A unified 7-step pipeline orchestrator in `rift_workflow.py`:
 Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all 7 stages.
 
 ### Key directories (gitignored)
+
 | Path | Contents |
 |------|----------|
 | `Source/` | Local copied game files (`assets.manifest`, `Assets/assets.###` archives) |
@@ -110,6 +119,7 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 | `docs/handoffs/` | Session handoff docs (AI-agent context resumption) |
 
 ### Data flow
+
 1. **Manifest** (`TWAM`) → parse header + tables (PAK listing, entry table)
 2. **Archive** (`TWAD`) → parse entry table, decompress (zlib/LZMA2/raw), detect type
 3. **NIF probe** → parse Gamebryo block structure, extract `NiMesh` → `NiDataStream` bindings
@@ -117,17 +127,22 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 5. **OBJ export** → behind `--experimental-position-source` (fallback) or `--export-obj` (attribute-set @264) flags
 
 ### CI pipeline (`.github/workflows/ci.yml`)
+
 Two parallel jobs on `windows-latest`:
+
 - **.NET job:** `dotnet build`, `dotnet format --verify-no-changes`, `dotnet test` (pwsh shell)
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Stage 18)
-- **94 OBJs, 65 faced, 10,795 faces, 6,079 vertices across 18+ families. 0 structural issues. 0 unexported candidates remain.**
+### Current project state (latest — Phase 49)
+
+- **268 OBJs (214 unique), 184 faced, 84 position-only, 23,201 faces, 19,797 vertices across 29 MeshSize families. 0 structural issues. 0 unknowns remaining.**
 - `batch_sweep.py` — 4-phase tool for OBJ integrity (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, manifest building
-- All 4 proof guards PASSED on full inventory
+- All 8 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
-- CI green: build 0 errors, tests 6/6, ruff 0, mypy 0
+- Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
+- Cross-MB audit (Phase 48): no recoverable faced candidates found across 84 pos-only OBJs
+- CI green: build 0 errors, tests 50/50 (C#) + 49 (Python), ruff 0, mypy 0
 
 ## Conventions
 
@@ -148,16 +163,20 @@ Two parallel jobs on `windows-latest`:
 ## Key discoveries
 
 ### NiDataStream header
+
 Every `NiDataStream` block in the copied set follows: `blockSize - firstUInt32 == 29` (31,777/31,777 blocks). The first uint32 is the declared payload byte count.
 
 ### Stream endianness
+
 After the Stage 9 endian-analysis fix (line 9322: `ReadUInt16BigEndian` → `ReadUInt16LittleEndian`):
+
 - **5,551** big-endian u16 lead bodies
 - **24,272** mixed-u16 bodies
 - **1,800** ambiguous-small-u16 bodies
 - **154** little-endian u16 lead bodies
 
 ### Top stream roles (full copied-set, 5,507 NiMesh blocks)
+
 | Role | Count |
 |---|---|
 | `uv-float2-ror1-lead` | 4,633 |
@@ -167,12 +186,15 @@ After the Stage 9 endian-analysis fix (line 9322: `ReadUInt16BigEndian` → `Rea
 | `index-u16be-list-lead` | 112 |
 
 ### @264 explicit-index extra streams
+
 The strongest positive proof lead: 5 meshes at meshSize=297 with `@264/#15` extra streams, `index-u16be-strip-lead`, raw-zero-based mapping preferred (5/5), degenerate-bridge-stitch strip structure. All 5 exported to OBJ via `batch-export-264`.
 
 ### meshSize=305 stream@188 residual-position dead end
+
 Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found magic 43606 (0xAA56) u16le pattern driving 0.9444 plausible rating — but float32 decode produces denormal garbage (10⁻²⁷ to 10⁻³⁹). **Not position data.** All 8 target rows failed strict classifier (below 0.95 threshold). Remains candidate-only ranking evidence; export blocked.
 
 ### Position-source sibling families
+
 5 shared-source sibling groups confirmed:
 | Mesh size | Groups | Decision |
 |---|---|---:|---|
@@ -183,6 +205,7 @@ Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found ma
 | 329 | 1 | shifted sibling position-source clue |
 
 ### Compression truth
+
 | Scope | Count | Compression |
 |---|---|---:|---|
 | Copied TWAD entries | 40,203 | `0=203`, `1=40000`, `2=0` |
@@ -227,6 +250,7 @@ The `.agents/` directory contains 10 custom agent definitions with a tiered mode
 | `investigator-gpt` | **OpenAI GPT-5.1** (high) | **Stream data investigation** (half-float decode, magic-byte analysis, position source discovery) |
 
 **Strategy:**
+
 - Default to Flash agents for speed/cost on routine work
 - Deploy `cs-architect-gpt` when a C# change requires multi-step reasoning across the ~15K-line `Program.cs` (complex algorithm changes, subtle stream classification bugs, new geometry decode paths)
 - Deploy `investigator-gpt` for binary stream analysis requiring pattern recognition and experimental decode prototyping

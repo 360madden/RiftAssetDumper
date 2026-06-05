@@ -30,7 +30,7 @@ def re_extract_with_original_names():
         if not bundle_path.is_dir():
             continue
         for f in os.listdir(bundle_path):
-            if f.endswith('.nif'):
+            if f.endswith(".nif"):
                 src = bundle_path / f
                 dst = dst_root / f
                 if not dst.exists():
@@ -43,12 +43,24 @@ def re_extract_with_original_names():
 def run_inventory():
     """Run the C# mesh-binding inventory on the live NIFs."""
     result = subprocess.run(
-        ["dotnet", "run", "--project", "src/RiftAssetDumper", "--no-build", "--",
-         "inventory-nif-mesh-bindings",
-         "--root", LIVE_NIFS,
-         "--out", "Exports/live-mesh-binding-inventory.json",
-         "--limit", "100"],
-        capture_output=True, text=True, timeout=300
+        [
+            "dotnet",
+            "run",
+            "--project",
+            "src/RiftAssetDumper",
+            "--no-build",
+            "--",
+            "inventory-nif-mesh-bindings",
+            "--root",
+            LIVE_NIFS,
+            "--out",
+            "Exports/live-mesh-binding-inventory.json",
+            "--limit",
+            "100",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
     )
     print(result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout)
     if result.stderr:
@@ -71,15 +83,15 @@ def check_for_264():
     print(f"Attribute sets: {len(data.get('TopAttributeSets', []))}")
 
     # Check for @264
-    fitness = data.get('TopAttributeExtraMappingFitness', [])
+    fitness = data.get("TopAttributeExtraMappingFitness", [])
     found_264 = []
     for f_item in fitness:
-        pattern = f_item.get('Pattern', '')
-        if '@264' in pattern:
-            vc = f_item.get('VertexCount', '?')
-            count = f_item.get('Count', '?')
-            samples = f_item.get('Samples', [])
-            ids = [s.get('IdPrefix', '?') for s in samples[:5]]
+        pattern = f_item.get("Pattern", "")
+        if "@264" in pattern:
+            vc = f_item.get("VertexCount", "?")
+            count = f_item.get("Count", "?")
+            samples = f_item.get("Samples", [])
+            ids = [s.get("IdPrefix", "?") for s in samples[:5]]
             print(f"\n  @264 FOUND: vc={vc} count={count} ids={ids}")
             found_264.append({"vc": vc, "count": count, "ids": ids})
 

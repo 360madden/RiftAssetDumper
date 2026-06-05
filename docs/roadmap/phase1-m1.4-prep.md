@@ -56,12 +56,14 @@ From `Exports/position-source-sibling-family-report.json`:
 ### Per-ID probe data (representative: 04297730afc68f38)
 
 **mesh#7** (attrSets=1):
+
 - Stream@188 — POSITION, block#21, 192 bytes, 16 float3 (ror1), plausible 0.958, extent 28.97
 - Stream@196 — NORMAL, block#22, 192 bytes, 16 float3 (ror1), plausible 0.958, 100% unit vectors
 - Has texture bindings (diffuseTexture, normalTexture)
 - `RotatedFloat3`: [-12..17] X, [-0.1..0.33] Y, [16.5..24] Z
 
 **mesh#27** (attrSets=0):
+
 - Stream@188 — POSITION, block#21, 192 bytes — **identical to mesh#7** (same BodyFirst16)
 - Stream@196 — UV-like, block#40, 216 bytes, 18 float2 (ror1), plausible 0.407, UV range
 - `RotatedFloat3` (stream@196): 100% unit vectors, near-unit float3 normals — appears to be UV + padding
@@ -84,12 +86,14 @@ From `Exports/position-source-sibling-family-report.json`:
 ## Key Differences & Parallels
 
 ### Parallels (shared patterns)
+
 1. **Both families have attrSets=1/#7 vs attrSets=0/sibling split** — consistent pattern across families
 2. **Both share primary position source** between #7 and sibling (#34 or #27)
 3. **Both have a secondary stream on the sibling** that differs from #7's secondary stream (#7 has UV@304 on 329, NORMAL@196 on 305; sibling has pos-like@304 on 329, UV-like@196 on 305)
 4. **Both siblings have attrSets=0** meaning no attribute-extra path for geometry export
 
 ### Differences (family-specific)
+
 1. **Sibling secondary stream role**: 329's #34 has a low-plaus anomaly (@304 position-like with c=75 but <0.5 plausible); 305's #27 has genuine UV data (@196 uv-float2-ror1-lead with c=80)
 2. **Stream payload** for secondary: 329's @304 is small (~0.4× primary) with anomalous bodies; 305's @196 is `position-float3-ror1-lead` that actually gives plausible ror1 float3 values
 3. **Resolution status**: 329's @304 is candidate-only with detailed quant (M1.2); 305's @188 was probed deeper and confirmed negative (residual classifier: all targets < 0.95, magic-43606 = denormal garbage)

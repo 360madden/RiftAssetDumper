@@ -200,7 +200,9 @@ with TemporaryDirectory() as temp_dir:
     check("batch first rank dir", captured_calls[0]["out_dir"].name, "rank01")
     check("batch skips shared finding", captured_calls[1]["asset_id"], "3333333333333333")
     check("batch second rank dir", captured_calls[1]["out_dir"].name, "rank03")
-    manifest = json.loads((out_dir / "ghidra-review-rank-probes" / "manifest-ghidra-only.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (out_dir / "ghidra-review-rank-probes" / "manifest-ghidra-only.json").read_text(encoding="utf-8")
+    )
     check("batch manifest schema", manifest["SchemaVersion"], "ghidra-review-rank-probes-manifest/v1")
     check("batch manifest selected count", manifest["SelectedCount"], 2)
     check("batch manifest kind", manifest["ReviewKindFilter"], "ghidra-only")

@@ -2099,6 +2099,7 @@ internal static class Program
     var totalNormals = 0;
     var totalUvs = 0;
     var objVertexBase = 0;
+    string? ObjFaceType = null;
 
     if (attributeSets.Count == 0)
     {
@@ -2234,11 +2235,11 @@ internal static class Program
                 .ThenByDescending(static p => p.IndexCoverageRatio)
                 .ToList();
 
-            Console.WriteLine($"    index-vertex pairings: {pairings.Count} total, {confidentPairings.Count} confident (minimum 60)");
-
+            Console.WriteLine($"    index-vertex pairings: {pairings.Count} total, {confidentPairings.Count} confident (minimum 60)"); string? faceType = null;
             if (confidentPairings.Count > 0)
             {
               var bestPairing = confidentPairings[0];
+              faceType = "degenerate-bridge UInt16BE strip";
               Console.WriteLine($"    best pairing: index=#{bestPairing.IndexBlockIndex} role={bestPairing.IndexRole} max={bestPairing.IndexMax} vertexCount={bestPairing.VertexCount} coverage={bestPairing.IndexCoverageRatio:0.####} confidence={bestPairing.Confidence}");
 
               if (blocksByIndex.TryGetValue(bestPairing.IndexBlockIndex, out var indexStreamBlock))
@@ -2309,7 +2310,34 @@ internal static class Program
             }
             else
             {
-              Console.WriteLine("    no index-vertex pairings found; OBJ will have vertices but no faces");
+              // Fallback: triangle fan from vertex 0 when no index stream exists.
+              // Produces (vertexCount - 2) faces by connecting consecutive triples.
+              // This is a rough topology approximation since no valid index stream
+              // is available — useful for visual inspection in Blender.
+              if (objVertices.Count >= 3)
+              {
+                faceType = "fallback triangle fan (approximate)";
+                var fanFaces = 0;
+                for (var fi = 1; fi < objVertices.Count - 1; fi++)
+                {
+                  var a = objVertexBase + 1;
+                  var b = objVertexBase + fi + 1;
+                  var c = objVertexBase + fi + 2;
+                  objFaces.Add($"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}");
+                  fanFaces++;
+                }
+                Console.WriteLine($"    no index-vertex pairings found; generated {fanFaces} fallback fan faces from {objVertices.Count} vertices");
+              }
+              else
+              {
+                Console.WriteLine($"    no index-vertex pairings found; OBJ will have vertices but no faces ({objVertices.Count} vertices, need >= 3)");
+              }
+            }
+
+            // Update OBJ header face type annotation when known
+            if (faceType is not null)
+            {
+              ObjFaceType = faceType;
             }
           }
 
@@ -2553,6 +2581,23 @@ internal static class Program
             Console.WriteLine($"    @264 strip faces: {facesGenerated} (indices={indices.Count}, windows={windowCount}, vertexBase={objVertexBase})");
           break; // Use first @264 extra stream found
         }
+
+        // Fallback: triangle fan from vertex 0 when no @264 index stream is available.
+        // Useful for attribute-set meshes that have vertex data but no extra index streams.
+        if (objFaces.Count == 0 && objVertices.Count >= 3)
+        {
+          var fanFaces = 0;
+          for (var fi = 1; fi < objVertices.Count - 1; fi++)
+          {
+            var a = objVertexBase + 1;
+            var b = objVertexBase + fi + 1;
+            var c = objVertexBase + fi + 2;
+            objFaces.Add($"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}");
+            fanFaces++;
+          }
+          Console.WriteLine($"    no @264 extra stream found; generated {fanFaces} fallback fan faces from {objVertices.Count} vertices");
+          ObjFaceType ??= "fallback triangle fan (approximate)";
+        }
       }
 
       objVertexBase = objVertices.Count;
@@ -2569,7 +2614,7 @@ internal static class Program
       writer.WriteLine($"# NIF version: {header.VersionText}");
       writer.WriteLine($"# Mesh block: #{meshBlock.Index}");
       writer.WriteLine($"# Positions: {objVertices.Count}  Normals: {objNormals.Count}  UVs: {objTexCoords.Count}");
-      writer.WriteLine($"# Faces: {objFaces.Count}  (degenerate-bridge UInt16BE strip)");
+      writer.WriteLine($"# Faces: {objFaces.Count}  ({ObjFaceType ?? "degenerate-bridge UInt16BE strip"})");
       if (positionDescriptor is not null)
       {
         writer.WriteLine($"# Position descriptor: {positionDescriptor}");

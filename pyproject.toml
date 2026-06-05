@@ -19,7 +19,10 @@ select = [
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
 ]
-ignore = ["E501"]  # line length enforced by ruff format, not lint
+ignore = [
+    "E501",   # line length enforced by ruff format, not lint
+    "UP038",  # isinstance(x, (A, B)) → isinstance(x, A | B) — project targets py314, pipe syntax is natural but tuple form is more explicit for multi-type checks
+]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = [

@@ -20,6 +20,7 @@
 ## ✅ Step 2 — Proof Guard Refresh
 
 ### @264/#15 Probe: `6fc01704d4a509d5` mesh block 6
+
 | Signal | Value | Status |
 |--------|-------|--------|
 | VertexCount | 128 | ✅ |
@@ -39,9 +40,11 @@
 | Degenerate repeats | Confirmed (e.g. 25→25→24) | ✅ |
 
 ### @264/#15 Probe: `caa9a88e94ec8db0` mesh block 6
+
 **Identical structure to 6fc01704d4a509d5** — same vertex count, same index stream pattern, same roles. Proof is consistent across both siblings.
 
 ### Mesh-Bindings Inventory
+
 | Metric | Count |
 |--------|-------|
 | InspectedPayloads | 40,203 |
@@ -58,12 +61,13 @@
 | RoleGroups | 9 |
 
 ### ⚠️ Noted Differences from Legacy PS Guard Output
+
 - The new C# mesh-bindings JSON restructured the output format (no more `AttributeExtraStreamGroups`, `AttributeTopologyGroups`)
 - Preference (raw-zero-based vs subtract-one) counts are now stored in individual probe JSONs, not at the inventory top-level
 - Guard assertions from the legacy `Invoke-RiftAssetWorkflow.ps1` cannot run directly due to PS syntax errors (deprecated per plan)
 - **Mitigation:** Individual `probe-nif-attribute-extra` probes confirm all proof signals intact
 
-### Verdict: 🟢 Proof signals unchanged. No regressions detected.
+### Verdict: 🟢 Proof signals unchanged. No regressions detected
 
 ---
 
@@ -100,6 +104,7 @@ All under `Exports/discovery-plan/stage0-baseline/` (ignored, non-conflicting).
 **Key Flags:** `--root`, `--out`, `--id`, `--mesh-block`, `--extra-offset`, `--write-obj`, `--experimental`, `--max-total`, `--limit`
 
 ### DecodeNifGeometry Current State
+
 - OBJ export exists but produces **point cloud only** ("No faces/indices decoded")
 - Experimental UInt16 path exists for position decode
 - Face/index injection point identified → **Stage 1 task**
@@ -109,6 +114,7 @@ All under `Exports/discovery-plan/stage0-baseline/` (ignored, non-conflicting).
 ## 📋 Stage 0 Disposition
 
 **Pass to Stage 1.** Foundation is healthy:
+
 - Builds clean, tests pass
 - @264 proof signals intact on both sibling samples
 - 52 attribute-compatible meshes available for Stage 1 cross-validation

@@ -22,7 +22,7 @@ Short version: keep high/extra-high reasoning for truth, proof, schema, runtime,
 
 Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
 
-Current stage terminology: the historical geometry/export pipeline is **Stage 18 complete**. Active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**, where Ghidra evidence stays candidate-only until parser/export promotion gates are executable and green.
+Current stage terminology: the historical geometry/export pipeline is **Phase 48+ complete** (268 OBJs, 0 unknowns). Active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**, where Ghidra evidence stays candidate-only until parser/export promotion gates are executable and green.
 
 Promotion-readiness checklist: `docs/nidatastream-promotion-readiness-checklist.md`.
 

@@ -17,6 +17,7 @@ Both were probed on mesh-block 7 and mesh-block 34 (the recurring sibling pair i
 ## Key Findings — Repeatable Pattern
 
 ### Consistent Configuration on mesh#7 (in this family)
+
 - `attributeSets = 1`
 - Position stream: `@212 → #28` (payload varies 576–768), role=`position-float3-ror1-lead` (c=75)
 - Normal stream: `@220 → #29` (or equivalent), role=`normal-float3-ror1-lead` (c=85)
@@ -24,6 +25,7 @@ Both were probed on mesh-block 7 and mesh-block 34 (the recurring sibling pair i
 - Extra u32-repeated-pattern body at `@296 → #32`
 
 ### Consistent Configuration on mesh#34 (sibling)
+
 - `attributeSets = 0`
 - Shares the **exact same** primary position reference: `@212 → #28`, role=`position-float3-ror1-lead` (c=75)
 - Own normal stream (different block, e.g. #53)
@@ -52,18 +54,21 @@ The u32-repeated-pattern body at @296 is consistently present on both but does n
 ## Value of This Evidence
 
 This is higher-resolution than pure family counting. We now have concrete, repeatable differences in how the two mesh variants in the family consume the shared position source. This is excellent input for future:
+
 - Role scoring refinement
 - Attribute set completion proofs
 - Binding guard development
 - Potential discovery of LOD / variant handling in the RIFT NIF data
 
 ## Generated Artifacts (this autonomous cycle)
+
 - `Exports/probe-nif-mesh-0364ea142bc00ce7.json` (both blocks)
 - `Exports/probe-nif-mesh-f2c347fe81a5e3b2.json` (both blocks)
 
 All outputs under ignored Exports/.
 
 ## Validation
+
 - GeneratedOutputGuard passed on all runs.
 - No policy violations (all candidate-only, offline, Python-driven).
 

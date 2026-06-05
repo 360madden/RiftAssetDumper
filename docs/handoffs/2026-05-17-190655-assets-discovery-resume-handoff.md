@@ -15,7 +15,6 @@ At the original handoff point, `main` was clean and synced with `origin/main` af
 
 Usage/access and semantic hints remain **leads only**. They are ranking/search evidence, not geometry/export/runtime truth.
 
-
 ## Continuation update — 2026-05-17 19:22:12 America/New_York
 
 Resumed development from this handoff and the latest 20 commits. Added a non-promotional residual-stream summary to the existing MeshBindings inventory:
@@ -43,7 +42,6 @@ Validation after this continuation:
 | `Invoke-RiftAssetWorkflow.ps1 -Mode UsageAccessCorrelationGuard -SkipBuild -PrivacyScan` | Passed; full run found one `meshSize=321` residual and preserved usage/access guard invariants. |
 | `Invoke-RiftAssetWorkflow.ps1 -Mode AttributeExtraProofGuard -SkipBuild -PrivacyScan` | Passed; `@264` raw-zero-based proof invariants preserved. |
 | `git diff --check` | Passed; Windows LF-to-CRLF warnings only. |
-
 
 ## Autonomous continuation update — 2026-05-17 21:01:58 America/New_York
 
@@ -310,6 +308,7 @@ Resume in C:\RIFT MODDING\Assets. Work Assets-only. Start by checking git status
 | 8 | Add a staged-file guard that refuses generated/copy/build outputs before commit. |
 | 9 | Re-run `@264/#15` sibling probes after any topology parser/report change. |
 | 10 | Keep OBJ/export blocked until position source, index/topology, normal/UV, sane bounds, repeated-family evidence, and proof guards all agree. |
+
 ## Autonomous continuation update — 2026-05-18 03:11:58 -04:00 America/New_York
 
 Continued Assets-only NIF/NiMesh residual discovery. No OBJ/export work, no live-game interaction, and no generated/copied asset output was staged.
@@ -696,13 +695,13 @@ No generated/copied asset output is staged.
 
 Added and validated a repeatable candidate-only workflow mode:
 
-`	ext
+` ext
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode PositionSourceGapReport -SkipBuild -PrivacyScan
 `
 
 Generated ignored outputs:
 
-`	ext
+` ext
 C:\RIFT MODDING\Assets\Exports\position-source-gap-report.json
 C:\RIFT MODDING\Assets\Exports\position-source-gap-report.md
 `
@@ -738,7 +737,7 @@ Candidate-only clue: both sibling meshes share the same position stream block #2
 
 Generated ignored probes:
 
-`	ext
+` ext
 C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-e3de1077a37d0337-mesh6.json
 C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-e3de1077a37d0337-mesh30.json
 `
@@ -756,7 +755,7 @@ Candidate-only clue: both sibling meshes share the same position stream block #2
 
 Generated ignored probes:
 
-`	ext
+` ext
 C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-8e01613d7ce9e297-mesh6.json
 C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-8e01613d7ce9e297-mesh31.json
 `
@@ -765,13 +764,13 @@ C:\RIFT MODDING\Assets\Exports\probe-nif-mesh-8e01613d7ce9e297-mesh31.json
 
 Added and validated a repeatable workflow mode:
 
-`	ext
+` ext
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\RIFT MODDING\Assets\scripts\Invoke-RiftAssetWorkflow.ps1" -Mode PositionSourceSiblingProbeReport -SkipBuild -PrivacyScan
 `
 
 This mode regenerates the four focused sibling probes above, then writes ignored report outputs:
 
-`	ext
+` ext
 C:\RIFT MODDING\Assets\Exports\position-source-sibling-probe-report.json
 C:\RIFT MODDING\Assets\Exports\position-source-sibling-probe-report.md
 `
@@ -1195,7 +1194,6 @@ M scripts/Invoke-RiftAssetWorkflow.ps1
 
 No generated/copied asset output is staged. Do not commit unless explicitly requested.
 
-
 ## Autonomous continuation update — 2026-05-19 01:49:18 -04:00 America/New_York
 
 ### Milestone Z — handoff hygiene and DiscoveryWorkbench workflow mode
@@ -1325,7 +1323,6 @@ Do not stage generated `Exports/` output. Do not commit unless explicitly reques
 | 9 | Re-run `GeneratedOutputGuard` before any staging request. |
 | 10 | Keep OBJ/export blocked until position, topology/index, normal/UV, bounds, repeated-family evidence, and proof guards all agree. |
 
-
 ### Final hygiene note — 2026-05-19 01:55:00 -04:00 America/New_York
 
 After the validation table above, the changed-file privacy scan caught that `scripts/discovery_workbench.py` contained the literal local account token inside its own privacy-pattern definition. The helper was adjusted to construct that token from split string fragments, matching the existing workflow-script hygiene pattern.
@@ -1348,7 +1345,6 @@ M docs/handoffs/2026-05-17-190655-assets-discovery-resume-handoff.md
 M scripts/Invoke-RiftAssetWorkflow.ps1
 ?? scripts/discovery_workbench.py
 ```
-
 
 ## Autonomous continuation update — 2026-05-19 02:21:37 -04:00 America/New_York
 

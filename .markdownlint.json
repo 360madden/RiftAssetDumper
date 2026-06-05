@@ -1,0 +1,63 @@
+{
+  "default": true,
+
+  // MD013: Line length — disabled because docs use long lines with tables and URLs
+  "MD013": false,
+
+  // MD033: Inline HTML — disabled (historical handoff docs use id attributes for anchors)
+  "MD033": false,
+
+  // MD024: Multiple headings with same content — allow in different sections
+  "MD024": {
+    "siblings_only": true
+  },
+
+  // MD041: First line should be a top-level heading — disabled for docs with frontmatter-like notes
+  "MD041": false,
+
+  // MD034: Bare URLs — disabled because many raw URLs are intentional in research docs
+  "MD034": false,
+
+  // MD029: Ordered list prefix — use consistent style
+  "MD029": {
+    "style": "ordered"
+  },
+
+  // MD046: Code block style — allow both fenced and indented
+  "MD046": {
+    "style": "fenced"
+  },
+
+  // MD040: Fenced code blocks should have a language — disabled for console output blocks
+  "MD040": false,
+
+  // MD052: Reference links — disabled (many false positives with hex IDs)
+  "MD052": false,
+
+  // MD058: Table pipe alignment — disabled (compact table style used throughout)
+  "MD058": false,
+
+  // MD060: Table column style — disabled (compact pipe style is intentional)
+  "MD060": false,
+
+  // MD056: Table column count — disabled (complex research tables vary by row)
+  "MD056": false,
+
+  // MD055: Table pipe style — disabled
+  "MD055": false,
+
+  // MD053: Link/image references — disabled (false positives with schema refs)
+  "MD053": false,
+
+  // MD001: Heading increment — disabled (historical handoff docs skip heading levels)
+  "MD001": false,
+
+  // MD036: Emphasis as heading — disabled (historical docs use bold for section breaks)
+  "MD036": false,
+
+  // MD029: Ordered list prefix — disabled (sequential numbering in handoff docs)
+  "MD029": false,
+
+  // MD033: Inline HTML — disabled (docs use id attributes for internal anchors)
+  "MD033": false
+}

@@ -68,7 +68,9 @@ def check_validation_error(desc: str, payload: dict[str, Any], schema: dict[str,
 def promotion_status_for_out(out_dir: Path) -> dict[str, Any]:
     output = io.StringIO()
     with (
-        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", str(out_dir), "--list-json"]),
+        patch.object(
+            sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", str(out_dir), "--list-json"]
+        ),
         patch("scripts.rift_workflow.generated_output_guard"),
         redirect_stdout(output),
     ):
@@ -158,14 +160,20 @@ with TemporaryDirectory() as temp_dir:
     ):
         rift_workflow.main()
 evidence_status = json.loads(evidence_output.getvalue())
-evidence_schema = json.loads(Path("docs/schemas/nidatastream-evidence-status-v1.schema.json").read_text(encoding="utf-8"))
+evidence_schema = json.loads(
+    Path("docs/schemas/nidatastream-evidence-status-v1.schema.json").read_text(encoding="utf-8")
+)
 jsonschema.validate(evidence_status, evidence_schema)
 print("  PASS: evidence status schema validation")
 check("evidence schema", evidence_status["SchemaVersion"], "nidatastream-evidence-status/v1")
 check("evidence candidate-only", evidence_status["CandidateOnly"], True)
 check("evidence artifact count", evidence_status["ArtifactCount"], 12)
 check("evidence existing count", evidence_status["ExistingCount"], 4)
-target_report = next(artifact for artifact in evidence_status["Artifacts"] if artifact["Key"] == "function-site-nidatastream-test-target-report")
+target_report = next(
+    artifact
+    for artifact in evidence_status["Artifacts"]
+    if artifact["Key"] == "function-site-nidatastream-test-target-report"
+)
 check("evidence report path redacted/repo-relative", target_report["Path"], "Exports/ghidra-reports/test-target.json")
 check("evidence report modified timestamp", target_report["ModifiedUtc"] is not None, True)
 
@@ -179,7 +187,9 @@ with (
 ):
     rift_workflow.main()
 status = json.loads(status_output.getvalue())
-status_schema = json.loads(Path("docs/schemas/nidatastream-promotion-status-v1.schema.json").read_text(encoding="utf-8"))
+status_schema = json.loads(
+    Path("docs/schemas/nidatastream-promotion-status-v1.schema.json").read_text(encoding="utf-8")
+)
 jsonschema.validate(status, status_schema)
 print("  PASS: promotion status schema validation")
 check("promotion status schema", status["SchemaVersion"], "nidatastream-promotion-status/v1")
@@ -195,7 +205,11 @@ check("descriptor field map entry count", status["DescriptorFieldMapStatus"]["Fi
 check("descriptor field map static offset count", status["DescriptorFieldMapStatus"]["StaticTableOffsetCount"], 3)
 check("stream descriptor record not mapped", status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"], False)
 check("layout report status present", "LayoutReportStatus" in status, True)
-check("layout report all-valid flag is boolean", isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool), True)
+check(
+    "layout report all-valid flag is boolean",
+    isinstance(status["LayoutReportStatus"]["AllBlocksGhidraStyleValid"], bool),
+    True,
+)
 check("descriptor/sample compare status present", "DescriptorSampleCompareStatus" in status, True)
 check(
     "descriptor/sample evidence ready flag is boolean",
@@ -327,19 +341,27 @@ check("descriptor semantic gate blocks promotion", semantic_gate["State"], "bloc
 table_sample_gate = next(gate for gate in status["Gates"] if gate["Key"] == "descriptor-table-sample-proof")
 check("descriptor table sample gate blocks promotion", table_sample_gate["BlocksPromotion"], True)
 check("pairing impact status present", "PairingImpactStatus" in status, True)
-check("pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True)
+check(
+    "pairing baseline pass flag is boolean", isinstance(status["PairingImpactStatus"]["GuardBaselinePass"], bool), True
+)
 missing_compare_status = json.loads(json.dumps(status))
 del missing_compare_status["DescriptorSampleCompareStatus"]
-check_validation_error("promotion status rejects missing descriptor/sample compare status", missing_compare_status, status_schema)
+check_validation_error(
+    "promotion status rejects missing descriptor/sample compare status", missing_compare_status, status_schema
+)
 string_ready_status = json.loads(json.dumps(status))
 string_ready_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"] = "true"
-check_validation_error("promotion status rejects string descriptor/sample ready flag", string_ready_status, status_schema)
+check_validation_error(
+    "promotion status rejects string descriptor/sample ready flag", string_ready_status, status_schema
+)
 semantic_ready_status = json.loads(json.dumps(status))
 semantic_ready_status["DescriptorSampleCompareStatus"]["DescriptorSemanticMappingReady"] = True
 check_validation_error("promotion status rejects semantic mapping promotion", semantic_ready_status, status_schema)
 table_sample_semantics_status = json.loads(json.dumps(status))
 table_sample_semantics_status["DescriptorSampleCompareStatus"]["DescriptorTableSampleSemanticsExplained"] = True
-check_validation_error("promotion status rejects table sample semantic promotion", table_sample_semantics_status, status_schema)
+check_validation_error(
+    "promotion status rejects table sample semantic promotion", table_sample_semantics_status, status_schema
+)
 string_index_status = json.loads(json.dumps(status))
 string_index_status["DescriptorSampleCompareStatus"]["DescriptorRecordIndexCandidateMapped"] = "true"
 check_validation_error("promotion status rejects string record index mapped flag", string_index_status, status_schema)
@@ -352,7 +374,9 @@ check_validation_error(
 )
 string_classified_status = json.loads(json.dumps(status))
 string_classified_status["DescriptorSampleCompareStatus"]["DescriptorRecordBytesClassified"] = "false"
-check_validation_error("promotion status rejects string record bytes classified flag", string_classified_status, status_schema)
+check_validation_error(
+    "promotion status rejects string record bytes classified flag", string_classified_status, status_schema
+)
 string_context_ready_status = json.loads(json.dumps(status))
 string_context_ready_status["DescriptorSampleCompareStatus"]["DescriptorContextCorrelationReady"] = "true"
 check_validation_error(
@@ -362,7 +386,9 @@ check_validation_error(
 )
 string_stream_map_status = json.loads(json.dumps(status))
 string_stream_map_status["DescriptorFieldMapStatus"]["StreamDescriptorRecordMapped"] = "false"
-check_validation_error("promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema)
+check_validation_error(
+    "promotion status rejects string stream-record mapped flag", string_stream_map_status, status_schema
+)
 
 print("=== NiDataStream pairing impact negative fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -387,7 +413,9 @@ with TemporaryDirectory() as temp_dir:
     )
     negative_output = io.StringIO()
     with (
-        patch.object(sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", temp_dir, "--list-json"]),
+        patch.object(
+            sys, "argv", ["rift_workflow.py", "nidatastream-promotion-status", "--out", temp_dir, "--list-json"]
+        ),
         patch("scripts.rift_workflow.generated_output_guard"),
         redirect_stdout(negative_output),
     ):
@@ -420,9 +448,15 @@ check(
     isinstance(missing_layout_compare["DescriptorContextCorrelationReady"], bool),
     True,
 )
-check("missing layout context correlation samples", missing_layout_compare["DescriptorContextCorrelationSampleCount"], 0)
-check("missing layout context correlation patterns", missing_layout_compare["DescriptorContextCorrelationPatternCount"], 0)
-check("missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False)
+check(
+    "missing layout context correlation samples", missing_layout_compare["DescriptorContextCorrelationSampleCount"], 0
+)
+check(
+    "missing layout context correlation patterns", missing_layout_compare["DescriptorContextCorrelationPatternCount"], 0
+)
+check(
+    "missing layout descriptor semantic mapping false", missing_layout_compare["DescriptorSemanticMappingReady"], False
+)
 check("missing layout descriptor/sample ready false", missing_layout_compare["DescriptorAndSampleEvidenceReady"], False)
 pairing_gate = next(gate for gate in negative_status["Gates"] if gate["Key"] == "pairing-impact-proof")
 check("negative pairing gate blocked", pairing_gate["State"], "blocked")
@@ -435,7 +469,11 @@ with TemporaryDirectory() as temp_dir:
 jsonschema.validate(corrupt_status, status_schema)
 print("  PASS: corrupt layout status schema validation")
 check("corrupt layout report error captured", bool(corrupt_status["LayoutReportStatus"]["Error"]), True)
-check("corrupt layout descriptor/sample ready false", corrupt_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"], False)
+check(
+    "corrupt layout descriptor/sample ready false",
+    corrupt_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"],
+    False,
+)
 corrupt_sample_gate = next(gate for gate in corrupt_status["Gates"] if gate["Key"] == "sample-byte-agreement")
 check("corrupt layout sample gate blocked", corrupt_sample_gate["State"], "blocked")
 
@@ -450,7 +488,11 @@ check(
     non_object_status["LayoutReportStatus"]["Error"],
     "layout report root must be a JSON object",
 )
-check("non-object layout descriptor/sample ready false", non_object_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"], False)
+check(
+    "non-object layout descriptor/sample ready false",
+    non_object_status["DescriptorSampleCompareStatus"]["DescriptorAndSampleEvidenceReady"],
+    False,
+)
 
 with TemporaryDirectory() as temp_dir:
     temp_path = Path(temp_dir)
@@ -497,9 +539,19 @@ with TemporaryDirectory() as temp_dir:
     check_contains("dashboard markdown field-map status", dashboard_markdown, "Descriptor candidate field-map entries")
     check_contains("dashboard markdown stream record status", dashboard_markdown, "Stream descriptor record mapped")
     check_contains("dashboard markdown byte-order status", dashboard_markdown, "Descriptor byte-order checks")
-    check_contains("dashboard markdown pattern matrix status", dashboard_markdown, "Descriptor record pattern matrix rows")
-    check_contains("dashboard markdown context correlation samples", dashboard_markdown, "Descriptor/sample context correlation samples")
-    check_contains("dashboard markdown context correlation ready", dashboard_markdown, "Descriptor/sample context correlation ready")
+    check_contains(
+        "dashboard markdown pattern matrix status", dashboard_markdown, "Descriptor record pattern matrix rows"
+    )
+    check_contains(
+        "dashboard markdown context correlation samples",
+        dashboard_markdown,
+        "Descriptor/sample context correlation samples",
+    )
+    check_contains(
+        "dashboard markdown context correlation ready",
+        dashboard_markdown,
+        "Descriptor/sample context correlation ready",
+    )
     check_contains("dashboard markdown table sample rows", dashboard_markdown, "Descriptor-table sample rows")
     check_contains(
         "dashboard markdown table sample semantics",
@@ -512,8 +564,12 @@ with TemporaryDirectory() as temp_dir:
         dashboard_markdown,
         "Descriptor helper high bytes proven unused",
     )
-    check_contains("dashboard markdown padding byte status", dashboard_markdown, "Descriptor record padding byte candidates")
-    check_contains("dashboard markdown remaining byte status", dashboard_markdown, "Descriptor record remaining unmapped bytes")
+    check_contains(
+        "dashboard markdown padding byte status", dashboard_markdown, "Descriptor record padding byte candidates"
+    )
+    check_contains(
+        "dashboard markdown remaining byte status", dashboard_markdown, "Descriptor record remaining unmapped bytes"
+    )
     check_contains("dashboard markdown semantic status", dashboard_markdown, "Descriptor semantic mapping ready")
     check_contains("dashboard console", dashboard_output.getvalue(), "candidate-only/report-only")
 
@@ -538,7 +594,9 @@ with TemporaryDirectory() as temp_dir:
     ):
         rift_workflow.main()
     check("preflight dashboard json written", (Path(temp_dir) / "nidatastream-promotion-dashboard.json").exists(), True)
-    check("preflight dashboard markdown written", (Path(temp_dir) / "nidatastream-promotion-dashboard.md").exists(), True)
+    check(
+        "preflight dashboard markdown written", (Path(temp_dir) / "nidatastream-promotion-dashboard.md").exists(), True
+    )
     check(
         "preflight descriptor/sample json written",
         (Path(temp_dir) / "nidatastream-descriptor-sample-compare.json").exists(),
@@ -551,7 +609,9 @@ with TemporaryDirectory() as temp_dir:
     )
     check("preflight runs guard suite", preflight_calls["guard_suite"], True)
     check("preflight runs initial and final generated-output guards", preflight_calls["generated_output_guard"], 2)
-    check_contains("preflight descriptor/sample compare", preflight_output.getvalue(), "Preflight descriptor/sample compare")
+    check_contains(
+        "preflight descriptor/sample compare", preflight_output.getvalue(), "Preflight descriptor/sample compare"
+    )
     check_contains("preflight evidence status", preflight_output.getvalue(), "NiDataStreamEvidenceStatus")
     check_contains("preflight console", preflight_output.getvalue(), "NiDataStreamPromotionPreflight passed")
 

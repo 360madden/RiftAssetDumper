@@ -4,7 +4,7 @@ Status date: 2026-05-25
 
 ## Canonical stage position
 
-The historical geometry/export pipeline is **Stage 18 complete**. Active work is now the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**.
+The historical geometry/export pipeline is **Phase 48+ complete** (268 OBJs, 0 unknowns). Active work is now the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**.
 
 Do not relabel this lane as a new Stage 4. Earlier `Stage 4` references in this repo belong to older geometry/export planning and batch-export work.
 

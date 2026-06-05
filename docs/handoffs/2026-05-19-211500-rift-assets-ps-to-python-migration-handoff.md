@@ -39,6 +39,7 @@ Ported 21 utility/helper functions from `Invoke-RiftAssetWorkflow.ps1` to a Pyth
 ### Thin PowerShell entry point (`scripts/Invoke-RiftWorkflow.ps1`)
 
 A ~50-line PowerShell wrapper that:
+
 1. Runs `generated_output_guard()` from Python on every invocation
 2. Delegates workflow commands to `scripts/rift_workflow.py`
 3. Demonstrates the "PS for thin wrappers only" pattern

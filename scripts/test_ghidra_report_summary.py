@@ -49,8 +49,19 @@ sample_report = {
         "parameterCount": 0,
         "returnType": "undefined",
     },
-    "instructionsNearTarget": [{"address": "141186980", "target": True, "mnemonic": "PUSH", "opStr": "PUSH RBP", "bytes": "55", "refsFrom": []}],
-    "functionInstructions": [{"address": "141186980", "target": False, "mnemonic": "PUSH", "opStr": "PUSH RBP", "bytes": "55", "refsFrom": []}],
+    "instructionsNearTarget": [
+        {"address": "141186980", "target": True, "mnemonic": "PUSH", "opStr": "PUSH RBP", "bytes": "55", "refsFrom": []}
+    ],
+    "functionInstructions": [
+        {
+            "address": "141186980",
+            "target": False,
+            "mnemonic": "PUSH",
+            "opStr": "PUSH RBP",
+            "bytes": "55",
+            "refsFrom": [],
+        }
+    ],
     "callers": [
         {
             "from": "141111111",
@@ -82,7 +93,7 @@ sample_report = {
     "decompile": {
         "completed": True,
         "errorMessage": "",
-        "c": "void FUN_141186980(void) {\n  // C:\\Users\\example\\Desktop\\local.txt\n  log(\"NiDataStream::LoadBinary\");\n}\n",
+        "c": 'void FUN_141186980(void) {\n  // C:\\Users\\example\\Desktop\\local.txt\n  log("NiDataStream::LoadBinary");\n}\n',
     },
 }
 
@@ -96,7 +107,11 @@ check_contains("data ref byte sample count shown", summary, "| Data ref byte sam
 check_contains("callee shown", summary, "FUN_1411821f0")
 check_contains("data ref byte sample shown", summary, "37 04 03 00")
 check_contains("term match shown", summary, "NiDataStream::LoadBinary")
-check("profile redaction", redact_user_profile_paths(r"C:\Users\example\Desktop\local.txt"), r"%USERPROFILE%\Desktop\local.txt")
+check(
+    "profile redaction",
+    redact_user_profile_paths(r"C:\Users\example\Desktop\local.txt"),
+    r"%USERPROFILE%\Desktop\local.txt",
+)
 check_contains("profile redacted in summary", summary, r"%USERPROFILE%\Desktop\local.txt")
 
 print("=== File summary ===")

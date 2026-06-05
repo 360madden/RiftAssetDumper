@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Extract full discovery details including any asset IDs."""
+
 import json
 
 # Check discovery scoreboard JSON

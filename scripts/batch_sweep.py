@@ -167,15 +167,20 @@ def export_candidate(
         # Run decode-nif-geometry
         dotnet_args = [
             "run",
-            "--project", str(project),
+            "--project",
+            str(project),
             "--",
             "decode-nif-geometry",
-            "--root", str(root),
-            "--id", asset_id,
-            "--mesh-block", str(mesh_block),
+            "--root",
+            str(root),
+            "--id",
+            asset_id,
+            "--mesh-block",
+            str(mesh_block),
             "--experimental-position-source",
             "--write-obj",
-            "--out", str(out_subdir),
+            "--out",
+            str(out_subdir),
         ]
 
         proc = subprocess.run(
@@ -235,15 +240,15 @@ def batch_export(
     results: list[dict[str, Any]] = []
     total = len(candidates)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Batch Sweep: {total} candidates")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for i, candidate in enumerate(candidates):
         aid = candidate["id"]
         mb = candidate["meshBlock"]
         ms = candidate["meshSize"]
-        label = f"[{i+1}/{total}] meshSize={ms} {aid} mesh#{mb}"
+        label = f"[{i + 1}/{total}] meshSize={ms} {aid} mesh#{mb}"
         print(f"  {label} ... ", end="", flush=True)
 
         result = export_candidate(candidate, project, root, out_dir, skip_build)
@@ -252,7 +257,7 @@ def batch_export(
         status = result["status"]
         if status == "OK":
             marker = "[OK]"
-            extra = f"  v={result.get('vertices',0)} f={result.get('faces',0)}  {result.get('objBytes',0):,}B"
+            extra = f"  v={result.get('vertices', 0)} f={result.get('faces', 0)}  {result.get('objBytes', 0):,}B"
         else:
             marker = "[!!]"
             extra = f"  status={status}"
@@ -264,9 +269,9 @@ def batch_export(
     faced_count = sum(1 for r in results if r.get("status") == "OK" and r.get("faces", 0) > 0)
     total_faces = sum(r.get("faces", 0) for r in results)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Batch Sweep Results")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Exported: {ok_count}/{total}")
     print(f"  Faced OBJs: {faced_count}")
     print(f"  Total new faces: {total_faces}")
@@ -287,9 +292,7 @@ def integrity_check(exported_dir: Path) -> list[dict[str, Any]]:
     Returns list of issue dicts.
     """
     objs = [
-        (p.stat().st_size, p)
-        for p in exported_dir.glob("**/*.obj")
-        if p.is_file() and "decode-nif-geometry" in str(p)
+        (p.stat().st_size, p) for p in exported_dir.glob("**/*.obj") if p.is_file() and "decode-nif-geometry" in str(p)
     ]
 
     # Deduplicate by (asset_id, mesh_block) — keep largest
@@ -345,7 +348,7 @@ def integrity_check(exported_dir: Path) -> list[dict[str, Any]]:
                     idx_str = p.split("/")[0]
                     try:
                         face_indices.append(int(idx_str))
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         pass
 
         max_idx = max(face_indices) if face_indices else -1
@@ -365,15 +368,17 @@ def integrity_check(exported_dir: Path) -> list[dict[str, Any]]:
             stats["negIndexCount"] += 1
 
         if entry_issues:
-            issues.append({
-                "id": aid,
-                "meshBlock": mb,
-                "path": str(path),
-                "v": v_count,
-                "f": f_count,
-                "sha256": sha,
-                "issues": entry_issues,
-            })
+            issues.append(
+                {
+                    "id": aid,
+                    "meshBlock": mb,
+                    "path": str(path),
+                    "v": v_count,
+                    "f": f_count,
+                    "sha256": sha,
+                    "issues": entry_issues,
+                }
+            )
 
     return issues, stats
 
@@ -419,9 +424,7 @@ def print_integrity_report(issues: list[dict[str, Any]], stats: dict[str, int]) 
 def build_manifest(exported_dir: Path, manifest_path: Path) -> list[dict[str, Any]]:
     """Build a complete OBJ manifest with SHA256 hashes and structural metadata."""
     objs = [
-        (p.stat().st_size, p)
-        for p in exported_dir.glob("**/*.obj")
-        if p.is_file() and "decode-nif-geometry" in str(p)
+        (p.stat().st_size, p) for p in exported_dir.glob("**/*.obj") if p.is_file() and "decode-nif-geometry" in str(p)
     ]
 
     by_key: dict[tuple[str, str], tuple[int, Path]] = {}
@@ -458,7 +461,7 @@ def build_manifest(exported_dir: Path, manifest_path: Path) -> list[dict[str, An
                 for p in line.split()[1:]:
                     try:
                         face_indices.append(int(p.split("/")[0]))
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         pass
 
         max_idx = max(face_indices) if face_indices else -1

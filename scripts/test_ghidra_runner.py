@@ -352,7 +352,11 @@ with TemporaryDirectory() as temp_dir:
     ):
         rift_workflow.main()
     sample_plan = parse_json_object(list_output.getvalue())
-    check("descriptor table sample plan schema", sample_plan["SchemaVersion"], "nidatastream-descriptor-table-sample-plan/v1")
+    check(
+        "descriptor table sample plan schema",
+        sample_plan["SchemaVersion"],
+        "nidatastream-descriptor-table-sample-plan/v1",
+    )
     check("descriptor table sample plan index count", sample_plan["IndexCount"], 2)
     check("descriptor table sample first index value", sample_plan["Indices"][0]["Value"], 55)
     check("descriptor table sample second index value", sample_plan["Indices"][1]["Value"], 54)
@@ -454,7 +458,9 @@ with TemporaryDirectory() as temp_dir:
         redirect_stdout(dry_run_output),
     ):
         rift_workflow.main()
-    check_contains("descriptor table sample dry-run title", dry_run_output.getvalue(), "NiDataStreamDescriptorTableSample")
+    check_contains(
+        "descriptor table sample dry-run title", dry_run_output.getvalue(), "NiDataStreamDescriptorTableSample"
+    )
     check_contains("descriptor table sample dry-run command", dry_run_output.getvalue(), "DescriptorTableSampler.java")
 
     captured_sample: dict[str, Any] = {}
@@ -535,8 +541,16 @@ with TemporaryDirectory() as temp_dir:
     sample_status = parse_json_object(sample_status_output.getvalue())
     jsonschema.validate(sample_status, descriptor_sample_status_schema)
     print("  PASS: descriptor table sample status schema validation")
-    check("descriptor table sample status schema", sample_status["SchemaVersion"], "nidatastream-descriptor-table-sample-status/v1")
-    check("descriptor table sample status explicit path", sample_status["Status"]["Path"], rift_workflow._display_path(report_file))
+    check(
+        "descriptor table sample status schema",
+        sample_status["SchemaVersion"],
+        "nidatastream-descriptor-table-sample-status/v1",
+    )
+    check(
+        "descriptor table sample status explicit path",
+        sample_status["Status"]["Path"],
+        rift_workflow._display_path(report_file),
+    )
     check("descriptor table sample status rows", sample_status["Status"]["RowCount"], 1)
     check("descriptor table sample status nonzero rows", sample_status["Status"]["NonzeroRowCount"], 1)
 
@@ -671,7 +685,11 @@ with TemporaryDirectory() as temp_dir:
     neighborhood_report = json.loads(report_file.read_text(encoding="utf-8"))
     jsonschema.validate(neighborhood_report, descriptor_neighborhood_schema)
     print("  PASS: descriptor neighborhood scan report schema validation")
-    check("descriptor neighborhood scan script", captured_scan["script"], "scripts/ghidra/DescriptorTableNeighborhoodScanner.java")
+    check(
+        "descriptor neighborhood scan script",
+        captured_scan["script"],
+        "scripts/ghidra/DescriptorTableNeighborhoodScanner.java",
+    )
     check("descriptor neighborhood scan args report", captured_scan["script_args"][0], str(report_file))
     check("descriptor neighborhood scan before arg", captured_scan["script_args"][1], "16")
     check("descriptor neighborhood scan after arg", captured_scan["script_args"][2], "32")
@@ -832,7 +850,11 @@ with TemporaryDirectory() as temp_dir:
     reference_report = json.loads(report_file.read_text(encoding="utf-8"))
     jsonschema.validate(reference_report, descriptor_reference_schema)
     print("  PASS: descriptor reference classification report schema validation")
-    check("descriptor reference classify script", captured_reference["script"], "scripts/ghidra/DescriptorReferenceClassifier.java")
+    check(
+        "descriptor reference classify script",
+        captured_reference["script"],
+        "scripts/ghidra/DescriptorReferenceClassifier.java",
+    )
     check("descriptor reference classify args report", captured_reference["script_args"][0], str(report_file))
     check("descriptor reference classify byte-count arg", captured_reference["script_args"][1], "8")
     check("descriptor reference classify max refs arg", captured_reference["script_args"][2], "4")

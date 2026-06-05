@@ -41,7 +41,7 @@ def _parse_int_header(line: str, split_idx: int = 2) -> int | None:
     if len(parts) > split_idx:
         try:
             return int(parts[split_idx])
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             return None
     return None
 
@@ -290,7 +290,7 @@ def main() -> int:
         # Progress indicator
         if (i + 1) % 50 == 0:
             elapsed = time.time() - start
-            print(f"  Scanned {i+1}/{len(obj_files)} OBJs ({elapsed:.1f}s)...")
+            print(f"  Scanned {i + 1}/{len(obj_files)} OBJs ({elapsed:.1f}s)...")
 
     elapsed = time.time() - start
 
@@ -357,7 +357,7 @@ def main() -> int:
                     for pinfo in probe_patterns[probe_key]:
                         e["sibling_pair"] = {
                             "mesh_size": pinfo["ms"],
-                            "note": f"resolved via probe lookup pattern (MB={e_mb}, pos-only)"
+                            "note": f"resolved via probe lookup pattern (MB={e_mb}, pos-only)",
                         }
                         resolved_from_pattern += 1
                         break
@@ -367,7 +367,10 @@ def main() -> int:
             exact_key = (e_faces, e_verts, e_mb, e_faced)
             if exact_key in pattern_lookup:
                 pms = pattern_lookup[exact_key]
-                e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb})"}
+                e["sibling_pair"] = {
+                    "mesh_size": pms,
+                    "note": f"resolved via pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb})",
+                }
                 resolved_from_pattern += 1
                 matched = True
             else:
@@ -377,7 +380,10 @@ def main() -> int:
                         face_diff = abs(pf - e_faces) / max(pf, 1)
                         vert_diff = abs(pv - e_verts) / max(pv, 1)
                         if face_diff <= 0.10 and vert_diff <= 0.10:
-                            e["sibling_pair"] = {"mesh_size": pms, "note": f"resolved via fuzzy pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb}) match={pf}f/{pv}v"}
+                            e["sibling_pair"] = {
+                                "mesh_size": pms,
+                                "note": f"resolved via fuzzy pattern match (faces={e_faces}, verts={e_verts}, MB={e_mb}) match={pf}f/{pv}v",
+                            }
                             resolved_from_pattern += 1
                             matched = True
                             break
@@ -388,7 +394,7 @@ def main() -> int:
                     for pinfo in probe_patterns[probe_key]:
                         e["sibling_pair"] = {
                             "mesh_size": pinfo["ms"],
-                            "note": f"resolved via probe lookup pattern (MB={e_mb}, faced={e_faced})"
+                            "note": f"resolved via probe lookup pattern (MB={e_mb}, faced={e_faced})",
                         }
                         resolved_from_pattern += 1
                         break
@@ -453,13 +459,17 @@ def main() -> int:
     print(f"  Position-only: {position_only_count}")
     print(f"  Total vertices: {total_vertices:,}")
     print(f"  Total faces: {total_faces:,}")
-    print(f"  Total bytes: {total_bytes:,} ({total_bytes/1024:.0f} KB)")
+    print(f"  Total bytes: {total_bytes:,} ({total_bytes / 1024:.0f} KB)")
 
     print("\n  Per-MeshSize Breakdown:")
     for ms_key in sorted(ms_breakdown.keys()):
         fb = ms_breakdown[ms_key]
-        pct = (fb["faced"] / (fb["faced"] + fb["position_only"]) * 100) if (fb["faced"] + fb["position_only"]) > 0 else 0
-        print(f"    MeshSize {ms_key}: {fb['faced']} faced + {fb['position_only']} pos-only = {fb['faced'] + fb['position_only']} ({pct:.0f}% faced)")
+        pct = (
+            (fb["faced"] / (fb["faced"] + fb["position_only"]) * 100) if (fb["faced"] + fb["position_only"]) > 0 else 0
+        )
+        print(
+            f"    MeshSize {ms_key}: {fb['faced']} faced + {fb['position_only']} pos-only = {fb['faced'] + fb['position_only']} ({pct:.0f}% faced)"
+        )
 
     print("\n  Export Batch Breakdown:")
     for batch, count in batch_counts.most_common():

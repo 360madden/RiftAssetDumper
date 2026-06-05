@@ -23,6 +23,7 @@
 | 12   | 066fa520a8ce62e3     | 22             | 264            | Completes the rich documented extra@304 set (both variants probed). |
 
 **Recommended first wave (top 8)** for immediate mesh-probe execution on both mesh#7 and mesh#34:
+
 1. 69da9507d49c42ff
 2. f2c347fe81a5e3b2
 3. 07c733b4eee3ed2e
@@ -33,6 +34,7 @@
 8. b57694c1f202ec07
 
 **Usage**:
+
 - Assign batches to prober subagents via updated task files.
 - Run via `python scripts/rift_workflow.py mesh-probe --id <ID> --mesh-block <7 or 34> --skip-build`.
 - Collect per-ID JSON + extract for matrix (attributeSets, roles at key offsets @212/@220/@296/@304, payloads, vectors, confidence).

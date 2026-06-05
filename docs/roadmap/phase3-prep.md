@@ -46,6 +46,7 @@ Scope the Phase 3 parser/export implementation using Phase 2 NiDataStream eviden
 **What**: Read 4 bytes at NiDataStream block header offset 24, classify against known patterns.
 
 **Scope**:
+
 - Add `DescriptorBytes` field to NiDataStream record in `Program.cs`
 - Implement `ClassifyDescriptor(byte[] bytes)` → pattern enum
 - Known patterns: `37_04_03_00` (ror1-float), `36_04_02_00` (unknown), `15_02_01_00` (unknown), `10_01_04_00` (unknown), `3c_01_04_00` (unknown)
@@ -53,12 +54,14 @@ Scope the Phase 3 parser/export implementation using Phase 2 NiDataStream eviden
 - Log classification for probed streams
 
 **NOT in scope**:
+
 - No role assignment from descriptor (role comes from Usage/Access)
 - No change to decode/export behavior
 - No change to promotion flags
 - No parser behavioral change — classification is informational only
 
 **Why this is the right first step**:
+
 1. Smallest possible code change (~50 lines in Program.cs)
 2. Uses best-proven evidence (4-byte structure, byte-3=0x00, 5 patterns)
 3. Doesn't change any existing behavior

@@ -113,18 +113,20 @@ def main() -> int:
         if current_id and "position" in current_role and current_meshsize:
             is_f2 = "float2" in current_dgr
             is_f3 = "float3" in current_dgr
-            all_position_streams[current_meshsize].append({
-                "id": current_id,
-                "mb": current_mb,
-                "role": current_role,
-                "dgr": current_dgr,
-                "meshsize": current_meshsize,
-                "payload": current_payload,
-                "body16": current_body16,
-                "archive": current_archive,
-                "entry": current_entry,
-                "pos_type": "float2" if is_f2 else ("float3" if is_f3 else "other"),
-            })
+            all_position_streams[current_meshsize].append(
+                {
+                    "id": current_id,
+                    "mb": current_mb,
+                    "role": current_role,
+                    "dgr": current_dgr,
+                    "meshsize": current_meshsize,
+                    "payload": current_payload,
+                    "body16": current_body16,
+                    "archive": current_archive,
+                    "entry": current_entry,
+                    "pos_type": "float2" if is_f2 else ("float3" if is_f3 else "other"),
+                }
+            )
             current_role = ""
 
     print()
@@ -144,7 +146,8 @@ def main() -> int:
 
     # PASS 2: Shared MeshSizes
     shared_sizes = [
-        ms for ms in all_position_streams
+        ms
+        for ms in all_position_streams
         if any(s["pos_type"] == "float2" for s in all_position_streams[ms])
         and any(s["pos_type"] == "float3" for s in all_position_streams[ms])
     ]
@@ -239,21 +242,23 @@ def main() -> int:
                     if best_f3.get("body16"):
                         print(f"    F3 first16: {best_f3['body16'][:40]}")
 
-                    all_pairs.append({
-                        "meshsize": int(ms),
-                        "archive": arch,
-                        "distance": best_dist,
-                        "float2_id": f2_m["id"][:16],
-                        "float2_mb": int(f2_m["mb"] or "0"),
-                        "float2_entry": f2_entry,
-                        "float2_payload": f2_m.get("payload", ""),
-                        "float2_body16": (f2_m.get("body16", "") or "")[:40],
-                        "float3_id": best_f3["id"][:16],
-                        "float3_mb": int(best_f3["mb"] or "0"),
-                        "float3_entry": f3_entry,
-                        "float3_payload": best_f3.get("payload", ""),
-                        "float3_body16": (best_f3.get("body16", "") or "")[:40],
-                    })
+                    all_pairs.append(
+                        {
+                            "meshsize": int(ms),
+                            "archive": arch,
+                            "distance": best_dist,
+                            "float2_id": f2_m["id"][:16],
+                            "float2_mb": int(f2_m["mb"] or "0"),
+                            "float2_entry": f2_entry,
+                            "float2_payload": f2_m.get("payload", ""),
+                            "float2_body16": (f2_m.get("body16", "") or "")[:40],
+                            "float3_id": best_f3["id"][:16],
+                            "float3_mb": int(best_f3["mb"] or "0"),
+                            "float3_entry": f3_entry,
+                            "float3_payload": best_f3.get("payload", ""),
+                            "float3_body16": (best_f3.get("body16", "") or "")[:40],
+                        }
+                    )
 
         if ms_pairs == 0:
             print("  No archive-close pairs found")
@@ -292,8 +297,13 @@ def main() -> int:
         if "float2" in types_in_nif and "float3" in types_in_nif:
             cross_type_nifs += 1
             entries = [
-                {"mb": r["mb"], "pos_type": r["pos_type"], "role": r["role"][:30],
-                 "dgr": r["dgr"], "meshsize": r["meshsize"]}
+                {
+                    "mb": r["mb"],
+                    "pos_type": r["pos_type"],
+                    "role": r["role"][:30],
+                    "dgr": r["dgr"],
+                    "meshsize": r["meshsize"],
+                }
                 for r in sorted(records, key=lambda x: int(x["mb"] or "0"))
             ]
             cross_type_details.append({"nif_id": nif_id[:16], "entries": entries})

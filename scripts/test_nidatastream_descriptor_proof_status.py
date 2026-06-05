@@ -140,7 +140,9 @@ with TemporaryDirectory() as temp_dir:
     targets_file.write_text(json.dumps(registry), encoding="utf-8")
     status = run_descriptor_status(temp_path, targets_file)
 
-schema = json.loads(Path("docs/schemas/nidatastream-descriptor-proof-status-v1.schema.json").read_text(encoding="utf-8"))
+schema = json.loads(
+    Path("docs/schemas/nidatastream-descriptor-proof-status-v1.schema.json").read_text(encoding="utf-8")
+)
 jsonschema.validate(status, schema)
 print("  PASS: descriptor status schema validation")
 check("descriptor schema", status["SchemaVersion"], "nidatastream-descriptor-proof-status/v1")
@@ -223,9 +225,15 @@ with TemporaryDirectory() as temp_dir:
 jsonschema.validate(negative_status, schema)
 print("  PASS: negative descriptor status schema validation")
 check("negative descriptor evidence blocks readiness", negative_status["AllRequiredEvidenceReady"], False)
-helper_status = next(target for target in negative_status["Targets"] if target["Key"] == "nidatastream-descriptor-helper")
+helper_status = next(
+    target for target in negative_status["Targets"] if target["Key"] == "nidatastream-descriptor-helper"
+)
 check("negative descriptor missing call", helper_status["MissingCalls"], ["141182280"])
-check("negative record index proof blocks", negative_status["DescriptorRecordIndexProof"]["CandidateRecordIndexMapped"], False)
+check(
+    "negative record index proof blocks",
+    negative_status["DescriptorRecordIndexProof"]["CandidateRecordIndexMapped"],
+    False,
+)
 check(
     "negative helper argument proof blocks",
     negative_status["DescriptorHelperArgumentUseProof"]["HelperLookupHighBytesProvenUnused"],

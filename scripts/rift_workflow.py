@@ -633,9 +633,7 @@ def _run_dotnet_and_summarize(
 
     # Output path
     if extra_offset >= 0:
-        out_path = out_dir / (
-            f"{base}-{asset_id}-mesh{mesh_block}-extra{extra_offset}.json"
-        )
+        out_path = out_dir / (f"{base}-{asset_id}-mesh{mesh_block}-extra{extra_offset}.json")
     elif asset_id:
         out_path = out_dir / f"{base}-{asset_id}.json"
     elif asset_type:
@@ -805,9 +803,12 @@ def _ensure_ghidra_attribute_candidate_report(
 
 def _slugify_review_kind(review_kind: str) -> str:
     """Return a filesystem-safe slug for review-kind specific generated files."""
-    return "-".join(part for part in "".join(
-        char.lower() if char.isalnum() else "-" for char in review_kind
-    ).split("-") if part) or "all"
+    return (
+        "-".join(
+            part for part in "".join(char.lower() if char.isalnum() else "-" for char in review_kind).split("-") if part
+        )
+        or "all"
+    )
 
 
 def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
@@ -850,10 +851,7 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
     project = Path(args.project) if args.project else DEFAULT_PROJECT
     root = Path(args.root) if args.root else DEFAULT_ROOT
 
-    print(
-        f"ghidra-review-rank-probes: probing {len(selected)} finding(s) "
-        f"from {review_path} into {probe_root}"
-    )
+    print(f"ghidra-review-rank-probes: probing {len(selected)} finding(s) from {review_path} into {probe_root}")
     results: list[dict[str, object]] = []
     for finding in selected:
         rank = _json_int_or_none(finding.get("Rank"))
@@ -863,10 +861,7 @@ def _run_ghidra_review_rank_probes(args: argparse.Namespace) -> None:
             continue
         rank_dir = probe_root / f"rank{rank:02d}"
         output_path = rank_dir / f"probe-nif-mesh-{asset_id}.json"
-        print(
-            f"\n--- rank {rank}: id={asset_id} meshBlock={mesh_block} "
-            f"kind={finding.get('ReviewKind', '-')}"
-        )
+        print(f"\n--- rank {rank}: id={asset_id} meshBlock={mesh_block} kind={finding.get('ReviewKind', '-')}")
         _run_dotnet_and_summarize(
             command="mesh-probe",
             out_dir=rank_dir,
@@ -1050,9 +1045,7 @@ def _run_ghidra_review_rank_probes_summary(args: argparse.Namespace) -> None:
         ranks_text = ""
         if isinstance(ranks_obj, list):
             ranks_text = ",".join(str(rank) for rank in ranks_obj)
-        md_lines.append(
-            f"| {item['ReviewKind']} | {item['SelectedCount']} | `{ranks_text}` | `{top_roles}` |"
-        )
+        md_lines.append(f"| {item['ReviewKind']} | {item['SelectedCount']} | `{ranks_text}` | `{top_roles}` |")
     summary_md = probe_root / f"summary-{summary_slug}.md"
     summary_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
     (probe_root / "summary.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
@@ -1117,7 +1110,11 @@ def _load_ghidra_function_site_targets(path: Path) -> dict[str, Any]:
 
 def _ghidra_function_site_targets_path(args: argparse.Namespace) -> Path:
     """Return the FunctionSiteSurvey target registry path."""
-    return Path(args.ghidra_targets_file) if args.ghidra_targets_file else REPO_ROOT / "docs" / "ghidra-function-site-targets.json"
+    return (
+        Path(args.ghidra_targets_file)
+        if args.ghidra_targets_file
+        else REPO_ROOT / "docs" / "ghidra-function-site-targets.json"
+    )
 
 
 def _ghidra_ignored_report_path_error(value: Any, field_name: str, expected_suffix: str) -> str | None:
@@ -1872,20 +1869,13 @@ def _nidatastream_descriptor_helper_argument_use_proof(
                 "ForbiddenHighByteTerms": forbidden_terms,
                 "PresentForbiddenHighByteTerms": present_forbidden_terms,
                 "Evidence": str(requirement["Evidence"]),
-                "Passed": (
-                    bool(report)
-                    and decompile_completed
-                    and not missing_terms
-                    and not present_forbidden_terms
-                ),
+                "Passed": (bool(report) and decompile_completed and not missing_terms and not present_forbidden_terms),
                 "Error": error,
             }
         )
 
     passed_count = sum(1 for check in checks if check["Passed"])
-    helper_lookup_high_bytes_proven_unused = (
-        passed_count == len(checks) and not high_byte_lookup_terms_present
-    )
+    helper_lookup_high_bytes_proven_unused = passed_count == len(checks) and not high_byte_lookup_terms_present
     blockers: list[str] = []
     if not helper_lookup_high_bytes_proven_unused:
         blockers.append("descriptor-helper-argument-use-proof-incomplete")
@@ -2091,11 +2081,7 @@ def _nidatastream_evidence_status_payload(args: argparse.Namespace) -> dict[str,
 def _print_nidatastream_evidence_status(status: dict[str, Any]) -> None:
     """Print local ignored evidence artifact status."""
     print("--- NiDataStreamEvidenceStatus")
-    print(
-        "Artifacts: "
-        f"{status['ExistingCount']}/{status['ArtifactCount']} present "
-        f"({status['MissingCount']} missing)"
-    )
+    print(f"Artifacts: {status['ExistingCount']}/{status['ArtifactCount']} present ({status['MissingCount']} missing)")
     print()
     print(f"{'Key':48} {'Exists':6} {'ModifiedUtc':22} Path")
     print(f"{'-' * 48} {'-' * 6} {'-' * 22} {'-' * 40}")
@@ -2340,9 +2326,11 @@ def _nidatastream_descriptor_record_byte_role_candidates(
             continue
         unique_value_count = _json_int_or_none(row.get("UniqueValueCount")) or 0
         top_values_value = row.get("TopValues")
-        top_values = [
-            value for value in top_values_value if isinstance(value, dict)
-        ] if isinstance(top_values_value, list) else []
+        top_values = (
+            [value for value in top_values_value if isinstance(value, dict)]
+            if isinstance(top_values_value, list)
+            else []
+        )
         top_value = top_values[0] if top_values else {}
         top_integer = _json_int_or_none(top_value.get("ValueInteger")) if isinstance(top_value, dict) else None
         top_count = _json_int_or_none(top_value.get("Count")) if isinstance(top_value, dict) else None
@@ -2357,8 +2345,7 @@ def _nidatastream_descriptor_record_byte_role_candidates(
             role = "static-descriptor-table-index"
             classification = "ghidra-record-index-proof"
             evidence = (
-                "Ghidra LoadBinary/helper evidence maps descriptor record byte 0 to the static "
-                "descriptor table index."
+                "Ghidra LoadBinary/helper evidence maps descriptor record byte 0 to the static descriptor table index."
             )
             blocks_semantic_mapping = False
             semantic_offsets.append(offset)
@@ -2449,8 +2436,7 @@ def _nidatastream_descriptor_record_pattern_matrix(
     rows = rows_value if isinstance(rows_value, list) else []
     index_offset = (
         record_index_proof.get("CandidateIndexByteOffset")
-        if isinstance(record_index_proof, dict)
-        and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
+        if isinstance(record_index_proof, dict) and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
         else None
     )
     helper_ignored_offsets = (
@@ -2472,11 +2458,7 @@ def _nidatastream_descriptor_record_pattern_matrix(
         else []
     )
     remaining_unmapped_offsets = (
-        [
-            int(offset)
-            for offset in record_byte_roles.get("RemainingUnmappedByteOffsets", [])
-            if isinstance(offset, int)
-        ]
+        [int(offset) for offset in record_byte_roles.get("RemainingUnmappedByteOffsets", []) if isinstance(offset, int)]
         if isinstance(record_byte_roles, dict)
         else []
     )
@@ -2494,11 +2476,7 @@ def _nidatastream_descriptor_record_pattern_matrix(
             malformed_record_count += count
             continue
         observed_record_count += count
-        index_value = (
-            _descriptor_record_pattern_value(parsed, index_offset)
-            if isinstance(index_offset, int)
-            else None
-        )
+        index_value = _descriptor_record_pattern_value(parsed, index_offset) if isinstance(index_offset, int) else None
         pattern_rows.append(
             {
                 "PatternRank": rank,
@@ -2625,7 +2603,9 @@ def _nidatastream_descriptor_sample_context_correlation(
 ) -> dict[str, Any]:
     """Correlate descriptor patterns with available copied-sample pair/context rows."""
     samples_value = layout_report.get("ShiftedSamples") if layout_report else None
-    samples = [sample for sample in samples_value if isinstance(sample, dict)] if isinstance(samples_value, list) else []
+    samples = (
+        [sample for sample in samples_value if isinstance(sample, dict)] if isinstance(samples_value, list) else []
+    )
     remaining_offsets = [
         int(offset)
         for offset in record_pattern_matrix.get("RemainingUnmappedByteOffsets", [])
@@ -2691,7 +2671,9 @@ def _nidatastream_descriptor_sample_context_correlation(
         pattern = pattern_by_record.get(descriptor_record, {})
         pair_rows = _counter_rows_from_strings(group["PairRecords"] if isinstance(group["PairRecords"], list) else [])
         usage_rows = _counter_rows_from_strings(group["UsageValues"] if isinstance(group["UsageValues"], list) else [])
-        access_rows = _counter_rows_from_strings(group["AccessValues"] if isinstance(group["AccessValues"], list) else [])
+        access_rows = _counter_rows_from_strings(
+            group["AccessValues"] if isinstance(group["AccessValues"], list) else []
+        )
         type_rows = _counter_rows_from_strings(group["TypeNames"] if isinstance(group["TypeNames"], list) else [])
         correlation_rows.append(
             {
@@ -2770,11 +2752,15 @@ def _nidatastream_descriptor_semantic_feasibility(
         if field.get("StreamDescriptorRecordStatus") not in (None, "", "not-mapped-to-parser-field")
     ]
     byte_offset_rows = record_byte_summary.get("ByteOffsets")
-    byte_offsets = [
-        int(row["OffsetBytes"])
-        for row in byte_offset_rows
-        if isinstance(row, dict) and isinstance(row.get("OffsetBytes"), int)
-    ] if isinstance(byte_offset_rows, list) else []
+    byte_offsets = (
+        [
+            int(row["OffsetBytes"])
+            for row in byte_offset_rows
+            if isinstance(row, dict) and isinstance(row.get("OffsetBytes"), int)
+        ]
+        if isinstance(byte_offset_rows, list)
+        else []
+    )
     record_width = _json_int_or_none(record_byte_summary.get("RecordWidthBytes")) or 0
     observed_record_count = _json_int_or_none(record_byte_summary.get("ObservedRecordCount")) or 0
     malformed_record_count = _json_int_or_none(record_byte_summary.get("MalformedRecordCount")) or 0
@@ -2794,8 +2780,7 @@ def _nidatastream_descriptor_semantic_feasibility(
     )
     candidate_index_byte_offset = (
         record_index_proof.get("CandidateIndexByteOffset")
-        if isinstance(record_index_proof, dict)
-        and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
+        if isinstance(record_index_proof, dict) and isinstance(record_index_proof.get("CandidateIndexByteOffset"), int)
         else None
     )
     remaining_unmapped_offsets = (
@@ -2809,16 +2794,10 @@ def _nidatastream_descriptor_semantic_feasibility(
     )
     if isinstance(record_byte_roles, dict) and isinstance(record_byte_roles.get("RemainingUnmappedByteOffsets"), list):
         remaining_unmapped_offsets = [
-            int(offset)
-            for offset in record_byte_roles["RemainingUnmappedByteOffsets"]
-            if isinstance(offset, int)
+            int(offset) for offset in record_byte_roles["RemainingUnmappedByteOffsets"] if isinstance(offset, int)
         ]
     candidate_padding_offsets = (
-        [
-            int(offset)
-            for offset in record_byte_roles.get("CandidatePaddingByteOffsets", [])
-            if isinstance(offset, int)
-        ]
+        [int(offset) for offset in record_byte_roles.get("CandidatePaddingByteOffsets", []) if isinstance(offset, int)]
         if isinstance(record_byte_roles, dict)
         else []
     )
@@ -3472,10 +3451,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         f"- Candidate-only: **{str(report['CandidateOnly']).lower()}**",
         f"- Parser/export promotion allowed: **{str(report['ParserExportPromotionAllowed']).lower()}**",
         f"- Field order promoted: **{str(report['FieldOrderPromoted']).lower()}**",
-        (
-            "- Descriptor + sample evidence ready: "
-            f"**{str(report['DescriptorAndSampleEvidenceReady']).lower()}**"
-        ),
+        (f"- Descriptor + sample evidence ready: **{str(report['DescriptorAndSampleEvidenceReady']).lower()}**"),
         f"- Blocking items: **{format_markdown_cell(report['BlockerCount'])}**",
         "",
         "## Evidence snapshot",
@@ -3507,10 +3483,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
             f"{format_markdown_cell(byte_order['PassedCount'])}/"
             f"{format_markdown_cell(byte_order['CheckCount'])} |"
         ),
-        (
-            "| Descriptor record byte patterns | "
-            f"{format_markdown_cell(record_bytes['RecordPatternCount'])} |"
-        ),
+        (f"| Descriptor record byte patterns | {format_markdown_cell(record_bytes['RecordPatternCount'])} |"),
         (
             "| Descriptor record index mapped | "
             f"{format_markdown_cell(str(record_index['CandidateRecordIndexMapped']).lower())} |"
@@ -3600,9 +3573,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         ]
     )
     for offset in record_bytes["ByteOffsets"]:
-        top_values = ", ".join(
-            f"{value['ValueHex']} ({value['Count']})" for value in offset["TopValues"][:8]
-        )
+        top_values = ", ".join(f"{value['ValueHex']} ({value['Count']})" for value in offset["TopValues"][:8])
         lines.append(
             "| "
             + " | ".join(
@@ -3679,9 +3650,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
                     format_markdown_cell(check["TargetKey"]),
                     format_markdown_cell(str(check["Passed"]).lower()),
                     format_markdown_cell(", ".join(str(term) for term in check["MissingTerms"])),
-                    format_markdown_cell(
-                        ", ".join(str(term) for term in check["PresentForbiddenHighByteTerms"])
-                    ),
+                    format_markdown_cell(", ".join(str(term) for term in check["PresentForbiddenHighByteTerms"])),
                     format_markdown_cell(check["Evidence"]),
                 ]
             )
@@ -3700,9 +3669,7 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         ]
     )
     for row in record_roles["Rows"]:
-        top_values = ", ".join(
-            f"{value['ValueHex']} ({value['Count']})" for value in row["TopValues"][:8]
-        )
+        top_values = ", ".join(f"{value['ValueHex']} ({value['Count']})" for value in row["TopValues"][:8])
         lines.append(
             "| "
             + " | ".join(
@@ -3737,21 +3704,14 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
     )
     for row in record_pattern_matrix["Rows"]:
         index_byte = row["CandidateIndexByte"]
-        index_text = (
-            f"{index_byte['OffsetBytes']}={index_byte['ValueHex']}"
-            if isinstance(index_byte, dict)
-            else "-"
-        )
+        index_text = f"{index_byte['OffsetBytes']}={index_byte['ValueHex']}" if isinstance(index_byte, dict) else "-"
         helper_ignored = ", ".join(
-            f"{value['OffsetBytes']}={value['ValueHex']}"
-            for value in row["CandidateHelperLookupIgnoredBytes"]
+            f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["CandidateHelperLookupIgnoredBytes"]
         )
         sign_guard = ", ".join(
             f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["CandidateSignGuardBytes"]
         )
-        remaining = ", ".join(
-            f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["RemainingUnmappedBytes"]
-        )
+        remaining = ", ".join(f"{value['OffsetBytes']}={value['ValueHex']}" for value in row["RemainingUnmappedBytes"])
         lines.append(
             "| "
             + " | ".join(
@@ -3787,18 +3747,10 @@ def _nidatastream_descriptor_sample_compare_markdown(report: dict[str, Any]) -> 
         ]
     )
     for row in sample_context["Rows"]:
-        top_pairs = ", ".join(
-            f"{value['Value']} ({value['Count']})" for value in row["TopPairRecordBytes"][:6]
-        )
-        top_usage = ", ".join(
-            f"{value['Value']} ({value['Count']})" for value in row["TopUsageValues"][:6]
-        )
-        top_access = ", ".join(
-            f"{value['Value']} ({value['Count']})" for value in row["TopAccessValues"][:6]
-        )
-        top_types = ", ".join(
-            f"{value['Value']} ({value['Count']})" for value in row["TopTypeNames"][:4]
-        )
+        top_pairs = ", ".join(f"{value['Value']} ({value['Count']})" for value in row["TopPairRecordBytes"][:6])
+        top_usage = ", ".join(f"{value['Value']} ({value['Count']})" for value in row["TopUsageValues"][:6])
+        top_access = ", ".join(f"{value['Value']} ({value['Count']})" for value in row["TopAccessValues"][:6])
+        top_types = ", ".join(f"{value['Value']} ({value['Count']})" for value in row["TopTypeNames"][:4])
         lines.append(
             "| "
             + " | ".join(
@@ -3989,10 +3941,7 @@ def _print_nidatastream_descriptor_sample_compare(report: dict[str, Any]) -> Non
         "Descriptor helper evidence-ready targets: "
         f"{descriptor['EvidenceReadyCount']}/{descriptor['RequiredTargetCount']}"
     )
-    print(
-        "Ghidra-style-valid sample blocks: "
-        f"{layout['GhidraStyleLayoutValidBlocks']}/{layout['NiDataStreamBlocks']}"
-    )
+    print(f"Ghidra-style-valid sample blocks: {layout['GhidraStyleLayoutValidBlocks']}/{layout['NiDataStreamBlocks']}")
     print(f"Sample corpus files parsed: {corpus['FilesParsed']}/{corpus['FilesScanned']}")
     print(f"Uniform sample-byte checks: {sample['PassedCount']}/{sample['CheckCount']}")
     print(f"Descriptor byte-order checks: {byte_order['PassedCount']}/{byte_order['CheckCount']}")
@@ -4131,7 +4080,9 @@ def _ghidra_attribute_candidate_report_status(args: argparse.Namespace) -> dict[
 def _nidatastream_descriptor_field_map_status(descriptor_status: dict[str, Any]) -> dict[str, Any]:
     """Summarize candidate descriptor field-map promotion readiness for dashboard/status output."""
     field_map_value = descriptor_status.get("CandidateFieldMap")
-    field_map = [field for field in field_map_value if isinstance(field, dict)] if isinstance(field_map_value, list) else []
+    field_map = (
+        [field for field in field_map_value if isinstance(field, dict)] if isinstance(field_map_value, list) else []
+    )
     candidate_only_count = sum(1 for field in field_map if field.get("PromotionStatus") == "candidate-only")
     static_offset_count = sum(1 for field in field_map if "StaticTableOffsetBytes" in field)
     stream_mapped_count = sum(
@@ -4162,9 +4113,7 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
     ready_count = int(function_status.get("EvidenceReadyCount", 0))
     evidence_ready = target_count > 0 and ready_count == target_count
     evidence_state = "pass" if evidence_ready else "blocked"
-    evidence_text = (
-        f"{ready_count}/{target_count} FunctionSiteSurvey targets have ignored local JSON reports and Markdown summaries."
-    )
+    evidence_text = f"{ready_count}/{target_count} FunctionSiteSurvey targets have ignored local JSON reports and Markdown summaries."
     descriptor_status = _nidatastream_descriptor_proof_status_payload(args)
     field_map_status = _nidatastream_descriptor_field_map_status(descriptor_status)
     descriptor_ready = bool(descriptor_status["AllRequiredEvidenceReady"])
@@ -4399,9 +4348,9 @@ def _nidatastream_promotion_status_payload(args: argparse.Namespace) -> dict[str
             ],
             "DescriptorRecordWidthBytes": record_byte_summary["RecordWidthBytes"],
             "DescriptorRecordIndexCandidateMapped": semantic_feasibility["DescriptorRecordIndexCandidateMapped"],
-            "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status[
-                "DescriptorHelperArgumentUseProof"
-            ]["HelperLookupHighBytesProvenUnused"],
+            "DescriptorHelperLookupHighBytesProvenUnused": descriptor_status["DescriptorHelperArgumentUseProof"][
+                "HelperLookupHighBytesProvenUnused"
+            ],
             "DescriptorHelperLookupIgnoredByteCount": len(
                 descriptor_status["DescriptorHelperArgumentUseProof"]["CandidateHelperLookupIgnoredByteOffsets"]
             ),
@@ -4434,10 +4383,7 @@ def _print_nidatastream_promotion_status(status: dict[str, Any]) -> None:
     print("--- NiDataStreamPromotionStatus")
     print(f"Historical stage: {status['HistoricalStage']}")
     print(f"Current lane: {status['CurrentLane']}")
-    print(
-        "FunctionSite evidence-ready targets: "
-        f"{target_status['EvidenceReadyCount']}/{target_status['TargetCount']}"
-    )
+    print(f"FunctionSite evidence-ready targets: {target_status['EvidenceReadyCount']}/{target_status['TargetCount']}")
     print(
         "Descriptor helper evidence-ready targets: "
         f"{descriptor_status['EvidenceReadyCount']}/{descriptor_status['RequiredTargetCount']}"
@@ -4579,10 +4525,7 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
             "| Descriptor/sample context correlation ready | "
             f"{format_markdown_cell(str(compare_status['DescriptorContextCorrelationReady']).lower())} |"
         ),
-        (
-            "| Descriptor-table sample rows | "
-            f"{format_markdown_cell(compare_status['DescriptorTableSampleRowCount'])} |"
-        ),
+        (f"| Descriptor-table sample rows | {format_markdown_cell(compare_status['DescriptorTableSampleRowCount'])} |"),
         (
             "| Descriptor-table sample nonzero rows | "
             f"{format_markdown_cell(compare_status['DescriptorTableSampleNonzeroRowCount'])} |"
@@ -4627,10 +4570,7 @@ def _nidatastream_promotion_dashboard_markdown(status: dict[str, Any]) -> str:
             "| Complete Ghidra-only P+N+UV groups | "
             f"{format_markdown_cell(pairing_status['CompletePositionNormalUvCandidateGroups'])} |"
         ),
-        (
-            "| Ghidra-only candidate groups | "
-            f"{format_markdown_cell(pairing_status['GhidraOnlyGroups'])} |"
-        ),
+        (f"| Ghidra-only candidate groups | {format_markdown_cell(pairing_status['GhidraOnlyGroups'])} |"),
         "",
         "## Gate table",
         "",
@@ -5010,10 +4950,7 @@ def _descriptor_table_sample_plan(args: argparse.Namespace) -> dict[str, Any]:
                     "ComputedAddress": f"{base_value + index * stride_bytes:x}" if stride_bytes > 0 else "",
                 }
             )
-    field_args = [
-        f"{field['Field']}:{field['DataAddress']}:{field['StaticTableOffsetBytes']}"
-        for field in fields
-    ]
+    field_args = [f"{field['Field']}:{field['DataAddress']}:{field['StaticTableOffsetBytes']}" for field in fields]
     script = args.ghidra_script or "scripts/ghidra/DescriptorTableSampler.java"
     project_name = args.ghidra_project_name if args.ghidra_project_name != "TempProject" else "RiftAnchorSurvey"
     process_path = args.ghidra_process or "rift_x64.exe"
@@ -5594,7 +5531,9 @@ def _run_nidatastream_descriptor_reference_classify(args: argparse.Namespace) ->
     _print_ghidra_result(result)
     report = load_json_report(str(report_path))
     if not report.get("CandidateOnly") or report.get("ParserExportPromotionAllowed"):
-        print("ERROR: descriptor reference classification report is not candidate-only/promoted-false.", file=sys.stderr)
+        print(
+            "ERROR: descriptor reference classification report is not candidate-only/promoted-false.", file=sys.stderr
+        )
         sys.exit(1)
     markdown_path.write_text(_descriptor_reference_classify_markdown(report), encoding="utf-8")
     print(
@@ -5844,12 +5783,8 @@ def _descriptor_base_model_review_markdown(report: dict[str, Any]) -> str:
         "|---|---|---|---:|---:|---:|---|---|",
     ]
     for field in report["FieldEvidence"]:
-        scales = ", ".join(
-            f"{row['ScaleBytes']} ({row['Count']})" for row in field["InstructionScaleCandidates"]
-        )
-        offsets = ", ".join(
-            f"{row['OffsetBytes']} ({row['Count']})" for row in field["InstructionOffsetCandidates"]
-        )
+        scales = ", ".join(f"{row['ScaleBytes']} ({row['Count']})" for row in field["InstructionScaleCandidates"])
+        offsets = ", ".join(f"{row['OffsetBytes']} ({row['Count']})" for row in field["InstructionOffsetCandidates"])
         lines.append(
             "| "
             + " | ".join(
@@ -6022,10 +5957,7 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         and step_49_status.get("CandidateOnly") is True
         and step_49_status.get("LiveReadExecuted") is True
     )
-    step_49_cluster_confirmed = (
-        step_49_initial_probe_executed
-        and step_49_status.get("ClusterConfirmed") is True
-    )
+    step_49_cluster_confirmed = step_49_initial_probe_executed and step_49_status.get("ClusterConfirmed") is True
     step_49_closure_mode = str(step_49_status.get("Step49ClosureMode", ""))
     step_49_closed_negative = (
         step_49_initial_probe_executed
@@ -6033,10 +5965,9 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         and step_49_status.get("ParserExportPromotionAllowed") is False
         and step_49_closure_mode == "closed-negative-current-live-state"
     )
-    step_49_complete = (
-        (step_49_cluster_confirmed or step_49_closed_negative)
-        and step_49_status.get("Step49Complete") is True
-    )
+    step_49_complete = (step_49_cluster_confirmed or step_49_closed_negative) and step_49_status.get(
+        "Step49Complete"
+    ) is True
     step_50_final_handoff_complete = step50_handoff_path is not None
     current_step = 46
     current_step_name = "Design live memory scan safety boundary"
@@ -6108,9 +6039,7 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         )
         if step_49_initial_probe_executed
         else False,
-        "Step49FullProcessExpectedStaticBatchHitCount": (
-            step_49_status.get("FullProcessExpectedStaticBatchHitCount")
-        )
+        "Step49FullProcessExpectedStaticBatchHitCount": (step_49_status.get("FullProcessExpectedStaticBatchHitCount"))
         if step_49_initial_probe_executed
         else None,
         "Step49Complete": step_49_complete,
@@ -6118,7 +6047,9 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
         "Step50FinalHandoffPath": _display_path(step50_handoff_path) if step50_handoff_path else "",
         "Step50FinalHandoffComplete": step_50_final_handoff_complete and step_49_complete,
         "LiveProcessReadExecuted": step_48_live_read_executed,
-        "LiveProcessReadApprovedForThisRun": bool(step_48_status.get("LiveReadApproved")) if step_48_live_read_executed else False,
+        "LiveProcessReadApprovedForThisRun": bool(step_48_status.get("LiveReadApproved"))
+        if step_48_live_read_executed
+        else False,
         "ParserExportPromotionAllowed": False,
         "Stages": [
             {
@@ -6169,8 +6100,7 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                     if step_49_initial_probe_executed
                     else "step-49-next"
                     if step_48_live_read_executed
-                    else
-                    "step-48-in-progress"
+                    else "step-48-in-progress"
                     if step_48_manifest_ready
                     else "step-48-next"
                     if step_47_complete
@@ -6184,17 +6114,14 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                     "docs/live-memory-step49-status.json; "
                     f"{_display_path(step50_handoff_path)}"
                     if step_50_final_handoff_complete and step_49_complete
-                    else
-                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    else "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
                     "docs/live-memory-scan-targets.json; docs/live-memory-step48-status.json; "
                     "docs/live-memory-step49-status.json"
                     if step_49_initial_probe_executed
-                    else
-                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    else "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
                     "docs/live-memory-scan-targets.json; docs/live-memory-step48-status.json"
                     if step_48_live_read_executed
-                    else
-                    "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
+                    else "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py; "
                     "docs/live-memory-scan-targets.json"
                     if step_48_manifest_ready
                     else "docs/live-memory-readonly-safety-boundary.md; scripts/live_memory_scanner.py"
@@ -6219,14 +6146,12 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
                 "step-50-final-handoff-not-complete",
             ]
             if step_49_complete
-            else
-            [
+            else [
                 "step-49-position-float3-cluster-not-confirmed",
                 "step-50-final-handoff-not-complete",
             ]
             if step_49_initial_probe_executed and not step_49_complete
-            else
-            [
+            else [
                 "step-49-position-float3-cluster-scan-not-executed",
                 "step-50-final-handoff-not-complete",
             ]
@@ -6244,8 +6169,7 @@ def _fifty_step_plan_status_payload() -> dict[str, Any]:
             else "Write the Step 50 final comprehensive handoff; keep Step 49 negative evidence candidate-only "
             "and parser/export promotion blocked."
             if step_49_closed_negative
-            else
-            step_49_status.get("NextAction", "")
+            else step_49_status.get("NextAction", "")
             if step_49_initial_probe_executed and step_49_status.get("NextAction")
             else "Write the Step 50 final comprehensive handoff after Step 49 is cluster-confirmed."
             if step_49_complete
@@ -6285,10 +6209,7 @@ def _print_fifty_step_plan_status(status: dict[str, Any]) -> None:
             "Step 49 closed without cluster confirmation: "
             f"{str(status['Step49ClosedWithoutClusterConfirmation']).lower()}"
         )
-    print(
-        "Step 49 full-process expected-static hits: "
-        f"{status['Step49FullProcessExpectedStaticBatchHitCount']}"
-    )
+    print(f"Step 49 full-process expected-static hits: {status['Step49FullProcessExpectedStaticBatchHitCount']}")
     if status["Step49Provider"]:
         print(f"Step 49 provider: {status['Step49Provider']}")
     print(f"Step 50 final handoff complete: {str(status['Step50FinalHandoffComplete']).lower()}")
@@ -6335,7 +6256,9 @@ def _optional_report_payload(key: str, path: Path) -> tuple[dict[str, Any], dict
         "Exists": path.exists(),
         "Bytes": path.stat().st_size if path.exists() else 0,
         "MtimeUtc": (
-            datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).replace(microsecond=0).isoformat()
+            datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+            .replace(microsecond=0)
+            .isoformat()
             .replace("+00:00", "Z")
             if path.exists()
             else ""
@@ -6500,8 +6423,7 @@ def _post50_lane_from_extra_position(rows: list[dict[str, Any]], rank: int) -> d
         "StrictPass": None,
         "ExportReady": False,
         "Rationale": (
-            "mesh#34 extra position-like stream repeats across source-binding "
-            f"siblings; payloads={payload_label}"
+            f"mesh#34 extra position-like stream repeats across source-binding siblings; payloads={payload_label}"
         ),
         "Decision": "candidate-only source-binding oddity; classify before parser/export changes",
     }
@@ -6554,11 +6476,7 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
         reports[key] = report
         report_statuses.append(status)
 
-    missing_reports = [
-        str(status["Key"])
-        for status in report_statuses
-        if not status["Exists"] or status["ParseError"]
-    ]
+    missing_reports = [str(status["Key"]) for status in report_statuses if not status["Exists"] or status["ParseError"]]
 
     sibling_rows = _dict_rows(reports["PositionSourceSiblingFamily"], "Families")
     top_sibling = (
@@ -6614,15 +6532,14 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
     if top_sibling:
         family_lane = _post50_lane_from_sibling_family(top_sibling, len(lanes) + 1)
         if family_proof_aggregate:
-            family_lane["EvidenceGroups"] = _as_rank_int(family_proof_aggregate.get("EvidenceGroups")) or family_lane[
-                "EvidenceGroups"
-            ]
-            family_lane["TotalStreamLinks"] = _as_rank_int(
-                family_proof_aggregate.get("TotalStreamLinks")
-            ) or family_lane["TotalStreamLinks"]
+            family_lane["EvidenceGroups"] = (
+                _as_rank_int(family_proof_aggregate.get("EvidenceGroups")) or family_lane["EvidenceGroups"]
+            )
+            family_lane["TotalStreamLinks"] = (
+                _as_rank_int(family_proof_aggregate.get("TotalStreamLinks")) or family_lane["TotalStreamLinks"]
+            )
             family_lane["Rationale"] = (
-                "schema-backed inventory proof confirms meshSize=329 "
-                "mesh#7/#34 stream@212 source-binding family"
+                "schema-backed inventory proof confirms meshSize=329 mesh#7/#34 stream@212 source-binding family"
             )
         lanes.append(family_lane)
     if extra_position_rows:
@@ -6634,12 +6551,12 @@ def _post50_position_source_status_payload(out_dir: Path) -> dict[str, Any]:
                 if isinstance(extra_payloads, list) and extra_payloads
                 else "unknown"
             )
-            extra_lane["EvidenceGroups"] = _as_rank_int(compare_aggregate.get("ExampleCount")) or extra_lane[
-                "EvidenceGroups"
-            ]
-            extra_lane["TotalStreamLinks"] = _as_rank_int(compare_aggregate.get("ExtraStreamCount")) or extra_lane[
-                "TotalStreamLinks"
-            ]
+            extra_lane["EvidenceGroups"] = (
+                _as_rank_int(compare_aggregate.get("ExampleCount")) or extra_lane["EvidenceGroups"]
+            )
+            extra_lane["TotalStreamLinks"] = (
+                _as_rank_int(compare_aggregate.get("ExtraStreamCount")) or extra_lane["TotalStreamLinks"]
+            )
             extra_lane["Rationale"] = (
                 "schema-backed meshSize=329 compare confirms shared @212/#28 "
                 f"and extra @304/#57 evidence; extraPayloads={payload_label}"
@@ -6799,7 +6716,9 @@ def _post50_mesh34_negative_binding_status_payload(out_dir: Path) -> dict[str, A
         else all(row["Mesh34UvStreamCount"] == 0 for row in example_rows)
     )
     parser_export_allowed = False
-    negative_binding_proven = example_count > 0 and all_lacks_attribute_set and all_lacks_uv and not parser_export_allowed
+    negative_binding_proven = (
+        example_count > 0 and all_lacks_attribute_set and all_lacks_uv and not parser_export_allowed
+    )
     blockers = [
         "mesh34-complete-geometry-binding-not-proven",
         "mesh34-uv-stream-missing",
@@ -7127,9 +7046,7 @@ def _post50_validation_suite_status_payload(out_dir: Path) -> dict[str, Any]:
     warnings: list[str] = []
     if older_keys:
         warnings.append(
-            "relative-report-mtime-drift:"
-            + ",".join(older_keys[:8])
-            + ("..." if len(older_keys) > 8 else "")
+            "relative-report-mtime-drift:" + ",".join(older_keys[:8]) + ("..." if len(older_keys) > 8 else "")
         )
     if missing_count or unreadable_count:
         warnings.append("missing-or-unreadable-post50-report-inputs")
@@ -7494,7 +7411,13 @@ def _run_command(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
         from scripts.rift_position_gap_report import main as gap_report_main
-        sys.argv = ["rift_position_gap_report.py", str(inventory_path), "--out", str(out_dir / "position-gap-report.json")]
+
+        sys.argv = [
+            "rift_position_gap_report.py",
+            str(inventory_path),
+            "--out",
+            str(out_dir / "position-gap-report.json"),
+        ]
         sys.exit(gap_report_main())
 
     if command == "triage-fallback-candidates":
@@ -7509,36 +7432,36 @@ def _run_command(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
-        with open(inventory_path, encoding='utf-8-sig') as f:
+        with open(inventory_path, encoding="utf-8-sig") as f:
             data = json.load(f)
 
         # --- Gather metrics ---
-        mesh_block_count = data.get('MeshBlockCount', data.get('MeshBlocks', 0))
-        attr_compatible = data.get('AttributeCompatibleMeshes', data.get('AttributeCompatibleSets', 0))
+        mesh_block_count = data.get("MeshBlockCount", data.get("MeshBlocks", 0))
+        attr_compatible = data.get("AttributeCompatibleMeshes", data.get("AttributeCompatibleSets", 0))
         zero_attr_count = mesh_block_count - attr_compatible
 
-        role_groups = data.get('RoleGroups', [])
+        role_groups = data.get("RoleGroups", [])
 
         def _find_role(role_name: str) -> dict | None:
             for rg in role_groups:
-                if rg.get('Role') == role_name:
+                if rg.get("Role") == role_name:
                     return rg
             return None
 
-        pos_role = _find_role('position-float3-ror1-lead')
-        normal_role = _find_role('normal-float3-ror1-lead')
-        uv_role = _find_role('uv-float2-ror1-lead')
+        pos_role = _find_role("position-float3-ror1-lead")
+        normal_role = _find_role("normal-float3-ror1-lead")
+        uv_role = _find_role("uv-float2-ror1-lead")
 
-        pos_count = pos_role.get('Count', 0) if pos_role else 0
-        normal_count = normal_role.get('Count', 0) if normal_role else 0
-        uv_count = uv_role.get('Count', 0) if uv_role else 0
-        pos_high_conf = pos_role.get('HighConfidenceCount', '?') if pos_role else '-'
+        pos_count = pos_role.get("Count", 0) if pos_role else 0
+        normal_count = normal_role.get("Count", 0) if normal_role else 0
+        uv_count = uv_role.get("Count", 0) if uv_role else 0
+        pos_high_conf = pos_role.get("HighConfidenceCount", "?") if pos_role else "-"
 
         # Attribute-set meshes also have position/normal/UV. Subtract them.
         # approximate: most position-float3 samples are on 0-attr-set meshes
-        pos_samples = (pos_role.get('Samples', []) if pos_role else [])
-        normal_samples = (normal_role.get('Samples', []) if normal_role else [])
-        uv_samples = (uv_role.get('Samples', []) if uv_role else [])
+        pos_samples = pos_role.get("Samples", []) if pos_role else []
+        normal_samples = normal_role.get("Samples", []) if normal_role else []
+        uv_samples = uv_role.get("Samples", []) if uv_role else []
 
         # --- Display summary ---
         print()
@@ -7561,20 +7484,20 @@ def _run_command(args: argparse.Namespace) -> None:
         if pos_samples:
             printed = 0
             for s in pos_samples:
-                id_pref = s.get('IdPrefix', s.get('id', '?'))
-                mesh_size = s.get('MeshSize', s.get('meshSize', '?'))
-                mesh_idx = s.get('MeshBlockIndex', s.get('meshBlockIndex', '?'))
+                id_pref = s.get("IdPrefix", s.get("id", "?"))
+                mesh_size = s.get("MeshSize", s.get("meshSize", "?"))
+                mesh_idx = s.get("MeshBlockIndex", s.get("meshBlockIndex", "?"))
                 # Check if this mesh has normal/UV too
-                pos_norm = '[ ]'
-                pos_uv = '[ ]'
+                pos_norm = "[ ]"
+                pos_uv = "[ ]"
                 # Match by ID to check companion streams
                 for ns in normal_samples:
-                    if ns.get('IdPrefix') == id_pref and ns.get('MeshBlockIndex') == mesh_idx:
-                        pos_norm = '[Y]'
+                    if ns.get("IdPrefix") == id_pref and ns.get("MeshBlockIndex") == mesh_idx:
+                        pos_norm = "[Y]"
                         break
                 for us in uv_samples:
-                    if us.get('IdPrefix') == id_pref and us.get('MeshBlockIndex') == mesh_idx:
-                        pos_uv = '[Y]'
+                    if us.get("IdPrefix") == id_pref and us.get("MeshBlockIndex") == mesh_idx:
+                        pos_uv = "[Y]"
                         break
                 print(f"    ID={id_pref} mesh#{mesh_idx} size={mesh_size}  norm={pos_norm} uv={pos_uv}")
                 printed += 1
@@ -7590,10 +7513,12 @@ def _run_command(args: argparse.Namespace) -> None:
         print("  --- Quick test commands ---")
         test_ids = set()
         for s in pos_samples[:8]:
-            test_ids.add(s.get('IdPrefix', ''))
+            test_ids.add(s.get("IdPrefix", ""))
         for tid in sorted(test_ids):
             if tid:
-                print(f"    python scripts/rift_workflow.py decode-geometry --id {tid} --mesh-block 6 --experimental-position-source --write-obj")
+                print(
+                    f"    python scripts/rift_workflow.py decode-geometry --id {tid} --mesh-block 6 --experimental-position-source --write-obj"
+                )
         print()
 
         # Summary statistics
@@ -7604,16 +7529,12 @@ def _run_command(args: argparse.Namespace) -> None:
         pos_uv = 0
         pos_both = 0
         for s in pos_samples:
-            id_pref = s.get('IdPrefix', '')
-            mesh_idx = s.get('MeshBlockIndex')
+            id_pref = s.get("IdPrefix", "")
+            mesh_idx = s.get("MeshBlockIndex")
             has_norm = any(
-                ns.get('IdPrefix') == id_pref and ns.get('MeshBlockIndex') == mesh_idx
-                for ns in normal_samples
+                ns.get("IdPrefix") == id_pref and ns.get("MeshBlockIndex") == mesh_idx for ns in normal_samples
             )
-            has_uv = any(
-                us.get('IdPrefix') == id_pref and us.get('MeshBlockIndex') == mesh_idx
-                for us in uv_samples
-            )
+            has_uv = any(us.get("IdPrefix") == id_pref and us.get("MeshBlockIndex") == mesh_idx for us in uv_samples)
             if has_norm and has_uv:
                 pos_both += 1
             elif has_norm:
@@ -7631,8 +7552,7 @@ def _run_command(args: argparse.Namespace) -> None:
         print()
         print(f"  Interpretation: {pos_both} meshes have full position+normal+UV float32 streams")
         print("  and can be decoded with --experimental-position-source.")
-        print(f"  {pos_norm} more have position+normal (no UV), "
-              f"{pos_uv} have position+UV (no normal).")
+        print(f"  {pos_norm} more have position+normal (no UV), {pos_uv} have position+UV (no normal).")
         print(f"  These are concentrated across {len(pos_samples)} unique sample entries")
         print("  from the full mesh-binding inventory.")
         print()
@@ -7657,9 +7577,9 @@ def _run_command(args: argparse.Namespace) -> None:
             "stream-endianness",
             "stream-bodies",
         ):
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  ALL → {subcommand}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             _run_dotnet_and_summarize(
                 command=subcommand,
                 out_dir=Path(args.out) if args.out else DEFAULT_OUT,
@@ -7692,10 +7612,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7723,10 +7648,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7766,13 +7696,21 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"probe-nif-attribute-extra-{asset_id}-mesh6-extra264.json"
         dotnet_args = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "probe-nif-attribute-extra",
-            "--root", str(root),
-            "--id", asset_id,
-            "--mesh-block", "6",
-            "--extra-offset", "264",
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--id",
+            asset_id,
+            "--mesh-block",
+            "6",
+            "--extra-offset",
+            "264",
+            "--out",
+            str(out_path),
         ]
         checked_run(f"attribute-extra-sibling-proof-guard {asset_id}", dotnet_args)
 
@@ -7796,10 +7734,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7827,10 +7770,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7858,10 +7806,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7889,10 +7842,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7929,10 +7887,15 @@ def _run_command(args: argparse.Namespace) -> None:
                 checked_run("dotnet build (solution)", ["build", str(solution), "--nologo"])
 
             dotnet_args: list[str] = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "inventory-nif-mesh-bindings",
-                "--root", str(root),
-                "--out", str(out_path),
+                "--root",
+                str(root),
+                "--out",
+                str(out_path),
             ]
             if args.full:
                 pass  # full scan
@@ -7959,10 +7922,15 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "nif-mesh-binding-inventory.json"
         dotnet_args: list[str] = [
-            "run", "--project", str(project), "--",
+            "run",
+            "--project",
+            str(project),
+            "--",
             "inventory-nif-mesh-bindings",
-            "--root", str(root),
-            "--out", str(out_path),
+            "--root",
+            str(root),
+            "--out",
+            str(out_path),
         ]
         if args.full:
             pass  # full scan
@@ -7989,41 +7957,159 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         sibling_probe_specs = [
-            {"Pair": "e3de325329", "PairLabel": "meshSize 325/329 shifted-position sibling", "Id": "e3de1077a37d0337", "MeshBlock": 6},
-            {"Pair": "e3de325329", "PairLabel": "meshSize 325/329 shifted-position sibling", "Id": "e3de1077a37d0337", "MeshBlock": 30},
-            {"Pair": "8e016329", "PairLabel": "meshSize 329 repeated-position sibling", "Id": "8e01613d7ce9e297", "MeshBlock": 6},
-            {"Pair": "8e016329", "PairLabel": "meshSize 329 repeated-position sibling", "Id": "8e01613d7ce9e297", "MeshBlock": 31},
+            {
+                "Pair": "e3de325329",
+                "PairLabel": "meshSize 325/329 shifted-position sibling",
+                "Id": "e3de1077a37d0337",
+                "MeshBlock": 6,
+            },
+            {
+                "Pair": "e3de325329",
+                "PairLabel": "meshSize 325/329 shifted-position sibling",
+                "Id": "e3de1077a37d0337",
+                "MeshBlock": 30,
+            },
+            {
+                "Pair": "8e016329",
+                "PairLabel": "meshSize 329 repeated-position sibling",
+                "Id": "8e01613d7ce9e297",
+                "MeshBlock": 6,
+            },
+            {
+                "Pair": "8e016329",
+                "PairLabel": "meshSize 329 repeated-position sibling",
+                "Id": "8e01613d7ce9e297",
+                "MeshBlock": 31,
+            },
         ]
 
         representative_probe_specs = [
-            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 7},
-            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 27},
-            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 7},
-            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 31},
-            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
-            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+            {
+                "Pair": "mesh305stream188",
+                "PairLabel": "meshSize 305 shared stream@188 sibling",
+                "Id": "04297730afc68f38",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh305stream188",
+                "PairLabel": "meshSize 305 shared stream@188 sibling",
+                "Id": "04297730afc68f38",
+                "MeshBlock": 27,
+            },
+            {
+                "Pair": "mesh321stream204",
+                "PairLabel": "meshSize 321 shared stream@204 sibling",
+                "Id": "03c35c3ba518aab0",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh321stream204",
+                "PairLabel": "meshSize 321 shared stream@204 sibling",
+                "Id": "03c35c3ba518aab0",
+                "MeshBlock": 31,
+            },
+            {
+                "Pair": "mesh329stream212",
+                "PairLabel": "meshSize 329 shared stream@212 sibling",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329stream212",
+                "PairLabel": "meshSize 329 shared stream@212 sibling",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 34,
+            },
         ]
 
         secondary_probe_specs = [
-            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
-            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 34, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 7, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 27, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
-            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 31, "ExpectedAttributeSetCount": 0},
+            {
+                "Pair": "mesh329stream212secondary",
+                "PairLabel": "meshSize 329 secondary shared stream@212 sibling",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 1,
+            },
+            {
+                "Pair": "mesh329stream212secondary",
+                "PairLabel": "meshSize 329 secondary shared stream@212 sibling",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 34,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh305stream188secondary",
+                "PairLabel": "meshSize 305 secondary shared stream@188 sibling",
+                "Id": "0d9a25c9a6af7b18",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh305stream188secondary",
+                "PairLabel": "meshSize 305 secondary shared stream@188 sibling",
+                "Id": "0d9a25c9a6af7b18",
+                "MeshBlock": 27,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh321stream204secondary",
+                "PairLabel": "meshSize 321 secondary shared stream@204 sibling",
+                "Id": "1dc433d4d2e4db64",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 1,
+            },
+            {
+                "Pair": "mesh321stream204secondary",
+                "PairLabel": "meshSize 321 secondary shared stream@204 sibling",
+                "Id": "1dc433d4d2e4db64",
+                "MeshBlock": 31,
+                "ExpectedAttributeSetCount": 0,
+            },
         ]
 
         extra_position_probe_specs = [
-            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
-            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
-            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 7},
-            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 34},
-            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 7},
-            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 34},
+            {
+                "Pair": "mesh329extra0364",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra0364",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 34,
+            },
+            {
+                "Pair": "mesh329extra04de",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra04de",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 34,
+            },
+            {
+                "Pair": "mesh329extra066f",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "066fa520a8ce62e3",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra066f",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "066fa520a8ce62e3",
+                "MeshBlock": 34,
+            },
         ]
 
         # Run all probes (16 total)
-        all_specs = sibling_probe_specs + representative_probe_specs + secondary_probe_specs + extra_position_probe_specs
+        all_specs = (
+            sibling_probe_specs + representative_probe_specs + secondary_probe_specs + extra_position_probe_specs
+        )
         seen = set()
         for spec in all_specs:
             asset_id = spec["Id"]
@@ -8035,12 +8121,19 @@ def _run_command(args: argparse.Namespace) -> None:
 
             out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
             dotnet_args = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "probe-nif-mesh",
-                "--root", str(root),
-                "--id", asset_id,
-                "--mesh-block", str(mesh_block),
-                "--out", str(out_path),
+                "--root",
+                str(root),
+                "--id",
+                asset_id,
+                "--mesh-block",
+                str(mesh_block),
+                "--out",
+                str(out_path),
             ]
             label = f"probe-nif-mesh {asset_id} mesh#{mesh_block}"
             checked_run(label, dotnet_args)
@@ -8070,12 +8163,42 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         representative_probe_specs = [
-            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 7},
-            {"Pair": "mesh305stream188", "PairLabel": "meshSize 305 shared stream@188 sibling", "Id": "04297730afc68f38", "MeshBlock": 27},
-            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 7},
-            {"Pair": "mesh321stream204", "PairLabel": "meshSize 321 shared stream@204 sibling", "Id": "03c35c3ba518aab0", "MeshBlock": 31},
-            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
-            {"Pair": "mesh329stream212", "PairLabel": "meshSize 329 shared stream@212 sibling", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
+            {
+                "Pair": "mesh305stream188",
+                "PairLabel": "meshSize 305 shared stream@188 sibling",
+                "Id": "04297730afc68f38",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh305stream188",
+                "PairLabel": "meshSize 305 shared stream@188 sibling",
+                "Id": "04297730afc68f38",
+                "MeshBlock": 27,
+            },
+            {
+                "Pair": "mesh321stream204",
+                "PairLabel": "meshSize 321 shared stream@204 sibling",
+                "Id": "03c35c3ba518aab0",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh321stream204",
+                "PairLabel": "meshSize 321 shared stream@204 sibling",
+                "Id": "03c35c3ba518aab0",
+                "MeshBlock": 31,
+            },
+            {
+                "Pair": "mesh329stream212",
+                "PairLabel": "meshSize 329 shared stream@212 sibling",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329stream212",
+                "PairLabel": "meshSize 329 shared stream@212 sibling",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 34,
+            },
         ]
 
         seen = set()
@@ -8089,12 +8212,19 @@ def _run_command(args: argparse.Namespace) -> None:
 
             out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
             dotnet_args = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "probe-nif-mesh",
-                "--root", str(root),
-                "--id", asset_id,
-                "--mesh-block", str(mesh_block),
-                "--out", str(out_path),
+                "--root",
+                str(root),
+                "--id",
+                asset_id,
+                "--mesh-block",
+                str(mesh_block),
+                "--out",
+                str(out_path),
             ]
             checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
 
@@ -8119,12 +8249,48 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         secondary_probe_specs = [
-            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
-            {"Pair": "mesh329stream212secondary", "PairLabel": "meshSize 329 secondary shared stream@212 sibling", "Id": "04de901531a091ab", "MeshBlock": 34, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 7, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh305stream188secondary", "PairLabel": "meshSize 305 secondary shared stream@188 sibling", "Id": "0d9a25c9a6af7b18", "MeshBlock": 27, "ExpectedAttributeSetCount": 0},
-            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 7, "ExpectedAttributeSetCount": 1},
-            {"Pair": "mesh321stream204secondary", "PairLabel": "meshSize 321 secondary shared stream@204 sibling", "Id": "1dc433d4d2e4db64", "MeshBlock": 31, "ExpectedAttributeSetCount": 0},
+            {
+                "Pair": "mesh329stream212secondary",
+                "PairLabel": "meshSize 329 secondary shared stream@212 sibling",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 1,
+            },
+            {
+                "Pair": "mesh329stream212secondary",
+                "PairLabel": "meshSize 329 secondary shared stream@212 sibling",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 34,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh305stream188secondary",
+                "PairLabel": "meshSize 305 secondary shared stream@188 sibling",
+                "Id": "0d9a25c9a6af7b18",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh305stream188secondary",
+                "PairLabel": "meshSize 305 secondary shared stream@188 sibling",
+                "Id": "0d9a25c9a6af7b18",
+                "MeshBlock": 27,
+                "ExpectedAttributeSetCount": 0,
+            },
+            {
+                "Pair": "mesh321stream204secondary",
+                "PairLabel": "meshSize 321 secondary shared stream@204 sibling",
+                "Id": "1dc433d4d2e4db64",
+                "MeshBlock": 7,
+                "ExpectedAttributeSetCount": 1,
+            },
+            {
+                "Pair": "mesh321stream204secondary",
+                "PairLabel": "meshSize 321 secondary shared stream@204 sibling",
+                "Id": "1dc433d4d2e4db64",
+                "MeshBlock": 31,
+                "ExpectedAttributeSetCount": 0,
+            },
         ]
 
         seen = set()
@@ -8138,12 +8304,19 @@ def _run_command(args: argparse.Namespace) -> None:
 
             out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
             dotnet_args = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "probe-nif-mesh",
-                "--root", str(root),
-                "--id", asset_id,
-                "--mesh-block", str(mesh_block),
-                "--out", str(out_path),
+                "--root",
+                str(root),
+                "--id",
+                asset_id,
+                "--mesh-block",
+                str(mesh_block),
+                "--out",
+                str(out_path),
             ]
             checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
 
@@ -8168,12 +8341,42 @@ def _run_command(args: argparse.Namespace) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         extra_position_probe_specs = [
-            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 7},
-            {"Pair": "mesh329extra0364", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "0364ea142bc00ce7", "MeshBlock": 34},
-            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 7},
-            {"Pair": "mesh329extra04de", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "04de901531a091ab", "MeshBlock": 34},
-            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 7},
-            {"Pair": "mesh329extra066f", "PairLabel": "meshSize 329 mesh#34 extra @304/#57", "Id": "066fa520a8ce62e3", "MeshBlock": 34},
+            {
+                "Pair": "mesh329extra0364",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra0364",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "0364ea142bc00ce7",
+                "MeshBlock": 34,
+            },
+            {
+                "Pair": "mesh329extra04de",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra04de",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "04de901531a091ab",
+                "MeshBlock": 34,
+            },
+            {
+                "Pair": "mesh329extra066f",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "066fa520a8ce62e3",
+                "MeshBlock": 7,
+            },
+            {
+                "Pair": "mesh329extra066f",
+                "PairLabel": "meshSize 329 mesh#34 extra @304/#57",
+                "Id": "066fa520a8ce62e3",
+                "MeshBlock": 34,
+            },
         ]
 
         seen = set()
@@ -8187,12 +8390,19 @@ def _run_command(args: argparse.Namespace) -> None:
 
             out_path = out_dir / f"probe-nif-mesh-{asset_id}-mesh{mesh_block}.json"
             dotnet_args = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "probe-nif-mesh",
-                "--root", str(root),
-                "--id", asset_id,
-                "--mesh-block", str(mesh_block),
-                "--out", str(out_path),
+                "--root",
+                str(root),
+                "--id",
+                asset_id,
+                "--mesh-block",
+                str(mesh_block),
+                "--out",
+                str(out_path),
             ]
             checked_run(f"probe-nif-mesh {asset_id} mesh#{mesh_block}", dotnet_args)
 
@@ -8288,13 +8498,15 @@ def _run_command(args: argparse.Namespace) -> None:
                 mesh_block_count = existing_data.get("MeshBlocks", existing_data.get("MeshBlockCount", 0))
                 attr_compatible = existing_data.get("AttributeCompatibleMeshes", 0)
                 zero_attr = mesh_block_count - attr_compatible
-                results.append({
-                    "step": "mesh-bindings",
-                    "status": "REUSED",
-                    "meshBlockCount": mesh_block_count,
-                    "attrCompatible": attr_compatible,
-                    "zeroAttrMeshes": zero_attr,
-                })
+                results.append(
+                    {
+                        "step": "mesh-bindings",
+                        "status": "REUSED",
+                        "meshBlockCount": mesh_block_count,
+                        "attrCompatible": attr_compatible,
+                        "zeroAttrMeshes": zero_attr,
+                    }
+                )
                 print(f"    Inventory: {mesh_block_count} meshes, {attr_compatible} attr-compatible")
             except Exception as exc:
                 print(f"    [WARN] Could not load existing inventory: {exc}")
@@ -8305,10 +8517,15 @@ def _run_command(args: argparse.Namespace) -> None:
             print("")
             print("  -- Step 1/7: Mesh-Binding Inventory --")
             dotnet_args = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "inventory-nif-mesh-bindings",
-                "--root", str(root),
-                "--out", str(inventory_path),
+                "--root",
+                str(root),
+                "--out",
+                str(inventory_path),
             ]
             if not args.full:
                 dotnet_args += ["--limit", str(args.limit)]
@@ -8319,13 +8536,15 @@ def _run_command(args: argparse.Namespace) -> None:
                 mesh_block_count = inv_data.get("MeshBlocks", inv_data.get("MeshBlockCount", 0))
                 attr_compatible = inv_data.get("AttributeCompatibleMeshes", 0)
                 zero_attr = mesh_block_count - attr_compatible
-                results.append({
-                    "step": "mesh-bindings",
-                    "status": "OK",
-                    "meshBlockCount": mesh_block_count,
-                    "attrCompatible": attr_compatible,
-                    "zeroAttrMeshes": zero_attr,
-                })
+                results.append(
+                    {
+                        "step": "mesh-bindings",
+                        "status": "OK",
+                        "meshBlockCount": mesh_block_count,
+                        "attrCompatible": attr_compatible,
+                        "zeroAttrMeshes": zero_attr,
+                    }
+                )
             except Exception as exc:
                 print(f"  [WARN] Could not parse inventory: {exc}")
                 results.append({"step": "mesh-bindings", "status": "PARSE_ERROR"})
@@ -8359,7 +8578,9 @@ def _run_command(args: argparse.Namespace) -> None:
                 family_data = load_json_report(str(family_report_path))
                 sibling_families = family_data.get("Families", [])
                 total_groups = len(sibling_families) if isinstance(sibling_families, list) else 0
-                results.append({"step": "position-source-sibling-family-report", "status": "OK", "siblingGroups": total_groups})
+                results.append(
+                    {"step": "position-source-sibling-family-report", "status": "OK", "siblingGroups": total_groups}
+                )
             else:
                 results.append({"step": "position-source-sibling-family-report", "status": "OK"})
         except Exception as exc:
@@ -8377,12 +8598,14 @@ def _run_command(args: argparse.Namespace) -> None:
                 classifier_data = load_json_report(str(classifier_report_path))
                 target_rows = len(classifier_data.get("Rows", []))
                 strict_passes = sum(1 for r in classifier_data.get("Rows", []) if r.get("Strict"))
-                results.append({
-                    "step": "residual-position-classifier-report",
-                    "status": "OK",
-                    "targetRows": target_rows,
-                    "strictPasses": strict_passes,
-                })
+                results.append(
+                    {
+                        "step": "residual-position-classifier-report",
+                        "status": "OK",
+                        "targetRows": target_rows,
+                        "strictPasses": strict_passes,
+                    }
+                )
             else:
                 results.append({"step": "residual-position-classifier-report", "status": "OK"})
         except Exception as exc:
@@ -8400,7 +8623,10 @@ def _run_command(args: argparse.Namespace) -> None:
             ("residual-lead-guard", lambda: residual_lead_guard(str(inventory_path))),
             ("position-source-sibling-lead-guard", lambda: position_source_sibling_lead_guard(str(inventory_path))),
             ("ghidra-pairing-non-export-guard", ghidra_pairing_non_export_guard),
-    ("descriptor-consistency-guard", lambda: descriptor_consistency_guard(str(Path("Exports/phase13-descriptor-consistency-baseline.json")))),
+            (
+                "descriptor-consistency-guard",
+                lambda: descriptor_consistency_guard(str(Path("Exports/phase13-descriptor-consistency-baseline.json"))),
+            ),
         ]
         for guard_name, guard_fn in guard_tasks:
             try:
@@ -8415,19 +8641,21 @@ def _run_command(args: argparse.Namespace) -> None:
                 print(f"    {guard_name}: ERROR - {exc}")
                 guard_results.append({"guard": guard_name, "passed": False, "detail": str(exc)})
 
-        results.append({
-            "step": "proof-guards",
-            "status": "OK",
-            "guards": guard_results,
-            "allPassed": all(g.get("passed", False) for g in guard_results),
-        })
+        results.append(
+            {
+                "step": "proof-guards",
+                "status": "OK",
+                "guards": guard_results,
+                "allPassed": all(g.get("passed", False) for g in guard_results),
+            }
+        )
 
         # --- Step 6: Discovery Workbench ---
 
         print()
         print("  -- Step 6/7: Discovery Workbench --")
         try:
-            discovery_workbench(str(REPO_ROOT), str(out_dir), getattr(args, 'privacy_scan', False))
+            discovery_workbench(str(REPO_ROOT), str(out_dir), getattr(args, "privacy_scan", False))
             wb_scoreboard = out_dir / "discovery-workbench-scoreboard.json"
             wb_queue = out_dir / "discovery-next-probe-queue.json"
             wb_seen = wb_scoreboard.exists()
@@ -8441,12 +8669,14 @@ def _run_command(args: argparse.Namespace) -> None:
                     wb_checks = len(wb_data.get("CrossChecks", []))
                 except Exception:
                     pass
-            results.append({
-                "step": "discovery-workbench",
-                "status": "OK",
-                "candidateRows": wb_candidates,
-                "crossChecks": wb_checks,
-            })
+            results.append(
+                {
+                    "step": "discovery-workbench",
+                    "status": "OK",
+                    "candidateRows": wb_candidates,
+                    "crossChecks": wb_checks,
+                }
+            )
             print(f"    Scoreboard: {wb_candidates} candidates, {wb_checks} cross-checks")
             if wb_queue_seen:
                 print(f"    Probe queue: {wb_queue}")
@@ -8614,11 +8844,17 @@ def _run_command(args: argparse.Namespace) -> None:
             label = f"export-obj {asset_id} (v={vertex_count})"
 
             dotnet_args: list[str] = [
-                "run", "--project", str(project), "--",
+                "run",
+                "--project",
+                str(project),
+                "--",
                 "decode-nif-geometry",
-                "--root", str(root),
-                "--id", asset_id,
-                "--mesh-block", str(mesh_block),
+                "--root",
+                str(root),
+                "--id",
+                asset_id,
+                "--mesh-block",
+                str(mesh_block),
                 "--export-obj",
             ]
 
@@ -8647,12 +8883,14 @@ def _run_command(args: argparse.Namespace) -> None:
                         stderr_lines = result.stderr.strip().splitlines()
                         for line in stderr_lines[-8:]:
                             print(f"    {line}")
-                    results.append({
-                        "id": asset_id,
-                        "v": vertex_count,
-                        "status": "FAIL",
-                        "exitCode": result.returncode,
-                    })
+                    results.append(
+                        {
+                            "id": asset_id,
+                            "v": vertex_count,
+                            "status": "FAIL",
+                            "exitCode": result.returncode,
+                        }
+                    )
                     continue
 
                 # Show dotnet output in verbose mode
@@ -8668,31 +8906,38 @@ def _run_command(args: argparse.Namespace) -> None:
 
                 if obj_exists and obj_size > 0:
                     print(f"  [OK] OBJ written: {obj_path.name} ({obj_size:,} bytes)")
-                    results.append({
-                        "id": asset_id,
-                        "v": vertex_count,
-                        "status": "OK",
-                        "objBytes": obj_size,
-                    })
+                    results.append(
+                        {
+                            "id": asset_id,
+                            "v": vertex_count,
+                            "status": "OK",
+                            "objBytes": obj_size,
+                        }
+                    )
                 else:
                     print(f"  [WARN] OBJ NOT FOUND at {obj_path}")
-                    results.append({
-                        "id": asset_id,
-                        "v": vertex_count,
-                        "status": "NO_OBJ",
-                    })
+                    results.append(
+                        {
+                            "id": asset_id,
+                            "v": vertex_count,
+                            "status": "NO_OBJ",
+                        }
+                    )
 
             except Exception as exc:
                 print(f"  [ERROR] {exc}")
                 if args.verbose:
                     import traceback
+
                     traceback.print_exc()
-                results.append({
-                    "id": asset_id,
-                    "v": vertex_count,
-                    "status": "ERROR",
-                    "error": str(exc),
-                })
+                results.append(
+                    {
+                        "id": asset_id,
+                        "v": vertex_count,
+                        "status": "ERROR",
+                        "error": str(exc),
+                    }
+                )
 
         # --- Summary ---
         print()
@@ -8877,10 +9122,7 @@ Examples:
     parser.add_argument(
         "--review-kind",
         default=None,
-        help=(
-            "ReviewKind filter for Ghidra review-rank workflows "
-            "(probes default: ghidra-only; summary default: all)"
-        ),
+        help=("ReviewKind filter for Ghidra review-rank workflows (probes default: ghidra-only; summary default: all)"),
     )
     parser.add_argument(
         "--review-report-limit",

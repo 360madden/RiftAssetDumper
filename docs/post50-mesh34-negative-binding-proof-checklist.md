@@ -88,11 +88,13 @@ Candidate-only; 329 family only. Supports M1.3 guard work on sibling source-bind
 Phase 1 (M1.1-M1.4) consolidation adds cross-family evidence to the negative-binding facts:
 
 ### 329 Family (full evidence chain)
+
 - M1.1: 12/12 paired matrix — attrSets=0 on #34 universal; @304 pos c=75 on #34; shared @212 primary.
 - M1.2: @304 deep classification — 10/10 low plaus despite c=75 role; avg ratio ~0.4× primary; non-attr-extra path (8/8 informative ERROR); 022bc2 (2/10) + c2 (9/10) magic patterns; distinct bodies; mixed endian; no simple float3 transform to primary.
 - M1.3: Sibling-binding + variant attr layout guards — 12/12 PASS (pilot 3/3 + prototype 12/12 scores 9-11/11); validation suite 9/9 PASS.
 
 ### 305 Family (cross-family validation)
+
 - M1.4: Light structural comparison — 15 groups, 30 links, #7↔#27 sibling pair; attrSets=1/#7 vs attrSets=0/#27 confirmed (same pattern as 329); shared primary position @188 (same BodyFirst16 between siblings).
 - 305 sibling #27: secondary stream @196 is **genuine UV data** (c=80, UV-range unit vectors) — different from 329 #34 @304 anomalous pos-like.
 - 305 residual: CONFIRMED NEGATIVE (magic-43606, plausible 0.9444 < 0.95, float32 = denormal garbage) — closed.

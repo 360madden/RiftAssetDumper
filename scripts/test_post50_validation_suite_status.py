@@ -69,7 +69,11 @@ def write_minimal_post50_reports(out_dir: Path) -> None:
             ],
         },
     )
-    write_json(out_dir, "position-source-sibling-probe-report.json", {"Schema": "position-source-sibling-probe-report/v1", "CandidateOnly": True})
+    write_json(
+        out_dir,
+        "position-source-sibling-probe-report.json",
+        {"Schema": "position-source-sibling-probe-report/v1", "CandidateOnly": True},
+    )
     write_json(
         out_dir,
         "position-source-sibling-extra-position-report.json",
@@ -206,11 +210,14 @@ with tempfile.TemporaryDirectory() as tmp:
     write_minimal_post50_reports(out_dir)
 
     output = StringIO()
-    with patch.object(
-        sys,
-        "argv",
-        ["rift_workflow.py", "post50-validation-suite", "--out", str(out_dir), "--list-json"],
-    ), redirect_stdout(output):
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["rift_workflow.py", "post50-validation-suite", "--out", str(out_dir), "--list-json"],
+        ),
+        redirect_stdout(output),
+    ):
         rift_workflow.main()
     status = json.loads(output.getvalue())
     jsonschema.validate(status, schema)
@@ -225,7 +232,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check("schema-backed row", rows["post50-reports-schema-backed-candidate"]["Pass"], True)
     check("promotion lock row", rows["post50-parser-export-promotion-locked"]["Pass"], True)
     check("mesh34 negative row", rows["mesh34-negative-binding-recorded"]["Pass"], True)
-    check("mesh34 complete-binding negative proof row", rows["mesh34-complete-binding-negative-proof-present"]["Pass"], True)
+    check(
+        "mesh34 complete-binding negative proof row",
+        rows["mesh34-complete-binding-negative-proof-present"]["Pass"],
+        True,
+    )
     check("residual threshold delta row", rows["residual-strict-threshold-delta-present"]["Pass"], True)
     check_contains("next action", status["NextAction"], "do not change parser/export behavior")
 

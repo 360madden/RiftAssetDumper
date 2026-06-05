@@ -27,18 +27,21 @@ Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata
 ## Proposed Milestones
 
 ### M6.1 — Descriptor Metadata in OBJ Export
+
 - [x] positionDescriptor variable captures descriptor in both experimental and attribute-set paths
 - [x] OBJ header comment: # Position descriptor: ...
 - [x] Console warning when descriptor is not float-family
 - [x] 41/41 tests pass
 
 ### M6.2 — Promotion Gate Re-Evaluation
+
 - [x] Formal re-evaluation of all 6 gates against 10 Phase 3-6 milestones
 - [x] 4 gates strengthened, gate 3 recommended for retirement (OBSOLETE), 0 cleared
 - [x] Both flags confirmed false; promotion readiness checklist updated
 - [x] Handoff: `docs/handoffs/2026-06-m6.2-promotion-gate-reevaluation.md`
 
 ### M6.3 — Descriptor-Aware Export Pre-Checks
+
 - [x] ValidateDescriptorExportPrechecks(): structural integrity (zero vertices/faces, low count) + descriptor alignment (u16, unknown, null)
 - [x] OBJ comment validation block: warnings or CLEAN stamp in exported .obj files
 - [x] Console pre-export validation summary before OBJ written
@@ -46,6 +49,7 @@ Use Phase 3-5 descriptor evidence to validate and enrich OBJ export — metadata
 - [x] Behind existing export gates; candidate-only; no decode/export behavior changed
 
 ### M6.4 — Phase 6 Exit Consolidation
+
 - [x] Comprehensive 7-part handoff covering M6.1-M6.3: `docs/handoffs/2026-06-m6.4-phase6-exit-consolidation.md`
 - [x] Cumulative phase progression table (Phase 1-6)
 - [x] Phase 7 entry assessment with 6 concrete recommendations

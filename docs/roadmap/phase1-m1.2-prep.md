@@ -6,13 +6,16 @@
 **Anti-drift**: Strictly meshSize=329 family only (light 305 comparison disallowed unless explicitly in later milestone). Everything **candidate-only**. No parser/export promotion. Use existing `python scripts/rift_workflow.py` commands. Every probe → JSON + MD + handoff contribution. Reference this prep + matrix + roadmap in all M1.2 work. High-reasoning lane per `docs/task-routing-safety-policy.md`.
 
 ## Exact Target List
-Reference the current matrix as the **exact target list**: `Exports/mesh329-family-attribute-role-matrix.json` (and .md/.csv). 
+
+Reference the current matrix as the **exact target list**: `Exports/mesh329-family-attribute-role-matrix.json` (and .md/.csv).
+
 - IDsCovered (10 total): 0364ea142bc00ce7, 04de901531a091ab, 066fa520a8ce62e3, 07c733b4eee3ed2e, 4eb7745610adf8c7, 69da9507d49c42ff, 83df87e22bff4a94, 91ead5caf689a8a5, c5a1982e92e15b7b, f2c347fe81a5e3b2.
 - All have #34 data showing the extra @304 position-like stream (attrSets=0, role=position-float3-ror1-lead c=75 on @304/#57, shared @212 primary, @296 u32 body).
 - 3 paired for contrast (UV@304 on #7 vs. extra pos@304 on #34): 0364ea142bc00ce7, 04de901531a091ab, 066fa520a8ce62e3.
 - See also curated queue (`docs/roadmap/phase1-m1.1-curated-probe-queue.md`) for overlap/rationale (top-8 wave executed on block 34; matrix is synthesized current view).
 
 ## Top 5-8 Representative IDs (from Matrix) Showing Extra @304 on #34
+
 Focus M1.2 deep dives here first (prioritized by matrix vector coverage + paired examples + @304 vec diversity; all directly from matrix #34 rows):
 
 1. 69da9507d49c42ff (#34 only in matrix; primary 77v / @304 38v pos; highest coverage, rich probe data)
@@ -27,6 +30,7 @@ Focus M1.2 deep dives here first (prioritized by matrix vector coverage + paired
 (Expand to remaining matrix IDs like 066fa520a8ce62e3 (paired low-v) and 91ead5caf689a8a5 as time allows.)
 
 ## Focused Approach for M1.2
+
 - **Probes/commands** (existing; run with --skip-build):
   - `mesh-probe --id <ID> --mesh-block 34` (baseline/refresh @304 details).
   - `attribute-extra-probe --id <ID> --mesh-block 34 --extra-offset 304` (core for deep dive on the extra stream; yields samples, histograms, index compat, position/normal vertex samples from *that* stream, body stats, role fit beyond mesh-probe).
@@ -50,6 +54,7 @@ Focus M1.2 deep dives here first (prioritized by matrix vector coverage + paired
   - Validation: GeneratedOutputGuard, schema (extend if new report), candidate-only review, explicit "Phase 1 M1.2 per roadmap" + matrix ref, no promotion.
 
 ## First Steps
+
 1. Review latest matrix + 1-2 rich probe JSONs (e.g., 69da #34 + a paired) for @304 body samples/stats.
 2. Run attribute-extra-probe batch on the 8 #34 targets (parallel where possible; --skip-build).
 3. Re-run/extend sibling-extra-pos + compare reports using matrix IDs (or Python post-process).
@@ -59,6 +64,7 @@ Focus M1.2 deep dives here first (prioritized by matrix vector coverage + paired
 **Validation gates** (repeat per run): GeneratedOutputGuard, candidate-only language, drift check (329 + matrix targets only), Phase 1 refs, schema if new reports.
 **References**: `docs/roadmap/project-roadmap.md` (Phase 1 M1.2), `current-phase.md`, matrix artifacts, M1.1 coordination/handoffs (e.g., role-analysis, draft matrix), curated queue, `scripts/rift_workflow.py` + `rift_workflow_reports.py` (probe/report logic).
 **Status**: Prep complete. Ready for main agent post-M1.1.
+
 ```
 
 ### Optional: Practical Next Steps / Improvement Ideas (Post-Prep / During M1.2)

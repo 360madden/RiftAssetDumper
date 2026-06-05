@@ -33,10 +33,7 @@ def build_project(skip_build: bool) -> bool:
     if skip_build:
         return True
     print("\nBuilding .NET project...")
-    result = subprocess.run(
-        ["dotnet", "build", SOLUTION, "--nologo"],
-        capture_output=True, text=True, timeout=120
-    )
+    result = subprocess.run(["dotnet", "build", SOLUTION, "--nologo"], capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         print("BUILD FAILED:")
         print(result.stderr[-500:] if result.stderr else "Unknown error")
@@ -56,15 +53,23 @@ def run_decode_geometry(
     # Use unique per-asset output directory to avoid overwrites (matches batch-export-264 convention)
     asset_out = os.path.join(out_dir, f"decode-nif-geometry-{asset_id}")
     cmd = [
-        "dotnet", "run", "--project", "src/RiftAssetDumper/RiftAssetDumper.csproj",
-        "--no-build", "--",
+        "dotnet",
+        "run",
+        "--project",
+        "src/RiftAssetDumper/RiftAssetDumper.csproj",
+        "--no-build",
+        "--",
         "decode-nif-geometry",
-        "--id", asset_id,
-        "--mesh-block", str(mesh_block),
+        "--id",
+        asset_id,
+        "--mesh-block",
+        str(mesh_block),
         "--experimental-position-source",
         "--export-obj",
-        "--root", project_root,
-        "--out", asset_out,
+        "--root",
+        project_root,
+        "--out",
+        asset_out,
     ]
 
     if dry_run:
@@ -149,11 +154,13 @@ def main() -> int:
         if dry_run:
             print(f"\n  [DRY RUN] Would export: {pair['float2_id']} MB={pair['float2_mb']}")
             print(f"    (paired with float3 MB={pair['float3_mb']} in {pair['archive']})")
-            results.append({
-                "id": pair["float2_id"],
-                "mb": pair["float2_mb"],
-                "dry_run": True,
-            })
+            results.append(
+                {
+                    "id": pair["float2_id"],
+                    "mb": pair["float2_mb"],
+                    "dry_run": True,
+                }
+            )
             continue
 
         print(f"\n  Exporting: {pair['float2_id'][:16]} MB={pair['float2_mb']}", end=" ")
@@ -211,7 +218,9 @@ def main() -> int:
     if failures:
         print("\n  Failed pairs:")
         for fail in failures:
-            print(f"    {fail['id'][:16]} MB={fail['mb']}: {fail.get('error', 'exit=' + str(fail.get('returncode', '?')))}")
+            print(
+                f"    {fail['id'][:16]} MB={fail['mb']}: {fail.get('error', 'exit=' + str(fail.get('returncode', '?')))}"
+            )
 
     print(SEP)
     print("DONE")

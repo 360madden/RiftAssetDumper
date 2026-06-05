@@ -59,6 +59,41 @@
       "description": "Large-file hex editor — inspect multi-GB TWAD archives, find magic bytes and compression boundaries",
       "installed": false,
       "category": "hex-editor"
+    },
+    "gitleaks": {
+      "path": "..\\Tools\\gitleaks\\gitleaks.exe",
+      "description": "Secret and path leak scanner — prevents accidental game paths or credentials in commits",
+      "installed": true,
+      "category": "security",
+      "home": "..\\Tools\\gitleaks"
+    },
+    "pre-commit": {
+      "path": "..\\Tools\\pre-commit\\pre-commit.cmd",
+      "description": "Git hook manager — auto-enforces ruff, mypy, dotnet format, gitleaks, and markdownlint before every commit",
+      "installed": true,
+      "category": "workflow",
+      "home": "..\\Tools\\pre-commit"
+    },
+    "semgrep": {
+      "path": "..\\Tools\\semgrep\\semgrep.cmd",
+      "description": "Static analysis with custom rules — C# stream parsing safety rules for Program.cs binary decoding",
+      "installed": true,
+      "category": "static-analysis",
+      "home": "..\\Tools\\semgrep"
+    },
+    "markdownlint": {
+      "path": "..\\Tools\\markdownlint-cli2\\markdownlint-cli2.cmd",
+      "description": "Markdown linter — enforces consistent docs formatting across 30+ markdown files",
+      "installed": true,
+      "category": "linter",
+      "home": "..\\Tools\\markdownlint-cli2"
+    },
+    "sysinternals": {
+      "path": "..\\Tools\\SysinternalsSuite\\Procmon64.exe",
+      "description": "Process Monitor — observe RIFT client file I/O at runtime (manual use, read-only)",
+      "installed": true,
+      "category": "runtime-analysis",
+      "home": "..\\Tools\\SysinternalsSuite"
     }
   }
 }

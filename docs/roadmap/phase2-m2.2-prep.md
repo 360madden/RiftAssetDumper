@@ -48,6 +48,7 @@ NiMesh(block=X, attribute=N) → NiDataStream(block=Y, offset=Z)
 ```
 
 Where:
+
 - **X** = NiMesh block index within the NIF
 - **N** = mesh attribute index (0=position, 1=normal, 2=UV, etc.)
 - **Y** = NiDataStream block index (the data provider)
@@ -71,6 +72,7 @@ From the M1.1 matrix (all 12 IDs consistent):
 ### Step 1: Formalize binding proof schema
 
 Create a machine-readable binding proof format:
+
 - Per-NIF, per-mesh-block: list of (attribute, stream_block, offset, role, confidence)
 - Cross-reference with descriptor bytes at stream block offset 24
 - Validate: do all position bindings target blocks with descriptor `37 04 03 00`?
@@ -78,6 +80,7 @@ Create a machine-readable binding proof format:
 ### Step 2: Validate bindings against Phase 1 evidence
 
 For the 12 matrix IDs:
+
 - Assert: mesh#7 attribute 0 → block #28 (12/12)
 - Assert: mesh#7 attribute 1 → block #29 (12/12)
 - Assert: mesh#7 attribute 2 → block #36 (12/12)
@@ -87,6 +90,7 @@ For the 12 matrix IDs:
 ### Step 3: Cross-validate with descriptor evidence
 
 For each binding pair (mesh_block, stream_block):
+
 - Read the NiDataStream descriptor at stream block offset 24
 - Assert descriptor byte 3 = 0x00 (confirmed 184/184)
 - Hypothesis: all position/normal/UV bindings target blocks with `37 04 03 00`
@@ -104,6 +108,7 @@ For each binding pair (mesh_block, stream_block):
 | UV-like (#27) | #27 | #40 | @196 | uv-float2-ror1-lead (80) | Representative (candidate-only) |
 
 Cross-family validation:
+
 - 329: mesh#7 ↔ mesh#34 share block #28 for position
 - 305: mesh#7 ↔ mesh#27 share block #21 for position
 - Validate: in both families, the sibling shares the SAME NiDataStream block for position
@@ -112,6 +117,7 @@ Cross-family validation:
 ### Step 5: Produce M2.2 handoff with binding tables
 
 Document per-family, per-ID binding proofs with:
+
 - Binding pair table (mesh attribute → stream block → role)
 - Cross-family comparison
 - Descriptor byte cross-reference

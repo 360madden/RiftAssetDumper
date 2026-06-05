@@ -332,7 +332,9 @@ with TemporaryDirectory() as temp_dir:
     attr_report = json.loads(attr_json.read_text(encoding="utf-8"))
     check_contains("ghidra attribute report console", attr_buffer.getvalue(), "GhidraAttributeCandidateReport passed")
     check_contains("ghidra attribute report candidate-only", str(attr_report.get("CandidateOnly")), "True")
-    check_contains("ghidra attribute report complete group", json.dumps(attr_report), "CompletePositionNormalUvCandidate")
+    check_contains(
+        "ghidra attribute report complete group", json.dumps(attr_report), "CompletePositionNormalUvCandidate"
+    )
     check_contains("ghidra attribute markdown", attr_md.read_text(encoding="utf-8"), "Complete position/normal/UV")
     attr_schema = json.loads(Path("docs/schemas/ghidra-attribute-candidate-v1.schema.json").read_text(encoding="utf-8"))
     check_contains(
@@ -341,7 +343,9 @@ with TemporaryDirectory() as temp_dir:
         str(attr_report["SchemaVersion"]),
     )
     check_contains("ghidra attribute schema groups", json.dumps(attr_schema.get("required", [])), "Groups")
-    check_contains("ghidra attribute schema completion marker", json.dumps(attr_schema), "CompletePositionNormalUvCandidate")
+    check_contains(
+        "ghidra attribute schema completion marker", json.dumps(attr_schema), "CompletePositionNormalUvCandidate"
+    )
     jsonschema.validate(attr_report, attr_schema)
     print("  PASS: ghidra attribute schema validation")
 
@@ -485,9 +489,7 @@ with TemporaryDirectory() as temp_dir_name:
         "## Probe rows",
     )
     sibling_schema = json.loads(
-        Path("docs/schemas/position-source-sibling-probe-report-v1.schema.json").read_text(
-            encoding="utf-8"
-        )
+        Path("docs/schemas/position-source-sibling-probe-report-v1.schema.json").read_text(encoding="utf-8")
     )
     check_contains(
         "sibling schema version",
@@ -561,7 +563,7 @@ with TemporaryDirectory() as temp_dir:
                                     "PassesBasicReview": True,
                                     "UvRangeRatio": 1.0,
                                 },
-                            }
+                            },
                         ],
                         "AttributeSets": [],
                         "PayloadWindows": [],

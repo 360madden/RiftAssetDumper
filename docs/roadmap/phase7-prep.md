@@ -52,6 +52,7 @@ Convert the 18-milestone cumulative evidence (Phases 2-6) into explicit promotio
 **Gate 4 now CLEARED** ✅ — third gate clearance in Phase 7.
 
 ### M7.4 — Formal Decision Record + Gate 5 Reframing
+
 - [x] Completed first formal decision record per 11-part template: `docs/handoffs/2026-06-m7.4-formal-decision-record.md`
 - [x] 7 evidence gates evaluated against cumulative Phase 2-7 evidence (20 milestones)
 - [x] Gate 5 reframing recommendation documented: accept attrSets=0 as architectural norm
@@ -60,6 +61,7 @@ Convert the 18-milestone cumulative evidence (Phases 2-6) into explicit promotio
 - [x] Both promotion flags confirmed false; all negative checks passed
 
 ### M7.5 — Phase 7 Exit Consolidation
+
 - [x] Comprehensive 7-part handoff: `docs/handoffs/2026-06-m7.5-phase7-exit-consolidation.md`
 - [x] 3 gates cleared, 1 retired, gate 5 reframing documented
 - [x] Cumulative 7-phase progression table

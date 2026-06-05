@@ -1,62 +1,64 @@
 #!/usr/bin/env python3
 """Edit Program.cs to add ExperimentalPositionSource flag."""
 
-with open('src/RiftAssetDumper/Program.cs', encoding='utf-8') as f:
+with open("src/RiftAssetDumper/Program.cs", encoding="utf-8") as f:
     content = f.read()
 
 changes = 0
 
 # 1. AppOptions record - add ExperimentalPositionSource field
-old1 = '      bool Experimental,\n      bool WriteObj)\n  {'
-new1 = '      bool Experimental,\n      bool ExperimentalPositionSource,\n      bool WriteObj)\n  {'
+old1 = "      bool Experimental,\n      bool WriteObj)\n  {"
+new1 = "      bool Experimental,\n      bool ExperimentalPositionSource,\n      bool WriteObj)\n  {"
 if old1 in content:
     content = content.replace(old1, new1, 1)
     changes += 1
-    print('OK: AppOptions record')
+    print("OK: AppOptions record")
 else:
-    idx = content.find('      bool Experimental,')
-    print(f'FAIL AppOptions record at {idx}')
+    idx = content.find("      bool Experimental,")
+    print(f"FAIL AppOptions record at {idx}")
     if idx >= 0:
-        print(repr(content[idx:idx+80]))
+        print(repr(content[idx : idx + 80]))
 
 # 2. Var declaration
-old2 = '      var experimental = false;\n      var writeObj = false;'
-new2 = '      var experimental = false;\n      var experimentalPositionSource = false;\n      var writeObj = false;'
+old2 = "      var experimental = false;\n      var writeObj = false;"
+new2 = "      var experimental = false;\n      var experimentalPositionSource = false;\n      var writeObj = false;"
 if old2 in content:
     content = content.replace(old2, new2, 1)
     changes += 1
-    print('OK: var declaration')
+    print("OK: var declaration")
 else:
-    idx = content.find('var experimental = false;')
-    print(f'FAIL var declaration at {idx}')
+    idx = content.find("var experimental = false;")
+    print(f"FAIL var declaration at {idx}")
     if idx >= 0:
-        print(repr(content[idx:idx+80]))
+        print(repr(content[idx : idx + 80]))
 
 # 3. Case parsing - insert after --experimental case
-old3_search = 'case "--experimental":\n            experimental = true;\n            break;\n          case "--write-obj"'
+old3_search = (
+    'case "--experimental":\n            experimental = true;\n            break;\n          case "--write-obj"'
+)
 idx = content.find(old3_search)
 if idx >= 0:
-    end_idx = content.find('\n            break;', idx + len(old3_search))
-    old3 = content[idx:end_idx + 16]
+    end_idx = content.find("\n            break;", idx + len(old3_search))
+    old3 = content[idx : end_idx + 16]
     new3 = old3.replace(
         'case "--experimental":\n            experimental = true;\n            break;\n          case "--write-obj"',
-        'case "--experimental":\n            experimental = true;\n            break;\n          case "--experimental-position-source":\n            experimentalPositionSource = true;\n            break;\n          case "--write-obj"'
+        'case "--experimental":\n            experimental = true;\n            break;\n          case "--experimental-position-source":\n            experimentalPositionSource = true;\n            break;\n          case "--write-obj"',
     )
-    content = content[:idx] + new3 + content[end_idx + 16:]
+    content = content[:idx] + new3 + content[end_idx + 16 :]
     changes += 1
-    print('OK: case parsing')
+    print("OK: case parsing")
 else:
-    print('FAIL case parsing')
+    print("FAIL case parsing")
 
 # 4. Constructor call
-old4 = '          experimental,\n          writeObj);'
-new4 = '          experimental,\n          experimentalPositionSource,\n          writeObj);'
+old4 = "          experimental,\n          writeObj);"
+new4 = "          experimental,\n          experimentalPositionSource,\n          writeObj);"
 if content.count(old4) == 1:
     content = content.replace(old4, new4, 1)
     changes += 1
-    print('OK: constructor')
+    print("OK: constructor")
 else:
-    print(f'FAIL constructor count={content.count(old4)}')
+    print(f"FAIL constructor count={content.count(old4)}")
 
 # 5. Help usage line
 old5 = 'Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-nif-geometry --root <SourceFolder> --id <16hex> --mesh-block <n> [--write-obj] [--experimental]");'
@@ -64,12 +66,12 @@ new5 = 'Console.WriteLine("  dotnet run --project src/RiftAssetDumper -- decode-
 if old5 in content:
     content = content.replace(old5, new5, 1)
     changes += 1
-    print('OK: help usage')
+    print("OK: help usage")
 else:
-    idx = content.find('decode-nif-geometry --root')
-    print(f'FAIL help usage at {idx}')
+    idx = content.find("decode-nif-geometry --root")
+    print(f"FAIL help usage at {idx}")
     if idx >= 0:
-        print(repr(content[idx-5:idx+150]))
+        print(repr(content[idx - 5 : idx + 150]))
 
 # 6. Help description
 old6 = 'Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file");'
@@ -77,12 +79,12 @@ new6 = 'Console.WriteLine("  --experimental-position-source"); Console.WriteLine
 if old6 in content:
     content = content.replace(old6, new6, 1)
     changes += 1
-    print('OK: help description')
+    print("OK: help description")
 else:
-    idx = content.find('--write-obj')
-    print(f'FAIL help description at {idx}')
+    idx = content.find("--write-obj")
+    print(f"FAIL help description at {idx}")
     if idx >= 0:
-        print(repr(content[idx-30:idx+100]))
+        print(repr(content[idx - 30 : idx + 100]))
 
 # 7. DecodeNifGeometry - modify the no-attribute-sets block (first occurrence)
 old7 = '    if (attributeSets.Count == 0)\n    {\n      Console.Error.WriteLine("ERROR: no attribute sets found for this mesh.");\n      return 1;\n    }'
@@ -93,15 +95,15 @@ if content.count(old7) == 2:
     if old7_ctx in content:
         content = content.replace(old7_ctx, new7_ctx, 1)
         changes += 1
-        print('OK: DecodeNifGeometry fallback')
+        print("OK: DecodeNifGeometry fallback")
     else:
-        print('FAIL DecodeNifGeometry fallback - context not found')
-        idx = content.find('    var blocksByIndex = header.Blocks.ToDictionary')
+        print("FAIL DecodeNifGeometry fallback - context not found")
+        idx = content.find("    var blocksByIndex = header.Blocks.ToDictionary")
         if idx >= 0:
-            print(repr(content[idx:idx+250]))
+            print(repr(content[idx : idx + 250]))
 else:
-    print(f'FAIL: attrsets block count = {content.count(old7)}')
+    print(f"FAIL: attrsets block count = {content.count(old7)}")
 
-with open('src/RiftAssetDumper/Program.cs', 'w', encoding='utf-8') as f:
+with open("src/RiftAssetDumper/Program.cs", "w", encoding="utf-8") as f:
     f.write(content)
-print(f'\nDone: {changes} changes applied')
+print(f"\nDone: {changes} changes applied")

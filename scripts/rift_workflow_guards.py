@@ -132,9 +132,7 @@ def _extract_csharp_static_member(source: str, member_name: str) -> str:
     """
     lines = source.splitlines(keepends=True)
     start = -1
-    declaration_pattern = re.compile(
-        rf"^  (?:private|internal|public)\s+static\b.*\b{re.escape(member_name)}\s*\("
-    )
+    declaration_pattern = re.compile(rf"^  (?:private|internal|public)\s+static\b.*\b{re.escape(member_name)}\s*\(")
     next_member_pattern = re.compile(r"^  (?:private|internal|public)\s+static\b")
     for index, line in enumerate(lines):
         if declaration_pattern.search(line):
@@ -159,11 +157,7 @@ def ghidra_pairing_non_export_guard(program_path: str | Path | None = None) -> N
     code must continue to use the legacy parser-derived stream summaries until
     a separate promotion proof is added.
     """
-    path = (
-        Path(program_path)
-        if program_path is not None
-        else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
-    )
+    path = Path(program_path) if program_path is not None else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
     source = path.read_text(encoding="utf-8-sig")
 
     failures: list[str] = []
@@ -207,11 +201,7 @@ def nidatastream_parser_export_non_consumption_guard(program_path: str | Path | 
     consumers must keep reading the legacy RoleStats/stream-body interpretation until a
     separate positive promotion proof updates this guard.
     """
-    path = (
-        Path(program_path)
-        if program_path is not None
-        else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
-    )
+    path = Path(program_path) if program_path is not None else REPO_ROOT / "src" / "RiftAssetDumper" / "Program.cs"
     source = path.read_text(encoding="utf-8-sig")
 
     failures: list[str] = []
@@ -233,9 +223,7 @@ def nidatastream_parser_export_non_consumption_guard(program_path: str | Path | 
         "RoleStats: roleStats",
         "GhidraRoleStats: ghidraRoleStats",
     )
-    missing_summary_markers = [
-        marker for marker in required_summary_markers if marker not in stream_summary_body
-    ]
+    missing_summary_markers = [marker for marker in required_summary_markers if marker not in stream_summary_body]
     if missing_summary_markers:
         failures.append(
             "BuildNifMeshBoundStreamSummaries: missing canonical legacy/Ghidra role separation markers: "
@@ -248,21 +236,17 @@ def nidatastream_parser_export_non_consumption_guard(program_path: str | Path | 
         "s.RoleStats.IndexMax is not null",
         "s.RoleStats.VertexCountCandidates.Count > 0",
     )
-    missing_pairing_markers = [
-        marker for marker in required_pairing_markers if marker not in pairing_body
-    ]
+    missing_pairing_markers = [marker for marker in required_pairing_markers if marker not in pairing_body]
     if missing_pairing_markers:
         failures.append(
-            "FindNifMeshProbePairings: missing legacy RoleStats pairing markers: "
-            + ", ".join(missing_pairing_markers)
+            "FindNifMeshProbePairings: missing legacy RoleStats pairing markers: " + ", ".join(missing_pairing_markers)
         )
     if "s.GhidraRoleStats" in pairing_body or ".GhidraRoleStats" in pairing_body:
         failures.append("FindNifMeshProbePairings: must not consume GhidraRoleStats for default pairings.")
 
     assert_proof_guard(
         not failures,
-        "NiDataStream candidate layout/Ghidra evidence is wired into parser/export consumers: "
-        + "; ".join(failures),
+        "NiDataStream candidate layout/Ghidra evidence is wired into parser/export consumers: " + "; ".join(failures),
     )
 
     print("\n--- NiDataStreamParserExportNonConsumptionGuard parser/export isolation guard")
@@ -328,9 +312,7 @@ def ghidra_attribute_candidate_guard(report_path: str | Path) -> None:
     if not isinstance(groups, list):
         raise ValueError("GhidraAttributeCandidateGuard failed: Groups is not an array.")
     complete_groups = [
-        group
-        for group in groups
-        if isinstance(group, dict) and group.get("CompletePositionNormalUvCandidate") is True
+        group for group in groups if isinstance(group, dict) and group.get("CompletePositionNormalUvCandidate") is True
     ]
     assert_proof_guard(
         len(complete_groups) == 0,
@@ -341,6 +323,7 @@ def ghidra_attribute_candidate_guard(report_path: str | Path) -> None:
     for key, expected_value in expected.items():
         print(f"  {key}: {expected_value}")
     print("GhidraAttributeCandidateGuard passed: current Ghidra-only candidates remain partial/report-only.")
+
 
 # ============================================================================
 # AttributeExtraProofGuard  (inventory-level, rewritten for C# v2 output)
@@ -423,8 +406,7 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
 
     # Filter to @264 extra streams
     at_264: list[dict[str, Any]] = [
-        g for g in extra_streams
-        if isinstance(g, dict) and json_value_or_dash(g, "ExtraMeshPayloadOffset") == 264
+        g for g in extra_streams if isinstance(g, dict) and json_value_or_dash(g, "ExtraMeshPayloadOffset") == 264
     ]
 
     assert_proof_guard(
@@ -474,7 +456,8 @@ def attribute_extra_proof_guard(report_path: str | Path) -> None:
             f"{context} ExtraDeclaredPayloadBytes {extra_bytes} < {expected['MinExtraBytes']}.",
         )
         assert_proof_guard(
-            topology in (
+            topology
+            in (
                 "implicit-strip-or-quad-candidate",
                 "implicit-triangle-strip-or-fan-candidate",
                 "explicit-index-candidate-present",
@@ -535,14 +518,34 @@ def _attribute_extra_proof_guard_fitness(
 
     # Known @264 extra-stream groups (must match expected_groups in the main guard)
     expected_groups = [
-        {"MeshSize": 297, "VertexCount": 128, "ExtraDeclaredPayloadBytes": 906, "MinCount": 2,
-         "Topology": "explicit-index-candidate-present"},
-        {"MeshSize": 297, "VertexCount": 95, "ExtraDeclaredPayloadBytes": 360, "MinCount": 1,
-         "Topology": "explicit-index-candidate-present"},
-        {"MeshSize": 297, "VertexCount": 80, "ExtraDeclaredPayloadBytes": 240, "MinCount": 1,
-         "Topology": "explicit-index-candidate-present"},
-        {"MeshSize": 297, "VertexCount": 64, "ExtraDeclaredPayloadBytes": 252, "MinCount": 1,
-         "Topology": "explicit-index-candidate-present"},
+        {
+            "MeshSize": 297,
+            "VertexCount": 128,
+            "ExtraDeclaredPayloadBytes": 906,
+            "MinCount": 2,
+            "Topology": "explicit-index-candidate-present",
+        },
+        {
+            "MeshSize": 297,
+            "VertexCount": 95,
+            "ExtraDeclaredPayloadBytes": 360,
+            "MinCount": 1,
+            "Topology": "explicit-index-candidate-present",
+        },
+        {
+            "MeshSize": 297,
+            "VertexCount": 80,
+            "ExtraDeclaredPayloadBytes": 240,
+            "MinCount": 1,
+            "Topology": "explicit-index-candidate-present",
+        },
+        {
+            "MeshSize": 297,
+            "VertexCount": 64,
+            "ExtraDeclaredPayloadBytes": 252,
+            "MinCount": 1,
+            "Topology": "explicit-index-candidate-present",
+        },
     ]
 
     total_count = 0
@@ -595,8 +598,7 @@ def _attribute_extra_proof_guard_fitness(
 
         assert_proof_guard(
             raw_pref >= sub1_pref,
-            f"{context} subtract-one unexpectedly preferred over raw-zero-based "
-            f"(raw={raw_pref}, sub1={sub1_pref}).",
+            f"{context} subtract-one unexpectedly preferred over raw-zero-based (raw={raw_pref}, sub1={sub1_pref}).",
         )
         assert_proof_guard(
             preferred in ("raw-zero-based", "tie"),
@@ -612,8 +614,7 @@ def _attribute_extra_proof_guard_fitness(
         if seg_delta is not None:
             assert_proof_guard(
                 isinstance(seg_delta, (int, float)) and float(seg_delta) > 0,
-                f"{context} segmented edge delta ({seg_delta}) is not positive "
-                f"(raw should beat subtract-one).",
+                f"{context} segmented edge delta ({seg_delta}) is not positive (raw should beat subtract-one).",
             )
         if area_gap is not None:
             assert_proof_guard(
@@ -783,8 +784,7 @@ def attribute_extra_sibling_proof_guard(
     is_body_role = role == "uint16-compatible-body"
     assert_proof_guard(
         is_index_role or is_body_role,
-        f"{context} extra role changed to {role} "
-        f"(expected index-u16be-strip-lead or uint16-compatible-body).",
+        f"{context} extra role changed to {role} (expected index-u16be-strip-lead or uint16-compatible-body).",
     )
 
     # --- role candidates & evidence ---
@@ -843,10 +843,7 @@ def attribute_extra_sibling_proof_guard(
     )
     body_first128 = str(required_json_value(extra, "BodyFirst128", context))
     assert_proof_guard(
-        body_first128.startswith(
-            "0001000200020001000300040005000600060005000700080009000a"
-            "000b000c000d000e000f0010"
-        ),
+        body_first128.startswith("0001000200020001000300040005000600060005000700080009000a000b000c000d000e000f0010"),
         f"{context} index prefix (first 128) changed.",
     )
 
@@ -922,8 +919,7 @@ def attribute_extra_sibling_proof_guard(
             f"— expected body-level overflow for index stream.",
         )
         assert_proof_guard(
-            str(required_json_value(topology, "PrimaryTopology", context))
-            == "explicit-index-candidate-present",
+            str(required_json_value(topology, "PrimaryTopology", context)) == "explicit-index-candidate-present",
             f"{context} PrimaryTopology changed for index-role asset.",
         )
         assert_proof_guard(
@@ -1277,10 +1273,7 @@ def attribute_extra_sibling_proof_guard(
             f"sub1Area={fitness_summary['SubtractOneAreaMedian']:.6g} "
             f"segments=77 bridges=51"
         )
-        print(
-            f"AttributeExtraSiblingProofGuard {asset_id}: passed — "
-            f"full index-compatibility proof signals intact."
-        )
+        print(f"AttributeExtraSiblingProofGuard {asset_id}: passed — full index-compatibility proof signals intact.")
     else:
         print(
             f"  role={role} u16Count={required_json_integer(body_stats, 'UInt16Count', context)} "
@@ -1306,9 +1299,7 @@ def attribute_extra_sibling_proof_guard(
         "VertexCount": required_json_integer(extra, "VertexCount", context),
         "PrimaryTopology": str(required_json_value(topology, "PrimaryTopology", context)),
         "TriangleStripCandidate": required_json_boolean(topology, "TriangleStripCandidate", context),
-        "TriangleStripTriangleCount": required_json_integer(
-            topology, "TriangleStripTriangleCount", context
-        ),
+        "TriangleStripTriangleCount": required_json_integer(topology, "TriangleStripTriangleCount", context),
     }
     if is_index_role:
         result.update(fitness_summary)
@@ -1456,10 +1447,7 @@ def usage_access_correlation_guard(report_path: str | Path) -> None:
 
     # --- Report ---
     print("\n--- UsageAccessCorrelationGuard NiDataStream usage/access correlation guard")
-    print(
-        f"{'Family':<34} {'Role':<30} "
-        f"{'Usage':<6} {'Access':<7} {'Count':>6} {'HighConf':>8} {'Min':>6}"
-    )
+    print(f"{'Family':<34} {'Role':<30} {'Usage':<6} {'Access':<7} {'Count':>6} {'HighConf':>8} {'Min':>6}")
     print("-" * 97)
     for r in sorted(results, key=lambda x: -x["Count"]):
         print(
@@ -1564,18 +1552,14 @@ def position_source_sibling_lead_guard(report_path: str | Path) -> None:
             f"{ctx} usage/access changed from 1/19 to {usage}/{access}.",
         )
 
-        mesh_blocks: list[int] = [
-            safe_int(mb) for mb in (group.get("MeshBlockIndices") or [])
-        ]
+        mesh_blocks: list[int] = [safe_int(mb) for mb in (group.get("MeshBlockIndices") or [])]
         for expected in expected_mesh_blocks:
             assert_proof_guard(
                 expected in mesh_blocks,
                 f"{ctx} missing mesh#{expected}.",
             )
 
-        offsets: list[int] = [
-            safe_int(mo) for mo in (group.get("MeshPayloadOffsets") or [])
-        ]
+        offsets: list[int] = [safe_int(mo) for mo in (group.get("MeshPayloadOffsets") or [])]
         for expected in expected_offsets:
             assert_proof_guard(
                 expected in offsets,
@@ -1617,19 +1601,13 @@ def position_source_sibling_lead_guard(report_path: str | Path) -> None:
     for g in sorted_groups:
         if not isinstance(g, dict):
             continue
-        mesh_blocks = [
-            f"mesh#{safe_int(mb)}"
-            for mb in (g.get("MeshBlockIndices") or [])
-        ]
+        mesh_blocks = [f"mesh#{safe_int(mb)}" for mb in (g.get("MeshBlockIndices") or [])]
         mesh_sizes_raw = g.get("MeshSizes") or []
         mesh_sizes = [
             f"{d.get('Size', '?') if isinstance(d, dict) else '?'}:{d.get('Count', '?') if isinstance(d, dict) else '?'}"
             for d in mesh_sizes_raw
         ]
-        mesh_offsets = [
-            f"stream@{safe_int(mo)}"
-            for mo in (g.get("MeshPayloadOffsets") or [])
-        ]
+        mesh_offsets = [f"stream@{safe_int(mo)}" for mo in (g.get("MeshPayloadOffsets") or [])]
         rows.append(
             {
                 "IdPrefix": str(json_value_or_dash(g, "IdPrefix")),
@@ -1641,8 +1619,7 @@ def position_source_sibling_lead_guard(report_path: str | Path) -> None:
                 "MeshSizes": ", ".join(mesh_sizes),
                 "MeshPayloadOffsets": ", ".join(mesh_offsets),
                 "UsageAccess": (
-                    f"{json_value_or_dash(g, 'DataStreamUsage')}/"
-                    f"{json_value_or_dash(g, 'DataStreamAccess')}"
+                    f"{json_value_or_dash(g, 'DataStreamUsage')}/{json_value_or_dash(g, 'DataStreamAccess')}"
                 ),
                 "Role": str(json_value_or_dash(g, "Role")),
             }
@@ -1720,8 +1697,7 @@ def position_source_sibling_lead_guard(report_path: str | Path) -> None:
     # --- Console output ---
     print("\n--- PositionSourceSiblingLeadGuard parser-derived sibling source leads")
     print(
-        f"{'IdPrefix':<18} {'Block':>6} {'Payload':>8} {'Count':>6} "
-        f"{'Distinct':>8} {'MeshBlocks':<24} {'Offsets':<24}"
+        f"{'IdPrefix':<18} {'Block':>6} {'Payload':>8} {'Count':>6} {'Distinct':>8} {'MeshBlocks':<24} {'Offsets':<24}"
     )
     print("-" * 100)
     for row in rows:
@@ -1786,8 +1762,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
         matches = [t for t in targets if safe_int(t.get("MeshSize")) == mesh_size]
         assert_proof_guard(
             len(matches) == 1,
-            f"expected one ResidualTargetMeshSizes entry for meshSize={mesh_size}, "
-            f"found {len(matches)}.",
+            f"expected one ResidualTargetMeshSizes entry for meshSize={mesh_size}, found {len(matches)}.",
         )
 
     # --- Find specific targets ---
@@ -1822,7 +1797,8 @@ def residual_lead_guard(report_path: str | Path) -> None:
 
     # --- meshSize=305 position-like leads (stream@188, POSITION, plausible >= 0.80) ---
     position_like: list[dict[str, Any]] = [
-        s for s in streams
+        s
+        for s in streams
         if safe_int(s.get("MeshSize")) == 305
         and safe_int(s.get("MeshPayloadOffset")) == 188
         and str(json_value_or_dash(s, "StringValue")) == "POSITION"
@@ -1838,7 +1814,8 @@ def residual_lead_guard(report_path: str | Path) -> None:
 
     # --- meshSize=321 noise-row guard (stream@204, payload=40, POSITION, usage=1, access=19) ---
     mesh321_noise_rows: list[dict[str, Any]] = [
-        s for s in streams
+        s
+        for s in streams
         if safe_int(s.get("MeshSize")) == 321
         and safe_int(s.get("MeshPayloadOffset")) == 204
         and safe_int(s.get("DeclaredPayloadBytes")) == 40
@@ -1860,9 +1837,12 @@ def residual_lead_guard(report_path: str | Path) -> None:
     assert_proof_guard(
         safe_int(mesh321_noise.get("Count")) == 1
         and str(json_value_or_dash(mesh321_noise, "Role")) == "strided-body"
-        and mesh321_plausible is not None and mesh321_plausible <= 0.30
-        and mesh321_nonzero is not None and mesh321_nonzero <= 0.34
-        and mesh321_extent is not None and abs(mesh321_extent) <= 0.000001
+        and mesh321_plausible is not None
+        and mesh321_plausible <= 0.30
+        and mesh321_nonzero is not None
+        and mesh321_nonzero <= 0.34
+        and mesh321_extent is not None
+        and abs(mesh321_extent) <= 0.000001
         and str(json_value_or_dash(mesh321_noise, "BodyFirst16")).lower().startswith("ffff80ff"),
         "meshSize=321 stream@204 no longer matches the low-signal sentinel/noise "
         "profile; review before treating it as side-stream noise.",
@@ -1870,7 +1850,8 @@ def residual_lead_guard(report_path: str | Path) -> None:
 
     # --- meshSize=329 POSITION noise-row guard (stream@212, POSITION, usage=1, access=19) ---
     mesh329_position_rows: list[dict[str, Any]] = [
-        s for s in streams
+        s
+        for s in streams
         if safe_int(s.get("MeshSize")) == 329
         and safe_int(s.get("MeshPayloadOffset")) == 212
         and str(json_value_or_dash(s, "StringValue")) == "POSITION"
@@ -1879,8 +1860,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
     ]
     assert_proof_guard(
         len(mesh329_position_rows) == 1,
-        f"expected exactly one meshSize=329 POSITION residual review row, "
-        f"found {len(mesh329_position_rows)}.",
+        f"expected exactly one meshSize=329 POSITION residual review row, found {len(mesh329_position_rows)}.",
     )
 
     mesh329_position = mesh329_position_rows[0]
@@ -1892,10 +1872,14 @@ def residual_lead_guard(report_path: str | Path) -> None:
     noise_check_329 = (
         safe_int(mesh329_position.get("Count")) >= 3
         and str(json_value_or_dash(mesh329_position, "Role")) == "strided-body"
-        and mesh329_finite is not None and abs(mesh329_finite) <= 0.000001
-        and mesh329_plausible is not None and abs(mesh329_plausible) <= 0.000001
-        and mesh329_nonzero is not None and abs(mesh329_nonzero) <= 0.000001
-        and mesh329_extent is not None and abs(mesh329_extent) <= 0.000001
+        and mesh329_finite is not None
+        and abs(mesh329_finite) <= 0.000001
+        and mesh329_plausible is not None
+        and abs(mesh329_plausible) <= 0.000001
+        and mesh329_nonzero is not None
+        and abs(mesh329_nonzero) <= 0.000001
+        and mesh329_extent is not None
+        and abs(mesh329_extent) <= 0.000001
     )
     assert_proof_guard(
         noise_check_329,
@@ -1905,7 +1889,8 @@ def residual_lead_guard(report_path: str | Path) -> None:
 
     # --- meshSize=329 COLOR repeated-pattern rows ---
     mesh329_color_pattern_rows: list[dict[str, Any]] = [
-        s for s in streams
+        s
+        for s in streams
         if safe_int(s.get("MeshSize")) == 329
         and str(json_value_or_dash(s, "StringValue")) == "COLOR"
         and str(json_value_or_dash(s, "Role")) == "u32-repeated-pattern-body"
@@ -1921,8 +1906,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
         plausible = json_double_or_none(row, "RotatedFloat3PlausibleValueRatio")
         assert_proof_guard(
             plausible is not None,
-            "meshSize=329 COLOR repeated-pattern row is missing "
-            "RotatedFloat3PlausibleValueRatio.",
+            "meshSize=329 COLOR repeated-pattern row is missing RotatedFloat3PlausibleValueRatio.",
         )
         mesh329_color_plausible_max = max(mesh329_color_plausible_max, plausible)
 
@@ -1933,15 +1917,15 @@ def residual_lead_guard(report_path: str | Path) -> None:
     )
 
     # Unique payload sizes for COLOR rows
-    mesh329_color_payloads = sorted(set(
-        safe_int(row.get("DeclaredPayloadBytes"))
-        for row in mesh329_color_pattern_rows
-    ))
+    mesh329_color_payloads = sorted(
+        set(safe_int(row.get("DeclaredPayloadBytes")) for row in mesh329_color_pattern_rows)
+    )
 
     # --- meshSize=297 singleton position-like rows ---
     # Filter: finite >= 0.95 AND plausible >= 0.80 AND extent > 0.0001
     mesh297_position_like_singletons: list[dict[str, Any]] = [
-        s for s in streams
+        s
+        for s in streams
         if safe_int(s.get("MeshSize")) == 297
         and (json_double_or_none(s, "RotatedFloat3FiniteVectorRatio") or 0.0) >= 0.95
         and (json_double_or_none(s, "RotatedFloat3PlausibleValueRatio") or 0.0) >= 0.80
@@ -1950,9 +1934,9 @@ def residual_lead_guard(report_path: str | Path) -> None:
 
     # Promotable without review: Count > 1 OR label is POSITION
     mesh297_promotable = [
-        s for s in mesh297_position_like_singletons
-        if safe_int(s.get("Count")) > 1
-        or str(json_value_or_dash(s, "StringValue")) == "POSITION"
+        s
+        for s in mesh297_position_like_singletons
+        if safe_int(s.get("Count")) > 1 or str(json_value_or_dash(s, "StringValue")) == "POSITION"
     ]
     assert_proof_guard(
         len(mesh297_promotable) == 0,
@@ -1984,10 +1968,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
         )
     ]
 
-    color_payload_str = (
-        f"{mesh329_color_payloads[0]}..{mesh329_color_payloads[-1]}"
-        if mesh329_color_payloads else "-"
-    )
+    color_payload_str = f"{mesh329_color_payloads[0]}..{mesh329_color_payloads[-1]}" if mesh329_color_payloads else "-"
 
     # Residual (noise/side-stream) review rows
     residual_review_rows: list[dict[str, object]] = [
@@ -2024,8 +2005,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
             "Label": "COLOR",
             "Decision": "repeated-pattern side stream",
             "Evidence": (
-                f"rows={len(mesh329_color_pattern_rows)} "
-                f"plausibleMax={mesh329_color_plausible_max} first16=3a3aff3a..."
+                f"rows={len(mesh329_color_pattern_rows)} plausibleMax={mesh329_color_plausible_max} first16=3a3aff3a..."
             ),
         },
     ]
@@ -2093,8 +2073,7 @@ def residual_lead_guard(report_path: str | Path) -> None:
     md_lines: list[str] = [
         "# Residual Target Family Review",
         "",
-        "Candidate-only review for residual streams in target mesh sizes "
-        "`297`, `305`, `321`, `325`, and `329`.",
+        "Candidate-only review for residual streams in target mesh sizes `297`, `305`, `321`, `325`, and `329`.",
         "",
         "Generated under ignored `Exports/`; do not stage generated asset/discovery output.",
         "",
@@ -2409,10 +2388,7 @@ def phase1_m13_329_variant_layout_guard(
     if not isinstance(matrix, dict):
         raise ValueError("mesh329-family-attribute-role-matrix.json is not a JSON object.")
     if matrix.get("Schema") != PHASE1_M13_MATRIX_SCHEMA:
-        raise ValueError(
-            f"Expected matrix schema {PHASE1_M13_MATRIX_SCHEMA!r}, "
-            f"got {matrix.get('Schema')!r}."
-        )
+        raise ValueError(f"Expected matrix schema {PHASE1_M13_MATRIX_SCHEMA!r}, got {matrix.get('Schema')!r}.")
     if matrix.get("CandidateOnly") is not True:
         raise ValueError("Matrix evidence must remain candidate-only.")
 
@@ -2551,20 +2527,14 @@ def descriptor_consistency_guard(report_path: str | Path) -> None:
     )
 
     # uint16-index -> float2 UV is the largest hard error category
-    uint16_to_uv = sum(
-        v for k, v in hard_error_map.items()
-        if "uint16-index" in k and "uv-" in k
-    )
+    uint16_to_uv = sum(v for k, v in hard_error_map.items() if "uint16-index" in k and "uv-" in k)
     assert_proof_guard(
         uint16_to_uv >= 200,
         f"uint16-index -> uv-float2 hard error count {uint16_to_uv} below expected 200+.",
     )
 
     # float2-uv -> normal-float3 is a key hard error
-    float2_to_normal = sum(
-        v for k, v in hard_error_map.items()
-        if "float2-uv" in k and "normal" in k
-    )
+    float2_to_normal = sum(v for k, v in hard_error_map.items() if "float2-uv" in k and "normal" in k)
     assert_proof_guard(
         float2_to_normal >= 150,
         f"float2-uv -> normal-float3 hard error count {float2_to_normal} below expected 150+.",
@@ -2572,10 +2542,7 @@ def descriptor_consistency_guard(report_path: str | Path) -> None:
 
     # Validate ambiguous categories — the largest group
     ambiguous_map = report.get("ambiguous", {})
-    float3_to_normal = sum(
-        v for k, v in ambiguous_map.items()
-        if "float3-generic" in k and "normal" in k
-    )
+    float3_to_normal = sum(v for k, v in ambiguous_map.items() if "float3-generic" in k and "normal" in k)
     assert_proof_guard(
         float3_to_normal >= 1000,
         f"float3-generic -> normal count {float3_to_normal} below expected 1000+.",

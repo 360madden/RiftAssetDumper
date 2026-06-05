@@ -67,19 +67,34 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+  lint-docs:
+    name: Docs Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            docs/**/*.md
+            *.md
+          config: .markdownlint.json
+
   final:
     name: Summary
-    needs: [dotnet, python]
+    needs: [dotnet, python, lint-docs]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check status
         run: |
-          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ]; then
+          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ] && [ "${{ needs.lint-docs.result }}" = "success" ]; then
             echo "✅ All CI checks passed"
           else
             echo "❌ Some CI checks failed"
             echo "  dotnet: ${{ needs.dotnet.result }}"
             echo "  python: ${{ needs.python.result }}"
+            echo "  lint-docs: ${{ needs.lint-docs.result }}"
             exit 1
           fi

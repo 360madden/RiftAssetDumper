@@ -99,8 +99,7 @@ with tempfile.TemporaryDirectory() as tmp:
                         "VertexCount": 93,
                         "PrimaryTopology": "implicit-triangle-list-candidate",
                         "SharedPositionStream": (
-                            "block#25 payload=1116 usage=1 access=19 "
-                            "role=position-float3-ror1-lead"
+                            "block#25 payload=1116 usage=1 access=19 role=position-float3-ror1-lead"
                         ),
                         "PositionOffsetPattern": "same mesh payload offset",
                         "NormalStreams": "mesh#6:block#26 payload=1116 | mesh#31:block#45 payload=1116",
@@ -197,9 +196,7 @@ with tempfile.TemporaryDirectory() as tmp:
         encoding="utf-8",
     )
     extra_schema = json.loads(
-        Path("docs/schemas/position-source-sibling-extra-position-report-v1.schema.json").read_text(
-            encoding="utf-8"
-        )
+        Path("docs/schemas/position-source-sibling-extra-position-report-v1.schema.json").read_text(encoding="utf-8")
     )
     extra_report = json.loads(
         (out_dir / "position-source-sibling-extra-position-report.json").read_text(encoding="utf-8")
@@ -314,11 +311,14 @@ with tempfile.TemporaryDirectory() as tmp:
     )
 
     output = StringIO()
-    with patch.object(
-        sys,
-        "argv",
-        ["rift_workflow.py", "post50-position-source-status", "--out", str(out_dir), "--list-json"],
-    ), redirect_stdout(output):
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["rift_workflow.py", "post50-position-source-status", "--out", str(out_dir), "--list-json"],
+        ),
+        redirect_stdout(output),
+    ):
         rift_workflow.main()
     status = json.loads(output.getvalue())
     jsonschema.validate(status, schema)
@@ -350,16 +350,21 @@ with tempfile.TemporaryDirectory() as tmp:
     check_contains("strict blocker", "\n".join(status["Blockers"]), "residual-position-strict-threshold-not-met")
     check_contains("extra-position blocker", "\n".join(status["Blockers"]), "mesh329-extra-position-like-stream")
     check_contains("family proof blocker", "\n".join(status["Blockers"]), "mesh329-family-proof-candidate-only")
-    check_contains("compare export blocker", "\n".join(status["Blockers"]), "mesh329-source-binding-compare-export-blocked")
+    check_contains(
+        "compare export blocker", "\n".join(status["Blockers"]), "mesh329-source-binding-compare-export-blocked"
+    )
     check_contains("next action", status["NextAction"], "source-binding compare report")
 
 with tempfile.TemporaryDirectory() as tmp:
     output = StringIO()
-    with patch.object(
-        sys,
-        "argv",
-        ["rift_workflow.py", "post50-position-source-status", "--out", tmp, "--list-json"],
-    ), redirect_stdout(output):
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["rift_workflow.py", "post50-position-source-status", "--out", tmp, "--list-json"],
+        ),
+        redirect_stdout(output),
+    ):
         rift_workflow.main()
     missing_status = json.loads(output.getvalue())
     jsonschema.validate(missing_status, schema)

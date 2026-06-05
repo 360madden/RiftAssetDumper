@@ -17,6 +17,7 @@ This is a fallback path for NIF files where the standard `FindNifMeshAttributeSe
 ### 1. `AppOptions` record — new `ExperimentalPositionSource` flag
 
 Added `bool ExperimentalPositionSource` field to the `AppOptions` record, with:
+
 - Variable declaration `var experimentalPositionSource = false;`
 - CLI argument parsing `case "--experimental-position-source"`
 - Constructor parameter `ExperimentalPositionSource: experimentalPositionSource`

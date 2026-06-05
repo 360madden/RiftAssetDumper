@@ -14,7 +14,7 @@
 
 Per `docs/roadmap/project-roadmap.md` Phase 1 M1.5:
 
-> 5. **M1.5**: Produce comprehensive family proof handoff + update promotion-readiness checklists.
+> 1. **M1.5**: Produce comprehensive family proof handoff + update promotion-readiness checklists.
 
 This milestone consolidates all Phase 1 evidence (M1.1-M1.4) into a single unified exit handoff that:
 
@@ -62,10 +62,13 @@ This is the **Phase 1 capstone** — it closes the Position Source Family Proof 
 ## Consolidation Plan (M1.5 Steps)
 
 ### Step 1: Gather all Phase 1 artifacts
+
 Re-read M1.1-M1.4 handoffs, prep docs, coordination docs, post50 checklists, and existing Exports/ artifacts. No new runs needed — purely synthesis.
 
 ### Step 2: Create unified evidence tables
+
 Produce cross-family comparison tables covering:
+
 - Family structure (groups, links, IDs, sibling pairs)
 - Stream roles (primary position, secondary on sibling, #7 secondary)
 - attrSets pattern (1 on #7, 0 on sibling)
@@ -74,7 +77,9 @@ Produce cross-family comparison tables covering:
 - Guard coverage (329: 12/12 PASS; 305: N/A — confirmed negative)
 
 ### Step 3: Create the comprehensive Phase 1 exit handoff
+
 Write `docs/handoffs/draft-2026-06-m1.5-phase1-exit-consolidation.md` with:
+
 - Unified family proof evidence
 - Cross-family structural comparison
 - Blocker matrix across all Phase 1 families
@@ -83,16 +88,20 @@ Write `docs/handoffs/draft-2026-06-m1.5-phase1-exit-consolidation.md` with:
 - AGENTS human-readable summary + Top 10
 
 ### Step 4: Update promotion-readiness checklists
+
 Append Phase 1 consolidation evidence to:
+
 - `docs/post50-mesh34-negative-binding-proof-checklist.md` (329 family)
 - `docs/post50-parser-export-promotion-readiness-checklist.md` (cross-family)
 
 ### Step 5: Refresh reports and validate
+
 - Re-run `post50-validation-suite` (should still 9/9 PASS)
 - Re-run `post50-mesh329-family-proof` (verify no regressions)
 - CI: ruff + mypy + Python tests
 
 ### Step 6: Mark Phase 1 COMPLETE
+
 - Update `docs/roadmap/current-phase.md`: M1.5 COMPLETE, Phase 1 COMPLETE, Phase 2 ACTIVE
 - Rename handoff from `draft-` to final
 

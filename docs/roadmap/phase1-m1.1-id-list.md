@@ -44,6 +44,7 @@ Recommended first wave (8 IDs) for mesh#7 and mesh#34 probes:
 8. **91ead5caf689a8a5** — 31 vectors (372) — good mid-range sample
 
 **Rationale for this batch**:
+
 - Covers high vector count range.
 - Includes previously probed examples for validation.
 - Mix of sizes to detect patterns in attribute set behavior and @304 extra stream.
@@ -51,6 +52,7 @@ Recommended first wave (8 IDs) for mesh#7 and mesh#34 probes:
 Once this wave is complete, remaining IDs can be run in a second wave if time/resources allow within the milestone.
 
 ## Next Step for Prober Agents
+
 Use the Priority Batch above as the first assignment.
 
 All probes must be run with `--skip-build` and results saved under Exports/.

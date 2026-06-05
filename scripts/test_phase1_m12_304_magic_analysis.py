@@ -58,9 +58,7 @@ def run() -> None:
             "IDsCovered": ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"],
             "MatrixRows": [],
         }
-        (root / "mesh329-family-attribute-role-matrix.json").write_text(
-            json.dumps(matrix), encoding="utf-8"
-        )
+        (root / "mesh329-family-attribute-role-matrix.json").write_text(json.dumps(matrix), encoding="utf-8")
         (root / "probe-nif-mesh-aaaaaaaaaaaaaaaa-mesh34.json").write_text(
             json.dumps(
                 _probe(

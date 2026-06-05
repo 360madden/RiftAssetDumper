@@ -67,6 +67,7 @@ Phase 1 (M1.1-M1.4, consolidated in M1.5) provides strong candidate-level eviden
 but does NOT clear any promotion gates:
 
 ### What Phase 1 proved (candidate-only level)
+
 - 329 family: 12/12 paired matrix with quantified attrSets=1/#7 vs attrSets=0/#34 pattern.
 - 329 @304: 10/10 deep classification — role c=75 but low plaus, ~0.4× size, non-attr-extra path, distinct bodies.
 - 329 guards: 12/12 PASS on sibling source-binding + variant attr layout.
@@ -74,6 +75,7 @@ but does NOT clear any promotion gates:
 - Cross-family: Both families blocked by attrSets=0 on sibling; 305 residual confirmed negative.
 
 ### What Phase 1 did NOT prove (still blocked)
+
 - Complete geometry binding for any mesh (position + normal + UV + index).
 - Parser-derived relationship fields for candidate streams.
 - Attribute-set agreement across sibling pairs (they systematically disagree).
@@ -91,6 +93,7 @@ Phase 2 (M2.1-M2.4, June 2026) performed structural NiDataStream descriptor & bi
 proof work. It strengthens the evidence landscape but does NOT clear any promotion gates.
 
 ### What Phase 2 proved (candidate-only level)
+
 - NiDataStream descriptors are **per-block embedded** (4 bytes at offset 24 in each block header), not a static table.
 - 5 descriptor byte patterns documented; `37 04 03 00` = generic ror1-float descriptor (90/184 = 49% of sampled blocks).
 - Byte-3 = 0x00 universal across 184 sampled blocks (padding/reserved/sign-guard).
@@ -101,6 +104,7 @@ proof work. It strengthens the evidence landscape but does NOT clear any promoti
 - Per-gate promotion evaluation: 3 gates strengthened, 1 reclassified, 2 unchanged, **0 cleared**.
 
 ### What Phase 2 did NOT prove (still blocked)
+
 - Bytes 1-2 descriptor semantics (component count? stride? element size?).
 - 4/5 descriptor patterns role-mapped (`36 04 02 00` = 27% of sample, no verified role).
 - Sample-byte agreement at scale (184 blocks = 0.58% of 31,777 total blocks).
@@ -134,6 +138,7 @@ evidence (Phase 2) into an operational parser subsystem. 10 descriptor-consuming
 milestones delivered across Phases 3-6.
 
 ### What Phases 3-6 proved (candidate-only level)
+
 - **Phase 3** (Descriptor Propagation): Descriptor fields on all 6 NiDataStream record types;
   `ClassifyNifDescriptor()` maps 5 patterns; 100% classification coverage at sample scale.
 - **Phase 4** (Descriptor-Aware Parser): 6 behavioral changes — byte-3 integrity (0/375 warnings),
@@ -162,6 +167,7 @@ milestones delivered across Phases 3-6.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false.
 
 ### What Phases 3-6 did NOT achieve
+
 - Bytes 1-2 descriptor semantics remain unknown (no code uses them).
 - 3/5 patterns have family labels but no verified role.
 - Sample corpus at 1.18% (375/31,777) — still below 10% target.
@@ -186,6 +192,7 @@ is the production parser architecture across 58 descriptor-consuming code lines,
 types, and all inventories/probes/exports. Keeping this gate tests a wrong model.
 
 **Evidence chain**:
+
 - M2.1: Ghidra base-model review — all static bytes zero at candidate addresses
 - M3.1: Per-block-embedded model operational — `DescriptorBytes` at offset 24 on `NifDataStreamLayout`
 - M3.2-M3.5: All 6 record types read per-block descriptors — zero static table code
@@ -267,6 +274,7 @@ blocked by bytes 1-2.
 | Cross-record validation | 6 record types | 6 record types |
 
 **Evidence chain**:
+
 - `inventory-nif-stream-headers --root Source --max-total 0` on 5,111 NIF payloads
 - 31,777 valid blocks, 0 invalid, 0 byte-3 non-zero
 - 5 patterns consistent with Phase 3-4 sample evidence
@@ -328,6 +336,7 @@ from the template against cumulative Phase 2-7 evidence. Recommended reframing g
 | Requires complete geometry groups (attrSets>=1 with all 4 attributes) | Accepts that attrSets=0 is architectural — partial bindings are the game's design |
 
 **Reframing evidence**:
+
 - attrSets=0 confirmed on 12/12 329-family pairs and 3/3 305-family pairs — not a gap, it's the architecture
 - Descriptor-guided pairing at 3 levels (confidence +5/-10, candidate ordering, validation warnings) — M5.2-M5.4
 - Export validated with descriptor metadata + pre-checks — M6.1, M6.3
@@ -377,6 +386,7 @@ Combined the stride semantics established in M9.1 (byte-1=element width, byte-2=
 | `3c010400` | 0x3c (vertex-data) | byte | vec4 | 4 | 1 | **Packed vertex attribute** (4×int8 or uint32) | Same stride and usage as `10010400` but different byte-0 sub-family. Likely a variant packed format (e.g., signed vs unsigned, or different attribute type). | ○ Probable |
 
 **Key findings**:
+
 - **3/5 patterns now have specific roles**: `37040300` (position/normal/UV), `36040200` (UV), `15020100` (index)
 - **2/5 patterns have probable roles**: `10010400` and `3c010400` (packed vertex attributes)
 - The `36040200` → UV mapping is particularly strong: it's the only float32×vec2 pattern, distinct from the vec3 `37040300`, and the 2-component structure is characteristic of texture coordinates
@@ -411,10 +421,12 @@ Cross-referenced the stride-semantic role predictions (M9.1+M9.2) against the ac
 **Result**: **16/16 (100%)** descriptor-to-usage consistency. Zero conflicts across all 5 patterns.
 
 **Significance**: This is an independent validation dimension — the stride semantics (element width × component count) predict the DataStreamUsage field without any usage-level training data. The descriptor bytes alone encode whether a stream is index or vertex data:
+
 - `15020100` (uint16×scalar, stride=2) → usage=0 → index stream (maps to `index-u16be-*` roles)
 - All other patterns (float or byte elements, stride≥4) → usage=1 → vertex data (maps to `position*`, `normal*`, `uv*`, `*ror1*` roles)
 
 **Combined evidence (M9.1+M9.2+M9.3)**:
+
 - 16/16 stride divisibility (structural, p≈7.4×10⁻¹⁴)
 - 16/16 usage consistency (semantic, 0 conflicts)
 - 3/5 specific roles, 2/5 probable roles, 0/5 unmapped
@@ -460,6 +472,7 @@ This is the **5th gate clearance** in project history and the **final semantic g
 **Result**: **16/16 (100%)** samples pass stride divisibility. Every DeclaredPayloadBytes is evenly divisible by the hypothesized byte-1 × byte-2 stride.
 
 **Element counts produced**:
+
 - `37040300`: 32, 137, 149 elements (stride=12) — all integer
 - `15020100`: 90, 810 elements (stride=2) — all integer (index stream, usage=0)
 - `36040200`: 137, 149 elements (stride=8) — all integer

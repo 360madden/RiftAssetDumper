@@ -7,21 +7,26 @@
 **References**: `docs/roadmap/project-roadmap.md` (Phase 1 M1.3 + M1.2), `docs/roadmap/phase1-m1.2-prep.md`, `docs/roadmap/current-phase.md`, `docs/task-routing-safety-policy.md` (high-reasoning for proof guards/asset truth), M1.2 handoff + analysis artifacts, `scripts/rift_workflow_guards.py` (pilot already present).
 
 ## Objective
+
 Per explicit definition in `docs/roadmap/project-roadmap.md`:
 > 3. **M1.3**: Develop or extend proof guard(s) for "sibling source-binding + variant attribute layout".
 
 Turn M1.2 @304 classification evidence (and M1.1 matrix) into **repeatable, machine-checkable proof guards** that assert, per matrix sibling pairs (and full family):
+
 1. **Sibling source-binding**: consistent primary position source (@212/#28, `position-float3-ror1-lead` c=75) shared between #7 and #34 variants; paired mesh-block relationship in 329 family.
 2. **Variant attribute layout**: mesh#7 `attributeSets=1` (often with UV@304) vs mesh#34 `attributeSets=0` + extra pos@304 (`position-float3-ror1-lead` c=75); M1.2 finding that @304 on #34 is **not** parsed via attribute-extra stream path (attrSets=0).
 
 ## Entry Criteria (M1.2 Complete)
+
 - M1.2 finalized (batch 8/8 informative "no attribute extra @304 on #34", analysis quant 8+ext, magic cross-ID, final summary 10/10+12/12 patterns, handoff updated with tables/blockers).
 - Primary artifacts from M1.2 + M1.1: matrix (exact target list), M1.2 analysis/magic/final JSON+MD, probes for matrix IDs, sibling extra-pos reports.
 - Guard pilot already prototyped in `scripts/rift_workflow_guards.py` (phase1_m13_329_variant_layout_guard + constants + matrix/probe helpers; wired in rift_workflow.py as `phase1-m1.3-329-variant-layout-guard`; refs this prep in docstring).
 - All candidate-only, 329+matrix, Python, guards/safety, Phase 1 refs per verification (see `Exports/phase1-m1.2-safety-drift-verification.md`).
 
 ## Exact Target List
-Reference the current matrix as the **exact target list**: `Exports/mesh329-family-attribute-role-matrix.json` (and .md/.csv). 
+
+Reference the current matrix as the **exact target list**: `Exports/mesh329-family-attribute-role-matrix.json` (and .md/.csv).
+
 - IDsCovered (12 total): 0364ea142bc00ce7, 04de901531a091ab, 066fa520a8ce62e3, 07c733b4eee3ed2e, 4eb7745610adf8c7, 69da9507d49c42ff, 7f3e71246752afb2, 83df87e22bff4a94, 91ead5caf689a8a5, b57694c1f202ec07, c5a1982e92e15b7b, f2c347fe81a5e3b2.
 - All have #34 data showing the extra @304 position-like stream (attrSets=0, role=position-float3-ror1-lead c=75 on @304/#57, shared @212 primary, @296 u32 body).
 - 3+ paired for contrast (UV@304 on #7 vs. extra pos@304 on #34): 0364ea142bc00ce7, 04de901531a091ab, 066fa520a8ce62e3 (pilot per guard code); expand to more from M1.2 analysis (e.g. 0364/04de/07c7/69da etc.).
@@ -29,7 +34,9 @@ Reference the current matrix as the **exact target list**: `Exports/mesh329-fami
 - See M1.2 prep/coordination/handoff + curated queue for rationale/overlap.
 
 ## Top Pilot + Representative IDs (from Matrix + M1.2 Analysis)
+
 Focus M1.3 guard pilot + expansion here first (3 anchors in existing guard code + prioritized by M1.2 coverage):
+
 1. 0364ea142bc00ce7 (paired anchor)
 2. 04de901531a091ab (paired)
 3. 066fa520a8ce62e3 (paired low-v)
@@ -41,6 +48,7 @@ Focus M1.3 guard pilot + expansion here first (3 anchors in existing guard code 
 (Expand to remaining: 7f3e71246752afb2, b57694c1f202ec07.)
 
 ## Focused Approach for M1.3
+
 - **Probes/commands** (existing + narrow; run with --skip-build):
   - `mesh-probe --id <ID> --mesh-block 7|34` (refresh layout/attrSets/roles if needed).
   - `mesh329-attribute-role-matrix` (re-synth if probes added).
@@ -57,6 +65,7 @@ Focus M1.3 guard pilot + expansion here first (3 anchors in existing guard code 
   - Output: Guard JSON+MD (phase1-m1.3-329-variant-layout-guard.json/.md per schema in code); refreshed post50 compare/family-proof; optional extended classification tying M1.2 quant (low plaus, magic) to guard (e.g. flag "requires-extra-proof" if low-plaus + attr delta).
   - Handoff contribution: pass/fail tables, fixture examples, updated blockers (e.g. "sibling-source-binding + variant-attr-layout-not-fully-guarded" resolved for 329 pilot).
 - **Candidate guard sketch** (pseudocode / small py logic; matches existing pilot in rift_workflow_guards.py; "if mesh34 attrSets==0 and has @304 pos-c75 and shared @212 then flag as sibling-variant-requires-extra-proof"):
+
 ```python
 # Sketch for M1.3 guard (Python; consumes matrix JSON + optional probes)
 def check_sibling_variant_layout(matrix_row_7, matrix_row_34, probe7=None, probe34=None):
@@ -75,6 +84,7 @@ def check_sibling_variant_layout(matrix_row_7, matrix_row_34, probe7=None, probe
 # Run on all matrix IDsCovered; produce pass/fail + negative fixtures (e.g. alter one row attrSets=1 on #34 -> expect FAIL)
 # See rift_workflow_guards.py:phase1_m13_329_variant_layout_guard for full impl (pilot 3 IDs, matrix-driven, probe optional, writes JSON+MD with PerID + Aggregate)
 ```
+
 - **Handoff structure**:
   - Artifacts: Guard report (JSON+MD), refreshed post50-*.json/md for 329, any extended py postproc outputs, pass/fail tables + fixtures.
   - Dedicated M1.3 handoff in `docs/handoffs/` (short, like M1.2: objective, IDs from matrix, guard results/tables, updated blockers, artifacts list, validation, refs to matrix/M1.2 handoff/roadmap/Phase 1 M1.3 + M1.2 parents).
@@ -84,6 +94,7 @@ def check_sibling_variant_layout(matrix_row_7, matrix_row_34, probe7=None, probe
 - **Validation gates** (repeat per run): GeneratedOutputGuard, candidate-only language, drift check (329 + matrix targets only), Phase 1 M1.2/M1.3 refs, schema if new, python-only.
 
 ## First Steps
+
 1. Review M1.2 blockers (from finalized handoff: `mesh34-complete-geometry-binding-not-proven`, `mesh329-variant-attribute-layout-not-classified`, `position-vs-extra-stream-role-ambiguity-in-siblings`, `mesh329-extra-position-like-stream-candidate-only`, `parser-export-promotion-not-allowed`) + M1.2 analysis aggregates (low plaus, magic, ratios) + matrix patterns (12/12).
 2. Sketch guard in py (see above; or review/extend existing `phase1_m13_329_variant_layout_guard` in `rift_workflow_guards.py` which already implements pilot on 3 + matrix).
 3. Run on matrix IDs: `python scripts/rift_workflow.py phase1-m1.3-329-variant-layout-guard --out Exports/` (pilot defaults to 3; extend via param or edit for full 12); capture JSON+MD; run on negative fixtures; cross with M1.2 magic JSON if desired.
@@ -92,6 +103,7 @@ def check_sibling_variant_layout(matrix_row_7, matrix_row_34, probe7=None, probe
 **Status**: Prep complete (draft in place + enhanced per task). Guard pilot pre-implemented in code. Ready for M1.3 execution per `docs/roadmap/current-phase.md`. Reference Phase 1 M1.2 (for entry evidence) + M1.3.
 
 ### Optional: Practical Next Steps / Improvement Ideas (Post-Prep / During M1.3)
+
 - After pilot 3 pass, auto-expand guard to full matrix IDsCovered via list param (reuse M1.2 matrix synthesizer patterns).
 - Tie M1.2 "low_plaus_despite_pos_role" + magic candidates into guard as "extra-proof required" annotations (not hard fail).
 - Add guard to rift_workflow_reports.py or post50 suite for machine checklist export.
@@ -99,6 +111,7 @@ def check_sibling_variant_layout(matrix_row_7, matrix_row_34, probe7=None, probe
 - Feed M1.3 guard outputs directly into M1.4 (light 305) + M1.5 (comprehensive) prep.
 
 #### Top 10 Suggested Next Best Recommended Actions 🚀 (Prioritized for M1.3 + Safety; ref Phase 1 M1.2/M1.3 + matrix + safety policy)
+
 1. 🚀 **Main + swarm**: Run `phase1-m1.3-329-variant-layout-guard` on pilot 3 + full 12; produce pass/fail + fixtures in Exports/.
 2. 📋 Enhance guard to consume phase1-m1.2-@304-analysis-initial.json (plaus/magic deltas as soft signals).
 3. 📊 Refresh post50-mesh329-source-binding-compare + family-proof with matrix 12 + guard results.

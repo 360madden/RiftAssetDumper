@@ -34,7 +34,9 @@ def check_contains(desc: str, text: str, expected: str) -> None:
         failed += 1
 
 
-schema = json.loads(Path("docs/schemas/post50-residual-strict-threshold-delta-v1.schema.json").read_text(encoding="utf-8"))
+schema = json.loads(
+    Path("docs/schemas/post50-residual-strict-threshold-delta-v1.schema.json").read_text(encoding="utf-8")
+)
 
 with tempfile.TemporaryDirectory() as tmp:
     out_dir = Path(tmp)

@@ -36,6 +36,7 @@
 ### Descriptor Subsystem
 
 The NiDataStream descriptor subsystem is proven complete:
+
 - All 4 descriptor bytes have identified semantics (family, element width, component count, padding)
 - All 5 descriptor patterns have role assignments (3 specific + 2 family-level, 0 unmapped)
 - Stride→usage rule proven: uint16×scalar → index, everything else → vertex
@@ -64,6 +65,7 @@ In the RIFT NIF format, `NiMesh` blocks reference streams through integer offset
 ### Impact on gate 5
 
 Gate 5's original criterion — "improves complete position+normal+UV evidence" — is structurally impossible. **No mesh in the copied archive set has complete geometry groups.** Yet:
+
 - 94 OBJ exports work with partial bindings
 - Pairing-based face generation works despite attrSets=0
 - Descriptor-guided pairing improves evidence quality at 3 independent levels
@@ -103,6 +105,7 @@ The gate tests an impossible standard.
 | "Improves complete position+normal+UV evidence" | "Improves available geometry evidence given the architectural constraint" |
 
 Under this reframing:
+
 - ✅ Descriptor data improves pairing quality (3 levels)
 - ✅ Descriptor data does not promote noise (all changes candidate-only/gated)
 - ✅ Pairing evidence is at the best available level (attrSets=0 is architectural)

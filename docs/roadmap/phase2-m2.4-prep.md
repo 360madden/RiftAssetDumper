@@ -13,6 +13,7 @@
 ## Objective
 
 Evaluate the NiDataStream promotion gate landscape against Phase 2 accumulated evidence (M2.1-M2.3). For each gate, determine:
+
 - **Advanceable**: Evidence from M2.1-M2.3 moves the gate closer to pass
 - **Still blocked**: Evidence is insufficient; document exactly why
 - **Partially addressed**: Evidence narrows the gap but doesn't close it
@@ -133,6 +134,7 @@ From live `nidatastream-promotion-status` and `nidatastream-descriptor-proof-sta
 | `narrow-parser-patch` | blocked | **blocked (unchanged)** | No parser changes; safety brake intentionally held |
 
 **Bottom line**: Phase 2 evidence strengthens 3 gates (field-order, sample-byte, pairing-impact), reclassifies 1 gate (table-sample), and leaves 2 unchanged (semantic-map, narrow-parser-patch). 0 gates can be cleared to pass. The core blockers are:
+
 1. Bytes 1-2 descriptor semantics unknown (blocks semantic-map)
 2. 4/5 descriptor patterns have no verified role (blocks field-order-proof)
 3. No parser implementation exists (blocks narrow-parser-patch by design)

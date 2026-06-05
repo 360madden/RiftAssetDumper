@@ -89,7 +89,7 @@ dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- \
 | Byte-order rule | ✅ Strong signal | `usage=1/access=19` → float3 normal/float2 UV (rotate-right-1) |
 | UInt16 magic 43606 | ✅ Pattern detected | Alternating position_triple / metadata_pair structure in big-endian uint16 streams |
 | Mesh→texture graph | ✅ Proven | 3,224 models → 2,514 texture assets; live-fallback extraction works |
-| Generated output guard | ✅ Active | Source/, Extracted/, Exports/, bin/, obj/, __pycache__, .pyc blocked |
+| Generated output guard | ✅ Active | Source/, Extracted/, Exports/, bin/, obj/, **pycache**, .pyc blocked |
 
 ---
 

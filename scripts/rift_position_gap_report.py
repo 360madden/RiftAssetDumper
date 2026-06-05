@@ -37,7 +37,7 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -157,51 +157,57 @@ def analyze_gaps(data: dict[str, Any]) -> dict[str, Any]:
     siblings_raw = safe_get(data, "TopPositionSourceSiblings", [])
     sibling_families: list[dict[str, Any]] = []
     for sib in siblings_raw:
-        sibling_families.append({
-            "pattern": safe_get(sib, "Pattern"),
-            "idPrefix": safe_get(sib, "IdPrefix"),
-            "targetBlockIndex": safe_get(sib, "TargetBlockIndex"),
-            "declaredPayloadBytes": safe_get(sib, "DeclaredPayloadBytes"),
-            "usage": safe_get(sib, "DataStreamUsage"),
-            "access": safe_get(sib, "DataStreamAccess"),
-            "count": safe_int(sib.get("Count")),
-            "distinctMeshes": safe_int(sib.get("DistinctMeshBlocks")),
-            "meshBlockIndices": safe_get(sib, "MeshBlockIndices", []),
-            "meshPayloadOffsets": safe_get(sib, "MeshPayloadOffsets", []),
-        })
+        sibling_families.append(
+            {
+                "pattern": safe_get(sib, "Pattern"),
+                "idPrefix": safe_get(sib, "IdPrefix"),
+                "targetBlockIndex": safe_get(sib, "TargetBlockIndex"),
+                "declaredPayloadBytes": safe_get(sib, "DeclaredPayloadBytes"),
+                "usage": safe_get(sib, "DataStreamUsage"),
+                "access": safe_get(sib, "DataStreamAccess"),
+                "count": safe_int(sib.get("Count")),
+                "distinctMeshes": safe_int(sib.get("DistinctMeshBlocks")),
+                "meshBlockIndices": safe_get(sib, "MeshBlockIndices", []),
+                "meshPayloadOffsets": safe_get(sib, "MeshPayloadOffsets", []),
+            }
+        )
 
     # --- 4. Residual target analysis ---
     residual_targets_raw = safe_get(data, "ResidualTargetMeshSizes", [])
     residual_targets: list[dict[str, Any]] = []
     for rt in residual_targets_raw:
-        residual_targets.append({
-            "meshSize": safe_int(rt.get("MeshSize")),
-            "meshBlockCount": safe_int(rt.get("MeshBlockCount")),
-            "nifPayloads": safe_int(rt.get("NifPayloads")),
-            "residualStreamCount": safe_int(rt.get("ResidualStreamCount")),
-            "residualPatternCount": safe_int(rt.get("ResidualPatternCount")),
-        })
+        residual_targets.append(
+            {
+                "meshSize": safe_int(rt.get("MeshSize")),
+                "meshBlockCount": safe_int(rt.get("MeshBlockCount")),
+                "nifPayloads": safe_int(rt.get("NifPayloads")),
+                "residualStreamCount": safe_int(rt.get("ResidualStreamCount")),
+                "residualPatternCount": safe_int(rt.get("ResidualPatternCount")),
+            }
+        )
 
     # --- 5. Top residual streams (candidate position leads) ---
     residual_streams_raw = safe_get(data, "TopResidualStreams", [])
     residual_streams: list[dict[str, Any]] = []
     for rs in residual_streams_raw:
-        residual_streams.append({
-            "meshSize": safe_int(rs.get("MeshSize")),
-            "pattern": safe_get(rs, "Pattern"),
-            "meshPayloadOffset": safe_get(rs, "MeshPayloadOffset"),
-            "declaredPayloadBytes": safe_get(rs, "DeclaredPayloadBytes"),
-            "usage": safe_get(rs, "DataStreamUsage"),
-            "access": safe_get(rs, "DataStreamAccess"),
-            "role": safe_get(rs, "Role"),
-            "roleConfidence": safe_get(rs, "RoleConfidence"),
-            "count": safe_int(rs.get("Count")),
-            "ror3VectorCount": safe_get(rs, "RotatedFloat3VectorCount"),
-            "ror3FiniteRatio": safe_get(rs, "RotatedFloat3FiniteVectorRatio"),
-            "ror3PlausibleRatio": safe_get(rs, "RotatedFloat3PlausibleValueRatio"),
-            "ror3MaxExtent": safe_get(rs, "RotatedFloat3MaxExtent"),
-            "bodyFirst16": safe_get(rs, "BodyFirst16"),
-        })
+        residual_streams.append(
+            {
+                "meshSize": safe_int(rs.get("MeshSize")),
+                "pattern": safe_get(rs, "Pattern"),
+                "meshPayloadOffset": safe_get(rs, "MeshPayloadOffset"),
+                "declaredPayloadBytes": safe_get(rs, "DeclaredPayloadBytes"),
+                "usage": safe_get(rs, "DataStreamUsage"),
+                "access": safe_get(rs, "DataStreamAccess"),
+                "role": safe_get(rs, "Role"),
+                "roleConfidence": safe_get(rs, "RoleConfidence"),
+                "count": safe_int(rs.get("Count")),
+                "ror3VectorCount": safe_get(rs, "RotatedFloat3VectorCount"),
+                "ror3FiniteRatio": safe_get(rs, "RotatedFloat3FiniteVectorRatio"),
+                "ror3PlausibleRatio": safe_get(rs, "RotatedFloat3PlausibleValueRatio"),
+                "ror3MaxExtent": safe_get(rs, "RotatedFloat3MaxExtent"),
+                "bodyFirst16": safe_get(rs, "BodyFirst16"),
+            }
+        )
 
     # --- 6. Position-source gap analysis: meshes with normals+UVs but no positions ---
     gap_families = sorted(
@@ -223,8 +229,7 @@ def analyze_gaps(data: dict[str, Any]) -> dict[str, Any]:
     position_lead_sizes = set(position_lead_mesh_sizes.keys())
     gap_mesh_sizes = set(s["meshSize"] for s in gap_families)
     normal_or_uv_mesh_sizes = set(
-        s["meshSize"] for s in classified
-        if (s["hasNormal"] or s["hasUv"]) and not s["hasPosition"]
+        s["meshSize"] for s in classified if (s["hasNormal"] or s["hasUv"]) and not s["hasPosition"]
     )
 
     return {
@@ -262,10 +267,12 @@ def analyze_gaps(data: dict[str, Any]) -> dict[str, Any]:
         "residualTargets": residual_targets,
         "residualStreams": residual_streams,
         "topResidualByMeshSize": [
-            {"meshSize": sz, "streams": sorted(
-                [rs for rs in residual_streams if rs["meshSize"] == sz],
-                key=lambda x: -x["count"]
-            )[:5]}
+            {
+                "meshSize": sz,
+                "streams": sorted([rs for rs in residual_streams if rs["meshSize"] == sz], key=lambda x: -x["count"])[
+                    :5
+                ],
+            }
             for sz in sorted(set(rs["meshSize"] for rs in residual_streams))
         ],
         "recommendations": _generate_recommendations(
@@ -285,11 +292,13 @@ def _generate_recommendations(
 
     # Check if there are any gap families at all
     if not gap_families:
-        recs.append({
-            "priority": "info",
-            "action": "No gap families found — all indexed mesh families with normals/UVs also have positions.",
-            "rationale": "The position gap may have been closed by a previous round of discovery.",
-        })
+        recs.append(
+            {
+                "priority": "info",
+                "action": "No gap families found — all indexed mesh families with normals/UVs also have positions.",
+                "rationale": "The position gap may have been closed by a previous round of discovery.",
+            }
+        )
         return recs
 
     # Rank gap families by count descending
@@ -333,70 +342,76 @@ def _generate_recommendations(
             if found_same_size:
                 sibling_hint = " Position-source sibling groups exist for this size family."
 
-        sample_ids = ", ".join(
-            str(s.get("IdPrefix", "?")) for s in (gf.get("samples") or [])[:3]
+        sample_ids = ", ".join(str(s.get("IdPrefix", "?")) for s in (gf.get("samples") or [])[:3])
+        recs.append(
+            {
+                "priority": priority,
+                "action": (
+                    f"meshSize={mesh_size} v={vertex_count} count={count} — "
+                    f"probe position-less meshes for inline float3 data or orphan stream candidates."
+                    f"{lead_info}{residual_hint}{sibling_hint}"
+                ),
+                "sampleIds": sample_ids or "-",
+                "rationale": (
+                    f"Top gap family: {count} meshes with normals+UVs but no position stream. "
+                    f"Vertex count {vertex_count} suggests expected position payload = {vertex_count * 12} bytes (float32 x3)."
+                ),
+            }
         )
-        recs.append({
-            "priority": priority,
-            "action": (
-                f"meshSize={mesh_size} v={vertex_count} count={count} — "
-                f"probe position-less meshes for inline float3 data or orphan stream candidates."
-                f"{lead_info}{residual_hint}{sibling_hint}"
-            ),
-            "sampleIds": sample_ids or "-",
-            "rationale": (
-                f"Top gap family: {count} meshes with normals+UVs but no position stream. "
-                f"Vertex count {vertex_count} suggests expected position payload = {vertex_count * 12} bytes (float32 x3)."
-            ),
-        })
 
     # Check residual streams for promising leads
     promising_residuals = [
-        rs for rs in residual_streams
-        if isinstance(rs.get("ror3PlausibleRatio"), (int, float))
-        and rs["ror3PlausibleRatio"] > 0.7
+        rs
+        for rs in residual_streams
+        if isinstance(rs.get("ror3PlausibleRatio"), (int, float)) and rs["ror3PlausibleRatio"] > 0.7
     ]
     if promising_residuals:
         top_r = promising_residuals[0]
-        recs.append({
-            "priority": "high",
-            "action": (
-                f"meshSize={top_r['meshSize']} residual stream @{top_r['meshPayloadOffset']} "
-                f"payload={top_r['declaredPayloadBytes']} — plausible float3 position candidate "
-                f"(ratio={top_r['ror3PlausibleRatio']:.2f}, extent={top_r['ror3MaxExtent']})."
-            ),
-            "sampleIds": "-",
-            "rationale": (
-                "Highest plausibility residual stream. This is the most promising "
-                "position lead outside the proven attribute-set inventory. "
-                "Requires focused mesh probe to confirm geometry role."
-            ),
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "action": (
+                    f"meshSize={top_r['meshSize']} residual stream @{top_r['meshPayloadOffset']} "
+                    f"payload={top_r['declaredPayloadBytes']} — plausible float3 position candidate "
+                    f"(ratio={top_r['ror3PlausibleRatio']:.2f}, extent={top_r['ror3MaxExtent']})."
+                ),
+                "sampleIds": "-",
+                "rationale": (
+                    "Highest plausibility residual stream. This is the most promising "
+                    "position lead outside the proven attribute-set inventory. "
+                    "Requires focused mesh probe to confirm geometry role."
+                ),
+            }
+        )
 
     # Sibling group recommendations
     high_count_siblings = [s for s in sibling_families if s["count"] >= 5]
     if high_count_siblings:
         top_sib = high_count_siblings[0]
-        recs.append({
-            "priority": "medium",
-            "action": (
-                f"Pattern '{top_sib['pattern']}' ({top_sib['count']} meshes, "
-                f"{top_sib['distinctMeshes']} distinct) — repeated position-source sibling "
-                f"at block#{top_sib['targetBlockIndex']} payload={top_sib['declaredPayloadBytes']}."
-            ),
-            "sampleIds": top_sib.get("idPrefix", "-"),
-            "rationale": (
-                "Repeated sibling binding across multiple meshes suggests this stream "
-                "may contain position data, but needs per-mesh probe validation."
-            ),
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "action": (
+                    f"Pattern '{top_sib['pattern']}' ({top_sib['count']} meshes, "
+                    f"{top_sib['distinctMeshes']} distinct) — repeated position-source sibling "
+                    f"at block#{top_sib['targetBlockIndex']} payload={top_sib['declaredPayloadBytes']}."
+                ),
+                "sampleIds": top_sib.get("idPrefix", "-"),
+                "rationale": (
+                    "Repeated sibling binding across multiple meshes suggests this stream "
+                    "may contain position data, but needs per-mesh probe validation."
+                ),
+            }
+        )
 
     if not recs:
-        recs.append({
-            "priority": "info",
-            "action": "No actionable recommendations from current inventory.",
-            "rationale": "All positions may already be discovered; run a full inventory to confirm.",
-        })
+        recs.append(
+            {
+                "priority": "info",
+                "action": "No actionable recommendations from current inventory.",
+                "rationale": "All positions may already be discovered; run a full inventory to confirm.",
+            }
+        )
 
     return recs
 
@@ -433,17 +448,23 @@ def print_human_summary(report: dict[str, Any]) -> None:
     # Profile breakdown
     print("  Attribute set profiles:")
     for profile_name, info in sorted(profile.items()):
-        print(f"    {profile_name:40s}  count={info['count']:3d}  meshes={info['totalMeshes']:5d}  sizes={info['meshSizes']}")
+        print(
+            f"    {profile_name:40s}  count={info['count']:3d}  meshes={info['totalMeshes']:5d}  sizes={info['meshSizes']}"
+        )
     print()
 
     # Gap families (top 10)
     gaps = report.get("gapFamilies", [])
     if gaps:
         print("  Top gap families (normals+UVs proven, positions MISSING):")
-        print(f"  {'MeshSize':>8s}  {'VtxCount':>8s}  {'Count':>6s}  {'Topology':>18s}  {'PosPayload':>10s}  {'NormPayload':>10s}  {'UVPayload':>10s}  {'Confidence':>9s}")
-        print(f"  {'-'*8}  {'-'*8}  {'-'*6}  {'-'*18}  {'-'*10}  {'-'*10}  {'-'*10}  {'-'*9}")
+        print(
+            f"  {'MeshSize':>8s}  {'VtxCount':>8s}  {'Count':>6s}  {'Topology':>18s}  {'PosPayload':>10s}  {'NormPayload':>10s}  {'UVPayload':>10s}  {'Confidence':>9s}"
+        )
+        print(f"  {'-' * 8}  {'-' * 8}  {'-' * 6}  {'-' * 18}  {'-' * 10}  {'-' * 10}  {'-' * 10}  {'-' * 9}")
         for gf in gaps[:15]:
-            print(f"  {gf['meshSize']:>8d}  {gf['vertexCount']:>8d}  {gf['count']:>6d}  {gf['primaryTopology']:>18s}  {str(gf['positionDeclaredPayloadBytes'] or '-'):>10s}  {str(gf['normalDeclaredPayloadBytes'] or '-'):>10s}  {str(gf['uvDeclaredPayloadBytes'] or '-'):>10s}  {gf['averageConfidence']:>9.1f}")
+            print(
+                f"  {gf['meshSize']:>8d}  {gf['vertexCount']:>8d}  {gf['count']:>6d}  {gf['primaryTopology']:>18s}  {str(gf['positionDeclaredPayloadBytes'] or '-'):>10s}  {str(gf['normalDeclaredPayloadBytes'] or '-'):>10s}  {str(gf['uvDeclaredPayloadBytes'] or '-'):>10s}  {gf['averageConfidence']:>9.1f}"
+            )
         print()
 
     # Residual streams (position-like candidates)
@@ -455,10 +476,14 @@ def print_human_summary(report: dict[str, Any]) -> None:
             key=lambda r: -r["ror3PlausibleRatio"],
         )
         if sorted_res:
-            print(f"  {'MeshSize':>8s}  {'Payload':>8s}  {'Count':>6s}  {'Plausible':>9s}  {'Extent':>8s}  {'Finite':>7s}  {'Role':>24s}")
-            print(f"  {'-'*8}  {'-'*8}  {'-'*6}  {'-'*9}  {'-'*8}  {'-'*7}  {'-'*24}")
+            print(
+                f"  {'MeshSize':>8s}  {'Payload':>8s}  {'Count':>6s}  {'Plausible':>9s}  {'Extent':>8s}  {'Finite':>7s}  {'Role':>24s}"
+            )
+            print(f"  {'-' * 8}  {'-' * 8}  {'-' * 6}  {'-' * 9}  {'-' * 8}  {'-' * 7}  {'-' * 24}")
             for rs in sorted_res[:10]:
-                print(f"  {rs['meshSize']:>8d}  {str(rs['declaredPayloadBytes'] or '-'):>8s}  {rs['count']:>6d}  {rs['ror3PlausibleRatio']:>9.3f}  {str(rs['ror3MaxExtent'] or '-'):>8s}  {str(rs['ror3FiniteRatio'] or '-'):>7s}  {str(rs.get('role', '-')):>24s}")
+                print(
+                    f"  {rs['meshSize']:>8d}  {str(rs['declaredPayloadBytes'] or '-'):>8s}  {rs['count']:>6d}  {rs['ror3PlausibleRatio']:>9.3f}  {str(rs['ror3MaxExtent'] or '-'):>8s}  {str(rs['ror3FiniteRatio'] or '-'):>7s}  {str(rs.get('role', '-')):>24s}"
+                )
         else:
             print("    (no residual streams have float3 plausibility data)")
         print()
@@ -469,11 +494,15 @@ def print_human_summary(report: dict[str, Any]) -> None:
     if sib_groups:
         print("  Position source sibling groups (top 10 by count):")
         sorted_sibs = sorted(sib_groups, key=lambda s: -s["count"])
-        print(f"  {'Count':>6s}  {'Distinct':>8s}  {'TargetBlock':>11s}  {'Payload':>8s}  {'Usage':>16s}  {'Access':>16s}  {'First offsets'}")
-        print(f"  {'-'*6}  {'-'*8}  {'-'*11}  {'-'*8}  {'-'*16}  {'-'*16}  {'-'*20}")
+        print(
+            f"  {'Count':>6s}  {'Distinct':>8s}  {'TargetBlock':>11s}  {'Payload':>8s}  {'Usage':>16s}  {'Access':>16s}  {'First offsets'}"
+        )
+        print(f"  {'-' * 6}  {'-' * 8}  {'-' * 11}  {'-' * 8}  {'-' * 16}  {'-' * 16}  {'-' * 20}")
         for sib in sorted_sibs[:10]:
             offsets = ", ".join(str(o) for o in (sib.get("meshPayloadOffsets") or [])[:4])
-            print(f"  {sib['count']:>6d}  {sib['distinctMeshes']:>8d}  block#{sib['targetBlockIndex']:>5d}  {str(sib['declaredPayloadBytes'] or '-'):>8s}  {str(sib.get('usage', '-')):>16s}  {str(sib.get('access', '-')):>16s}  {offsets}")
+            print(
+                f"  {sib['count']:>6d}  {sib['distinctMeshes']:>8d}  block#{sib['targetBlockIndex']:>5d}  {str(sib['declaredPayloadBytes'] or '-'):>8s}  {str(sib.get('usage', '-')):>16s}  {str(sib.get('access', '-')):>16s}  {offsets}"
+            )
         print()
 
     # Recommendations
@@ -521,9 +550,7 @@ def main() -> int:
         print(f"ERROR: inventory not found: {inventory_path}", file=sys.stderr)
         return 1
 
-    output_path = Path(args.out) if args.out else (
-        inventory_path.parent / "position-gap-report.json"
-    )
+    output_path = Path(args.out) if args.out else (inventory_path.parent / "position-gap-report.json")
 
     try:
         data = load_inventory(str(inventory_path))

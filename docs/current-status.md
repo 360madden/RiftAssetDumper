@@ -1,11 +1,16 @@
+> **⚠️ SUPERSEDED: This document is historically accurate through Phase 10 but does not reflect the current project state (Phase 48+).**
+> Refer to `docs/roadmap/project-summary.md` and `docs/roadmap/current-phase.md` for the current status.
+> This file is preserved for historical reference only.
+
 # Current Status — High-impact RIFT asset discoveries 🚀
-Date: 2026-06 (Phase 10 COMPLETE; 10 phases; all 7 gates cleared; both promotion flags true)
 
-**Final handoff**: `docs/handoffs/2026-06-project-completion-final-handoff.md`
+Date: 2026-06 (Phase 48+; 50 phases completed; 268 OBJs, 0 unknowns)
 
-## 2026-06 — Phase 10 COMPLETE: All Gates Cleared
+**Current handoff**: `docs/roadmap/project-summary.md`
 
-**7 of 7 gates cleared.** Gate 6 (safety brake) released — all other gates cleared, 13 code milestones with zero regressions, 49 tests. Both promotion flags set to true. Project complete at the autonomous level.
+## 2026-06 — Phase 48+: 0 Unknowns, All OBJs Classified 🎉
+
+**268 OBJs (214 unique), 184 faced, 84 position-only, 20,354 faces, 19,797 vertices across 29 families. 0 unknowns remaining.** Phase 48 cross-MB audit confirmed no recoverable faced candidates exist for the 84 pos-only OBJs. Triangle fan fallback added for approximate face generation.
 
 ### Final Gate Status (ALL 7 CLEARED)
 
@@ -95,11 +100,13 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 **2026-06-03 — Stage 2 refresh: Position-source discovery sweep (complete):**
 
 **Fresh baseline:**
+
 - Endian-analysis fix (Stage 9) confirmed stable: **1,949 pair-compatible meshes** across full inventory.
 - All guard/report functions fully ported from PowerShell to Python; `complex_modes` set is now empty.
 - All 12 PS complex modes runnable via `python scripts/rift_workflow.py`.
 
 **Position-source gap report:**
+
 - No position gaps in the five indexed target mesh sizes (297, 305, 321, 325, 329).
 - meshSize=297: topology-proof anchor (4+ attribute sets).
 - meshSize=305: residual-position-candidate-family (5+ position-like rows with plausible ≥ 0.80).
@@ -107,6 +114,7 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 - meshSize=325: topology-rich sparse-position singleton lead (300+ pairings, 0 residual streams).
 
 **Position-source sibling family report:**
+
 - Five known sibling groups with shared position sources confirmed.
 - | Mesh size | Mesh blocks | Stream offsets | Groups | Links | Decision |
   |---:|---|---:---:|---|---|
@@ -119,6 +127,7 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 - meshSize=305 is the second strongest: 15 groups sharing stream@188, target block#21, 30 links.
 
 **Residual position classifier report:**
+
 - Candidate-only dry-run on meshSize=305 stream@188 POSITION usage=1 access=19 residuals.
 - 8 target rows identified; **0 strict passes** (all below 0.95 PlausibleValueRatio).
 - 5 candidate guard rows with plausible ≥ 0.80 — held as ranking evidence only.
@@ -128,6 +137,7 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 - All 3+ guard assertions pass: strict=0, paired rows ≥ 8, divergent = 0, candidate guard ≥ 3.
 
 **Residual position cluster probe report:**
+
 - Deep-dive on 5 payload variants (96, 180, 192, 288, 396) at meshSize=305 stream@188 block#21.
 - All payloads emit to mesh#7 and mesh#27 over the same stream block #21.
 - **Key structural finding — UInt16 triples analysis:**
@@ -146,11 +156,13 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 **Bottom line:** The meshSize=305 stream@188 position-like data is persistently below the strict 0.95 classifier threshold. The magic-43606 pattern in payload 288 (0.9444 plausible) is the most promising lead for quantized/packed uint16 positions, but no index pairing or attribute sets exist to confirm geometry binding. This lane remains candidate-only ranking evidence.
 
 **2026-06-02 — Stage 2: Position-source fallback + triage + end-to-end validation (original, completed 2026-06-02):**
+
 - Extended `ExperimentalPositionSource` fallback to decode **normals** and **UVs** from linked NiDataStream blocks. Build/tests/code-review clean.
 - Full inventory: 5,507 NiMesh blocks, 5,455 (99%) have 0 attribute sets, 210 position-float3 candidates.
 - End-to-end validated on 0-attribute-set meshes.
 
 **Known limitations (unchanged from Stage 2):**
+
 - Faces are trivial triangle fan (vertex 0 to consecutive pairs) since no index stream is available in fallback mode.
 - Only the first float32 candidate per role is used; multiple candidates are skipped.
 - 5,455 meshes (99%) have 0 attribute sets — fallback handles these where linked streams contain float32 data.
@@ -159,6 +171,7 @@ python scripts/rift_workflow.py position-source-sibling-extra-position-report --
 **2026-05-20 — C# gate fixes + fitness guard completion:**
 
 **2026-05-20 — C# gate fixes + fitness guard completion:**
+
 - Fixed two `StartsWith("index-")` gates in `Program.cs` (inventory loop L3949, probe loop L2602) → now use `IndexStats is not null`. This was the root cause preventing `TopAttributeExtraMappingFitness` from populating for `uint16-compatible-body` extra streams.
 - Removed the `if (preferredMapping != "insufficient")` gate so fitness accumulation runs unconditionally.
 - Added `required_json_boolean()` + boolean rejection in `required_json_number()`/`required_json_integer()` to `rift_workflow_utils.py`.
@@ -204,6 +217,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 | New mesh families + aggressive lead pursuit (Stage 16) | ✅ complete | **4 new faced families discovered** — meshSize=267 (5v/2f), 345 (137-149v/414-424f), 361 (151v/414f), 365 (138-176v/414-464f). **73 OBJs, 47 faced, 7,744 faces, 4,649 vertices across 17 families.** meshSize=465 confirmed dead end (no position/index streams). Targeted inventory query for index-stream sizes was the breakthrough methodology. All 4 guards PASSED. CI green. |
 | OBJ manifest + remaining unexplored sizes (Stage 17) | ✅ complete | **1 new faced family** — meshSize=354 (24v/22f). OBJ manifest with SHA256 hashes (`Exports/obj-manifest-stage17.json`). **76 OBJs, 48 faced, 7,766 faces, 4,695 vertices across 18 families.** 2 mesh sizes confirmed dead ends (330, 370). All 4 guards PASSED. CI green. |
 | Batch-sweep runner + OBJ integrity + candidate exhaustion (Stage 18) | ✅ complete | `batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building. **94 OBJs, 65 faced, 10,795 faces, 6,079 vertices across 18+ families. 0 structural issues. 0 unexported candidates remain.** All 4 proof guards PASSED. CI green (build 0e, tests 6/6, ruff 0, mypy 0). |
+
 ## Approved operating mode 🚀
 
 This repo is now following the approved **Aggressive Evidence Workflow**:
@@ -1370,6 +1384,7 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - Build: 0 errors, Tests: 6/6 pass, Code review: clean.
 
 **Known limitations:**
+
 - `--export-obj` only works for meshes with attribute sets (position+normal+UV); 0-attribute-set meshes will produce an empty OBJ.
 - Face format uses raw-zero-based indexing (+1 for OBJ), consistent with the proven degenerate-bridge strip hypothesis.
 - Only `@264` extra streams are decoded for faces; other index sources are not yet wired.
@@ -1389,11 +1404,13 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 - Build: 0 errors, Tests: 6/6 pass, Code review: clean.
 
 **Known limitations:**
+
 - No 0-attribute-set mesh with index pairings was found in the current copied archive subset (the `pair-compatible meshes` count in the mesh-binding inventory is 2,076 but those pairings are with vertex streams that are not position streams). The code path is in place and tested to degrade gracefully (reports "all below threshold" or "no pairings found" and skips faces).
 - If a future mesh does have pairings in the experimental path, the index-body validation requires the stream header's first uint32 to be ≤ `payload.Length - 4`; malformed streams will be skipped with a console message.
 - Face format uses +1 vertex offset (OBJ 1-based) and degenerate-bridge triangle-strip walking, consistent with the `@264` attribute-set path.
 
 **2026-06-03 — Stage 4: batch-export-264 command (complete):**
+
 - Added `batch-export-264` Python workflow command — batch exports all 5 known `@264`-indexed meshes via `--export-obj`.
 - Uses hardcoded known-good IDs from mesh-binding inventory: all `meshSize=297`, `meshBlock=6`, `extra@264`, `index-u16be-strip-lead`.
 - Each mesh gets its own output subdirectory under `Exports/decode-nif-geometry-{id}/` to avoid overwrites.
@@ -1590,7 +1607,6 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 - **Bottom line:** The pairing-based face generation path scales across mesh families. The key enabler is the C#-level `FindNifMeshProbePairings` which performs deeper per-mesh probing than the aggregated inventory. Next steps: open the largest meshes in a 3D viewer; continue probing remaining mesh size families (meshSize=465 with 30 pairings, meshSize=405 with 24 pairings, meshSize=309 with 18 pairings).
 
-
 **2026-05-22 — Stage 12: Scaling to all remaining mesh families — 8 new faced OBJs from 3 families (complete):**
 
 - **Goal:** Scale the Stage 11 breakthrough to ALL remaining mesh sizes in the inventory. Batch-decode every unprobed mesh family to find which ones produce faces via C#-level .
@@ -1638,7 +1654,8 @@ dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper
 
 - **Bottom line:** The pairing-based face generation path has been exhaustively tested against all 23 mesh sizes in the copied archive set. 8 families produce faced OBJs; 4 produce position-only; 11 produce nothing (no pairings or no archive matches). The C#-level  decoder finds valid index→vertex pairings where the aggregated inventory sees only index→normal/UV pairings. All proof guard baselines hold. Next: open the largest OBJs in a 3D viewer; investigate live archive sampling to reach meshSize=465 and other families whose samples are missing from the copied set.
 
-## 
+##
+
 **2026-06-03 — Stage 13: Baseline verification and integrity sweep (complete):**
 
 - **Goal:** After the exhaustive Stage 12 probe of all 23 mesh sizes, refresh the full discovery pipeline, run all 4 proof guards, verify the OBJ inventory, and confirm no regressions.

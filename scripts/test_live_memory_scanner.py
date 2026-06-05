@@ -70,7 +70,11 @@ target_manifest = json.loads(Path("docs/live-memory-scan-targets.json").read_tex
 jsonschema.validate(target_manifest, target_schema)
 manifest_specs = load_pattern_specs_from_file(Path("docs/live-memory-scan-targets.json"))
 check("manifest target count", len(manifest_specs), 1)
-check("manifest first pattern", manifest_specs[0], "stage5_step48_at264_index_strip_prefix=00010002000200010003000400050006")
+check(
+    "manifest first pattern",
+    manifest_specs[0],
+    "stage5_step48_at264_index_strip_prefix=00010002000200010003000400050006",
+)
 check("manifest candidate-only", target_manifest["CandidateOnly"], True)
 check("manifest live read not executed", target_manifest["LiveReadExecuted"], False)
 
@@ -114,17 +118,20 @@ check_raises(
 
 print("=== CLI list-json plan ===")
 output = StringIO()
-with patch.object(
-    sys,
-    "argv",
-    [
-        "rift_workflow.py",
-        "scan-live-memory",
-        "--live-pattern-file",
-        "docs/live-memory-scan-targets.json",
-        "--list-json",
-    ],
-), redirect_stdout(output):
+with (
+    patch.object(
+        sys,
+        "argv",
+        [
+            "rift_workflow.py",
+            "scan-live-memory",
+            "--live-pattern-file",
+            "docs/live-memory-scan-targets.json",
+            "--list-json",
+        ],
+    ),
+    redirect_stdout(output),
+):
     rift_workflow.main()
 cli_plan = json.loads(output.getvalue())
 jsonschema.validate(cli_plan, schema)
@@ -133,7 +140,7 @@ check("CLI list-json does not execute", cli_plan["LiveProcessReadExecuted"], Fal
 check("CLI loaded manifest pattern", cli_plan["Patterns"][0]["Label"], "stage5_step48_at264_index_strip_prefix")
 
 print("=== fixture scan core ===")
-fixture = FixtureProcessReader([(0x1000, (b"A" * (SCAN_CHUNK_SIZE - 2)) + b"\xDE\xAD\xBE\xEF" + b"B" * 16, "fixture")])
+fixture = FixtureProcessReader([(0x1000, (b"A" * (SCAN_CHUNK_SIZE - 2)) + b"\xde\xad\xbe\xef" + b"B" * 16, "fixture")])
 scan = scan_process_reader(
     fixture,
     [parse_hex_pattern("boundary=DEADBEEF")],
@@ -143,7 +150,11 @@ scan = scan_process_reader(
     timeout_seconds=5,
 )
 check("fixture match count", scan["PatternResults"][0]["MatchCount"], 1)
-check("fixture cross-chunk address", scan["PatternResults"][0]["Matches"][0]["Address"], f"0x{0x1000 + SCAN_CHUNK_SIZE - 2:X}")
+check(
+    "fixture cross-chunk address",
+    scan["PatternResults"][0]["Matches"][0]["Address"],
+    f"0x{0x1000 + SCAN_CHUNK_SIZE - 2:X}",
+)
 check("fixture scan not timed out", scan["TimedOut"], False)
 
 print(f"\n{'=' * 50}")

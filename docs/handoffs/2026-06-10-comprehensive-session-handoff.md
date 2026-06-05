@@ -148,6 +148,7 @@ The `.agents/` directory was rebuilt from scratch after being deleted. It now co
 ### Agent model strategy documented
 
 The new `knowledge.md` entry defines a tiered strategy:
+
 - **Default:** Flash agents for speed/cost on routine work
 - **Complex C#:** Deploy `cs-architect-gpt` (GPT-5.5) when changes require multi-step reasoning across ~15K-line `Program.cs`
 - **Binary analysis:** Deploy `investigator-gpt` (GPT-5.1) for stream data requiring pattern recognition and experimental decode prototyping

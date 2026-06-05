@@ -28,6 +28,7 @@ Aggressive lead pursuit across all untapped mesh families. **4 new faced familie
 ### Export Details
 
 All 11 new faced OBJs exported successfully via `--experimental-position-source`:
+
 - All structurally valid (index bounds OK, no NaN)
 - Degenerate-bridge triangle-strip walking for strip-lead index streams
 - Pairing-based face generation for list-lead index streams
@@ -35,6 +36,7 @@ All 11 new faced OBJs exported successfully via `--experimental-position-source`
 ## Blockers Investigated
 
 ### meshSize=465 — CONFIRMED DEAD END
+
 - 13 samples across 4 patterns in `assets.050`, all mesh#8
 - Stream layout: 3× normal-float3 (uint16-packed, tangent-space data), 1× UV, 1× u32 metadata
 - **No position stream, no index stream** — 0 pairings across all samples
@@ -43,6 +45,7 @@ All 11 new faced OBJs exported successfully via `--experimental-position-source`
 - **Verdict:** Not exportable as faced geometry without reinterpreting uint16-packed data
 
 ### meshSize=280, 303, 316, 330, 354 — NO INDEX STREAMS
+
 - Probed meshSize=280 (36v, 0f), meshSize=316 (4v, 0f) — both position-only
 - These mesh sizes lack index streams despite appearing in pair-compatible inventory patterns
 

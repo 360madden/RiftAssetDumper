@@ -62,6 +62,7 @@ All 94 OBJs pass all structural validation checks. Manifest written to `Exports/
 **Dry-run result: 0 unexported candidates with index streams found.**
 
 The exhaustive sweep across all mesh sizes is complete. Every mesh in the copied archive set that has an index stream and can be paired with position/normal/UV data has been exported. Remaining unexported meshes are either:
+
 - Position-only families (no index streams)
 - Have index streams but no position/vertex pairings
 - Missing from the copied archive set entirely

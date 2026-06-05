@@ -20,7 +20,7 @@ ARCHIVE_HEADER_SIZE = 0x14
 
 def read_archive_entry(data: bytes, offset: int, index: int) -> dict:
     """Read a single archive entry (44 bytes) at the given offset."""
-    entry_data = data[offset:offset + ARCHIVE_ENTRY_SIZE]
+    entry_data = data[offset : offset + ARCHIVE_ENTRY_SIZE]
     id_bytes = entry_data[0:8]
     data_offset = struct.unpack_from("<I", entry_data, 8)[0]
     size = struct.unpack_from("<I", entry_data, 12)[0]
@@ -92,7 +92,7 @@ def is_nif_magic(data: bytes) -> bool:
     if len(data) < 8:
         return False
     for magic in NIF_MAGIC_BYTES:
-        if data[:len(magic)] == magic:
+        if data[: len(magic)] == magic:
             return True
     return False
 
@@ -163,7 +163,7 @@ def extract_nifs_from_archive(
                 failures += 1
                 continue
 
-            packed = data[entry["offset"]:entry["offset"] + entry["size"]]
+            packed = data[entry["offset"] : entry["offset"] + entry["size"]]
             payload = decompress_payload(entry, packed)
             if payload is None:
                 failures += 1
@@ -182,8 +182,10 @@ def extract_nifs_from_archive(
                 out_f.write(payload)
 
             if nif_found <= 3 or nif_found % 50 == 0:
-                print(f"  [{nif_found}/{max_count}] entry={entry['index']} id={entry['id_prefix']} "
-                      f"comp={entry['compression']} size={len(payload)}")
+                print(
+                    f"  [{nif_found}/{max_count}] entry={entry['index']} id={entry['id_prefix']} "
+                    f"comp={entry['compression']} size={len(payload)}"
+                )
 
         except Exception as e:
             failures += 1
@@ -252,8 +254,7 @@ def main():
         "archive_path": archive_path,
         "nif_count": len(nif_entries),
         "nif_entries": [
-            {"index": e["index"], "id_prefix": e["id_prefix"], "compression": e["compression"]}
-            for e in nif_entries
+            {"index": e["index"], "id_prefix": e["id_prefix"], "compression": e["compression"]} for e in nif_entries
         ],
     }
     manifest_path = os.path.join(out_dir, "extract-manifest.json")

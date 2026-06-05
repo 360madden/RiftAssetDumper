@@ -34,6 +34,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map (Phase 9: 4/4 byt
 ## M11.1 — C# Implementation
 
 ### Changes
+
 - **`ClassifyNifDescriptor`** label strings updated from generic/candidate labels to proven semantic map:
   - `37040300` → `"float32xvec3 (position/normal/UV vertex data)"`
   - `36040200` → `"float32xvec2 (UV coordinates)"`
@@ -49,6 +50,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map (Phase 9: 4/4 byt
 - **Tests**: 50/50 pass (added `ClassifyNifDescriptorRole_KnownPatternsAndEdgeCases`)
 
 ### Commits
+
 - `2b848c9` — feat(phase11): M11.1 descriptor-guided stream role classification
 - `291ffe4` — test(phase11): add ClassifyNifDescriptorRole test coverage
 
@@ -57,6 +59,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map (Phase 9: 4/4 byt
 ## M11.2 — Population-Scale Inventory
 
 ### Scale
+
 - **40,203** inspected payloads, **5,111** NIF payloads, **5,507** NiMesh blocks
 - **8,152** total stream records in inventory
 - **4,045** (49.6%) have recognized descriptor bytes → `DescriptorGuidedRole` populated
@@ -99,6 +102,7 @@ Applied the proven 4-byte NiDataStream descriptor semantic map (Phase 9: 4/4 byt
 **Key finding**: Only 134 of 2,304 `descriptor-float3-generic` streams are classified as position by the heuristic — just 5.8%.
 
 ### Commit
+
 - `5aacf06` — docs(phase11): M11.2 population-scale inventory complete
 
 ---
@@ -106,9 +110,11 @@ Applied the proven 4-byte NiDataStream descriptor semantic map (Phase 9: 4/4 byt
 ## M11.3 — Descriptor→Role Mismatch Analysis
 
 ### Method
+
 Cross-referenced `DescriptorGuidedRole` (element format from descriptor) vs `PrimaryRole` (role from heuristic classifier) for all 4,044 cross-referenced pairs.
 
 ### Clear Component-Count Contradictions
+
 Streams where the descriptor's element width × component count cannot plausibly hold the heuristic's role:
 
 | Mismatch | Count | Issue |
@@ -118,17 +124,21 @@ Streams where the descriptor's element width × component count cannot plausibly
 | **Total clear mismatches** | **546** | **13.5% of classified** |
 
 ### Initial Interpretation
+
 These 546 streams appeared to be heuristic classification errors — float2 data cannot hold 3-component positions or normals.
 
 ### Reframed by M11.4
+
 See below — 63% of OBJ-exported positions use float2 descriptors. Float2 position encoding is valid.
 
 ### Ambiguous Cases
+
 - **`descriptor-float3-generic`** → `normal-float3-ror1-lead`: 1,180 streams — component count matches (float3 can hold normals)
 - **`descriptor-float3-generic`** → `uv-float2-ror1-lead`: 614 streams — float3 descriptor but float2 role — could be UV3 or heuristic error
 - These require data-value inspection to disambiguate
 
 ### Commit
+
 - `d5a5251` — docs(phase11): M11.3 descriptor→role mismatch analysis
 
 ---
@@ -136,6 +146,7 @@ See below — 63% of OBJ-exported positions use float2 descriptors. Float2 posit
 ## M11.4 — OBJ Export Validation
 
 ### Method
+
 Cross-referenced 94 OBJ exports (65 faced, 28 position-only) against the descriptor-guided inventory. 82 unique OBJ IDs matched in inventory data.
 
 ### OBJ Stream Role Distribution
@@ -160,6 +171,7 @@ Cross-referenced 94 OBJ exports (65 faced, 28 position-only) against the descrip
 **63% of successfully exported OBJ position streams have `descriptor-float2-uv` (float32×2 descriptor).** This means RIFT uses float2 position encoding — not all positions are float32×3. The Gamebryo engine likely uses 2 floats for XY and computes Z separately, or stores Z in a different stream.
 
 This reframes the M11.3 findings:
+
 - The 458 `float2→position` "mismatches" are NOT errors — they're valid float2-encoded positions
 - The 88 `float2→normal` "mismatches" may similarly be valid float2-encoded normals
 - The heuristic classifier is correctly assigning position/normal roles to float2 streams
@@ -174,6 +186,7 @@ This reframes the M11.3 findings:
 | `bytexvec4` → packed attribute | ⚠️ Unvalidated | No OBJ exports use bytexvec4 streams |
 
 ### Commit
+
 - `ba99b23` — docs(phase11): M11.4 OBJ export validation
 
 ---

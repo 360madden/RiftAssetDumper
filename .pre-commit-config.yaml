@@ -1,0 +1,76 @@
+# Pre-commit hooks for RIFT Asset Dumper workspace
+# Install: ..\Tools\pre-commit\pre-commit.cmd install
+# Run all: ..\Tools\pre-commit\pre-commit.cmd run --all-files
+
+repos:
+  # ── Python: ruff lint + format ──────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^scripts/.*\.py$
+      - id: ruff-format
+        files: ^scripts/.*\.py$
+
+  # ── Python: mypy type check ─────────────────────────────────────
+  # NOTE: mypy hook intentionally omitted — pre-commit runs mypy in a
+  # separate venv that doesn't have our project dependencies installed.
+  # mypy is enforced via CI and manual `mypy scripts/ --no-error-summary`.
+  # To re-add: use a local hook (repo: local) which runs system mypy
+  # with the correct config auto-discovered from pyproject.toml.
+
+  # ── Secrets & path leak scanning ────────────────────────────────
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks — scan for path leaks and secrets
+        entry: ../Tools/gitleaks/gitleaks.exe protect --staged --verbose
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # ── Markdown linting ────────────────────────────────────────────
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.44.0
+    hooks:
+      - id: markdownlint-fix
+        args: [--config, .markdownlint.json]
+        files: \.md$
+
+  # ── .NET format check (C# only) ────────────────────────────────
+  # Uses pass_filenames: false — dotnet format validates the whole solution.
+  # Only triggers when .cs files are staged (via `files:` filter).
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format (C# files)
+        entry: dotnet format RiftAssetDumper.slnx --verify-no-changes
+        language: system
+        files: \.cs$
+        pass_filenames: false
+
+  # ── Generated output guard ──────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: generated-output-guard
+        name: generated output guard — block Source/Exports/Extracted
+        entry: python -c "import sys; files=sys.argv[1:]; bad=[f for f in files if any(f.startswith(p) for p in ['Source/','Exports/','Extracted/','RecoveredNames/'])]; sys.exit(1 if bad else 0)"
+        language: system
+        always_run: true
+        pass_filenames: true
+        files: .*
+
+# Global excludes — never run hooks on these
+exclude: |
+  (?x)(
+    ^Source/|
+    ^Extracted/|
+    ^Exports/|
+    ^RecoveredNames/|
+    ^Candidates/|
+    ^bin/|
+    ^obj/|
+    __pycache__|
+    \.pyc$
+  )

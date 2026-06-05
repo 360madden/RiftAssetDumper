@@ -134,16 +134,17 @@ for ms in sorted(all_position_streams.keys(), key=lambda x: int(x) if x.isdigit(
 # ============================================================
 
 shared_sizes = [
-    ms for ms in all_position_streams
+    ms
+    for ms in all_position_streams
     if any("float2" in s["dgr"] for s in all_position_streams[ms])
     and any("float3" in s["dgr"] for s in all_position_streams[ms])
 ]
 
 print(f"\nShared MeshSizes (float2 AND float3): {sorted(shared_sizes, key=lambda x: int(x) if x.isdigit() else 0)}")
 
-print(f"\n{'='*80}")
+print(f"\n{'=' * 80}")
 print("CONCRETE SIBLING PAIRING MAP")
-print(f"{'='*80}\n")
+print(f"{'=' * 80}\n")
 
 ms_pair_total = 0
 
@@ -211,7 +212,9 @@ for ms in sorted(shared_sizes, key=lambda x: int(x) if x.isdigit() else 0):
                     pair_count += 1
                     print(f"  Pair #{pair_count}:")
                     print(f"    FLOAT2: {f2_m['id'][:16]} MB={f2_m['mb']} entry={f2_entry} payload={f2_m['payload']}")
-                    print(f"    FLOAT3: {best_f3['id'][:16]} MB={best_f3['mb']} entry={f3_entry} payload={best_f3['payload']}")
+                    print(
+                        f"    FLOAT3: {best_f3['id'][:16]} MB={best_f3['mb']} entry={f3_entry} payload={best_f3['payload']}"
+                    )
                     print(f"    Archive: {arch}, distance={best_dist}")
                     # Show body16 if available
                     if f2_m.get("body16"):
@@ -236,9 +239,9 @@ for ms in sorted(shared_sizes, key=lambda x: int(x) if x.isdigit() else 0):
 
 total_pairs = ms_pair_total
 
-print(f"{'='*80}")
+print(f"{'=' * 80}")
 print("SIBLING PAIRING SUMMARY")
-print(f"{'='*80}")
+print(f"{'=' * 80}")
 print(f"\nShared MeshSizes with both float2 and float3: {len(shared_sizes)}")
 print(f"Total concrete sibling pairs (archive-close): {total_pairs}")
 print()

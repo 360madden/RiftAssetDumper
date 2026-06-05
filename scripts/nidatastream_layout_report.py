@@ -188,7 +188,9 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
         if pair_count > 100_000 or offset + (pair_count * 8) > len(payload):
             raise NifParseError(f"Pair count {pair_count} does not fit in block.")
         pair_records_offset = offset
-        first_pair_record_bytes = _hex_prefix(payload[pair_records_offset : pair_records_offset + min(8, pair_count * 8)], 8)
+        first_pair_record_bytes = _hex_prefix(
+            payload[pair_records_offset : pair_records_offset + min(8, pair_count * 8)], 8
+        )
         offset += pair_count * 8
         descriptor_count_offset = offset
         descriptor_count = _u32le(payload, offset)
@@ -311,11 +313,7 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
 
     valid_declared = [block for block in all_blocks if block.get("ValidDeclaredPayload")]
     ghidra_valid = [block for block in all_blocks if block.get("GhidraStyleLayoutValid")]
-    shifted = [
-        block
-        for block in all_blocks
-        if block.get("LegacyOffsetMinusGhidraOffset") not in (None, 0)
-    ]
+    shifted = [block for block in all_blocks if block.get("LegacyOffsetMinusGhidraOffset") not in (None, 0)]
 
     prefix_counts: Counter[Any] = Counter(block.get("PayloadPrefixBytes") for block in all_blocks)
     trailer_counts: Counter[Any] = Counter(block.get("PayloadTrailerBytes") for block in all_blocks)
@@ -327,7 +325,9 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
     first_pair_record_bytes_counts: Counter[Any] = Counter(block.get("FirstPairRecordBytes") for block in all_blocks)
     descriptor_counts: Counter[Any] = Counter(block.get("DescriptorCount") for block in all_blocks)
     descriptor_count_offset_counts: Counter[Any] = Counter(block.get("DescriptorCountOffset") for block in all_blocks)
-    descriptor_record_offset_counts: Counter[Any] = Counter(block.get("DescriptorRecordsOffset") for block in all_blocks)
+    descriptor_record_offset_counts: Counter[Any] = Counter(
+        block.get("DescriptorRecordsOffset") for block in all_blocks
+    )
     first_descriptor_record_bytes_counts: Counter[Any] = Counter(
         block.get("FirstDescriptorRecordBytes") for block in all_blocks
     )
@@ -410,7 +410,14 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
         lines.append("")
 
     samples = report.get("ShiftedSamples")
-    lines.extend(["## Shifted samples", "", "| File | Block | Size | Declared | Pair record | Descriptor record | Legacy offset | Ghidra offset | Trailer | Flag | Legacy first16 | Ghidra first16 |", "|---|---:|---:|---:|---|---|---:|---:|---:|---:|---|---|"])
+    lines.extend(
+        [
+            "## Shifted samples",
+            "",
+            "| File | Block | Size | Declared | Pair record | Descriptor record | Legacy offset | Ghidra offset | Trailer | Flag | Legacy first16 | Ghidra first16 |",
+            "|---|---:|---:|---:|---|---|---:|---:|---:|---:|---|---|",
+        ]
+    )
     if isinstance(samples, list) and samples:
         for sample_value in samples[:20]:
             sample = sample_value if isinstance(sample_value, Mapping) else {}

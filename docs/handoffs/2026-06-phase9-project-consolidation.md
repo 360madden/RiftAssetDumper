@@ -143,13 +143,13 @@ Binding reuse proven     0 decode/export changes       1 gate RETIRED
 
 ### Semantic Corrections
 
-6. **`15020100` is an index stream descriptor** (not u16-vertex-data) — cross-referenced with usage=0 at sample scale (M8.2).
+1. **`15020100` is an index stream descriptor** (not u16-vertex-data) — cross-referenced with usage=0 at sample scale (M8.2).
 
 ### Safety Record
 
-7. **Zero decode/export changes across 13 code milestones** (Phases 4-6) — the safety brake (gate 6) has held perfectly through the entire descriptor stack implementation.
+1. **Zero decode/export changes across 13 code milestones** (Phases 4-6) — the safety brake (gate 6) has held perfectly through the entire descriptor stack implementation.
 
-8. **Both promotion flags remain false** — `FieldOrderPromoted` and `ParserExportPromotionAllowed` have never been set to true.
+2. **Both promotion flags remain false** — `FieldOrderPromoted` and `ParserExportPromotionAllowed` have never been set to true.
 
 ---
 

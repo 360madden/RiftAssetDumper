@@ -849,8 +849,7 @@ def main() -> int:
         "Candidates": scoreboard,
         "CrossChecks": cross_checks,
         "Interpretation": (
-            "Ranked discovery workbench only; no parser role, geometry truth, "
-            "or OBJ/export readiness is promoted."
+            "Ranked discovery workbench only; no parser role, geometry truth, or OBJ/export readiness is promoted."
         ),
     }
     queue_payload = {

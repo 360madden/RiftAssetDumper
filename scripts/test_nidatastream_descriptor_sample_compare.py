@@ -72,12 +72,8 @@ def write_descriptor_fixture(temp_path: Path) -> Path:
             json.dumps(
                 {
                     "function": {"entry": f"{address_base + index:x}"},
-                    "callsFromFunction": [
-                        {"calleeEntry": f"0x{call}"} for call in requirements["RequiredCalls"]
-                    ],
-                    "dataRefsFromFunction": [
-                        {"to": f"0x{data_ref}"} for data_ref in requirements["RequiredDataRefs"]
-                    ],
+                    "callsFromFunction": [{"calleeEntry": f"0x{call}"} for call in requirements["RequiredCalls"]],
+                    "dataRefsFromFunction": [{"to": f"0x{data_ref}"} for data_ref in requirements["RequiredDataRefs"]],
                     "decompile": {
                         "completed": True,
                         "c": " ".join(decompile_terms) or "return;",
@@ -338,13 +334,19 @@ check("record pattern matrix candidate-only", record_pattern_matrix["CandidateOn
 check("record pattern matrix rows", record_pattern_matrix["RecordPatternCount"], 2)
 check("record pattern matrix observed count", record_pattern_matrix["ObservedRecordCount"], 5)
 check("record pattern matrix index offset", record_pattern_matrix["CandidateIndexByteOffset"], 0)
-check("record pattern matrix helper ignored offsets", record_pattern_matrix["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check(
+    "record pattern matrix helper ignored offsets",
+    record_pattern_matrix["CandidateHelperLookupIgnoredByteOffsets"],
+    [1, 2],
+)
 check("record pattern matrix sign guard offsets", record_pattern_matrix["CandidateSignGuardByteOffsets"], [3])
 check("record pattern matrix remaining offsets", record_pattern_matrix["RemainingUnmappedByteOffsets"], [1, 2])
 first_pattern_row = record_pattern_matrix["Rows"][0]
 check("record pattern matrix first hex", first_pattern_row["RecordHex"], "aa 04 03 00")
 check("record pattern matrix first index", first_pattern_row["CandidateIndexByte"]["ValueHex"], "aa")
-check("record pattern matrix first helper ignored count", len(first_pattern_row["CandidateHelperLookupIgnoredBytes"]), 2)
+check(
+    "record pattern matrix first helper ignored count", len(first_pattern_row["CandidateHelperLookupIgnoredBytes"]), 2
+)
 check("record pattern matrix first remaining count", len(first_pattern_row["RemainingUnmappedBytes"]), 2)
 sample_context = compare["DescriptorSampleContextCorrelation"]
 check("sample context candidate-only", sample_context["CandidateOnly"], True)
@@ -390,7 +392,9 @@ check(
 semantic_feasibility = compare["DescriptorSemanticFeasibility"]
 check("semantic feasibility candidate-only", semantic_feasibility["CandidateOnly"], True)
 check("semantic feasibility static field map ready", semantic_feasibility["StaticFieldMapReady"], True)
-check("semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True)
+check(
+    "semantic feasibility byte distribution ready", semantic_feasibility["DescriptorRecordByteDistributionReady"], True
+)
 check("semantic feasibility record index mapped", semantic_feasibility["DescriptorRecordIndexCandidateMapped"], True)
 check("semantic feasibility byte roles classified", semantic_feasibility["DescriptorRecordByteRolesClassified"], True)
 check(
@@ -402,14 +406,20 @@ check("semantic feasibility mapping blocked", semantic_feasibility["SemanticMapp
 check("semantic feasibility static offsets", semantic_feasibility["StaticFieldMapOffsetCount"], 3)
 check("semantic feasibility record offsets", semantic_feasibility["DescriptorRecordByteOffsetCount"], 4)
 check("semantic feasibility mapped fields", semantic_feasibility["StreamDescriptorRecordMappedCount"], 1)
-check("semantic feasibility blocker present", "stream-record-semantics-partial" in semantic_feasibility["Blockers"], True)
+check(
+    "semantic feasibility blocker present", "stream-record-semantics-partial" in semantic_feasibility["Blockers"], True
+)
 check(
     "semantic feasibility remaining byte blocker",
     "stream-record-payload-bytes-unmapped" in semantic_feasibility["Blockers"],
     True,
 )
 check("semantic feasibility padding offsets", semantic_feasibility["CandidatePaddingByteOffsets"], [3])
-check("semantic feasibility helper ignored offsets", semantic_feasibility["CandidateHelperLookupIgnoredByteOffsets"], [1, 2])
+check(
+    "semantic feasibility helper ignored offsets",
+    semantic_feasibility["CandidateHelperLookupIgnoredByteOffsets"],
+    [1, 2],
+)
 check("semantic feasibility sign guard offsets", semantic_feasibility["CandidateSignGuardByteOffsets"], [3])
 check("semantic feasibility remaining offsets", semantic_feasibility["RemainingUnmappedRecordByteOffsets"], [1, 2])
 first_semantic_row = semantic_feasibility["OffsetComparisonRows"][0]
@@ -422,16 +432,24 @@ check(
 )
 check("candidate field map count", len(compare["CandidateFieldMap"]), 4)
 stride_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-table-stride")
-format_field = next(field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-format-size-lookup")
+format_field = next(
+    field for field in compare["CandidateFieldMap"] if field["Field"] == "descriptor-format-size-lookup"
+)
 check("field map promotion status", stride_field["PromotionStatus"], "candidate-only")
 check("field map table stride", stride_field["StaticTableStrideBytes"], 12)
 check("field map format offset", format_field["StaticTableOffsetBytes"], 8)
-check("field map stream record not promoted", format_field["StreamDescriptorRecordStatus"], "not-mapped-to-parser-field")
+check(
+    "field map stream record not promoted", format_field["StreamDescriptorRecordStatus"], "not-mapped-to-parser-field"
+)
 descriptor_record_check = next(
     check for check in compare["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
 )
 check("descriptor record offset observed", descriptor_record_check["ObservedInteger"], 24)
-check("descriptor byte examples present", compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 04 03 00")
+check(
+    "descriptor byte examples present",
+    compare["DescriptorByteOrderProof"]["TopFirstDescriptorRecordBytes"][0]["Value"],
+    "aa 04 03 00",
+)
 check("sample corpus root", compare["SampleCorpusStatus"]["Root"], "Extracted")
 check("sample corpus files scanned", compare["SampleCorpusStatus"]["FilesScanned"], 2)
 check("sample corpus shifted samples", compare["SampleCorpusStatus"]["ShiftedSampleCount"], 5)
@@ -476,7 +494,11 @@ with TemporaryDirectory() as temp_dir:
 all_index_compare = json.loads(all_index_output.getvalue())
 jsonschema.validate(all_index_compare, schema)
 all_index_table = all_index_compare["DescriptorTableSampleStatus"]
-check("all-index table sample preferred", all_index_table["Path"].endswith("nidatastream_descriptor_table_all_indices.json"), True)
+check(
+    "all-index table sample preferred",
+    all_index_table["Path"].endswith("nidatastream_descriptor_table_all_indices.json"),
+    True,
+)
 check("all-index table sample nonzero rows", all_index_table["NonzeroRowCount"], 1)
 check("all-index table sample all rows zero false", all_index_table["AllRowsZero"], False)
 
@@ -509,7 +531,9 @@ with TemporaryDirectory() as temp_dir:
 mismatch = json.loads(mismatch_output.getvalue())
 jsonschema.validate(mismatch, schema)
 print("  PASS: mismatch comparison schema validation")
-prefix_check = next(check for check in mismatch["SampleByteSummary"]["Checks"] if check["Key"] == "payload-prefix-bytes")
+prefix_check = next(
+    check for check in mismatch["SampleByteSummary"]["Checks"] if check["Key"] == "payload-prefix-bytes"
+)
 check("mismatch sample checks fail", mismatch["SampleByteSummary"]["AllExpectedValuesUniform"], False)
 check("mismatch descriptor + sample evidence not ready", mismatch["DescriptorAndSampleEvidenceReady"], False)
 check("mismatch prefix observed", prefix_check["ObservedInteger"], 29)
@@ -551,12 +575,24 @@ byte_order_mismatch = json.loads(byte_order_output.getvalue())
 jsonschema.validate(byte_order_mismatch, schema)
 print("  PASS: byte-order mismatch comparison schema validation")
 descriptor_offset_check = next(
-    check for check in byte_order_mismatch["DescriptorByteOrderProof"]["Checks"] if check["Key"] == "descriptor-record-offset"
+    check
+    for check in byte_order_mismatch["DescriptorByteOrderProof"]["Checks"]
+    if check["Key"] == "descriptor-record-offset"
 )
-check("byte-order mismatch checks fail", byte_order_mismatch["DescriptorByteOrderProof"]["AllExpectedFieldsUniform"], False)
-check("byte-order mismatch descriptor + sample evidence not ready", byte_order_mismatch["DescriptorAndSampleEvidenceReady"], False)
+check(
+    "byte-order mismatch checks fail",
+    byte_order_mismatch["DescriptorByteOrderProof"]["AllExpectedFieldsUniform"],
+    False,
+)
+check(
+    "byte-order mismatch descriptor + sample evidence not ready",
+    byte_order_mismatch["DescriptorAndSampleEvidenceReady"],
+    False,
+)
 check("byte-order mismatch observed", descriptor_offset_check["ObservedInteger"], 25)
-check("byte-order mismatch blocker present", "descriptor-byte-order-incomplete" in byte_order_mismatch["Blockers"], True)
+check(
+    "byte-order mismatch blocker present", "descriptor-byte-order-incomplete" in byte_order_mismatch["Blockers"], True
+)
 
 print("=== NiDataStream descriptor malformed record fixture ===")
 with TemporaryDirectory() as temp_dir:
@@ -681,28 +717,40 @@ record_index_promoted_compare["DescriptorRecordIndexProof"]["ParserExportPromoti
 check_validation_error("schema rejects promoted descriptor record index proof", record_index_promoted_compare, schema)
 helper_argument_promoted_compare = json.loads(json.dumps(compare))
 helper_argument_promoted_compare["DescriptorHelperArgumentUseProof"]["ParserExportPromotionAllowed"] = True
-check_validation_error("schema rejects promoted descriptor helper argument proof", helper_argument_promoted_compare, schema)
+check_validation_error(
+    "schema rejects promoted descriptor helper argument proof", helper_argument_promoted_compare, schema
+)
 record_role_promoted_compare = json.loads(json.dumps(compare))
 record_role_promoted_compare["DescriptorRecordByteRoleCandidates"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor byte-role candidates", record_role_promoted_compare, schema)
 record_pattern_promoted_compare = json.loads(json.dumps(compare))
 record_pattern_promoted_compare["DescriptorRecordPatternMatrix"]["ParserExportPromotionAllowed"] = True
-check_validation_error("schema rejects promoted descriptor record pattern matrix", record_pattern_promoted_compare, schema)
+check_validation_error(
+    "schema rejects promoted descriptor record pattern matrix", record_pattern_promoted_compare, schema
+)
 sample_context_promoted_compare = json.loads(json.dumps(compare))
 sample_context_promoted_compare["DescriptorSampleContextCorrelation"]["ParserExportPromotionAllowed"] = True
-check_validation_error("schema rejects promoted descriptor sample context correlation", sample_context_promoted_compare, schema)
+check_validation_error(
+    "schema rejects promoted descriptor sample context correlation", sample_context_promoted_compare, schema
+)
 sample_context_string_ready_compare = json.loads(json.dumps(compare))
 sample_context_string_ready_compare["DescriptorSampleContextCorrelation"]["CorrelationReady"] = "true"
-check_validation_error("schema rejects string descriptor sample context ready flag", sample_context_string_ready_compare, schema)
+check_validation_error(
+    "schema rejects string descriptor sample context ready flag", sample_context_string_ready_compare, schema
+)
 sample_context_bad_review_rank_compare = json.loads(json.dumps(compare))
 sample_context_bad_review_rank_compare["DescriptorSampleContextCorrelation"]["ReviewQueueRows"][0]["Rank"] = 0
-check_validation_error("schema rejects descriptor sample context review rank zero", sample_context_bad_review_rank_compare, schema)
+check_validation_error(
+    "schema rejects descriptor sample context review rank zero", sample_context_bad_review_rank_compare, schema
+)
 table_sample_promoted_compare = json.loads(json.dumps(compare))
 table_sample_promoted_compare["DescriptorTableSampleStatus"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor table sample status", table_sample_promoted_compare, schema)
 table_sample_semantics_compare = json.loads(json.dumps(compare))
 table_sample_semantics_compare["DescriptorTableSampleStatus"]["StreamSemanticsExplained"] = True
-check_validation_error("schema rejects descriptor table sample semantic promotion", table_sample_semantics_compare, schema)
+check_validation_error(
+    "schema rejects descriptor table sample semantic promotion", table_sample_semantics_compare, schema
+)
 semantic_promoted_compare = json.loads(json.dumps(compare))
 semantic_promoted_compare["DescriptorSemanticFeasibility"]["ParserExportPromotionAllowed"] = True
 check_validation_error("schema rejects promoted descriptor semantic feasibility", semantic_promoted_compare, schema)
@@ -755,7 +803,9 @@ with TemporaryDirectory() as temp_dir:
     check_contains("markdown descriptor record pattern row", markdown, "aa 04 03 00")
     check_contains("markdown descriptor sample context correlation", markdown, "Descriptor/sample context correlation")
     check_contains("markdown descriptor sample context pair", markdown, "00 00 00 00 05 00 00 00")
-    check_contains("markdown descriptor sample context review queue", markdown, "Descriptor/sample context review queue")
+    check_contains(
+        "markdown descriptor sample context review queue", markdown, "Descriptor/sample context review queue"
+    )
     check_contains("markdown descriptor semantic feasibility", markdown, "Descriptor semantic feasibility")
     check_contains("markdown semantic mapping decision", markdown, "selected-by-record-byte-0-index-candidate")
     check_contains("markdown candidate field map", markdown, "Candidate descriptor field map")

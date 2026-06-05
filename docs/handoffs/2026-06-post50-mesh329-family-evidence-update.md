@@ -18,6 +18,7 @@ This cycle executed the two recommended narrow commands on this exact lead:
 ## New Evidence (Candidate-Only)
 
 ### From `post50-mesh329-family-proof`
+
 - Evidence groups: **23**
 - Total stream links: **46**
 - Distinct IDs: **23**
@@ -26,6 +27,7 @@ This cycle executed the two recommended narrow commands on this exact lead:
 - Family consistency checks: all passed.
 
 ### From `post50-mesh329-source-binding-compare`
+
 - 3 detailed examples examined (IDs 0364ea14..., 04de9015..., 066fa520...).
 - Primary @212/#28 vectors: 22–48
 - mesh#34 carries consistent extra stream `@304/#57` (position-like role candidate) in addition to the shared primary.
@@ -37,6 +39,7 @@ This cycle executed the two recommended narrow commands on this exact lead:
 **Aggregate interpretation**: Strong, repeatable source-binding pattern. mesh#34 frequently appears as a "sibling + extra stream" variant of mesh#7 within the same family. No complete geometry bindings proven yet.
 
 ## Blockers (unchanged)
+
 - `source-binding-family-candidate-only`
 - `mesh34-complete-geometry-binding-not-proven`
 - `parser-export-promotion-not-allowed`
@@ -58,6 +61,7 @@ After strengthening the family proof:
 No live scanning or parser/export changes are warranted from this cycle.
 
 ## Artifacts Generated (this cycle)
+
 - `Exports/post50-mesh329-source-binding-compare.json`
 - `Exports/post50-mesh329-source-binding-compare.md`
 - `Exports/post50-mesh329-family-proof.json`
@@ -66,6 +70,7 @@ No live scanning or parser/export changes are warranted from this cycle.
 All outputs correctly placed under ignored `Exports/`.
 
 ## Validation Performed
+
 - GeneratedOutputGuard: passed (twice)
 - Solution build: succeeded (pre-existing package warning only)
 

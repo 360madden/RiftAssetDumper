@@ -117,8 +117,7 @@ def _show_asset_signatures(report: dict[str, Any]) -> None:
                     f"{json_value_or_dash(g, 'Type')}:"
                     + top_text(
                         g["XmlTagCounts"],
-                        lambda c: f"{json_value_or_dash(c, 'Value')}="
-                        f"{json_value_or_dash(c, 'Count')}",
+                        lambda c: f"{json_value_or_dash(c, 'Value')}={json_value_or_dash(c, 'Count')}",
                         5,
                     )
                 ),
@@ -133,8 +132,7 @@ def _show_asset_signatures(report: dict[str, Any]) -> None:
                     f"{json_value_or_dash(g, 'Type')}:"
                     + top_text(
                         g["XmlAttributeCounts"],
-                        lambda c: f"{json_value_or_dash(c, 'Value')}="
-                        f"{json_value_or_dash(c, 'Count')}",
+                        lambda c: f"{json_value_or_dash(c, 'Value')}={json_value_or_dash(c, 'Count')}",
                         5,
                     )
                 ),
@@ -160,8 +158,7 @@ def _show_asset_signatures(report: dict[str, Any]) -> None:
                     f"{json_value_or_dash(g, 'Type')}:"
                     + top_text(
                         g["XmlParseStatusCounts"],
-                        lambda c: f"{json_value_or_dash(c, 'Value')}="
-                        f"{json_value_or_dash(c, 'Count')}",
+                        lambda c: f"{json_value_or_dash(c, 'Value')}={json_value_or_dash(c, 'Count')}",
                         5,
                     )
                 ),
@@ -187,8 +184,7 @@ def _show_asset_signatures(report: dict[str, Any]) -> None:
                     f"{json_value_or_dash(g, 'Type')}:"
                     + top_text(
                         g["XmlParseWarningCounts"],
-                        lambda c: f"{json_value_or_dash(c, 'Value')}="
-                        f"{json_value_or_dash(c, 'Count')}",
+                        lambda c: f"{json_value_or_dash(c, 'Value')}={json_value_or_dash(c, 'Count')}",
                         5,
                     )
                 ),
@@ -232,9 +228,7 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
             + top_text(
                 usage_access_roles,
                 lambda g: (
-                    f"{format_nif_usage_access(g)} "
-                    f"{json_value_or_dash(g, 'Role')}="
-                    f"{json_value_or_dash(g, 'Count')}"
+                    f"{format_nif_usage_access(g)} {json_value_or_dash(g, 'Role')}={json_value_or_dash(g, 'Count')}"
                 ),
                 8,
             )
@@ -325,8 +319,7 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
         position_groups = [
             g
             for g in role_groups
-            if isinstance(g, dict)
-            and str(json_value_or_dash(g, "Role")) == "position-float3-ror1-lead"
+            if isinstance(g, dict) and str(json_value_or_dash(g, "Role")) == "position-float3-ror1-lead"
         ]
         if position_groups:
             pos_role = position_groups[0]
@@ -436,9 +429,7 @@ def _show_mesh_bindings(report: dict[str, Any]) -> None:
         )
 
     top_ghidra_pairing_review_findings = report.get("TopGhidraPairingReviewFindings")
-    if top_ghidra_pairing_review_findings and isinstance(
-        top_ghidra_pairing_review_findings, list
-    ):
+    if top_ghidra_pairing_review_findings and isinstance(top_ghidra_pairing_review_findings, list):
         print(
             "Top Ghidra pairing review findings: "
             + top_text(
@@ -788,24 +779,15 @@ def _show_attribute_extra_probe(report: dict[str, Any]) -> None:
 
             pos_samples = extra.get("PositionVertexSamples")
             if pos_samples and isinstance(pos_samples, list):
-                print(
-                    "    position samples: "
-                    + top_text(pos_samples, format_vector_sample, 6)
-                )
+                print("    position samples: " + top_text(pos_samples, format_vector_sample, 6))
 
             norm_samples = extra.get("NormalVertexSamples")
             if norm_samples and isinstance(norm_samples, list):
-                print(
-                    "    normal samples: "
-                    + top_text(norm_samples, format_vector_sample, 6)
-                )
+                print("    normal samples: " + top_text(norm_samples, format_vector_sample, 6))
 
             uv_samples = extra.get("UvVertexSamples")
             if uv_samples and isinstance(uv_samples, list):
-                print(
-                    "    uv samples: "
-                    + top_text(uv_samples, format_vector_sample, 6)
-                )
+                print("    uv samples: " + top_text(uv_samples, format_vector_sample, 6))
 
             fit_values = extra.get("MappingPositionFitness")
             if fit_values and isinstance(fit_values, list) and fit_values:
@@ -942,7 +924,9 @@ def _show_simple_inventory(report: dict[str, Any], mode: str) -> None:
                 "Top sizes: "
                 + top_text(
                     sizes,
-                    lambda g: f"payload={json_value_or_dash(g, 'DeclaredPayloadBytes')} count={json_value_or_dash(g, 'Count')}",
+                    lambda g: (
+                        f"payload={json_value_or_dash(g, 'DeclaredPayloadBytes')} count={json_value_or_dash(g, 'Count')}"
+                    ),
                 )
             )
         sigs = report.get("TopBodySignatures")
@@ -970,7 +954,7 @@ def show_report_summary(mode_name: str, report_path: str) -> None:
     """
     try:
         report = load_json_report(report_path)
-    except (FileNotFoundError, ValueError):
+    except FileNotFoundError, ValueError:
         print(f"No report found: {report_path}", file=sys.stderr)
         return
 
@@ -1007,9 +991,7 @@ def _new_semantic_hint_entry_row(entry: dict[str, Any], job: str) -> dict[str, A
     """
     model = semantic_hint_primary_model(entry)
     name_candidates = entry.get("NameCandidates") or []
-    texture_count = len(
-        [n for n in name_candidates if isinstance(n, str) and n.endswith(".dds")]
-    )
+    texture_count = len([n for n in name_candidates if isinstance(n, str) and n.endswith(".dds")])
     categories = entry.get("SemanticCategories") or []
     return {
         "Job": job,
@@ -1041,9 +1023,7 @@ def semantic_hint_cross_tab(out_dir: str) -> None:
 
     for required_path in (actor_path, map_path, poi_path):
         if not required_path.exists():
-            raise FileNotFoundError(
-                f"SemanticHintCrossTab failed: required matrix output is missing: {required_path}"
-            )
+            raise FileNotFoundError(f"SemanticHintCrossTab failed: required matrix output is missing: {required_path}")
 
     actor_data = load_json_report(str(actor_path))
     map_data = load_json_report(str(map_path))
@@ -1077,9 +1057,7 @@ def semantic_hint_cross_tab(out_dir: str) -> None:
                 "Bucket": bucket,
                 "Count": len(group),
                 "Jobs": ",".join(sorted({r["Job"] for r in group})),
-                "SampleIds": ",".join(
-                    [r["AssetIdPrefix"] for r in group[:5]]
-                ),
+                "SampleIds": ",".join([r["AssetIdPrefix"] for r in group[:5]]),
             }
             for bucket, group in bucket_groups.items()
         ],
@@ -1241,43 +1219,21 @@ def ghidra_pairing_review_report(
             "Count": json_value_or_dash(group_obj, "Count"),
             "LegacyRoles": _role_pair(legacy_pairing) if legacy_pairing else "-",
             "GhidraRoles": _role_pair(ghidra_pairing) if ghidra_pairing else "-",
-            "LegacyVertexSemanticClass": json_value_or_dash(
-                group_obj, "LegacyVertexSemanticClass"
-            ),
-            "GhidraVertexSemanticClass": json_value_or_dash(
-                group_obj, "GhidraVertexSemanticClass"
-            ),
-            "AverageLegacyConfidence": json_value_or_dash(
-                group_obj, "AverageLegacyConfidence"
-            ),
-            "AverageGhidraConfidence": json_value_or_dash(
-                group_obj, "AverageGhidraConfidence"
-            ),
-            "AverageConfidenceDelta": json_value_or_dash(
-                group_obj, "AverageConfidenceDelta"
-            ),
+            "LegacyVertexSemanticClass": json_value_or_dash(group_obj, "LegacyVertexSemanticClass"),
+            "GhidraVertexSemanticClass": json_value_or_dash(group_obj, "GhidraVertexSemanticClass"),
+            "AverageLegacyConfidence": json_value_or_dash(group_obj, "AverageLegacyConfidence"),
+            "AverageGhidraConfidence": json_value_or_dash(group_obj, "AverageGhidraConfidence"),
+            "AverageConfidenceDelta": json_value_or_dash(group_obj, "AverageConfidenceDelta"),
             "SampleIdPrefix": json_value_or_dash(sample, "IdPrefix"),
             "SampleMeshBlockIndex": json_value_or_dash(sample, "MeshBlockIndex"),
-            "SampleIndexOffset": json_value_or_dash(
-                chosen_pairing, "IndexMeshPayloadOffset"
-            ),
+            "SampleIndexOffset": json_value_or_dash(chosen_pairing, "IndexMeshPayloadOffset"),
             "SampleIndexBlock": json_value_or_dash(chosen_pairing, "IndexBlockIndex"),
-            "SampleVertexOffset": json_value_or_dash(
-                chosen_pairing, "VertexMeshPayloadOffset"
-            ),
+            "SampleVertexOffset": json_value_or_dash(chosen_pairing, "VertexMeshPayloadOffset"),
             "SampleVertexBlock": json_value_or_dash(chosen_pairing, "VertexBlockIndex"),
-            "LegacyIndexBodyFirst16": json_value_or_dash(
-                legacy_pairing, "IndexBodyFirst16"
-            ),
-            "LegacyVertexBodyFirst16": json_value_or_dash(
-                legacy_pairing, "VertexBodyFirst16"
-            ),
-            "GhidraIndexBodyFirst16": json_value_or_dash(
-                ghidra_pairing, "IndexBodyFirst16"
-            ),
-            "GhidraVertexBodyFirst16": json_value_or_dash(
-                ghidra_pairing, "VertexBodyFirst16"
-            ),
+            "LegacyIndexBodyFirst16": json_value_or_dash(legacy_pairing, "IndexBodyFirst16"),
+            "LegacyVertexBodyFirst16": json_value_or_dash(legacy_pairing, "VertexBodyFirst16"),
+            "GhidraIndexBodyFirst16": json_value_or_dash(ghidra_pairing, "IndexBodyFirst16"),
+            "GhidraVertexBodyFirst16": json_value_or_dash(ghidra_pairing, "VertexBodyFirst16"),
         }
         finding["ProbeCommand"] = (
             "python scripts/rift_workflow.py mesh-probe "
@@ -1288,9 +1244,7 @@ def ghidra_pairing_review_report(
         findings.append(finding)
 
     if not findings:
-        raise ValueError(
-            "GhidraPairingReviewReport failed: no valid review findings were found."
-        )
+        raise ValueError("GhidraPairingReviewReport failed: no valid review findings were found.")
 
     kind_counts: dict[str, int] = {}
     for finding in findings:
@@ -1319,8 +1273,7 @@ def ghidra_pairing_review_report(
     md_lines = [
         "# Ghidra pairing review report",
         "",
-        "Candidate-only: yes. This report ranks review targets and does not promote "
-        "parser/export behavior.",
+        "Candidate-only: yes. This report ranks review targets and does not promote parser/export behavior.",
         "",
         f"- Source report: `{format_markdown_cell(report_path)}`",
         f"- Emitted findings: {len(findings)}",
@@ -1333,9 +1286,7 @@ def ghidra_pairing_review_report(
         "|---:|---|---:|---:|---|---|---|---|---|",
     ]
     for finding in findings:
-        classes = (
-            f"{finding['LegacyVertexSemanticClass']}->{finding['GhidraVertexSemanticClass']}"
-        )
+        classes = f"{finding['LegacyVertexSemanticClass']}->{finding['GhidraVertexSemanticClass']}"
         sample = (
             f"{finding['SampleIdPrefix']} mesh#{finding['SampleMeshBlockIndex']} "
             f"index@{finding['SampleIndexOffset']}/#{finding['SampleIndexBlock']} "
@@ -1366,8 +1317,7 @@ def ghidra_pairing_review_report(
     print(f"GhidraPairingReviewReport JSON: {json_path}")
     print(f"GhidraPairingReviewReport markdown: {md_path}")
     print(
-        "GhidraPairingReviewReport passed: review findings remain candidate-only "
-        "and export behavior was not changed."
+        "GhidraPairingReviewReport passed: review findings remain candidate-only and export behavior was not changed."
     )
 
 
@@ -1518,9 +1468,7 @@ def ghidra_attribute_candidate_report(
         group["HasNormal"] = "normal" in semantics
         group["HasUv"] = "uv" in semantics
         group["HasRejectedNoise"] = bool(semantics & {"noise", "other"})
-        group["CompletePositionNormalUvCandidate"] = (
-            group["HasPosition"] and group["HasNormal"] and group["HasUv"]
-        )
+        group["CompletePositionNormalUvCandidate"] = group["HasPosition"] and group["HasNormal"] and group["HasUv"]
         if group["HasPosition"] and group["HasNormal"]:
             decision = "position-normal partial; needs UV/group proof"
         elif group["HasPosition"] and group["HasUv"]:
@@ -1546,10 +1494,14 @@ def ghidra_attribute_candidate_report(
         ),
         "ProbeBackedRanks": sum(1 for row in evidence_rows if row["ProbeBacked"]),
         "PositionReviewPassGroups": sum(
-            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "position" and row["PassesBasicReview"] is True
+            1
+            for row in evidence_rows
+            if row["GhidraVertexSemanticClass"] == "position" and row["PassesBasicReview"] is True
         ),
         "NormalReviewPassGroups": sum(
-            1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "normal" and row["PassesBasicReview"] is True
+            1
+            for row in evidence_rows
+            if row["GhidraVertexSemanticClass"] == "normal" and row["PassesBasicReview"] is True
         ),
         "UvReviewPassGroups": sum(
             1 for row in evidence_rows if row["GhidraVertexSemanticClass"] == "uv" and row["PassesBasicReview"] is True
@@ -1654,30 +1606,16 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
 
     # --- Decision function (hardcoded known families) ---
 
-    def _get_family_decision(
-        mesh_size: int, mesh_blocks: str, mesh_offsets: str
-    ) -> str:
+    def _get_family_decision(mesh_size: int, mesh_blocks: str, mesh_offsets: str) -> str:
         """Assign a candidate-only decision for a known family.
 
         Mirrors: Get-PositionSourceSiblingFamilyDecision
         """
-        if (
-            mesh_size == 305
-            and mesh_blocks == "mesh#7, mesh#27"
-            and mesh_offsets == "stream@188"
-        ):
+        if mesh_size == 305 and mesh_blocks == "mesh#7, mesh#27" and mesh_offsets == "stream@188":
             return "repeated meshSize=305 source-binding family; candidate-only probe queue"
-        if (
-            mesh_size == 321
-            and mesh_blocks == "mesh#7, mesh#31"
-            and mesh_offsets == "stream@204"
-        ):
+        if mesh_size == 321 and mesh_blocks == "mesh#7, mesh#31" and mesh_offsets == "stream@204":
             return "repeated meshSize=321 source-binding family; candidate-only probe queue"
-        if (
-            mesh_size == 329
-            and mesh_blocks == "mesh#7, mesh#34"
-            and mesh_offsets == "stream@212"
-        ):
+        if mesh_size == 329 and mesh_blocks == "mesh#7, mesh#34" and mesh_offsets == "stream@212":
             return "repeated meshSize=329 source-binding family; candidate-only probe queue"
         if mesh_size == 325 and mesh_blocks == "mesh#6, mesh#30":
             return "known shifted sibling position-source clue; candidate-only"
@@ -1716,20 +1654,21 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
         if len(mesh_blocks) < 2 or len(mesh_offsets) == 0:
             continue
 
-        source_rows.append({
-            "MeshSize": dominant_size,
-            "MeshBlocks": ", ".join(f"mesh#{mb}" for mb in mesh_blocks),
-            "MeshPayloadOffsets": ", ".join(f"stream@{mo}" for mo in mesh_offsets),
-            "TargetBlock": safe_int(json_value_or_dash(group, "TargetBlockIndex")),
-            "Payload": safe_int(json_value_or_dash(group, "DeclaredPayloadBytes")),
-            "IdPrefix": str(json_value_or_dash(group, "IdPrefix")),
-            "Count": safe_int(json_value_or_dash(group, "Count")),
-            "UsageAccess": (
-                f"{json_value_or_dash(group, 'DataStreamUsage')}/"
-                f"{json_value_or_dash(group, 'DataStreamAccess')}"
-            ),
-            "Role": str(json_value_or_dash(group, "Role")),
-        })
+        source_rows.append(
+            {
+                "MeshSize": dominant_size,
+                "MeshBlocks": ", ".join(f"mesh#{mb}" for mb in mesh_blocks),
+                "MeshPayloadOffsets": ", ".join(f"stream@{mo}" for mo in mesh_offsets),
+                "TargetBlock": safe_int(json_value_or_dash(group, "TargetBlockIndex")),
+                "Payload": safe_int(json_value_or_dash(group, "DeclaredPayloadBytes")),
+                "IdPrefix": str(json_value_or_dash(group, "IdPrefix")),
+                "Count": safe_int(json_value_or_dash(group, "Count")),
+                "UsageAccess": (
+                    f"{json_value_or_dash(group, 'DataStreamUsage')}/{json_value_or_dash(group, 'DataStreamAccess')}"
+                ),
+                "Role": str(json_value_or_dash(group, "Role")),
+            }
+        )
 
     if not source_rows:
         raise ValueError(
@@ -1765,24 +1704,26 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
         roles_set = sorted(set(str(r["Role"]) for r in fam_rows))
         total_links = sum(int(r["Count"]) for r in fam_rows)
 
-        family_rows.append({
-            "MeshSize": int(first["MeshSize"]),
-            "MeshBlocks": str(first["MeshBlocks"]),
-            "MeshPayloadOffsets": str(first["MeshPayloadOffsets"]),
-            "EvidenceGroups": len(fam_rows),
-            "TotalStreamLinks": total_links,
-            "DistinctIds": len(ids),
-            "TargetBlocks": ", ".join(f"block#{tb}" for tb in target_blocks),
-            "PayloadBytes": ", ".join(str(p) for p in payloads),
-            "RepresentativeIds": ", ".join(ids[:8]),
-            "UsageAccess": ", ".join(usage_access_set),
-            "Roles": ", ".join(roles_set),
-            "Decision": _get_family_decision(
-                int(first["MeshSize"]),
-                str(first["MeshBlocks"]),
-                str(first["MeshPayloadOffsets"]),
-            ),
-        })
+        family_rows.append(
+            {
+                "MeshSize": int(first["MeshSize"]),
+                "MeshBlocks": str(first["MeshBlocks"]),
+                "MeshPayloadOffsets": str(first["MeshPayloadOffsets"]),
+                "EvidenceGroups": len(fam_rows),
+                "TotalStreamLinks": total_links,
+                "DistinctIds": len(ids),
+                "TargetBlocks": ", ".join(f"block#{tb}" for tb in target_blocks),
+                "PayloadBytes": ", ".join(str(p) for p in payloads),
+                "RepresentativeIds": ", ".join(ids[:8]),
+                "UsageAccess": ", ".join(usage_access_set),
+                "Roles": ", ".join(roles_set),
+                "Decision": _get_family_decision(
+                    int(first["MeshSize"]),
+                    str(first["MeshBlocks"]),
+                    str(first["MeshPayloadOffsets"]),
+                ),
+            }
+        )
 
     # Sort family rows: EvidenceGroups desc, MeshSize asc, MeshBlocks, MeshPayloadOffsets
     family_rows.sort(
@@ -1810,15 +1751,15 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
         """
         ctx = f"meshSize={mesh_size} {mesh_blocks} {mesh_offsets}"
         matches = [
-            r for r in family_rows
+            r
+            for r in family_rows
             if int(r["MeshSize"]) == mesh_size
             and str(r["MeshBlocks"]) == mesh_blocks
             and str(r["MeshPayloadOffsets"]) == mesh_offsets
         ]
         if len(matches) != 1:
             raise ValueError(
-                f"PositionSourceSiblingFamilyReport failed: expected one family "
-                f"{ctx}, found {len(matches)}."
+                f"PositionSourceSiblingFamilyReport failed: expected one family {ctx}, found {len(matches)}."
             )
         row = matches[0]
 
@@ -1851,11 +1792,19 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
         _assert_family(305, "mesh#7, mesh#27", "stream@188", 10, "block#21"),
         _assert_family(321, "mesh#7, mesh#31", "stream@204", 8, "block#25"),
         _assert_family(
-            325, "mesh#6, mesh#30", "stream@292, stream@296", 1, "block#24",
+            325,
+            "mesh#6, mesh#30",
+            "stream@292, stream@296",
+            1,
+            "block#24",
             "e3de1077a37d0337",
         ),
         _assert_family(
-            329, "mesh#6, mesh#31", "stream@296", 1, "block#25",
+            329,
+            "mesh#6, mesh#31",
+            "stream@296",
+            1,
+            "block#25",
             "8e01613d7ce9e297",
         ),
     ]
@@ -1979,9 +1928,7 @@ def position_source_sibling_family_report(report_path: str | Path) -> None:
 # ============================================================================
 
 
-def _get_position_lead_count_for_mesh_size(
-    position_role: dict[str, Any], mesh_size: int
-) -> int:
+def _get_position_lead_count_for_mesh_size(position_role: dict[str, Any], mesh_size: int) -> int:
     """Count position leads for a given mesh size from the role group.
 
     Mirrors: Get-PositionLeadCountForMeshSize
@@ -2010,22 +1957,13 @@ def _get_position_gap_decision(
     if mesh_size == 305 and residual_position_candidate_rows >= 5:
         return "residual-position-candidate-family"
 
-    if (
-        mesh_size == 325
-        and topology_pairing_count >= 300
-        and position_lead_count <= 5
-        and residual_stream_count == 0
-    ):
+    if mesh_size == 325 and topology_pairing_count >= 300 and position_lead_count <= 5 and residual_stream_count == 0:
         return "topology-rich sparse-position singleton lead"
 
     if mesh_size == 297 and attribute_set_count >= 4:
         return "topology-proof anchor; residual singleton follow-up only"
 
-    if (
-        mesh_size == 329
-        and attribute_set_count >= 20
-        and residual_stream_count >= 40
-    ):
+    if mesh_size == 329 and attribute_set_count >= 20 and residual_stream_count >= 40:
         return "attribute-rich family; residual side-streams low-signal"
 
     if mesh_size in (321, 329) and topology_pairing_count >= 100:
@@ -2085,8 +2023,7 @@ def position_source_gap_report(report_path: str | Path) -> None:
     position_role_matches = [
         g
         for g in role_groups
-        if isinstance(g, dict)
-        and str(json_value_or_dash(g, "Role")) == "position-float3-ror1-lead"
+        if isinstance(g, dict) and str(json_value_or_dash(g, "Role")) == "position-float3-ror1-lead"
     ]
     if len(position_role_matches) != 1:
         raise ValueError(
@@ -2103,38 +2040,32 @@ def position_source_gap_report(report_path: str | Path) -> None:
     for mesh_size in target_mesh_sizes:
         # Pairings filtered by mesh_size and index-* role
         pairings = [
-            p for p in top_pairings
+            p
+            for p in top_pairings
             if isinstance(p, dict)
             and safe_int(p.get("MeshSize", 0)) == mesh_size
             and str(json_value_or_dash(p, "IndexRole")).startswith("index-")
         ]
         attribute_rows = [
-            a for a in attribute_sets
-            if isinstance(a, dict)
-            and safe_int(a.get("MeshSize", 0)) == mesh_size
+            a for a in attribute_sets if isinstance(a, dict) and safe_int(a.get("MeshSize", 0)) == mesh_size
         ]
         residual_target = [
-            rt for rt in residual_targets
-            if isinstance(rt, dict)
-            and safe_int(rt.get("MeshSize", 0)) == mesh_size
+            rt for rt in residual_targets if isinstance(rt, dict) and safe_int(rt.get("MeshSize", 0)) == mesh_size
         ]
         residual_target_first = residual_target[0] if residual_target else {}
 
         mesh_residual_rows = [
-            rs for rs in residual_streams
-            if isinstance(rs, dict)
-            and safe_int(rs.get("MeshSize", 0)) == mesh_size
+            rs for rs in residual_streams if isinstance(rs, dict) and safe_int(rs.get("MeshSize", 0)) == mesh_size
         ]
         residual_position_candidate_rows = [
-            r for r in mesh_residual_rows
+            r
+            for r in mesh_residual_rows
             if str(json_value_or_dash(r, "StringValue")) == "POSITION"
             and json_double_or_none(r, "RotatedFloat3PlausibleValueRatio") is not None
             and (json_double_or_none(r, "RotatedFloat3PlausibleValueRatio") or 0.0) >= 0.80
         ]
 
-        position_lead_count = _get_position_lead_count_for_mesh_size(
-            position_role, mesh_size
-        )
+        position_lead_count = _get_position_lead_count_for_mesh_size(position_role, mesh_size)
 
         # Position samples (top 4)
         position_samples = []
@@ -2156,24 +2087,15 @@ def position_source_gap_report(report_path: str | Path) -> None:
 
         pairing_count = measure_sum_or_zero(pairings, "Count")
         normal_pairing_count = measure_sum_or_zero(
-            [
-                p for p in pairings
-                if str(json_value_or_dash(p, "VertexRole")).startswith("normal")
-            ],
+            [p for p in pairings if str(json_value_or_dash(p, "VertexRole")).startswith("normal")],
             "Count",
         )
         uv_pairing_count = measure_sum_or_zero(
-            [
-                p for p in pairings
-                if str(json_value_or_dash(p, "VertexRole")).startswith("uv")
-            ],
+            [p for p in pairings if str(json_value_or_dash(p, "VertexRole")).startswith("uv")],
             "Count",
         )
         position_pairing_count = measure_sum_or_zero(
-            [
-                p for p in pairings
-                if str(json_value_or_dash(p, "VertexRole")).startswith("position")
-            ],
+            [p for p in pairings if str(json_value_or_dash(p, "VertexRole")).startswith("position")],
             "Count",
         )
 
@@ -2212,9 +2134,7 @@ def position_source_gap_report(report_path: str | Path) -> None:
             )
 
         residual_stream_count = (
-            safe_int(residual_target_first.get("ResidualStreamCount", 0))
-            if residual_target_first
-            else 0
+            safe_int(residual_target_first.get("ResidualStreamCount", 0)) if residual_target_first else 0
         )
         decision = _get_position_gap_decision(
             mesh_size=mesh_size,
@@ -2225,35 +2145,32 @@ def position_source_gap_report(report_path: str | Path) -> None:
             attribute_set_count=len(attribute_rows),
         )
 
-        rows.append({
-            "MeshSize": mesh_size,
-            "PositionLeadCount": position_lead_count,
-            "TopPairingRows": len(pairings),
-            "TopologyPairingCount": pairing_count,
-            "NormalPairingCount": normal_pairing_count,
-            "UvPairingCount": uv_pairing_count,
-            "PositionPairingCount": position_pairing_count,
-            "AttributeSetRows": len(attribute_rows),
-            "ResidualStreamCount": residual_stream_count,
-            "ResidualPositionCandidateRows": len(residual_position_candidate_rows),
-            "Decision": decision,
-            "PositionSamples": " | ".join(position_samples) if position_samples else "-",
-            "TopologyHints": " | ".join(topology_hints) if topology_hints else "-",
-            "ResidualHints": " | ".join(residual_hints) if residual_hints else "-",
-        })
+        rows.append(
+            {
+                "MeshSize": mesh_size,
+                "PositionLeadCount": position_lead_count,
+                "TopPairingRows": len(pairings),
+                "TopologyPairingCount": pairing_count,
+                "NormalPairingCount": normal_pairing_count,
+                "UvPairingCount": uv_pairing_count,
+                "PositionPairingCount": position_pairing_count,
+                "AttributeSetRows": len(attribute_rows),
+                "ResidualStreamCount": residual_stream_count,
+                "ResidualPositionCandidateRows": len(residual_position_candidate_rows),
+                "Decision": decision,
+                "PositionSamples": " | ".join(position_samples) if position_samples else "-",
+                "TopologyHints": " | ".join(topology_hints) if topology_hints else "-",
+                "ResidualHints": " | ".join(residual_hints) if residual_hints else "-",
+            }
+        )
 
     # --- Guard assertions ---
 
     mesh325_rows = [r for r in rows if r["MeshSize"] == 325]
     if not mesh325_rows:
-        raise ValueError(
-            "PositionSourceGapReport failed: no meshSize=325 row found."
-        )
+        raise ValueError("PositionSourceGapReport failed: no meshSize=325 row found.")
     mesh325 = mesh325_rows[0]
-    if (
-        int(mesh325["TopologyPairingCount"]) < 300
-        or int(mesh325["ResidualStreamCount"]) != 0
-    ):
+    if int(mesh325["TopologyPairingCount"]) < 300 or int(mesh325["ResidualStreamCount"]) != 0:
         raise ValueError(
             "PositionSourceGapReport failed: meshSize=325 no longer matches the "
             "topology-rich residual-empty gap profile; review before reranking."
@@ -2261,9 +2178,7 @@ def position_source_gap_report(report_path: str | Path) -> None:
 
     mesh305_rows = [r for r in rows if r["MeshSize"] == 305]
     if not mesh305_rows:
-        raise ValueError(
-            "PositionSourceGapReport failed: no meshSize=305 row found."
-        )
+        raise ValueError("PositionSourceGapReport failed: no meshSize=305 row found.")
     mesh305 = mesh305_rows[0]
     if int(mesh305["ResidualPositionCandidateRows"]) < 5:
         raise ValueError(
@@ -2359,10 +2274,7 @@ def position_source_gap_report(report_path: str | Path) -> None:
         )
     print(f"PositionSourceGapReport JSON: {json_path}")
     print(f"PositionSourceGapReport markdown: {md_path}")
-    print(
-        "PositionSourceGapReport passed: topology-rich families are ranked "
-        "without promoting geometry/export truth."
-    )
+    print("PositionSourceGapReport passed: topology-rich families are ranked without promoting geometry/export truth.")
 
 
 # ============================================================================
@@ -2370,9 +2282,7 @@ def position_source_gap_report(report_path: str | Path) -> None:
 # ============================================================================
 
 
-def _format_residual_float3_prefix(
-    prefix_items: list[dict[str, Any]], take: int = 2
-) -> str:
+def _format_residual_float3_prefix(prefix_items: list[dict[str, Any]], take: int = 2) -> str:
     """Format vector prefix samples for display.
 
     Mirrors: Format-ResidualFloat3Prefix
@@ -2410,14 +2320,9 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
     report = load_json_report(report_path)
 
     residual_streams_raw = report.get("TopResidualStreams")
-    if (
-        not residual_streams_raw
-        or not isinstance(residual_streams_raw, list)
-        or len(residual_streams_raw) == 0
-    ):
+    if not residual_streams_raw or not isinstance(residual_streams_raw, list) or len(residual_streams_raw) == 0:
         raise ValueError(
-            "ResidualPositionClassifierReport failed: TopResidualStreams "
-            "is missing from mesh-binding inventory."
+            "ResidualPositionClassifierReport failed: TopResidualStreams is missing from mesh-binding inventory."
         )
     streams: list[dict[str, Any]] = residual_streams_raw
 
@@ -2450,29 +2355,21 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             review = {}
 
         miss_reasons_val = review.get("MissReasons")
-        miss_reasons = (
-            "; ".join(str(m) for m in miss_reasons_val)
-            if isinstance(miss_reasons_val, list)
-            else "-"
-        )
+        miss_reasons = "; ".join(str(m) for m in miss_reasons_val) if isinstance(miss_reasons_val, list) else "-"
 
         strict_pass = bool(review.get("PassesStrictClassifier", False))
 
-        max_plausible_threshold_raw = review.get(
-            "MaxPlausibleValueRatioThresholdForThisSample"
-        )
+        max_plausible_threshold_raw = review.get("MaxPlausibleValueRatioThresholdForThisSample")
         max_plausible_threshold: float | None = None
         if max_plausible_threshold_raw is not None:
             try:
                 max_plausible_threshold = float(max_plausible_threshold_raw)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 max_plausible_threshold = None
 
         # Samples
         samples_raw = lead.get("Samples")
-        samples: list[dict[str, Any]] = (
-            samples_raw if isinstance(samples_raw, list) else []
-        )
+        samples: list[dict[str, Any]] = samples_raw if isinstance(samples_raw, list) else []
 
         sample_ids_list = sorted(
             {
@@ -2484,21 +2381,11 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
         sample_ids = ",".join(sample_ids_list) if sample_ids_list else "-"
 
         sample_meshes_list = sorted(
-            {
-                f"mesh#{json_value_or_dash(s, 'MeshBlockIndex')}"
-                for s in samples
-                if isinstance(s, dict)
-            }
+            {f"mesh#{json_value_or_dash(s, 'MeshBlockIndex')}" for s in samples if isinstance(s, dict)}
         )
         sample_meshes = ",".join(sample_meshes_list) if sample_meshes_list else "-"
 
-        archive_names_set = sorted(
-            {
-                str(json_value_or_dash(s, "ArchiveName"))
-                for s in samples
-                if isinstance(s, dict)
-            }
-        )
+        archive_names_set = sorted({str(json_value_or_dash(s, "ArchiveName")) for s in samples if isinstance(s, dict)})
         archive_count = len(archive_names_set)
 
         # Build lead sample rows
@@ -2513,70 +2400,58 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             if role_stats is None or not isinstance(role_stats, dict):
                 role_stats = {}
             rotated_float3_stats = role_stats.get("RotatedFloat3Stats")
-            if rotated_float3_stats is None or not isinstance(
-                rotated_float3_stats, dict
-            ):
+            if rotated_float3_stats is None or not isinstance(rotated_float3_stats, dict):
                 rotated_float3_stats = {}
             prefix_raw = rotated_float3_stats.get("Prefix")
-            prefix: list[dict[str, Any]] = (
-                prefix_raw if isinstance(prefix_raw, list) else []
-            )
+            prefix: list[dict[str, Any]] = prefix_raw if isinstance(prefix_raw, list) else []
 
-            lead_sample_rows.append({
-                "Payload": safe_int(lead.get("DeclaredPayloadBytes", 0)),
-                "IdPrefix": str(json_value_or_dash(sample, "IdPrefix")),
-                "ArchiveName": str(json_value_or_dash(sample, "ArchiveName")),
-                "EntryIndex": safe_int(sample.get("EntryIndex", 0)),
-                "ManifestEntryIndex": json_value_or_dash(sample, "ManifestEntryIndex"),
-                "MeshBlock": f"mesh#{json_value_or_dash(sample, 'MeshBlockIndex')}",
-                "MeshBlockIndex": safe_int(sample.get("MeshBlockIndex", 0)),
-                "StreamBlock": f"#{json_value_or_dash(stream, 'TargetBlockIndex')}",
-                "StreamBlockIndex": safe_int(stream.get("TargetBlockIndex", 0)),
-                "TargetSize": json_value_or_dash(stream, "TargetSize"),
-                "HeaderBytes": json_value_or_dash(stream, "HeaderBytes"),
-                "BodyFirst16": str(json_value_or_dash(stream, "BodyFirst16")),
-                "VectorCount": json_value_or_dash(rotated_float3_stats, "VectorCount"),
-                "Finite": json_double_or_none(
-                    rotated_float3_stats, "FiniteVectorRatio"
-                ),
-                "Plausible": json_double_or_none(
-                    rotated_float3_stats, "PlausibleValueRatio"
-                ),
-                "NonZero": json_double_or_none(
-                    rotated_float3_stats, "NonZeroVectorRatio"
-                ),
-                "Extent": json_double_or_none(
-                    rotated_float3_stats, "MaxExtent"
-                ),
-                "Prefix": _format_residual_float3_prefix(prefix, take=2),
-                "StrictPass": strict_pass,
-                "MissReasons": miss_reasons,
-            })
+            lead_sample_rows.append(
+                {
+                    "Payload": safe_int(lead.get("DeclaredPayloadBytes", 0)),
+                    "IdPrefix": str(json_value_or_dash(sample, "IdPrefix")),
+                    "ArchiveName": str(json_value_or_dash(sample, "ArchiveName")),
+                    "EntryIndex": safe_int(sample.get("EntryIndex", 0)),
+                    "ManifestEntryIndex": json_value_or_dash(sample, "ManifestEntryIndex"),
+                    "MeshBlock": f"mesh#{json_value_or_dash(sample, 'MeshBlockIndex')}",
+                    "MeshBlockIndex": safe_int(sample.get("MeshBlockIndex", 0)),
+                    "StreamBlock": f"#{json_value_or_dash(stream, 'TargetBlockIndex')}",
+                    "StreamBlockIndex": safe_int(stream.get("TargetBlockIndex", 0)),
+                    "TargetSize": json_value_or_dash(stream, "TargetSize"),
+                    "HeaderBytes": json_value_or_dash(stream, "HeaderBytes"),
+                    "BodyFirst16": str(json_value_or_dash(stream, "BodyFirst16")),
+                    "VectorCount": json_value_or_dash(rotated_float3_stats, "VectorCount"),
+                    "Finite": json_double_or_none(rotated_float3_stats, "FiniteVectorRatio"),
+                    "Plausible": json_double_or_none(rotated_float3_stats, "PlausibleValueRatio"),
+                    "NonZero": json_double_or_none(rotated_float3_stats, "NonZeroVectorRatio"),
+                    "Extent": json_double_or_none(rotated_float3_stats, "MaxExtent"),
+                    "Prefix": _format_residual_float3_prefix(prefix, take=2),
+                    "StrictPass": strict_pass,
+                    "MissReasons": miss_reasons,
+                }
+            )
 
         sample_rows.extend(lead_sample_rows)
 
-        rows.append({
-            "MeshSize": safe_int(lead.get("MeshSize", 305)),
-            "Stream": f"stream@{json_value_or_dash(lead, 'MeshPayloadOffset')}",
-            "Payload": safe_int(lead.get("DeclaredPayloadBytes", 0)),
-            "Count": safe_int(lead.get("Count", 0)),
-            "SampleCount": len(samples),
-            "ArchiveCount": archive_count,
-            "SampleMeshes": sample_meshes,
-            "SampleIds": sample_ids,
-            "VectorCount": json_value_or_dash(lead, "RotatedFloat3VectorCount"),
-            "Finite": json_double_or_none(lead, "RotatedFloat3FiniteVectorRatio"),
-            "Plausible": json_double_or_none(
-                lead, "RotatedFloat3PlausibleValueRatio"
-            ),
-            "NonZero": json_double_or_none(
-                lead, "RotatedFloat3NonZeroVectorRatio"
-            ),
-            "Extent": json_double_or_none(lead, "RotatedFloat3MaxExtent"),
-            "StrictPass": strict_pass,
-            "MaxPlausibleThresholdForSample": max_plausible_threshold,
-            "MissReasons": miss_reasons,
-        })
+        rows.append(
+            {
+                "MeshSize": safe_int(lead.get("MeshSize", 305)),
+                "Stream": f"stream@{json_value_or_dash(lead, 'MeshPayloadOffset')}",
+                "Payload": safe_int(lead.get("DeclaredPayloadBytes", 0)),
+                "Count": safe_int(lead.get("Count", 0)),
+                "SampleCount": len(samples),
+                "ArchiveCount": archive_count,
+                "SampleMeshes": sample_meshes,
+                "SampleIds": sample_ids,
+                "VectorCount": json_value_or_dash(lead, "RotatedFloat3VectorCount"),
+                "Finite": json_double_or_none(lead, "RotatedFloat3FiniteVectorRatio"),
+                "Plausible": json_double_or_none(lead, "RotatedFloat3PlausibleValueRatio"),
+                "NonZero": json_double_or_none(lead, "RotatedFloat3NonZeroVectorRatio"),
+                "Extent": json_double_or_none(lead, "RotatedFloat3MaxExtent"),
+                "StrictPass": strict_pass,
+                "MaxPlausibleThresholdForSample": max_plausible_threshold,
+                "MissReasons": miss_reasons,
+            }
+        )
 
     # --- Guard rows (Plausible >= 0.80, MaxPlausibleThresholdForSample not None) ---
 
@@ -2594,16 +2469,8 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             f"plausible>=0.80 guard, found {len(guard_rows)}."
         )
 
-    min_plausible = min(
-        float(r["Plausible"])
-        for r in guard_rows
-        if r["Plausible"] is not None
-    )
-    max_plausible = max(
-        float(r["Plausible"])
-        for r in guard_rows
-        if r["Plausible"] is not None
-    )
+    min_plausible = min(float(r["Plausible"]) for r in guard_rows if r["Plausible"] is not None)
+    max_plausible = max(float(r["Plausible"]) for r in guard_rows if r["Plausible"] is not None)
     strict_pass_count = sum(1 for r in rows if r["StrictPass"])
 
     # --- ID / mesh-block pairing analysis ---
@@ -2616,18 +2483,10 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
 
     id_mesh_rows: list[dict[str, object]] = []
     for (payload, id_prefix), group_items in id_mesh_groups.items():
-        mesh_blocks_set = sorted(
-            {str(item["MeshBlock"]) for item in group_items}
-        )
-        stream_blocks_set = sorted(
-            {str(item["StreamBlock"]) for item in group_items}
-        )
-        body_first16_set = sorted(
-            {str(item["BodyFirst16"]) for item in group_items}
-        )
-        prefix_set = sorted(
-            {str(item["Prefix"]) for item in group_items}
-        )
+        mesh_blocks_set = sorted({str(item["MeshBlock"]) for item in group_items})
+        stream_blocks_set = sorted({str(item["StreamBlock"]) for item in group_items})
+        body_first16_set = sorted({str(item["BodyFirst16"]) for item in group_items})
+        prefix_set = sorted({str(item["Prefix"]) for item in group_items})
 
         has_mesh7 = "mesh#7" in mesh_blocks_set
         has_mesh27 = "mesh#27" in mesh_blocks_set
@@ -2643,12 +2502,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
         body_first16_matches = len(body_first16_set) == 1
         prefixes_match = len(prefix_set) == 1
 
-        if (
-            pair_status == "mesh#7+mesh#27"
-            and stream_blocks_match
-            and body_first16_matches
-            and prefixes_match
-        ):
+        if pair_status == "mesh#7+mesh#27" and stream_blocks_match and body_first16_matches and prefixes_match:
             pair_comparison = "paired-mesh-same-stream-body-prefix"
         elif pair_status == "mesh#7+mesh#27":
             pair_comparison = "paired-mesh-different-stream-evidence"
@@ -2656,30 +2510,28 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             pair_comparison = pair_status
 
         first = group_items[0]
-        id_mesh_rows.append({
-            "Payload": payload,
-            "IdPrefix": id_prefix,
-            "SampleCount": len(group_items),
-            "MeshBlocks": ",".join(mesh_blocks_set),
-            "PairStatus": pair_status,
-            "PairComparison": pair_comparison,
-            "StreamBlocksMatch": stream_blocks_match,
-            "BodyFirst16Matches": body_first16_matches,
-            "PrefixesMatch": prefixes_match,
-            "ArchiveNames": ",".join(
-                sorted({str(item["ArchiveName"]) for item in group_items})
-            ),
-            "EntryIndices": ",".join(
-                sorted({str(item["EntryIndex"]) for item in group_items})
-            ),
-            "StreamBlocks": ",".join(stream_blocks_set),
-            "BodyFirst16": ",".join(body_first16_set),
-            "Prefixes": " || ".join(prefix_set[:3]),
-            "Plausible": first["Plausible"],
-            "Extent": first["Extent"],
-            "StrictPass": first["StrictPass"],
-            "MissReasons": str(first["MissReasons"]),
-        })
+        id_mesh_rows.append(
+            {
+                "Payload": payload,
+                "IdPrefix": id_prefix,
+                "SampleCount": len(group_items),
+                "MeshBlocks": ",".join(mesh_blocks_set),
+                "PairStatus": pair_status,
+                "PairComparison": pair_comparison,
+                "StreamBlocksMatch": stream_blocks_match,
+                "BodyFirst16Matches": body_first16_matches,
+                "PrefixesMatch": prefixes_match,
+                "ArchiveNames": ",".join(sorted({str(item["ArchiveName"]) for item in group_items})),
+                "EntryIndices": ",".join(sorted({str(item["EntryIndex"]) for item in group_items})),
+                "StreamBlocks": ",".join(stream_blocks_set),
+                "BodyFirst16": ",".join(body_first16_set),
+                "Prefixes": " || ".join(prefix_set[:3]),
+                "Plausible": first["Plausible"],
+                "Extent": first["Extent"],
+                "StrictPass": first["StrictPass"],
+                "MissReasons": str(first["MissReasons"]),
+            }
+        )
 
     # --- Payload summary ---
 
@@ -2690,52 +2542,34 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
 
     payload_rows: list[dict[str, object]] = []
     for payload, p_items in payload_groups.items():
-        p_id_mesh_rows = [
-            r for r in id_mesh_rows if int(r["Payload"]) == payload
-        ]
-        mesh7_and27_count = sum(
-            1 for r in p_id_mesh_rows
-            if str(r["PairStatus"]) == "mesh#7+mesh#27"
-        )
-        single_mesh_count = sum(
-            1 for r in p_id_mesh_rows
-            if str(r["PairStatus"]) == "single-mesh"
-        )
-        candidate_guard = any(
-            r for r in guard_rows if int(r["Payload"]) == payload
-        )
-        p_strict_passes = sum(
-            1 for item in p_items if item["StrictPass"]
-        )
+        p_id_mesh_rows = [r for r in id_mesh_rows if int(r["Payload"]) == payload]
+        mesh7_and27_count = sum(1 for r in p_id_mesh_rows if str(r["PairStatus"]) == "mesh#7+mesh#27")
+        single_mesh_count = sum(1 for r in p_id_mesh_rows if str(r["PairStatus"]) == "single-mesh")
+        candidate_guard = any(r for r in guard_rows if int(r["Payload"]) == payload)
+        p_strict_passes = sum(1 for item in p_items if item["StrictPass"])
 
         first_p = p_items[0]
-        payload_rows.append({
-            "Payload": payload,
-            "SampleCount": len(p_items),
-            "IdCount": len({str(item["IdPrefix"]) for item in p_items}),
-            "MeshBlocks": ",".join(
-                sorted({str(item["MeshBlock"]) for item in p_items})
-            ),
-            "Mesh7And27IdCount": mesh7_and27_count,
-            "SingleMeshIdCount": single_mesh_count,
-            "CandidateGuard": candidate_guard,
-            "StrictPassCount": p_strict_passes,
-            "Plausible": first_p["Plausible"],
-            "Extent": first_p["Extent"],
-            "MissReasons": str(first_p["MissReasons"]),
-        })
+        payload_rows.append(
+            {
+                "Payload": payload,
+                "SampleCount": len(p_items),
+                "IdCount": len({str(item["IdPrefix"]) for item in p_items}),
+                "MeshBlocks": ",".join(sorted({str(item["MeshBlock"]) for item in p_items})),
+                "Mesh7And27IdCount": mesh7_and27_count,
+                "SingleMeshIdCount": single_mesh_count,
+                "CandidateGuard": candidate_guard,
+                "StrictPassCount": p_strict_passes,
+                "Plausible": first_p["Plausible"],
+                "Extent": first_p["Extent"],
+                "MissReasons": str(first_p["MissReasons"]),
+            }
+        )
 
     # --- Same/different paired rows ---
 
-    same_paired_rows = [
-        r
-        for r in id_mesh_rows
-        if str(r["PairComparison"]) == "paired-mesh-same-stream-body-prefix"
-    ]
+    same_paired_rows = [r for r in id_mesh_rows if str(r["PairComparison"]) == "paired-mesh-same-stream-body-prefix"]
     different_paired_rows = [
-        r
-        for r in id_mesh_rows
-        if str(r["PairComparison"]) == "paired-mesh-different-stream-evidence"
+        r for r in id_mesh_rows if str(r["PairComparison"]) == "paired-mesh-different-stream-evidence"
     ]
 
     # --- Representative probe rows ---
@@ -2771,8 +2605,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             fallback = [
                 sr
                 for sr in sample_rows
-                if int(sr["Payload"]) == payload
-                and str(sr["IdPrefix"]) == str(id_row["IdPrefix"])
+                if int(sr["Payload"]) == payload and str(sr["IdPrefix"]) == str(id_row["IdPrefix"])
             ]
             if not fallback:
                 continue
@@ -2780,8 +2613,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
 
         stream_block_num = str(selected["StreamBlock"]).lstrip("#")
         out_path = (
-            report_dir
-            / f"probe-residual-position-payload{selected['Payload']}-"
+            report_dir / f"probe-residual-position-payload{selected['Payload']}-"
             f"{selected['IdPrefix']}-stream{stream_block_num}.json"
         )
         dotnet_cmd = (
@@ -2791,16 +2623,18 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             f"--stream-block {stream_block_num} "
             f'--out "{out_path}"'
         )
-        representative_probe_rows.append({
-            "Payload": int(selected["Payload"]),
-            "IdPrefix": str(selected["IdPrefix"]),
-            "MeshBlock": str(selected["MeshBlock"]),
-            "StreamBlock": f"#{stream_block_num}",
-            "BodyFirst16": str(selected["BodyFirst16"]),
-            "Prefix": str(selected["Prefix"]),
-            "OutPath": str(out_path),
-            "Command": dotnet_cmd,
-        })
+        representative_probe_rows.append(
+            {
+                "Payload": int(selected["Payload"]),
+                "IdPrefix": str(selected["IdPrefix"]),
+                "MeshBlock": str(selected["MeshBlock"]),
+                "StreamBlock": f"#{stream_block_num}",
+                "BodyFirst16": str(selected["BodyFirst16"]),
+                "Prefix": str(selected["Prefix"]),
+                "OutPath": str(out_path),
+                "Command": dotnet_cmd,
+            }
+        )
 
     # --- Guard assertions ---
 
@@ -2827,10 +2661,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
 
     # --- Console output ---
 
-    print(
-        "\n--- ResidualPositionClassifierReport candidate-only strict "
-        "classifier dry-run"
-    )
+    print("\n--- ResidualPositionClassifierReport candidate-only strict classifier dry-run")
     print(
         "Strict role classifier remains: VectorCount>=3, "
         "FiniteVectorRatio>=0.95, PlausibleValueRatio>=0.95, "
@@ -2852,26 +2683,12 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
     print("-" * 150)
     for row in sorted_rows:
         threshold_str = (
-            f"{row['MaxPlausibleThresholdForSample']:.4f}"
-            if row["MaxPlausibleThresholdForSample"] is not None
-            else "-"
+            f"{row['MaxPlausibleThresholdForSample']:.4f}" if row["MaxPlausibleThresholdForSample"] is not None else "-"
         )
-        finite_str = (
-            f"{row['Finite']:.4f}" if row["Finite"] is not None else "-"
-        )
-        plausible_str = (
-            f"{row['Plausible']:.4f}"
-            if row["Plausible"] is not None
-            else "-"
-        )
-        nonzero_str = (
-            f"{row['NonZero']:.4f}"
-            if row["NonZero"] is not None
-            else "-"
-        )
-        extent_str = (
-            f"{row['Extent']:.4f}" if row["Extent"] is not None else "-"
-        )
+        finite_str = f"{row['Finite']:.4f}" if row["Finite"] is not None else "-"
+        plausible_str = f"{row['Plausible']:.4f}" if row["Plausible"] is not None else "-"
+        nonzero_str = f"{row['NonZero']:.4f}" if row["NonZero"] is not None else "-"
+        extent_str = f"{row['Extent']:.4f}" if row["Extent"] is not None else "-"
         print(
             f"{row['Payload']:>8} {row['Count']:>6} {row['SampleCount']:>8} "
             f"{row['ArchiveCount']:>9} {str(row['SampleMeshes']):<30} "
@@ -2884,9 +2701,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
     print("\nStrict classifier miss reasons by payload:")
     for row in sorted_rows:
         threshold_text = (
-            f"{row['MaxPlausibleThresholdForSample']:.4f}"
-            if row["MaxPlausibleThresholdForSample"] is not None
-            else "-"
+            f"{row['MaxPlausibleThresholdForSample']:.4f}" if row["MaxPlausibleThresholdForSample"] is not None else "-"
         )
         print(
             f"  payload={row['Payload']} count={row['Count']}: "
@@ -2928,9 +2743,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             "MaxCandidatePlausible": max_plausible,
         },
         "Rows": sorted_rows,
-        "CandidateGuardRows": sorted(
-            guard_rows, key=lambda r: (int(r["Payload"]), int(r["Count"]))
-        ),
+        "CandidateGuardRows": sorted(guard_rows, key=lambda r: (int(r["Payload"]), int(r["Count"]))),
         "Interpretation": (
             "Strict classifier miss report only. Repeated bounded-position-like "
             "rows remain candidate-only and do not promote parser roles, "
@@ -2968,9 +2781,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
     ]
     for row in sorted_rows:
         threshold_md = (
-            f"{row['MaxPlausibleThresholdForSample']:.4f}"
-            if row["MaxPlausibleThresholdForSample"] is not None
-            else "-"
+            f"{row['MaxPlausibleThresholdForSample']:.4f}" if row["MaxPlausibleThresholdForSample"] is not None else "-"
         )
         md_lines.append(
             f"| {format_markdown_cell(row['Payload'])} "
@@ -3019,21 +2830,13 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
             "SampleRows": len(sample_rows),
             "StrictPassRows": strict_pass_count,
             "CandidateGuardRows": len(guard_rows),
-            "Mesh7And27IdRows": sum(
-                1 for r in id_mesh_rows
-                if str(r["PairStatus"]) == "mesh#7+mesh#27"
-            ),
+            "Mesh7And27IdRows": sum(1 for r in id_mesh_rows if str(r["PairStatus"]) == "mesh#7+mesh#27"),
             "Mesh7And27SameStreamBodyPrefixRows": len(same_paired_rows),
-            "SingleMeshIdRows": sum(
-                1 for r in id_mesh_rows
-                if str(r["PairStatus"]) == "single-mesh"
-            ),
+            "SingleMeshIdRows": sum(1 for r in id_mesh_rows if str(r["PairStatus"]) == "single-mesh"),
             "MinCandidatePlausible": min_plausible,
             "MaxCandidatePlausible": max_plausible,
         },
-        "PayloadSummary": sorted(
-            payload_rows, key=lambda r: int(r["Payload"])
-        ),
+        "PayloadSummary": sorted(payload_rows, key=lambda r: int(r["Payload"])),
         "IdMeshPairs": sorted(
             id_mesh_rows,
             key=lambda r: (int(r["Payload"]), str(r["IdPrefix"])),
@@ -3181,9 +2984,7 @@ def discovery_workbench(repo_root: str, out_dir: str, privacy_scan: bool = False
     """
     workbench_script = Path(repo_root) / "scripts" / "discovery_workbench.py"
     if not workbench_script.exists():
-        raise FileNotFoundError(
-            f"DiscoveryWorkbench failed: missing helper script {workbench_script}"
-        )
+        raise FileNotFoundError(f"DiscoveryWorkbench failed: missing helper script {workbench_script}")
 
     python_args = [str(workbench_script), "--root", str(repo_root), "--exports", str(out_dir)]
     if privacy_scan:
@@ -3196,9 +2997,7 @@ def discovery_workbench(repo_root: str, out_dir: str, privacy_scan: bool = False
         capture_output=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"DiscoveryWorkbench failed: python exited with {result.returncode}."
-        )
+        raise RuntimeError(f"DiscoveryWorkbench failed: python exited with {result.returncode}.")
 
     out_path = Path(out_dir)
     scoreboard_path = out_path / "discovery-workbench-scoreboard.json"
@@ -3208,29 +3007,19 @@ def discovery_workbench(repo_root: str, out_dir: str, privacy_scan: bool = False
 
     for required_path in (scoreboard_path, scoreboard_md_path, queue_path, queue_md_path):
         if not required_path.exists():
-            raise FileNotFoundError(
-                f"DiscoveryWorkbench failed: expected output missing: {required_path}"
-            )
+            raise FileNotFoundError(f"DiscoveryWorkbench failed: expected output missing: {required_path}")
 
     scoreboard = load_json_report(str(scoreboard_path))
     if scoreboard.get("CandidateOnly") is not True:
-        raise ValueError(
-            "DiscoveryWorkbench failed: scoreboard CandidateOnly flag is not true."
-        )
+        raise ValueError("DiscoveryWorkbench failed: scoreboard CandidateOnly flag is not true.")
 
     candidates = scoreboard.get("Candidates") or []
-    non_candidate_rows = [
-        c for c in candidates if c.get("CandidateOnly") is not True
-    ]
+    non_candidate_rows = [c for c in candidates if c.get("CandidateOnly") is not True]
     if non_candidate_rows:
-        raise ValueError(
-            f"DiscoveryWorkbench failed: non-candidate rows found ({len(non_candidate_rows)})."
-        )
+        raise ValueError(f"DiscoveryWorkbench failed: non-candidate rows found ({len(non_candidate_rows)}).")
 
     cross_checks = scoreboard.get("CrossChecks") or []
-    non_candidate_checks = [
-        c for c in cross_checks if c.get("CandidateOnly") is not True
-    ]
+    non_candidate_checks = [c for c in cross_checks if c.get("CandidateOnly") is not True]
     if non_candidate_checks:
         raise ValueError(
             f"DiscoveryWorkbench failed: non-candidate cross-check rows found ({len(non_candidate_checks)})."
@@ -3252,7 +3041,6 @@ def discovery_workbench(repo_root: str, out_dir: str, privacy_scan: bool = False
     print("DiscoveryWorkbench passed: generated candidate-only scoreboard and next-probe queue.")
 
 
-
 # ============================================================================
 # PositionSourceSibling probe helpers (shared by all sibling probe reports)
 # ============================================================================
@@ -3264,6 +3052,7 @@ def _format_position_source_stream_list(streams):
     Mirrors: Format-PositionSourceStreamList
     """
     from scripts.rift_workflow_utils import json_value_or_dash
+
     items = []
     for s in streams:
         items.append(
@@ -3272,7 +3061,7 @@ def _format_position_source_stream_list(streams):
             f"payload={json_value_or_dash(s, 'Payload')} "
             f"{json_value_or_dash(s, 'Role')}"
         )
-    return ' | '.join(items) if items else 'none'
+    return " | ".join(items) if items else "none"
 
 
 def _get_position_source_sibling_unique_count(rows, key):
@@ -3280,7 +3069,8 @@ def _get_position_source_sibling_unique_count(rows, key):
 
     Mirrors: Get-PositionSourceSiblingUniqueCount
     """
-    return len({str(r.get(key, '')) for r in rows})
+    return len({str(r.get(key, "")) for r in rows})
+
 
 def _new_position_source_sibling_probe_row(spec):
     """Build a probe row from a sibling probe spec (with Path).
@@ -3289,18 +3079,13 @@ def _new_position_source_sibling_probe_row(spec):
     """
     path = str(spec["Path"])
     if not Path(path).exists():
-        raise FileNotFoundError(
-            f"PositionSourceSiblingProbeReport failed: probe report not found: {path}"
-        )
+        raise FileNotFoundError(f"PositionSourceSiblingProbeReport failed: probe report not found: {path}")
 
     report = load_json_report(path)
     mesh_block = int(spec["MeshBlock"])
 
     meshes = report.get("Meshes") or []
-    mesh_entries = [
-        m for m in meshes
-        if isinstance(m, dict) and safe_int(m.get("MeshBlockIndex", -1)) == mesh_block
-    ]
+    mesh_entries = [m for m in meshes if isinstance(m, dict) and safe_int(m.get("MeshBlockIndex", -1)) == mesh_block]
     if len(mesh_entries) != 1:
         raise ValueError(
             f"PositionSourceSiblingProbeReport failed: expected exactly one "
@@ -3330,48 +3115,20 @@ def _new_position_source_sibling_probe_row(spec):
         "MeshBlock": mesh_block,
         "MeshSize": safe_int(json_value_or_dash(attr, "MeshSize")),
         "VertexCount": safe_int(json_value_or_dash(attr, "VertexCount")),
-        "PrimaryTopology": str(
-            json_value_or_dash(topology, "PrimaryTopology")
-            if isinstance(topology, dict)
-            else "-"
-        ),
-        "TopologyConfidence": safe_int(
-            json_value_or_dash(topology, "Confidence")
-            if isinstance(topology, dict)
-            else 0
-        ),
-        "PositionMeshPayloadOffset": safe_int(
-            json_value_or_dash(attr, "PositionMeshPayloadOffset")
-        ),
-        "PositionBlockIndex": safe_int(
-            json_value_or_dash(attr, "PositionBlockIndex")
-        ),
-        "PositionDeclaredPayloadBytes": safe_int(
-            json_value_or_dash(attr, "PositionDeclaredPayloadBytes")
-        ),
-        "PositionDataStreamUsage": str(
-            json_value_or_dash(attr, "PositionDataStreamUsage")
-        ),
-        "PositionDataStreamAccess": str(
-            json_value_or_dash(attr, "PositionDataStreamAccess")
-        ),
+        "PrimaryTopology": str(json_value_or_dash(topology, "PrimaryTopology") if isinstance(topology, dict) else "-"),
+        "TopologyConfidence": safe_int(json_value_or_dash(topology, "Confidence") if isinstance(topology, dict) else 0),
+        "PositionMeshPayloadOffset": safe_int(json_value_or_dash(attr, "PositionMeshPayloadOffset")),
+        "PositionBlockIndex": safe_int(json_value_or_dash(attr, "PositionBlockIndex")),
+        "PositionDeclaredPayloadBytes": safe_int(json_value_or_dash(attr, "PositionDeclaredPayloadBytes")),
+        "PositionDataStreamUsage": str(json_value_or_dash(attr, "PositionDataStreamUsage")),
+        "PositionDataStreamAccess": str(json_value_or_dash(attr, "PositionDataStreamAccess")),
         "PositionRole": str(json_value_or_dash(attr, "PositionRole")),
-        "NormalMeshPayloadOffset": safe_int(
-            json_value_or_dash(attr, "NormalMeshPayloadOffset")
-        ),
-        "NormalBlockIndex": safe_int(
-            json_value_or_dash(attr, "NormalBlockIndex")
-        ),
-        "NormalDeclaredPayloadBytes": safe_int(
-            json_value_or_dash(attr, "NormalDeclaredPayloadBytes")
-        ),
-        "UvMeshPayloadOffset": safe_int(
-            json_value_or_dash(attr, "UvMeshPayloadOffset")
-        ),
+        "NormalMeshPayloadOffset": safe_int(json_value_or_dash(attr, "NormalMeshPayloadOffset")),
+        "NormalBlockIndex": safe_int(json_value_or_dash(attr, "NormalBlockIndex")),
+        "NormalDeclaredPayloadBytes": safe_int(json_value_or_dash(attr, "NormalDeclaredPayloadBytes")),
+        "UvMeshPayloadOffset": safe_int(json_value_or_dash(attr, "UvMeshPayloadOffset")),
         "UvBlockIndex": safe_int(json_value_or_dash(attr, "UvBlockIndex")),
-        "UvDeclaredPayloadBytes": safe_int(
-            json_value_or_dash(attr, "UvDeclaredPayloadBytes")
-        ),
+        "UvDeclaredPayloadBytes": safe_int(json_value_or_dash(attr, "UvDeclaredPayloadBytes")),
         "PairingCount": pairing_count,
         "ExtraStreamCount": extra_count,
         "ProbePath": path,
@@ -3386,18 +3143,14 @@ def _new_position_source_representative_probe_row(spec):
     path = str(spec["Path"])
     if not Path(path).exists():
         raise FileNotFoundError(
-            f"PositionSourceSiblingRepresentativeProbeReport failed: "
-            f"probe report not found: {path}"
+            f"PositionSourceSiblingRepresentativeProbeReport failed: probe report not found: {path}"
         )
 
     report = load_json_report(path)
     mesh_block = int(spec["MeshBlock"])
 
     meshes = report.get("Meshes") or []
-    mesh_entries = [
-        m for m in meshes
-        if isinstance(m, dict) and safe_int(m.get("MeshBlockIndex", -1)) == mesh_block
-    ]
+    mesh_entries = [m for m in meshes if isinstance(m, dict) and safe_int(m.get("MeshBlockIndex", -1)) == mesh_block]
     if len(mesh_entries) != 1:
         raise ValueError(
             f"PositionSourceSiblingRepresentativeProbeReport failed: expected "
@@ -3418,7 +3171,8 @@ def _new_position_source_representative_probe_row(spec):
     normal_streams = [s for s in streams if _stream_role(s).startswith("normal")]
     uv_streams = [s for s in streams if _stream_role(s).startswith("uv")]
     side_streams = [
-        s for s in streams
+        s
+        for s in streams
         if not _stream_role(s).startswith("position-float3")
         and not _stream_role(s).startswith("normal")
         and not _stream_role(s).startswith("uv")
@@ -3435,11 +3189,7 @@ def _new_position_source_representative_probe_row(spec):
     attribute_summary = "none"
     if attr_sets:
         attr = attr_sets[0]
-        extras_count = (
-            len(attr.get("ExtraStreams"))
-            if isinstance(attr.get("ExtraStreams"), list)
-            else 0
-        )
+        extras_count = len(attr.get("ExtraStreams")) if isinstance(attr.get("ExtraStreams"), list) else 0
         topo = attr.get("Topology") or {}
         attribute_summary = (
             f"v={json_value_or_dash(attr, 'VertexCount')} "
@@ -3468,6 +3218,7 @@ def _new_position_source_representative_probe_row(spec):
         "ProbePath": path,
     }
 
+
 # ============================================================================
 # PositionSourceSiblingProbeReport (orchestrator)
 # ============================================================================
@@ -3485,10 +3236,7 @@ def position_source_sibling_probe_report(probe_specs):
     import json
     from pathlib import Path
 
-    rows = [
-        _new_position_source_sibling_probe_row(spec)
-        for spec in probe_specs
-    ]
+    rows = [_new_position_source_sibling_probe_row(spec) for spec in probe_specs]
 
     # Group by Pair
     pair_groups = {}
@@ -3498,16 +3246,13 @@ def position_source_sibling_probe_report(probe_specs):
 
     if len(pair_groups) < 2:
         raise ValueError(
-            "PositionSourceSiblingProbeReport failed: expected at least two "
-            f"sibling pairs, found {len(pair_groups)}."
+            f"PositionSourceSiblingProbeReport failed: expected at least two sibling pairs, found {len(pair_groups)}."
         )
 
     # Validate and build pair summaries
     pair_summaries = []
     for pair_key, pair_rows in sorted(pair_groups.items()):
-        pair_rows_sorted = sorted(
-            pair_rows, key=lambda r: int(r["MeshBlock"])
-        )
+        pair_rows_sorted = sorted(pair_rows, key=lambda r: int(r["MeshBlock"]))
         if len(pair_rows_sorted) != 2:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
@@ -3518,21 +3263,11 @@ def position_source_sibling_probe_report(probe_specs):
         sibling = pair_rows_sorted[1]
 
         position_shared = (
-            _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "PositionBlockIndex"
-            ) == 1
-            and _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "PositionDeclaredPayloadBytes"
-            ) == 1
-            and _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "PositionDataStreamUsage"
-            ) == 1
-            and _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "PositionDataStreamAccess"
-            ) == 1
-            and _get_position_source_sibling_unique_count(
-                pair_rows_sorted, "PositionRole"
-            ) == 1
+            _get_position_source_sibling_unique_count(pair_rows_sorted, "PositionBlockIndex") == 1
+            and _get_position_source_sibling_unique_count(pair_rows_sorted, "PositionDeclaredPayloadBytes") == 1
+            and _get_position_source_sibling_unique_count(pair_rows_sorted, "PositionDataStreamUsage") == 1
+            and _get_position_source_sibling_unique_count(pair_rows_sorted, "PositionDataStreamAccess") == 1
+            and _get_position_source_sibling_unique_count(pair_rows_sorted, "PositionRole") == 1
         )
         if not position_shared:
             raise ValueError(
@@ -3541,73 +3276,63 @@ def position_source_sibling_probe_report(probe_specs):
                 "usage/access/role evidence."
             )
 
-        if _get_position_source_sibling_unique_count(
-            pair_rows_sorted, "VertexCount"
-        ) != 1:
+        if _get_position_source_sibling_unique_count(pair_rows_sorted, "VertexCount") != 1:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
                 "no longer has matching vertex-count evidence."
             )
 
-        if _get_position_source_sibling_unique_count(
-            pair_rows_sorted, "PrimaryTopology"
-        ) != 1:
+        if _get_position_source_sibling_unique_count(pair_rows_sorted, "PrimaryTopology") != 1:
             raise ValueError(
                 f"PositionSourceSiblingProbeReport failed: pair '{pair_key}' "
                 "no longer has matching primary topology evidence."
             )
 
         mesh_size_delta = int(sibling["MeshSize"]) - int(primary["MeshSize"])
-        position_offset_delta = (
-            int(sibling["PositionMeshPayloadOffset"])
-            - int(primary["PositionMeshPayloadOffset"])
-        )
+        position_offset_delta = int(sibling["PositionMeshPayloadOffset"]) - int(primary["PositionMeshPayloadOffset"])
         if position_offset_delta == 0:
             position_offset_pattern = "same mesh payload offset"
         elif position_offset_delta == mesh_size_delta:
-            position_offset_pattern = (
-                "mesh payload offset shifts with mesh-size delta "
-                f"({position_offset_delta})"
-            )
+            position_offset_pattern = f"mesh payload offset shifts with mesh-size delta ({position_offset_delta})"
         else:
             position_offset_pattern = (
-                f"mesh payload offset delta {position_offset_delta}; "
-                f"mesh-size delta {mesh_size_delta}"
+                f"mesh payload offset delta {position_offset_delta}; mesh-size delta {mesh_size_delta}"
             )
 
-        pair_summaries.append({
-            "Pair": pair_key,
-            "PairLabel": str(primary["PairLabel"]),
-            "Id": str(primary["Id"]),
-            "MeshBlocks": f"mesh#{primary['MeshBlock']}, mesh#{sibling['MeshBlock']}",
-            "MeshSizes": f"{primary['MeshSize']}, {sibling['MeshSize']}",
-            "VertexCount": int(primary["VertexCount"]),
-            "PrimaryTopology": str(primary["PrimaryTopology"]),
-            "SharedPositionStream": (
-                f"block#{primary['PositionBlockIndex']} "
-                f"payload={primary['PositionDeclaredPayloadBytes']} "
-                f"usage={primary['PositionDataStreamUsage']} "
-                f"access={primary['PositionDataStreamAccess']} "
-                f"role={primary['PositionRole']}"
-            ),
-            "PositionOffsetPattern": position_offset_pattern,
-            "NormalStreams": (
-                f"mesh#{primary['MeshBlock']}:block#{primary['NormalBlockIndex']} "
-                f"payload={primary['NormalDeclaredPayloadBytes']} | "
-                f"mesh#{sibling['MeshBlock']}:block#{sibling['NormalBlockIndex']} "
-                f"payload={sibling['NormalDeclaredPayloadBytes']}"
-            ),
-            "UvStreams": (
-                f"mesh#{primary['MeshBlock']}:block#{primary['UvBlockIndex']} "
-                f"payload={primary['UvDeclaredPayloadBytes']} | "
-                f"mesh#{sibling['MeshBlock']}:block#{sibling['UvBlockIndex']} "
-                f"payload={sibling['UvDeclaredPayloadBytes']}"
-            ),
-            "Decision": (
-                "shared-position-stream sibling evidence; candidate-only "
-                "source ranking, not geometry/export truth"
-            ),
-        })
+        pair_summaries.append(
+            {
+                "Pair": pair_key,
+                "PairLabel": str(primary["PairLabel"]),
+                "Id": str(primary["Id"]),
+                "MeshBlocks": f"mesh#{primary['MeshBlock']}, mesh#{sibling['MeshBlock']}",
+                "MeshSizes": f"{primary['MeshSize']}, {sibling['MeshSize']}",
+                "VertexCount": int(primary["VertexCount"]),
+                "PrimaryTopology": str(primary["PrimaryTopology"]),
+                "SharedPositionStream": (
+                    f"block#{primary['PositionBlockIndex']} "
+                    f"payload={primary['PositionDeclaredPayloadBytes']} "
+                    f"usage={primary['PositionDataStreamUsage']} "
+                    f"access={primary['PositionDataStreamAccess']} "
+                    f"role={primary['PositionRole']}"
+                ),
+                "PositionOffsetPattern": position_offset_pattern,
+                "NormalStreams": (
+                    f"mesh#{primary['MeshBlock']}:block#{primary['NormalBlockIndex']} "
+                    f"payload={primary['NormalDeclaredPayloadBytes']} | "
+                    f"mesh#{sibling['MeshBlock']}:block#{sibling['NormalBlockIndex']} "
+                    f"payload={sibling['NormalDeclaredPayloadBytes']}"
+                ),
+                "UvStreams": (
+                    f"mesh#{primary['MeshBlock']}:block#{primary['UvBlockIndex']} "
+                    f"payload={primary['UvDeclaredPayloadBytes']} | "
+                    f"mesh#{sibling['MeshBlock']}:block#{sibling['UvBlockIndex']} "
+                    f"payload={sibling['UvDeclaredPayloadBytes']}"
+                ),
+                "Decision": (
+                    "shared-position-stream sibling evidence; candidate-only source ranking, not geometry/export truth"
+                ),
+            }
+        )
 
     # Sort pair summaries
     pair_summaries.sort(key=lambda ps: str(ps["Pair"]))
@@ -3624,9 +3349,7 @@ def position_source_sibling_probe_report(probe_specs):
         "CandidateOnly": True,
         "SourceProbes": [str(spec["Path"]) for spec in probe_specs],
         "PairSummaries": pair_summaries,
-        "ProbeRows": sorted(
-            rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))
-        ),
+        "ProbeRows": sorted(rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))),
         "Interpretation": (
             "Shared position stream blocks across sibling mesh blocks are "
             "parser-search evidence only. This report does not promote "
@@ -3684,11 +3407,7 @@ def position_source_sibling_probe_report(probe_specs):
             f"#{row['NormalBlockIndex']} "
             f"payload={row['NormalDeclaredPayloadBytes']}"
         )
-        uv_text = (
-            f"stream@{row['UvMeshPayloadOffset']}/"
-            f"#{row['UvBlockIndex']} "
-            f"payload={row['UvDeclaredPayloadBytes']}"
-        )
+        uv_text = f"stream@{row['UvMeshPayloadOffset']}/#{row['UvBlockIndex']} payload={row['UvDeclaredPayloadBytes']}"
         md_lines.append(
             f"| {format_markdown_cell(row['PairLabel'])} "
             f"| {format_markdown_cell(row['MeshBlock'])} "
@@ -3726,6 +3445,7 @@ def position_source_sibling_probe_report(probe_specs):
         "evidence stayed candidate-only and no geometry/export truth was promoted."
     )
 
+
 # ============================================================================
 # PositionSourceSiblingRepresentativeProbeReport
 # ============================================================================
@@ -3743,10 +3463,7 @@ def position_source_sibling_representative_probe_report(probe_specs):
     import json
     from pathlib import Path
 
-    rows = [
-        _new_position_source_representative_probe_row(spec)
-        for spec in probe_specs
-    ]
+    rows = [_new_position_source_representative_probe_row(spec) for spec in probe_specs]
 
     # Group by Pair
     pair_groups = {}
@@ -3756,9 +3473,7 @@ def position_source_sibling_representative_probe_report(probe_specs):
 
     pair_summaries = []
     for pair_key, pair_rows in sorted(pair_groups.items()):
-        pair_rows_sorted = sorted(
-            pair_rows, key=lambda r: int(r["MeshBlock"])
-        )
+        pair_rows_sorted = sorted(pair_rows, key=lambda r: int(r["MeshBlock"]))
         if len(pair_rows_sorted) != 2:
             raise ValueError(
                 f"PositionSourceSiblingRepresentativeProbeReport failed: "
@@ -3776,15 +3491,19 @@ def position_source_sibling_representative_probe_report(probe_specs):
         for lp in left_pos:
             for rp in right_pos:
                 if isinstance(lp, dict) and isinstance(rp, dict):
-                    if int(lp.get("TargetBlockIndex", -1)) == int(rp.get("TargetBlockIndex", -1)) and int(lp.get("Payload", -1)) == int(rp.get("Payload", -1)):
-                        shared_positions.append({
-                            "TargetBlockIndex": int(lp["TargetBlockIndex"]),
-                            "Payload": int(lp["Payload"]),
-                            "MeshPayloadOffsets": [
-                                int(lp["MeshPayloadOffset"]),
-                                int(rp["MeshPayloadOffset"]),
-                            ],
-                        })
+                    if int(lp.get("TargetBlockIndex", -1)) == int(rp.get("TargetBlockIndex", -1)) and int(
+                        lp.get("Payload", -1)
+                    ) == int(rp.get("Payload", -1)):
+                        shared_positions.append(
+                            {
+                                "TargetBlockIndex": int(lp["TargetBlockIndex"]),
+                                "Payload": int(lp["Payload"]),
+                                "MeshPayloadOffsets": [
+                                    int(lp["MeshPayloadOffset"]),
+                                    int(rp["MeshPayloadOffset"]),
+                                ],
+                            }
+                        )
 
         if not shared_positions:
             raise ValueError(
@@ -3815,9 +3534,7 @@ def position_source_sibling_representative_probe_report(probe_specs):
                 offset_str = "?"
             return f"block#{sp['TargetBlockIndex']} payload={sp['Payload']} offsets={offset_str}"
 
-        shared_pos_str = " | ".join(
-            _shared_pos_summary(sp) for sp in shared_positions
-        )
+        shared_pos_str = " | ".join(_shared_pos_summary(sp) for sp in shared_positions)
 
         def _cast_streams(raw):
             if isinstance(raw, list):
@@ -3848,20 +3565,22 @@ def position_source_sibling_representative_probe_report(probe_specs):
             f"side={_format_position_source_stream_list(_cast_streams(right_side_streams))}"
         )
 
-        pair_summaries.append({
-            "Pair": pair_key,
-            "PairLabel": str(left["PairLabel"]),
-            "Id": str(left["Id"]),
-            "MeshBlocks": f"mesh#{left['MeshBlock']}, mesh#{right['MeshBlock']}",
-            "MeshSizes": f"{left['MeshSize']}, {right['MeshSize']}",
-            "SharedPositionStreams": shared_pos_str,
-            "PrimaryMeshSummary": primary_summary,
-            "SiblingMeshSummary": sibling_summary,
-            "Decision": (
-                "shared position source repeats, but sibling lacks complete "
-                "attribute-set binding; candidate-only follow-up"
-            ),
-        })
+        pair_summaries.append(
+            {
+                "Pair": pair_key,
+                "PairLabel": str(left["PairLabel"]),
+                "Id": str(left["Id"]),
+                "MeshBlocks": f"mesh#{left['MeshBlock']}, mesh#{right['MeshBlock']}",
+                "MeshSizes": f"{left['MeshSize']}, {right['MeshSize']}",
+                "SharedPositionStreams": shared_pos_str,
+                "PrimaryMeshSummary": primary_summary,
+                "SiblingMeshSummary": sibling_summary,
+                "Decision": (
+                    "shared position source repeats, but sibling lacks complete "
+                    "attribute-set binding; candidate-only follow-up"
+                ),
+            }
+        )
 
     pair_summaries.sort(key=lambda ps: str(ps["Pair"]))
 
@@ -3875,9 +3594,7 @@ def position_source_sibling_representative_probe_report(probe_specs):
         "Schema": "position-source-sibling-representative-probe-comparison/v1",
         "CandidateOnly": True,
         "PairSummaries": pair_summaries,
-        "ProbeRows": sorted(
-            rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))
-        ),
+        "ProbeRows": sorted(rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))),
         "Interpretation": (
             "Representative parser-derived sibling probes for meshSize "
             "305/321/329. Shared position sources are search evidence only; "
@@ -3921,12 +3638,8 @@ def position_source_sibling_representative_probe_report(probe_specs):
     ]
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
-    print("\n--- PositionSourceSiblingRepresentativeProbeReport candidate-only "
-          "representative sibling probes")
-    print(
-        f"{'PairLabel':<45} {'Id':<18} {'MeshBlocks':<22} "
-        f"{'MeshSizes':<12} {'SharedPosition'} {'Decision'}"
-    )
+    print("\n--- PositionSourceSiblingRepresentativeProbeReport candidate-only representative sibling probes")
+    print(f"{'PairLabel':<45} {'Id':<18} {'MeshBlocks':<22} {'MeshSizes':<12} {'SharedPosition'} {'Decision'}")
     print("-" * 150)
     for ps_item in pair_summaries:
         print(
@@ -3960,10 +3673,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
     import json
     from pathlib import Path
 
-    rows = [
-        _new_position_source_representative_probe_row(spec)
-        for spec in probe_specs
-    ]
+    rows = [_new_position_source_representative_probe_row(spec) for spec in probe_specs]
 
     # Group by Pair
     pair_groups = {}
@@ -3973,9 +3683,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
 
     pair_summaries = []
     for pair_key, pair_rows in sorted(pair_groups.items()):
-        pair_rows_sorted = sorted(
-            pair_rows, key=lambda r: int(r["MeshBlock"])
-        )
+        pair_rows_sorted = sorted(pair_rows, key=lambda r: int(r["MeshBlock"]))
         if len(pair_rows_sorted) != 2:
             raise ValueError(
                 f"PositionSourceSiblingSecondaryProbeReport failed: "
@@ -3993,15 +3701,19 @@ def position_source_sibling_secondary_probe_report(probe_specs):
         for lp in left_pos:
             for rp in right_pos:
                 if isinstance(lp, dict) and isinstance(rp, dict):
-                    if int(lp.get("TargetBlockIndex", -1)) == int(rp.get("TargetBlockIndex", -1)) and int(lp.get("Payload", -1)) == int(rp.get("Payload", -1)):
-                        shared_positions.append({
-                            "TargetBlockIndex": int(lp["TargetBlockIndex"]),
-                            "Payload": int(lp["Payload"]),
-                            "MeshPayloadOffsets": [
-                                int(lp["MeshPayloadOffset"]),
-                                int(rp["MeshPayloadOffset"]),
-                            ],
-                        })
+                    if int(lp.get("TargetBlockIndex", -1)) == int(rp.get("TargetBlockIndex", -1)) and int(
+                        lp.get("Payload", -1)
+                    ) == int(rp.get("Payload", -1)):
+                        shared_positions.append(
+                            {
+                                "TargetBlockIndex": int(lp["TargetBlockIndex"]),
+                                "Payload": int(lp["Payload"]),
+                                "MeshPayloadOffsets": [
+                                    int(lp["MeshPayloadOffset"]),
+                                    int(rp["MeshPayloadOffset"]),
+                                ],
+                            }
+                        )
 
         if not shared_positions:
             raise ValueError(
@@ -4014,7 +3726,8 @@ def position_source_sibling_secondary_probe_report(probe_specs):
             row_id = str(row["Id"])
             row_mesh = int(row["MeshBlock"])
             matching_specs = [
-                s for s in probe_specs
+                s
+                for s in probe_specs
                 if str(s.get("Pair")) == pair_key
                 and str(s.get("Id")) == row_id
                 and int(s.get("MeshBlock", -1)) == row_mesh
@@ -4042,9 +3755,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
                 offset_str = "?"
             return f"block#{sp['TargetBlockIndex']} payload={sp['Payload']} offsets={offset_str}"
 
-        shared_pos_str = " | ".join(
-            _shared_pos_summary(sp) for sp in shared_positions
-        )
+        shared_pos_str = " | ".join(_shared_pos_summary(sp) for sp in shared_positions)
 
         def _cast_streams(raw):
             if isinstance(raw, list):
@@ -4080,21 +3791,23 @@ def position_source_sibling_secondary_probe_report(probe_specs):
             f"mesh#{right['MeshBlock']}={right['AttributeSetCount']}"
         )
 
-        pair_summaries.append({
-            "Pair": pair_key,
-            "PairLabel": str(left["PairLabel"]),
-            "Id": str(left["Id"]),
-            "MeshBlocks": f"mesh#{left['MeshBlock']}, mesh#{right['MeshBlock']}",
-            "MeshSizes": f"{left['MeshSize']}, {right['MeshSize']}",
-            "AttributeSetCounts": attr_set_counts,
-            "SharedPositionStreams": shared_pos_str,
-            "PrimaryMeshSummary": primary_summary,
-            "SiblingMeshSummary": sibling_summary,
-            "Decision": (
-                "secondary sibling spot-check stayed candidate-only; "
-                "attribute-set availability is evidence, not geometry truth"
-            ),
-        })
+        pair_summaries.append(
+            {
+                "Pair": pair_key,
+                "PairLabel": str(left["PairLabel"]),
+                "Id": str(left["Id"]),
+                "MeshBlocks": f"mesh#{left['MeshBlock']}, mesh#{right['MeshBlock']}",
+                "MeshSizes": f"{left['MeshSize']}, {right['MeshSize']}",
+                "AttributeSetCounts": attr_set_counts,
+                "SharedPositionStreams": shared_pos_str,
+                "PrimaryMeshSummary": primary_summary,
+                "SiblingMeshSummary": sibling_summary,
+                "Decision": (
+                    "secondary sibling spot-check stayed candidate-only; "
+                    "attribute-set availability is evidence, not geometry truth"
+                ),
+            }
+        )
 
     pair_summaries.sort(key=lambda ps: str(ps["Pair"]))
 
@@ -4108,9 +3821,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
         "Schema": "position-source-sibling-secondary-probe-comparison/v1",
         "CandidateOnly": True,
         "PairSummaries": pair_summaries,
-        "ProbeRows": sorted(
-            rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))
-        ),
+        "ProbeRows": sorted(rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))),
         "Interpretation": (
             "Secondary sibling-family spot checks for meshSize 305/321/329. "
             "Shared position sources remain source-binding search evidence only; "
@@ -4126,8 +3837,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
     md_lines = [
         "# Position Source Sibling Secondary Probe Comparison",
         "",
-        "Candidate-only comparison of secondary parser-derived sibling "
-        "leads for meshSize `305`, `321`, and `329`.",
+        "Candidate-only comparison of secondary parser-derived sibling leads for meshSize `305`, `321`, and `329`.",
         "",
         "Generated under ignored `Exports/`; do not stage generated discovery output.",
         "",
@@ -4156,8 +3866,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
     ]
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
-    print("\n--- PositionSourceSiblingSecondaryProbeReport candidate-only "
-          "secondary sibling probes")
+    print("\n--- PositionSourceSiblingSecondaryProbeReport candidate-only secondary sibling probes")
     print(
         f"{'PairLabel':<45} {'Id':<18} {'MeshBlocks':<22} "
         f"{'MeshSizes':<12} {'AttrSets':<18} {'SharedPosition'} {'Decision'}"
@@ -4173,10 +3882,7 @@ def position_source_sibling_secondary_probe_report(probe_specs):
         )
     print(f"PositionSourceSiblingSecondaryProbeReport JSON: {json_path}")
     print(f"PositionSourceSiblingSecondaryProbeReport markdown: {md_path}")
-    print(
-        "PositionSourceSiblingSecondaryProbeReport passed: secondary sibling "
-        "source leads stayed candidate-only."
-    )
+    print("PositionSourceSiblingSecondaryProbeReport passed: secondary sibling source leads stayed candidate-only.")
 
 
 # ============================================================================
@@ -4196,10 +3902,7 @@ def position_source_sibling_extra_position_report(probe_specs):
     import json
     from pathlib import Path
 
-    rows = [
-        _new_position_source_representative_probe_row(spec)
-        for spec in probe_specs
-    ]
+    rows = [_new_position_source_representative_probe_row(spec) for spec in probe_specs]
 
     # Group by Pair
     pair_groups = {}
@@ -4209,9 +3912,7 @@ def position_source_sibling_extra_position_report(probe_specs):
 
     pair_summaries = []
     for pair_key, pair_rows in sorted(pair_groups.items()):
-        pair_rows_sorted = sorted(
-            pair_rows, key=lambda r: int(r["MeshBlock"])
-        )
+        pair_rows_sorted = sorted(pair_rows, key=lambda r: int(r["MeshBlock"]))
         if len(pair_rows_sorted) != 2:
             raise ValueError(
                 f"PositionSourceSiblingExtraPositionReport failed: "
@@ -4223,8 +3924,7 @@ def position_source_sibling_extra_position_report(probe_specs):
         sibling_list = [r for r in pair_rows_sorted if int(r["MeshBlock"]) == 34]
         if len(primary_list) != 1 or len(sibling_list) != 1:
             raise ValueError(
-                f"PositionSourceSiblingExtraPositionReport failed: "
-                f"pair '{pair_key}' expected mesh#7 and mesh#34 rows."
+                f"PositionSourceSiblingExtraPositionReport failed: pair '{pair_key}' expected mesh#7 and mesh#34 rows."
             )
 
         primary = primary_list[0]
@@ -4251,15 +3951,21 @@ def position_source_sibling_extra_position_report(probe_specs):
         for lp in primary_pos:
             for rp in sibling_pos:
                 if isinstance(lp, dict) and isinstance(rp, dict):
-                    if int(lp.get("TargetBlockIndex", -1)) == 28 and int(rp.get("TargetBlockIndex", -1)) == 28 and int(lp.get("Payload", -1)) == int(rp.get("Payload", -1)):
-                        shared_primary.append({
-                            "TargetBlockIndex": 28,
-                            "Payload": int(lp["Payload"]),
-                            "MeshPayloadOffsets": [
-                                int(lp["MeshPayloadOffset"]),
-                                int(rp["MeshPayloadOffset"]),
-                            ],
-                        })
+                    if (
+                        int(lp.get("TargetBlockIndex", -1)) == 28
+                        and int(rp.get("TargetBlockIndex", -1)) == 28
+                        and int(lp.get("Payload", -1)) == int(rp.get("Payload", -1))
+                    ):
+                        shared_primary.append(
+                            {
+                                "TargetBlockIndex": 28,
+                                "Payload": int(lp["Payload"]),
+                                "MeshPayloadOffsets": [
+                                    int(lp["MeshPayloadOffset"]),
+                                    int(rp["MeshPayloadOffset"]),
+                                ],
+                            }
+                        )
 
         if not shared_primary:
             raise ValueError(
@@ -4270,7 +3976,8 @@ def position_source_sibling_extra_position_report(probe_specs):
 
         # Find extra position stream on sibling (mesh#34): @304/#57, role=position-float3-ror1-lead
         extra_position_streams = [
-            sp for sp in sibling_pos
+            sp
+            for sp in sibling_pos
             if isinstance(sp, dict)
             and int(sp.get("MeshPayloadOffset", -1)) == 304
             and int(sp.get("TargetBlockIndex", -1)) == 57
@@ -4301,9 +4008,7 @@ def position_source_sibling_extra_position_report(probe_specs):
                 offset_str = "?"
             return f"block#{sp['TargetBlockIndex']} payload={sp['Payload']} offsets={offset_str}"
 
-        shared_primary_str = " | ".join(
-            _shared_pos_summary(sp) for sp in shared_primary
-        )
+        shared_primary_str = " | ".join(_shared_pos_summary(sp) for sp in shared_primary)
 
         extra_pos_item = extra_position_streams[0]
         mesh34_extra_str = (
@@ -4342,19 +4047,21 @@ def position_source_sibling_extra_position_report(probe_specs):
             f"side={_format_position_source_stream_list(_cast_streams(sibling_side_streams))}"
         )
 
-        pair_summaries.append({
-            "Pair": pair_key,
-            "PairLabel": str(primary["PairLabel"]),
-            "Id": str(primary["Id"]),
-            "SharedPrimaryPosition": shared_primary_str,
-            "Mesh34ExtraPosition": mesh34_extra_str,
-            "Mesh7Summary": mesh7_summary,
-            "Mesh34Summary": mesh34_summary,
-            "Decision": (
-                "mesh#34 extra @304/#57 position-like stream repeats; "
-                "candidate-only source-binding oddity, not geometry truth"
-            ),
-        })
+        pair_summaries.append(
+            {
+                "Pair": pair_key,
+                "PairLabel": str(primary["PairLabel"]),
+                "Id": str(primary["Id"]),
+                "SharedPrimaryPosition": shared_primary_str,
+                "Mesh34ExtraPosition": mesh34_extra_str,
+                "Mesh7Summary": mesh7_summary,
+                "Mesh34Summary": mesh34_summary,
+                "Decision": (
+                    "mesh#34 extra @304/#57 position-like stream repeats; "
+                    "candidate-only source-binding oddity, not geometry truth"
+                ),
+            }
+        )
 
     pair_summaries.sort(key=lambda ps: str(ps["Pair"]))
 
@@ -4368,9 +4075,7 @@ def position_source_sibling_extra_position_report(probe_specs):
         "Schema": "position-source-sibling-extra-position-report/v1",
         "CandidateOnly": True,
         "PairSummaries": pair_summaries,
-        "ProbeRows": sorted(
-            rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))
-        ),
+        "ProbeRows": sorted(rows, key=lambda r: (str(r["Pair"]), int(r["MeshBlock"]))),
         "Interpretation": (
             "Focused meshSize=329 mesh#7/#34 report for the repeated mesh#34 "
             "@304/#57 position-like stream. This is source-binding search "
@@ -4390,8 +4095,7 @@ def position_source_sibling_extra_position_report(probe_specs):
         "",
         "Generated under ignored `Exports/`; do not stage generated discovery output.",
         "",
-        "| ID | Shared primary position | mesh#34 extra position | "
-        "mesh#7 summary | mesh#34 summary | Decision |",
+        "| ID | Shared primary position | mesh#34 extra position | mesh#7 summary | mesh#34 summary | Decision |",
         "|---|---|---|---|---|---|",
     ]
     for ps_item in pair_summaries:
@@ -4412,12 +4116,8 @@ def position_source_sibling_extra_position_report(probe_specs):
     ]
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
-    print("\n--- PositionSourceSiblingExtraPositionReport candidate-only "
-          "mesh#34 extra position stream")
-    print(
-        f"{'Id':<18} {'SharedPrimaryPosition':<50} "
-        f"{'Mesh34Extra':<50} {'Decision'}"
-    )
+    print("\n--- PositionSourceSiblingExtraPositionReport candidate-only mesh#34 extra position stream")
+    print(f"{'Id':<18} {'SharedPrimaryPosition':<50} {'Mesh34Extra':<50} {'Decision'}")
     print("-" * 150)
     for ps_item in pair_summaries:
         print(
@@ -4428,10 +4128,7 @@ def position_source_sibling_extra_position_report(probe_specs):
         )
     print(f"PositionSourceSiblingExtraPositionReport JSON: {json_path}")
     print(f"PositionSourceSiblingExtraPositionReport markdown: {md_path}")
-    print(
-        "PositionSourceSiblingExtraPositionReport passed: mesh#34 extra "
-        "position-like stream stayed candidate-only."
-    )
+    print("PositionSourceSiblingExtraPositionReport passed: mesh#34 extra position-like stream stayed candidate-only.")
 
 
 # ============================================================================
@@ -4538,10 +4235,7 @@ def post50_mesh329_source_binding_compare(
         mesh7 = mesh7_rows[0]
         mesh34 = mesh34_rows[0]
         if safe_int(mesh7.get("MeshSize")) != 329 or safe_int(mesh34.get("MeshSize")) != 329:
-            raise ValueError(
-                "Post50Mesh329SourceBindingCompare expected meshSize=329 for "
-                f"pair {pair_key}."
-            )
+            raise ValueError(f"Post50Mesh329SourceBindingCompare expected meshSize=329 for pair {pair_key}.")
 
         mesh7_pos_streams = _stream_dicts(mesh7.get("PositionStreams"))
         mesh34_pos_streams = _stream_dicts(mesh34.get("PositionStreams"))
@@ -4587,11 +4281,7 @@ def post50_mesh329_source_binding_compare(
         extra_vector_count = _payload_vector_count(extra_payload, 12)
         normal_vector_count = _payload_vector_count(normal_payload, 12)
         primary_shared = primary_payload == mesh34_primary_payload
-        extra_to_primary_ratio = (
-            round(extra_vector_count / primary_vector_count, 4)
-            if primary_vector_count
-            else 0.0
-        )
+        extra_to_primary_ratio = round(extra_vector_count / primary_vector_count, 4) if primary_vector_count else 0.0
 
         compare_rows.append(
             {
@@ -4655,9 +4345,7 @@ def post50_mesh329_source_binding_compare(
         "ExtraPayloadRemainders": extra_remainders,
         "AllPrimarySharedAt212Block28": all(row["SharedPrimaryStream"] is True for row in compare_rows),
         "AllExtraAt304Block57": len(compare_rows) == len(pair_summaries),
-        "AllMesh7CompleteAttributeSet": all(
-            safe_int(row["Mesh7AttributeSetCount"]) == 1 for row in compare_rows
-        ),
+        "AllMesh7CompleteAttributeSet": all(safe_int(row["Mesh7AttributeSetCount"]) == 1 for row in compare_rows),
         "AllMesh34LacksCompleteAttributeSet": all(
             safe_int(row["Mesh34AttributeSetCount"]) == 0 for row in compare_rows
         ),
@@ -4988,7 +4676,11 @@ def post50_residual_strict_threshold_delta_report(
     if not target_row:
         raise ValueError("classifier report has no target meshSize=305 stream@188 payload=288 row")
 
-    cluster_path = Path(cluster_report_path) if cluster_report_path is not None else classifier_path.parent / "residual-position-cluster-probe-report.json"
+    cluster_path = (
+        Path(cluster_report_path)
+        if cluster_report_path is not None
+        else classifier_path.parent / "residual-position-cluster-probe-report.json"
+    )
     cluster_payload_row: dict[str, Any] = {}
     if cluster_path.exists():
         cluster_report = load_json_report(cluster_path)
@@ -4996,11 +4688,7 @@ def post50_residual_strict_threshold_delta_report(
             payload_rows = cluster_report.get("PayloadRows")
             if isinstance(payload_rows, list):
                 cluster_payload_row = next(
-                    (
-                        row
-                        for row in payload_rows
-                        if isinstance(row, dict) and safe_int(row.get("Payload")) == 288
-                    ),
+                    (row for row in payload_rows if isinstance(row, dict) and safe_int(row.get("Payload")) == 288),
                     {},
                 )
 
@@ -5202,11 +4890,7 @@ def post50_mesh329_family_proof_report(
         payload = safe_int(raw_row.get("DeclaredPayloadBytes"))
         samples_raw = raw_row.get("Samples")
         samples_iter = samples_raw if isinstance(samples_raw, list) else []
-        sample_summaries = [
-            _family_sample_summary(sample)
-            for sample in samples_iter
-            if isinstance(sample, dict)
-        ]
+        sample_summaries = [_family_sample_summary(sample) for sample in samples_iter if isinstance(sample, dict)]
         proof_rows.append(
             {
                 "IdPrefix": str(raw_row.get("IdPrefix", "")),
@@ -5267,9 +4951,7 @@ def post50_mesh329_family_proof_report(
     payload_remainders = sorted({safe_int(row["PayloadRemainder"]) for row in proof_rows})
     family_report_consistency = {
         "FamilyReportPresent": bool(top_family),
-        "EvidenceGroupsMatch": (
-            safe_int(top_family.get("EvidenceGroups")) == evidence_groups if top_family else False
-        ),
+        "EvidenceGroupsMatch": (safe_int(top_family.get("EvidenceGroups")) == evidence_groups if top_family else False),
         "TotalStreamLinksMatch": (
             safe_int(top_family.get("TotalStreamLinks")) == total_stream_links if top_family else False
         ),
@@ -5301,9 +4983,7 @@ def post50_mesh329_family_proof_report(
             row["DataStreamUsage"] == "1" and row["DataStreamAccess"] == "19" for row in proof_rows
         ),
         "AllRowsRolePositionFloat3Ror1Lead": all(row["Role"] == "position-float3-ror1-lead" for row in proof_rows),
-        "AllSamplesGhidraStyleLayoutValid": all(
-            bool(row["AllSamplesGhidraStyleLayoutValid"]) for row in proof_rows
-        ),
+        "AllSamplesGhidraStyleLayoutValid": all(bool(row["AllSamplesGhidraStyleLayoutValid"]) for row in proof_rows),
         "FamilyReportConsistency": family_report_consistency,
         "CandidateOnly": True,
         "ParserExportPromotionAllowed": False,
@@ -5345,8 +5025,7 @@ def post50_mesh329_family_proof_report(
     md_lines = [
         "# Post-50 meshSize 329 family proof",
         "",
-        "Candidate-only proof packet for source-binding family `meshSize=329`, "
-        "`mesh#7/#34`, `stream@212`, `block#28`.",
+        "Candidate-only proof packet for source-binding family `meshSize=329`, `mesh#7/#34`, `stream@212`, `block#28`.",
         "",
         f"Source inventory: `{_repo_relative_report_path(inventory_path)}`",
         "",
@@ -5389,6 +5068,7 @@ def post50_mesh329_family_proof_report(
     print(f"Post50Mesh329FamilyProof markdown: {_repo_relative_report_path(md_path)}")
     print("Post50Mesh329FamilyProof passed: family evidence remains candidate-only.")
     return json_path, md_path
+
 
 # ============================================================================
 # ResidualPositionClusterProbeReport  (focused cluster probes)
@@ -5460,9 +5140,7 @@ def _get_hex_byte_comparison(row: dict[str, Any], baseline: dict[str, Any]) -> d
     }
 
 
-def _get_optional_cluster_report(
-    out_dir: Path, file_name: str, missing_reports: list[str]
-) -> dict[str, Any] | None:
+def _get_optional_cluster_report(out_dir: Path, file_name: str, missing_reports: list[str]) -> dict[str, Any] | None:
     """Load an optional source report, logging missing paths.
 
     Mirrors: Get-OptionalClusterReport
@@ -5470,8 +5148,7 @@ def _get_optional_cluster_report(
     path = out_dir / file_name
     if not path.exists():
         print(
-            f"ResidualPositionClusterProbeReport note: optional source report "
-            f"is missing: {path}",
+            f"ResidualPositionClusterProbeReport note: optional source report is missing: {path}",
             file=sys.stderr,
         )
         missing_reports.append(file_name)
@@ -5510,17 +5187,14 @@ def _get_cluster_mesh_row(spec: dict[str, Any], path: str) -> dict[str, object]:
     """
     path_obj = Path(path)
     if not path_obj.exists():
-        raise FileNotFoundError(
-            f"ResidualPositionClusterProbeReport failed: mesh probe output missing: {path}"
-        )
+        raise FileNotFoundError(f"ResidualPositionClusterProbeReport failed: mesh probe output missing: {path}")
 
     report = load_json_report(path)
     meshes = report.get("Meshes") or []
     mesh_entries = [
         m
         for m in meshes
-        if isinstance(m, dict)
-        and safe_int(m.get("MeshBlockIndex", -1)) == safe_int(spec.get("MeshBlock", -1))
+        if isinstance(m, dict) and safe_int(m.get("MeshBlockIndex", -1)) == safe_int(spec.get("MeshBlock", -1))
     ]
     if len(mesh_entries) != 1:
         raise ValueError(
@@ -5584,17 +5258,14 @@ def _get_cluster_stream_row(spec: dict[str, Any], path: str) -> dict[str, object
     """
     path_obj = Path(path)
     if not path_obj.exists():
-        raise FileNotFoundError(
-            f"ResidualPositionClusterProbeReport failed: stream-body output missing: {path}"
-        )
+        raise FileNotFoundError(f"ResidualPositionClusterProbeReport failed: stream-body output missing: {path}")
 
     report = load_json_report(path)
     stream_bodies = report.get("StreamBodies") or []
     stream_entries = [
         s
         for s in stream_bodies
-        if isinstance(s, dict)
-        and safe_int(s.get("BlockIndex", -1)) == safe_int(spec.get("StreamBlock", -1))
+        if isinstance(s, dict) and safe_int(s.get("BlockIndex", -1)) == safe_int(spec.get("StreamBlock", -1))
     ]
     if len(stream_entries) != 1:
         raise ValueError(
@@ -5626,9 +5297,7 @@ def _get_cluster_stream_row(spec: dict[str, Any], path: str) -> dict[str, object
         c_vals = [safe_int(t.get("C", 0)) for t in u16_triples if isinstance(t, dict)]
         if a_vals:
             u16_triples_summary = (
-                f"A={min(a_vals)}..{max(a_vals)} "
-                f"B={min(b_vals)}..{max(b_vals)} "
-                f"C={min(c_vals)}..{max(c_vals)}"
+                f"A={min(a_vals)}..{max(a_vals)} B={min(b_vals)}..{max(b_vals)} C={min(c_vals)}..{max(c_vals)}"
             )
 
     return {
@@ -5647,9 +5316,7 @@ def _get_cluster_stream_row(spec: dict[str, Any], path: str) -> dict[str, object
         "PlausibleFloat32Count": safe_int(json_value_or_dash(stats, "PlausibleFloat32Count")),
         "UInt16Distinct": safe_int(json_value_or_dash(stats, "UInt16Distinct")),
         "UInt16TriplesStructureFamily": (
-            str(u16_triples_structure.get("StructuralFamily", "-"))
-            if isinstance(u16_triples_structure, dict)
-            else "-"
+            str(u16_triples_structure.get("StructuralFamily", "-")) if isinstance(u16_triples_structure, dict) else "-"
         ),
         "UInt16TriplesMagic43606": (
             bool(u16_triples_structure.get("Magic43606Found", False))
@@ -5662,9 +5329,7 @@ def _get_cluster_stream_row(spec: dict[str, Any], path: str) -> dict[str, object
             else False
         ),
         "UInt16TriplesInterpretation": (
-            str(u16_triples_structure.get("Interpretation", "-"))
-            if isinstance(u16_triples_structure, dict)
-            else "-"
+            str(u16_triples_structure.get("Interpretation", "-")) if isinstance(u16_triples_structure, dict) else "-"
         ),
         "OutputPath": path,
     }
@@ -5713,15 +5378,9 @@ def residual_position_cluster_probe_report(
     )
 
     source_report_statuses = [
-        _get_cluster_source_report_status(
-            out_dir_path, "residual-position-classifier-report.json"
-        ),
-        _get_cluster_source_report_status(
-            out_dir_path, "residual-position-family-crosstab.json"
-        ),
-        _get_cluster_source_report_status(
-            out_dir_path, "position-source-sibling-family-report.json"
-        ),
+        _get_cluster_source_report_status(out_dir_path, "residual-position-classifier-report.json"),
+        _get_cluster_source_report_status(out_dir_path, "residual-position-family-crosstab.json"),
+        _get_cluster_source_report_status(out_dir_path, "position-source-sibling-family-report.json"),
     ]
 
     classifier_rows: list[dict[str, Any]] = []
@@ -5767,10 +5426,7 @@ def residual_position_cluster_probe_report(
         stream_block = safe_int(spec.get("StreamBlock", 0))
 
         # Stream body probe
-        stream_path = (
-            out_dir_path
-            / f"probe-residual-position-payload{payload}-{spec_id}-stream{stream_block}.json"
-        )
+        stream_path = out_dir_path / f"probe-residual-position-payload{payload}-{spec_id}-stream{stream_block}.json"
         stream_args = [
             "run",
             "--project",
@@ -5794,9 +5450,7 @@ def residual_position_cluster_probe_report(
 
         # Mesh probes for mesh#7 and mesh#27
         for mesh_block in (7, 27):
-            mesh_path = (
-                out_dir_path / f"probe-nif-mesh-{spec_id}-mesh{mesh_block}.json"
-            )
+            mesh_path = out_dir_path / f"probe-nif-mesh-{spec_id}-mesh{mesh_block}.json"
             mesh_args = [
                 "run",
                 "--project",
@@ -5832,167 +5486,98 @@ def residual_position_cluster_probe_report(
     payload_rows: list[dict[str, object]] = []
     sorted_mesh_rows = sorted(mesh_rows, key=lambda r: safe_int(r.get("Payload", 0)))
 
-    for payload_val, group_items_iter in groupby(
-        sorted_mesh_rows, key=lambda r: safe_int(r.get("Payload", 0))
-    ):
+    for payload_val, group_items_iter in groupby(sorted_mesh_rows, key=lambda r: safe_int(r.get("Payload", 0))):
         items = list(group_items_iter)
         first = items[0]
 
         # Find matching stream row
-        stream_matches = [
-            sr for sr in stream_rows if safe_int(sr.get("Payload", 0)) == payload_val
-        ]
+        stream_matches = [sr for sr in stream_rows if safe_int(sr.get("Payload", 0)) == payload_val]
         stream = stream_matches[0] if stream_matches else {}
 
         # Find matching classifier and family rows
         classifier_match = [
-            cr
-            for cr in classifier_rows
-            if isinstance(cr, dict)
-            and safe_int(cr.get("Payload", 0)) == payload_val
+            cr for cr in classifier_rows if isinstance(cr, dict) and safe_int(cr.get("Payload", 0)) == payload_val
         ]
         classifier = classifier_match[0] if classifier_match else None
 
         family_match = [
-            fr
-            for fr in family_payload_rows
-            if isinstance(fr, dict)
-            and safe_int(fr.get("Payload", 0)) == payload_val
+            fr for fr in family_payload_rows if isinstance(fr, dict) and safe_int(fr.get("Payload", 0)) == payload_val
         ]
         family = family_match[0] if family_match else None
 
-        strict_pass = (
-            bool(json_value_or_dash(classifier, "StrictPass"))
-            if classifier
-            else None
-        )
-        candidate_guard = (
-            bool(json_value_or_dash(family, "CandidateGuard"))
-            if family
-            else None
-        )
+        strict_pass = bool(json_value_or_dash(classifier, "StrictPass")) if classifier else None
+        candidate_guard = bool(json_value_or_dash(family, "CandidateGuard")) if family else None
 
-        classifier_plausible = (
-            json_double_or_none(classifier, "Plausible") if classifier else None
-        )
+        classifier_plausible = json_double_or_none(classifier, "Plausible") if classifier else None
         classifier_max_threshold = (
-            json_double_or_none(classifier, "MaxPlausibleThresholdForSample")
-            if classifier
-            else None
+            json_double_or_none(classifier, "MaxPlausibleThresholdForSample") if classifier else None
         )
-        classifier_miss_reasons = (
-            str(json_value_or_dash(classifier, "MissReasons"))
-            if classifier
-            else "-"
-        )
+        classifier_miss_reasons = str(json_value_or_dash(classifier, "MissReasons")) if classifier else "-"
 
-        mesh_blocks_list = ",".join(
-            sorted(
-                f"mesh#{safe_int(m.get('MeshBlock', 0))}" for m in items
-            )
-        )
+        mesh_blocks_list = ",".join(sorted(f"mesh#{safe_int(m.get('MeshBlock', 0))}" for m in items))
         mesh_roles_list = "; ".join(
-            sorted(
-                f"mesh#{safe_int(m.get('MeshBlock', 0))}={m.get('Role', '-')}"
-                for m in items
-            )
+            sorted(f"mesh#{safe_int(m.get('MeshBlock', 0))}={m.get('Role', '-')}" for m in items)
         )
-        attribute_set_total = sum(
-            safe_int(m.get("AttributeSetCount", 0)) for m in items
-        )
+        attribute_set_total = sum(safe_int(m.get("AttributeSetCount", 0)) for m in items)
         pairing_total = sum(safe_int(m.get("PairingCount", 0)) for m in items)
-        review_required = any(
-            m.get("ReviewRequired", False) for m in items
-        )
+        review_required = any(m.get("ReviewRequired", False) for m in items)
 
         sibling_family_evidence = (
-            safe_int(mesh305_sibling_family.get("EvidenceGroups", 0))
-            if mesh305_sibling_family
-            else 0
+            safe_int(mesh305_sibling_family.get("EvidenceGroups", 0)) if mesh305_sibling_family else 0
         )
         sibling_family_links = (
-            safe_int(mesh305_sibling_family.get("TotalStreamLinks", 0))
-            if mesh305_sibling_family
-            else 0
+            safe_int(mesh305_sibling_family.get("TotalStreamLinks", 0)) if mesh305_sibling_family else 0
         )
-        sibling_family_ids = (
-            safe_int(mesh305_sibling_family.get("DistinctIds", 0))
-            if mesh305_sibling_family
-            else 0
-        )
-        sibling_family_targets = (
-            str(mesh305_sibling_family.get("TargetBlocks", "-"))
-            if mesh305_sibling_family
-            else "-"
-        )
+        sibling_family_ids = safe_int(mesh305_sibling_family.get("DistinctIds", 0)) if mesh305_sibling_family else 0
+        sibling_family_targets = str(mesh305_sibling_family.get("TargetBlocks", "-")) if mesh305_sibling_family else "-"
 
-        payload_rows.append({
-            "Payload": payload_val,
-            "Id": str(first.get("Id", "")),
-            "StreamBlock": safe_int(stream.get("StreamBlock", 0)),
-            "StreamClassification": str(stream.get("Classification", "")),
-            "BodyFirst16": str(stream.get("BodyFirst16", "")),
-            "StreamBodyFirst128": str(stream.get("BodyFirst128", "")),
-            "StreamByteLength": safe_int(stream.get("ByteLength", 0)),
-            "PreferredStrideSummary": str(
-                stream.get("PreferredStrideSummary", "")
-            ),
-            "UInt16TriplesCount": safe_int(
-                stream.get("UInt16TriplesCount", 0)
-            ),
-            "UInt16TriplesSummary": str(
-                stream.get("UInt16TriplesSummary", "")
-            ),
-            "UInt16TriplesAlternation": bool(
-                stream.get("UInt16TriplesAlternation", False)
-            ),
-            "UInt16TriplesMagic43606": bool(
-                stream.get("UInt16TriplesMagic43606", False)
-            ),
-            "UInt16TriplesStructureFamily": str(
-                stream.get("UInt16TriplesStructureFamily", "")
-            ),
-            "UInt16TriplesInterpretation": str(
-                stream.get("UInt16TriplesInterpretation", "")
-            ),
-            "ClassifierPlausible": classifier_plausible,
-            "ClassifierStrictPass": strict_pass,
-            "ClassifierMissReasons": classifier_miss_reasons,
-            "ClassifierMaxPlausibleThresholdForSample": classifier_max_threshold,
-            "ResidualFamilySampleCount": (
-                safe_int(family.get("SampleCount", 0)) if family else 0
-            ),
-            "ResidualFamilyIdCount": (
-                safe_int(family.get("IdCount", 0)) if family else 0
-            ),
-            "ResidualFamilyMesh7And27IdCount": (
-                safe_int(family.get("Mesh7And27IdCount", 0)) if family else 0
-            ),
-            "ResidualFamilyCandidateGuard": candidate_guard,
-            "SiblingFamilyEvidenceGroups": sibling_family_evidence,
-            "SiblingFamilyTotalStreamLinks": sibling_family_links,
-            "SiblingFamilyDistinctIds": sibling_family_ids,
-            "SiblingFamilyTargetBlocks": sibling_family_targets,
-            "MeshBlocks": mesh_blocks_list,
-            "MeshRoles": mesh_roles_list,
-            "AttributeSetTotal": attribute_set_total,
-            "PairingTotal": pairing_total,
-            "ReviewRequired": review_required,
-            "ExportReady": False,
-            "GeometryTruthPromoted": False,
-            "Decision": (
-                "review-required; keep candidate-only until guards agree"
-                if review_required
-                else "candidate-only; no complete geometry binding"
-            ),
-        })
+        payload_rows.append(
+            {
+                "Payload": payload_val,
+                "Id": str(first.get("Id", "")),
+                "StreamBlock": safe_int(stream.get("StreamBlock", 0)),
+                "StreamClassification": str(stream.get("Classification", "")),
+                "BodyFirst16": str(stream.get("BodyFirst16", "")),
+                "StreamBodyFirst128": str(stream.get("BodyFirst128", "")),
+                "StreamByteLength": safe_int(stream.get("ByteLength", 0)),
+                "PreferredStrideSummary": str(stream.get("PreferredStrideSummary", "")),
+                "UInt16TriplesCount": safe_int(stream.get("UInt16TriplesCount", 0)),
+                "UInt16TriplesSummary": str(stream.get("UInt16TriplesSummary", "")),
+                "UInt16TriplesAlternation": bool(stream.get("UInt16TriplesAlternation", False)),
+                "UInt16TriplesMagic43606": bool(stream.get("UInt16TriplesMagic43606", False)),
+                "UInt16TriplesStructureFamily": str(stream.get("UInt16TriplesStructureFamily", "")),
+                "UInt16TriplesInterpretation": str(stream.get("UInt16TriplesInterpretation", "")),
+                "ClassifierPlausible": classifier_plausible,
+                "ClassifierStrictPass": strict_pass,
+                "ClassifierMissReasons": classifier_miss_reasons,
+                "ClassifierMaxPlausibleThresholdForSample": classifier_max_threshold,
+                "ResidualFamilySampleCount": (safe_int(family.get("SampleCount", 0)) if family else 0),
+                "ResidualFamilyIdCount": (safe_int(family.get("IdCount", 0)) if family else 0),
+                "ResidualFamilyMesh7And27IdCount": (safe_int(family.get("Mesh7And27IdCount", 0)) if family else 0),
+                "ResidualFamilyCandidateGuard": candidate_guard,
+                "SiblingFamilyEvidenceGroups": sibling_family_evidence,
+                "SiblingFamilyTotalStreamLinks": sibling_family_links,
+                "SiblingFamilyDistinctIds": sibling_family_ids,
+                "SiblingFamilyTargetBlocks": sibling_family_targets,
+                "MeshBlocks": mesh_blocks_list,
+                "MeshRoles": mesh_roles_list,
+                "AttributeSetTotal": attribute_set_total,
+                "PairingTotal": pairing_total,
+                "ReviewRequired": review_required,
+                "ExportReady": False,
+                "GeometryTruthPromoted": False,
+                "Decision": (
+                    "review-required; keep candidate-only until guards agree"
+                    if review_required
+                    else "candidate-only; no complete geometry binding"
+                ),
+            }
+        )
 
     # --- Guard: no export readiness or promoted truth ---
 
     review_rows = [r for r in payload_rows if r.get("ReviewRequired")]
-    unsafe_promotion_rows = [
-        r for r in payload_rows if r.get("ExportReady") or r.get("GeometryTruthPromoted")
-    ]
+    unsafe_promotion_rows = [r for r in payload_rows if r.get("ExportReady") or r.get("GeometryTruthPromoted")]
     if unsafe_promotion_rows:
         raise ValueError(
             "ResidualPositionClusterProbeReport failed: cluster rows must never "
@@ -6010,13 +5595,9 @@ def residual_position_cluster_probe_report(
 
     # --- Build body comparison rows ---
 
-    sorted_payload_rows = sorted(
-        payload_rows, key=lambda r: safe_int(r.get("Payload", 0))
-    )
+    sorted_payload_rows = sorted(payload_rows, key=lambda r: safe_int(r.get("Payload", 0)))
     baseline = baseline_rows[0]
-    body_comparison_rows = [
-        _get_hex_byte_comparison(row, baseline) for row in sorted_payload_rows
-    ]
+    body_comparison_rows = [_get_hex_byte_comparison(row, baseline) for row in sorted_payload_rows]
 
     # --- Build attribute binding search rows ---
 
@@ -6027,15 +5608,11 @@ def residual_position_cluster_probe_report(
             "AttributeSetTotal": safe_int(r.get("AttributeSetTotal", 0)),
             "PairingTotal": safe_int(r.get("PairingTotal", 0)),
             "CompleteBindingFound": (
-                safe_int(r.get("AttributeSetTotal", 0)) > 0
-                and safe_int(r.get("PairingTotal", 0)) > 0
+                safe_int(r.get("AttributeSetTotal", 0)) > 0 and safe_int(r.get("PairingTotal", 0)) > 0
             ),
             "Decision": (
                 "review-required; possible complete binding evidence changed"
-                if (
-                    safe_int(r.get("AttributeSetTotal", 0)) > 0
-                    and safe_int(r.get("PairingTotal", 0)) > 0
-                )
+                if (safe_int(r.get("AttributeSetTotal", 0)) > 0 and safe_int(r.get("PairingTotal", 0)) > 0)
                 else "no complete focused attribute/index binding found"
             ),
         }
@@ -6055,18 +5632,10 @@ def residual_position_cluster_probe_report(
         for r in sorted_payload_rows
     ]
     magic_43606_payloads = sorted(
-        [
-            safe_int(r.get("Payload", 0))
-            for r in sorted_payload_rows
-            if r.get("UInt16TriplesMagic43606")
-        ]
+        [safe_int(r.get("Payload", 0)) for r in sorted_payload_rows if r.get("UInt16TriplesMagic43606")]
     )
     alternating_payloads = sorted(
-        [
-            safe_int(r.get("Payload", 0))
-            for r in sorted_payload_rows
-            if r.get("UInt16TriplesAlternation")
-        ]
+        [safe_int(r.get("Payload", 0)) for r in sorted_payload_rows if r.get("UInt16TriplesAlternation")]
     )
 
     # --- Write JSON output ---
@@ -6082,15 +5651,9 @@ def residual_position_cluster_probe_report(
         "ExportPromotion": "blocked",
         "ExportReadinessAssertion": "blocked-for-all-rows",
         "SourceReports": {
-            "ResidualClassifier": str(
-                out_dir_path / "residual-position-classifier-report.json"
-            ),
-            "ResidualFamilyCrossTab": str(
-                out_dir_path / "residual-position-family-crosstab.json"
-            ),
-            "PositionSourceSiblingFamily": str(
-                out_dir_path / "position-source-sibling-family-report.json"
-            ),
+            "ResidualClassifier": str(out_dir_path / "residual-position-classifier-report.json"),
+            "ResidualFamilyCrossTab": str(out_dir_path / "residual-position-family-crosstab.json"),
+            "PositionSourceSiblingFamily": str(out_dir_path / "position-source-sibling-family-report.json"),
         },
         "SourceReportStatuses": source_report_statuses,
         "MissingSourceReports": missing_source_reports,
@@ -6104,9 +5667,7 @@ def residual_position_cluster_probe_report(
         "PayloadRows": sorted_payload_rows,
         "BodyComparisonRows": body_comparison_rows,
         "FocusedAttributeBindingSearchRows": attribute_binding_search_rows,
-        "StreamRows": sorted(
-            stream_rows, key=lambda r: safe_int(r.get("Payload", 0))
-        ),
+        "StreamRows": sorted(stream_rows, key=lambda r: safe_int(r.get("Payload", 0))),
         "MeshRows": sorted(
             mesh_rows,
             key=lambda r: (safe_int(r.get("Payload", 0)), safe_int(r.get("MeshBlock", 0))),
@@ -6135,8 +5696,7 @@ def residual_position_cluster_probe_report(
     md_lines: list[str] = [
         "# Residual Position Cluster Probe Report",
         "",
-        "Candidate-only focused probe report for "
-        "`meshSize=305 stream@188 StringValue=POSITION usage=1 access=19`.",
+        "Candidate-only focused probe report for `meshSize=305 stream@188 StringValue=POSITION usage=1 access=19`.",
         "",
         "| Payload | ID | Plausible | Strict pass | Candidate guard | "
         "Residual IDs | Sibling family | Stream body classifier | "
@@ -6154,11 +5714,7 @@ def residual_position_cluster_probe_report(
                 f"target={row.get('SiblingFamilyTargetBlocks', '-')}"
             )
 
-        plausible_str = (
-            f"{row['ClassifierPlausible']:.4f}"
-            if row.get("ClassifierPlausible") is not None
-            else "-"
-        )
+        plausible_str = f"{row['ClassifierPlausible']:.4f}" if row.get("ClassifierPlausible") is not None else "-"
 
         md_lines.append(
             f"| {format_markdown_cell(row['Payload'])} "
@@ -6184,11 +5740,7 @@ def residual_position_cluster_probe_report(
         "|---:|---:|---:|---:|---|---|---|",
     ]
     for comp_row in body_comparison_rows:
-        diff_str = (
-            f"{comp_row['DiffBytes']}/{comp_row['ComparedBytes']}"
-            if comp_row['ComparedBytes'] > 0
-            else "-"
-        )
+        diff_str = f"{comp_row['DiffBytes']}/{comp_row['ComparedBytes']}" if comp_row["ComparedBytes"] > 0 else "-"
         md_lines.append(
             f"| {format_markdown_cell(comp_row['Payload'])} "
             f"| {format_markdown_cell(comp_row['CommonPrefixBytes'])} "
@@ -6223,8 +5775,7 @@ def residual_position_cluster_probe_report(
         "",
         "## Focused attribute/index binding search",
         "",
-        "| Payload | Mesh blocks | Attribute sets | Pairings | "
-        "Complete binding found | Decision |",
+        "| Payload | Mesh blocks | Attribute sets | Pairings | Complete binding found | Decision |",
         "|---:|---|---:|---:|---|---|",
     ]
     for ab_row in attribute_binding_search_rows:
@@ -6266,10 +5817,7 @@ def residual_position_cluster_probe_report(
 
     # --- Console output ---
 
-    print(
-        "\n--- ResidualPositionClusterProbeReport candidate-only "
-        "residual cluster probes"
-    )
+    print("\n--- ResidualPositionClusterProbeReport candidate-only residual cluster probes")
     print(
         f"{'Payload':>8} {'Id':<18} {'Plausible':>10} {'Strict':>7} "
         f"{'Guard':>7} {'ResIDs':>6} {'Sibling':<30} {'Attr':>5} "
@@ -6277,11 +5825,7 @@ def residual_position_cluster_probe_report(
     )
     print("-" * 140)
     for row in sorted_payload_rows:
-        plausible_str = (
-            f"{row['ClassifierPlausible']:.4f}"
-            if row.get("ClassifierPlausible") is not None
-            else "-"
-        )
+        plausible_str = f"{row['ClassifierPlausible']:.4f}" if row.get("ClassifierPlausible") is not None else "-"
         sibling_summary_short = "-"
         eg = safe_int(row.get("SiblingFamilyEvidenceGroups", 0))
         if eg > 0:
@@ -6302,10 +5846,7 @@ def residual_position_cluster_probe_report(
             f"{len(review_rows)}. Candidate-only boundary preserved.",
             file=sys.stderr,
         )
-    print(
-        "ResidualPositionClusterProbeReport passed: strict thresholds "
-        "unchanged and OBJ/export remains blocked."
-    )
+    print("ResidualPositionClusterProbeReport passed: strict thresholds unchanged and OBJ/export remains blocked.")
 
 
 # ============================================================================
@@ -6418,7 +5959,9 @@ def mesh329_family_attribute_role_matrix(
         def _get(off: int) -> dict[str, Any] | None:
             return stream_map.get(off)
 
-        id_prefix = str(report.get("Source", {}).get("IdPrefix", probe_path.stem.split("-")[-2] if "-" in probe_path.stem else ""))
+        id_prefix = str(
+            report.get("Source", {}).get("IdPrefix", probe_path.stem.split("-")[-2] if "-" in probe_path.stem else "")
+        )
         if not id_prefix or len(id_prefix) < 16:
             # fallback parse from filename
             stem = probe_path.stem
@@ -6439,9 +5982,7 @@ def mesh329_family_attribute_role_matrix(
             "StreamsAt304": _get(304),
             "TotalStreams": len([s for s in streams if isinstance(s, dict)]),
             "AttrExtraStreamCount": (
-                len(attr_sets[0].get("ExtraStreams") or [])
-                if attr_sets and isinstance(attr_sets[0], dict)
-                else 0
+                len(attr_sets[0].get("ExtraStreams") or []) if attr_sets and isinstance(attr_sets[0], dict) else 0
             ),
             "ProbePath": _repo_relative_report_path(probe_path),
             "CandidateOnly": True,
@@ -6474,38 +6015,30 @@ def mesh329_family_attribute_role_matrix(
             s34_304 = row34.get("StreamsAt304") or {}
             s7_304 = row7.get("StreamsAt304") or {}
 
-            pair_comps.append({
-                "Id": idv,
-                "AttrSetCount7": row7["AttributeSetCount"],
-                "AttrSetCount34": row34["AttributeSetCount"],
-                "AttrDelta": row7["AttributeSetCount"] - row34["AttributeSetCount"],
-                "Shared212Payload": bool(
-                    s7_212.get("payload") == s34_212.get("payload")
-                    and s7_212.get("payload")
-                ),
-                "Shared212Block": bool(
-                    s7_212.get("block") == s34_212.get("block")
-                    and s7_212.get("block")
-                ),
-                "Mesh34_304Role": str(s34_304.get("role", "")),
-                "Mesh34_304Conf": safe_int(s34_304.get("conf", 0)),
-                "Mesh34_304VectorCount": safe_int(s34_304.get("vectorCount", 0)),
-                "Mesh7HasUV": bool(
-                    s7_304 and "uv-float2" in str(s7_304.get("role", "")).lower()
-                ),
-                "Mesh34HasUV": bool(
-                    s34_304 and "uv-float2" in str(s34_304.get("role", "")).lower()
-                ),
-                "Mesh7HasAttrSet": row7["AttributeSetCount"] > 0,
-                "Mesh34HasAttrSet": row34["AttributeSetCount"] > 0,
-                "Mesh7PosPayload": safe_int(s7_212.get("payload", 0)),
-                "Mesh34PosPrimaryPayload": safe_int(s34_212.get("payload", 0)),
-                "Decision": (
-                    "candidate-only; mesh#34 variant shares primary @212 position source "
-                    "but shows attributeSets=0 and @304 scored as secondary position"
-                ),
-                "CandidateOnly": True,
-            })
+            pair_comps.append(
+                {
+                    "Id": idv,
+                    "AttrSetCount7": row7["AttributeSetCount"],
+                    "AttrSetCount34": row34["AttributeSetCount"],
+                    "AttrDelta": row7["AttributeSetCount"] - row34["AttributeSetCount"],
+                    "Shared212Payload": bool(s7_212.get("payload") == s34_212.get("payload") and s7_212.get("payload")),
+                    "Shared212Block": bool(s7_212.get("block") == s34_212.get("block") and s7_212.get("block")),
+                    "Mesh34_304Role": str(s34_304.get("role", "")),
+                    "Mesh34_304Conf": safe_int(s34_304.get("conf", 0)),
+                    "Mesh34_304VectorCount": safe_int(s34_304.get("vectorCount", 0)),
+                    "Mesh7HasUV": bool(s7_304 and "uv-float2" in str(s7_304.get("role", "")).lower()),
+                    "Mesh34HasUV": bool(s34_304 and "uv-float2" in str(s34_304.get("role", "")).lower()),
+                    "Mesh7HasAttrSet": row7["AttributeSetCount"] > 0,
+                    "Mesh34HasAttrSet": row34["AttributeSetCount"] > 0,
+                    "Mesh7PosPayload": safe_int(s7_212.get("payload", 0)),
+                    "Mesh34PosPrimaryPayload": safe_int(s34_212.get("payload", 0)),
+                    "Decision": (
+                        "candidate-only; mesh#34 variant shares primary @212 position source "
+                        "but shows attributeSets=0 and @304 scored as secondary position"
+                    ),
+                    "CandidateOnly": True,
+                }
+            )
 
     # de-dupe covered
     covered = sorted(set(covered))
@@ -6514,9 +6047,7 @@ def mesh329_family_attribute_role_matrix(
     both_count = len(pair_comps)
     mesh7_attr1 = sum(1 for p in pair_comps if p["AttrSetCount7"] == 1)
     mesh34_attr0 = sum(1 for p in pair_comps if p["AttrSetCount34"] == 0)
-    mesh34_304_pos = sum(
-        1 for p in pair_comps if "position-float3" in p.get("Mesh34_304Role", "").lower()
-    )
+    mesh34_304_pos = sum(1 for p in pair_comps if "position-float3" in p.get("Mesh34_304Role", "").lower())
     mesh7_uv = sum(1 for p in pair_comps if p["Mesh7HasUV"])
     mesh34_no_uv = sum(1 for p in pair_comps if not p["Mesh34HasUV"])
 
@@ -6528,8 +6059,12 @@ def mesh329_family_attribute_role_matrix(
         "IDsWithMesh7UVPresent": mesh7_uv,
         "IDsWithMesh34UVAbsent": mesh34_no_uv,
         "ConsistentPatterns": [
-            f"mesh#34 consistently shows attributeSets=0 (observed in {mesh34_attr0}/{both_count} paired examples)" if both_count else "no paired data yet",
-            f"mesh#34 @304 scored as position-float3-ror1-lead (c=75) in {mesh34_304_pos}/{both_count} paired examples" if both_count else "",
+            f"mesh#34 consistently shows attributeSets=0 (observed in {mesh34_attr0}/{both_count} paired examples)"
+            if both_count
+            else "no paired data yet",
+            f"mesh#34 @304 scored as position-float3-ror1-lead (c=75) in {mesh34_304_pos}/{both_count} paired examples"
+            if both_count
+            else "",
             "mesh#7 typically has attributeSets=1 (pos@212 + normal@220 + uv@304) with extra u32 at @296",
         ],
         "QuantifiedNotes": {
@@ -6613,10 +6148,12 @@ def mesh329_family_attribute_role_matrix(
         "|---|---:|---:|---:|---|---|---|---|---|",
     ]
     for r in sorted(matrix_rows, key=lambda x: (x["Id"], x["MeshBlock"])):
+
         def _fmt_stream(s):
             if not s:
                 return "-"
-            return f"{s.get('role','?')}(c={s.get('conf',0)})/{s.get('vectorCount',0)}"
+            return f"{s.get('role', '?')}(c={s.get('conf', 0)})/{s.get('vectorCount', 0)}"
+
         md_lines.append(
             f"| {format_markdown_cell(r['Id'])} "
             f"| {r['MeshBlock']} "
@@ -6647,7 +6184,7 @@ def mesh329_family_attribute_role_matrix(
         "",
         "This matrix is reusable input for role scoring, attribute completion proofs, and M1.2/M1.3 guard work.",
         "",
-        f"Generated for Phase 1 M1.1 per { 'docs/roadmap/project-roadmap.md' }.",
+        f"Generated for Phase 1 M1.1 per {'docs/roadmap/project-roadmap.md'}.",
         "All output candidate-only. No promotion of parser, geometry, or export behavior.",
     ]
 
@@ -6656,12 +6193,34 @@ def mesh329_family_attribute_role_matrix(
     # CSV (flat matrix rows for easy consumption / spreadsheet)
     if matrix_rows:
         fieldnames = [
-            "Id", "MeshBlock", "MeshSize", "AttributeSetCount", "VertexCount",
-            "At212_block", "At212_payload", "At212_role", "At212_conf", "At212_vecs",
-            "At220_block", "At220_payload", "At220_role", "At220_conf", "At220_vecs",
-            "At296_block", "At296_payload", "At296_role", "At296_conf", "At296_vecs",
-            "At304_block", "At304_payload", "At304_role", "At304_conf", "At304_vecs",
-            "TotalStreams", "AttrExtraStreamCount", "ProbePath",
+            "Id",
+            "MeshBlock",
+            "MeshSize",
+            "AttributeSetCount",
+            "VertexCount",
+            "At212_block",
+            "At212_payload",
+            "At212_role",
+            "At212_conf",
+            "At212_vecs",
+            "At220_block",
+            "At220_payload",
+            "At220_role",
+            "At220_conf",
+            "At220_vecs",
+            "At296_block",
+            "At296_payload",
+            "At296_role",
+            "At296_conf",
+            "At296_vecs",
+            "At304_block",
+            "At304_payload",
+            "At304_role",
+            "At304_conf",
+            "At304_vecs",
+            "TotalStreams",
+            "AttrExtraStreamCount",
+            "ProbePath",
         ]
         with csv_path.open("w", newline="", encoding="utf-8") as fcsv:
             writer = csv.DictWriter(fcsv, fieldnames=fieldnames)
@@ -6671,36 +6230,38 @@ def mesh329_family_attribute_role_matrix(
                 s220 = r.get("StreamsAt220") or {}
                 s296 = r.get("StreamsAt296") or {}
                 s304 = r.get("StreamsAt304") or {}
-                writer.writerow({
-                    "Id": r["Id"],
-                    "MeshBlock": r["MeshBlock"],
-                    "MeshSize": r["MeshSize"],
-                    "AttributeSetCount": r["AttributeSetCount"],
-                    "VertexCount": r["VertexCount"],
-                    "At212_block": s212.get("block", ""),
-                    "At212_payload": s212.get("payload", ""),
-                    "At212_role": s212.get("role", ""),
-                    "At212_conf": s212.get("conf", ""),
-                    "At212_vecs": s212.get("vectorCount", ""),
-                    "At220_block": s220.get("block", ""),
-                    "At220_payload": s220.get("payload", ""),
-                    "At220_role": s220.get("role", ""),
-                    "At220_conf": s220.get("conf", ""),
-                    "At220_vecs": s220.get("vectorCount", ""),
-                    "At296_block": s296.get("block", ""),
-                    "At296_payload": s296.get("payload", ""),
-                    "At296_role": s296.get("role", ""),
-                    "At296_conf": s296.get("conf", ""),
-                    "At296_vecs": s296.get("vectorCount", ""),
-                    "At304_block": s304.get("block", ""),
-                    "At304_payload": s304.get("payload", ""),
-                    "At304_role": s304.get("role", ""),
-                    "At304_conf": s304.get("conf", ""),
-                    "At304_vecs": s304.get("vectorCount", ""),
-                    "TotalStreams": r["TotalStreams"],
-                    "AttrExtraStreamCount": r["AttrExtraStreamCount"],
-                    "ProbePath": r["ProbePath"],
-                })
+                writer.writerow(
+                    {
+                        "Id": r["Id"],
+                        "MeshBlock": r["MeshBlock"],
+                        "MeshSize": r["MeshSize"],
+                        "AttributeSetCount": r["AttributeSetCount"],
+                        "VertexCount": r["VertexCount"],
+                        "At212_block": s212.get("block", ""),
+                        "At212_payload": s212.get("payload", ""),
+                        "At212_role": s212.get("role", ""),
+                        "At212_conf": s212.get("conf", ""),
+                        "At212_vecs": s212.get("vectorCount", ""),
+                        "At220_block": s220.get("block", ""),
+                        "At220_payload": s220.get("payload", ""),
+                        "At220_role": s220.get("role", ""),
+                        "At220_conf": s220.get("conf", ""),
+                        "At220_vecs": s220.get("vectorCount", ""),
+                        "At296_block": s296.get("block", ""),
+                        "At296_payload": s296.get("payload", ""),
+                        "At296_role": s296.get("role", ""),
+                        "At296_conf": s296.get("conf", ""),
+                        "At296_vecs": s296.get("vectorCount", ""),
+                        "At304_block": s304.get("block", ""),
+                        "At304_payload": s304.get("payload", ""),
+                        "At304_role": s304.get("role", ""),
+                        "At304_conf": s304.get("conf", ""),
+                        "At304_vecs": s304.get("vectorCount", ""),
+                        "TotalStreams": r["TotalStreams"],
+                        "AttrExtraStreamCount": r["AttrExtraStreamCount"],
+                        "ProbePath": r["ProbePath"],
+                    }
+                )
     else:
         csv_path = None
 

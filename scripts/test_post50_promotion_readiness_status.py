@@ -219,11 +219,14 @@ with tempfile.TemporaryDirectory() as tmp:
     write_minimal_post50_reports(out_dir)
 
     output = StringIO()
-    with patch.object(
-        sys,
-        "argv",
-        ["rift_workflow.py", "post50-mesh34-negative-binding-status", "--out", str(out_dir), "--list-json"],
-    ), redirect_stdout(output):
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["rift_workflow.py", "post50-mesh34-negative-binding-status", "--out", str(out_dir), "--list-json"],
+        ),
+        redirect_stdout(output),
+    ):
         rift_workflow.main()
     negative_status = json.loads(output.getvalue())
     jsonschema.validate(negative_status, negative_schema)
@@ -236,11 +239,14 @@ with tempfile.TemporaryDirectory() as tmp:
     check_contains("negative blocker", "\n".join(negative_status["Blockers"]), "mesh34-complete-geometry-binding")
 
     output = StringIO()
-    with patch.object(
-        sys,
-        "argv",
-        ["rift_workflow.py", "post50-promotion-readiness-status", "--out", str(out_dir), "--list-json"],
-    ), redirect_stdout(output):
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["rift_workflow.py", "post50-promotion-readiness-status", "--out", str(out_dir), "--list-json"],
+        ),
+        redirect_stdout(output),
+    ):
         rift_workflow.main()
     readiness_status = json.loads(output.getvalue())
     jsonschema.validate(readiness_status, readiness_schema)

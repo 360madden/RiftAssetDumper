@@ -47,7 +47,9 @@ jsonschema.validate(step48_status, step48_schema)
 print("  PASS: Step 48 live scan status schema validation")
 jsonschema.validate(step49_status, step49_schema)
 print("  PASS: Step 49 live scan status schema validation")
-check("step 49 generic RiftReader triplet command available", step49_status["RiftReaderGenericTripletScanAvailable"], True)
+check(
+    "step 49 generic RiftReader triplet command available", step49_status["RiftReaderGenericTripletScanAvailable"], True
+)
 check(
     "step 49 generic RiftReader triplet command",
     step49_status["RiftReaderGenericTripletScanCommand"],

@@ -7,6 +7,7 @@
 **IDs to probe** (Curated Ranked Batch from completed ID Curator subagent task 019e8655-c7c1-7851-b421-d23747fb4827 — see docs/roadmap/phase1-m1.1-curated-probe-queue.md):
 
 Priority first wave (top 8 from curator ranking):
+
 1. 69da9507d49c42ff (77v — highest)
 2. f2c347fe81a5e3b2 (64v)
 3. 07c733b4eee3ed2e (56v)
@@ -20,6 +21,7 @@ Priority first wave (top 8 from curator ranking):
 python scripts/rift_workflow.py mesh-probe --id <ID> --mesh-block 7 --skip-build
 
 **Required outputs per ID**:
+
 - Full raw JSON saved to Exports/
 - Extracted structured data:
   - attributeSets count
@@ -30,11 +32,12 @@ Save a summary table (markdown or JSON) when batch is complete.
 
 Update docs/roadmap/phase1-m1.1-coordination.md with your progress when done.
 
-**✅ COMPLETE (Block 7 execution subagent for M1.1)**: Ran exact commands `python scripts/rift_workflow.py mesh-probe --id <ID> --mesh-block 7 --skip-build` for all priority + anchor (69da9507d49c42ff, f2c347fe81a5e3b2, 07c733b4eee3ed2e, 83df87e22bff4a94, 7f3e71246752afb2, 4eb7745610adf8c7, b57694c1f202ec07, 0364ea142bc00ce7). 
+**✅ COMPLETE (Block 7 execution subagent for M1.1)**: Ran exact commands `python scripts/rift_workflow.py mesh-probe --id <ID> --mesh-block 7 --skip-build` for all priority + anchor (69da9507d49c42ff, f2c347fe81a5e3b2, 07c733b4eee3ed2e, 83df87e22bff4a94, 7f3e71246752afb2, 4eb7745610adf8c7, b57694c1f202ec07, 0364ea142bc00ce7).
 
 Raw JSONs: Exports/probe-nif-mesh-*.json (plain from workflow) + suffixed Exports/probe-nif-mesh-*-mesh7.json (naming ensured for matrix; see coordination update).
 
 Key candidate findings (meshSize=329 family, #7):
+
 - attributeSets: 1 for all 8 (pos@212 + normal@220 + uv@304 + extra u32@296)
 - Consistent roles/conf across: @212 position-float3-ror1-lead (c=75), @220 normal-float3-ror1-lead (c=85), @296 u32-repeated-pattern-body (c=25 extra), @304 uv-float2-ror1-lead (c=80)
 - vec counts (vtx from attr): 77,64,56,52,49,46,38,48 matching curator queue

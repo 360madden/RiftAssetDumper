@@ -26,6 +26,7 @@ Created `.agents/` directory with 8 custom agent definition files embedding proj
 Each agent embeds project-specific knowledge: NiDataStream 29-byte invariant, @264/#15 index lead, degenerate-bridge strip semantics, experimental-position-source flags, safety policy rules, proof guard structure, etc.
 
 All definitions were code-reviewed by `@code-reviewer-deepseek-flash` — issues found and fixed:
+
 - `proof-guard-agent` was missing write tools (needed for guard baseline updates) — fixed
 - `autonomous-worker` was missing `spawn_agents` in toolNames — fixed
 - `autonomous-worker` had stale `autoContinue` param — removed
@@ -50,6 +51,7 @@ All definitions were code-reviewed by `@code-reviewer-deepseek-flash` — issues
 Discovered and explored two sibling repos on the local machine:
 
 **RiftReader** (`../RiftReader/`) — Live game client memory reader
+
 - Player/target coordinate anchors (`PlayerCoordAnchor*`, `CoordTrace*`)
 - Lua addon bridge (`ReaderBridgeSnapshot`, `ValidatorSnapshot`)
 - Player orientation analysis (`PlayerOrientation*`)
@@ -58,6 +60,7 @@ Discovered and explored two sibling repos on the local machine:
 - **Best for:** Live validation — attach to running RIFT, read actual coordinates, compare against NIF-decoded positions
 
 **Riftscan** (`../Riftscan/`) — Memory discovery pipeline
+
 - `FloatTripletStructureAnalyzer` — finds Vec3 coordinate data in memory (directly relevant)
 - `StructureClusterAnalyzer` — could find known NIF block patterns
 - `Vec3TruthPromotionService` — pipeline for promoting 3D data candidates to truth
@@ -71,6 +74,7 @@ Discovered and explored two sibling repos on the local machine:
 ### 4. knowledge.md updated
 
 Updated with:
+
 - Custom agent definitions directory structure and usage
 - Architecture summary with C#/Python/PowerShell quickstart table
 - Full proof guard status and lane-level TL;DR

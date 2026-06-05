@@ -13,6 +13,7 @@
 The `decode-nif-geometry` fallback (triggered when `attributeSets.Count == 0`) now decodes **normals** and **UVs** from linked NiDataStream blocks in addition to positions.
 
 **Key details:**
+
 - Candidates filtered by `Role.StartsWith("normal-", StringComparison.OrdinalIgnoreCase)` and `Role.StartsWith("uv-", StringComparison.OrdinalIgnoreCase)` — safer than `Contains` to avoid false matches.
 - Uses existing `BuildNifAttributeFloatVertexSamples()` with `components: 3` for normals and `components: 2` for UVs.
 - Console output prints first 4 normal samples with `VectorLength` for validation, plus sample counts.
@@ -20,6 +21,7 @@ The `decode-nif-geometry` fallback (triggered when `attributeSets.Count == 0`) n
 - Summary line shows `"linked-stream fallback"` instead of `"0 attribute sets"` for clarity.
 
 **Validated on `e3de1077a37d0337` mesh#6:**
+
 - 71 positions decoded from component #24 (`position-float3-ror1-lead`)
 - 71 normals decoded from component #25 (`normal-float3-ror1-lead`)
 - 71 UVs decoded from component #26 (`uv-float2-ror1-lead`)
@@ -28,12 +30,14 @@ The `decode-nif-geometry` fallback (triggered when `attributeSets.Count == 0`) n
 ### 2. Python: `--write-obj` flag wiring (rift_workflow.py)
 
 **Changes:**
+
 - Added `write_obj: bool = False` parameter to `_run_dotnet_and_summarize()`
 - Forwarded `--write-obj` to dotnet args when `write_obj=True`
 - Added `--write-obj` CLI argument to `decode-geometry` command in `_run_command()`
 - Passed `write_obj=args.write_obj` from handler
 
 **Usage:**
+
 ```powershell
 python scripts/rift_workflow.py decode-geometry --id e3de1077a37d0337 --mesh-block 6 --experimental-position-source --write-obj
 ```

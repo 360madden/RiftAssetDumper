@@ -47,6 +47,7 @@ OBJ inventory revealed **56 unique meshes** (deduplicated by asset+mesh) across 
 ### 5. Magic-43606 lead re-investigated — confirmed dead end
 
 Probed meshSize=305 stream@188 (block#21) on asset 75d5a06d7c0de1dd:
+
 - Stream role: `position-float3-ror1-lead` (confidence 75)
 - The magic-43606 (0xAA56) pattern was found in payload variant 288, not 192
 - Previous deep probe (Stage 10) already proved: float32 decode = denormal garbage (10⁻²⁷ to 10⁻³⁹)

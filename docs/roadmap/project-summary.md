@@ -1,8 +1,8 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06 (Phase 45 — **0 unknowns remaining** 🎉)
+**Last Updated**: 2026-06 (Phase 49 — triangle fan fallback implemented; all doc cleanup complete)
 
-**Purpose**: Comprehensive overview of all 47 completed phases, current state, key discoveries, and remaining work.
+**Purpose**: Comprehensive overview of all 50 completed phases, current state, key discoveries, and remaining work.
 
 ---
 
@@ -32,24 +32,32 @@ Reverse-engineering workspace for RIFT game asset archives. Focuses on decoding 
 
 ---
 
-## 2. Phase Summary (47 Phases)
+## 2. Phase Summary (51 Phases)
 
 ### Phase Group 1: Foundation (Phases 1-10)
+
 Descriptor subsystem, gate clearance, promotion, proof guards.
+
 - 7 gates cleared, 6 descriptor patterns proven, 49 tests, 0 regressions
 
 ### Phase Group 2: Discovery & Classification (Phases 11-20)
+
 Population-scale inventory, sibling pairing maps, cross-type verification.
+
 - 142 sibling pairs across 10 MeshSize families, 9 cross-type NIFs, float2 Z-source resolved
 
 ### Phase Group 3: Export Pipeline (Phases 21-34)
+
 Batch export scripts, manifest, index stream family map, coverage audit.
+
 - 4 export scripts, export manifest (schema v2), 100% pairing-map coverage
 
 ### Phase Group 4: Cluster Probe Analysis (Phases 35-41)
+
 Targeted probes, cluster analysis, regex bug fix, pattern matching.
 
 **Key achievements:**
+
 - **Phase 35**: 3 probes confirmed MS=321, 325; 37 cluster IDs identified
 - **Phase 35.5**: 13 inferred IDs; unknowns 101→83
 - **Phase 36**: `infer_meshsizes_from_clusters.py`; MS=276, 354 discovered; unknowns 83→79
@@ -62,6 +70,10 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 - **Phase 43**: **Probe lookup pattern matching** added — secondary lookup from `probe-meshsize-lookup.json` for IDs probed but never OBJ-exported; **18 more entries resolved**; unknowns 22→4
 - **Phase 44**: Project summary updated through Phase 43; health sweep (all clean)
 - **Phase 45**: **0 unknowns remaining!** 🎉 Two bug fixes (regex `-mesh\d+(\.*)?$` fix for nested directories + guard removal for unresolved asset IDs) and 3 final probes resolved last edge cases. All 268 OBJs now fully classified.
+- **Phase 46**: Documentation update with 0 unknowns milestone; accurate stats from live manifest
+- **Phase 47**: MS=280 MB=25 anomaly investigation — MB=25 has index stream but no position data; sibling-pairing behavior confirmed
+- **Phase 48**: Pos-only cross-MB pairing audit — **0 recoverable faced candidates found** across all 84 pos-only OBJs
+- **Phase 49**: **Triangle fan fallback** for pos-only OBJs — approximate fan faces from vertex 0 when no index-vertex pairings exist. **Batch export**: 76/77 pos-only OBJs exported with 2,847 fan faces across 15 families. All docs updated through Phase 49.
 
 ---
 
@@ -76,7 +88,7 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 | **Faced** | **184** (68.7%) |
 | **Position-only** | **84** (31.3%) |
 | Total vertices | 19,797 |
-| Total faces | 20,354 |
+| Total faces | 23,201 |
 | Total bytes | 2,201 KB |
 | Structural issues | 0 |
 | Probe lookup entries | 71 |
@@ -134,24 +146,31 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 ## 4. Key Discoveries
 
 ### Sibling Position Pairing (Phase 15.5-17)
+
 Z is sourced through sibling position pairing. Float2 meshes store XY-only (8 bytes/vertex). A paired float3 sibling provides full XYZ data.
 
 ### Index Stream Family Map (Phase 28-29)
+
 Faced vs position-only is determined by **which mesh block you export**. MB=6 is the canonical faced geometry block for MeshSizes 240-405. MB=7 and MB=27 are sister blocks for sibling pairing.
 
 ### 29 MeshSize Families Identified (Phases 27-41)
+
 Through systematic probes, cluster analysis, and pattern matching:
+
 - **17 faced-capable families**: 240, 267, 276, 280, 297, 301, 309, 321, 325, 330, 345, 354, 361, 365, 367, 405, 465 (MB=7)
 - **1 mixed family**: 305 (faced at MB=6,45,46; pos-only at MB=7,27)
 - **11 position-only families**: 193, 197, 214, 272, 275, 307, 326, 329, 337, 370, 389
 
 ### Regex Bug Discovery (Phase 38)
+
 `extract_asset_id()` had a regex bug: `r"-mesh\d+$"` never matched `.obj` extension. Fixed to `r"-mesh\d+\..*$"`. Recovered **33 hidden IDs**.
 
 ### Pattern-Matching Resolution (Phase 41)
+
 `build_export_manifest.py` now resolves no-ID entries by matching (faces, vertices, mesh_block, faced) patterns against known probe entries with 10% tolerance. **32 entries resolved without probes** in the first run.
 
 ### Batch Export Scripts
+
 - **batch_export_sibling.py**: 142 sibling pairs exported
 - **batch_export_float3.py**: 9 IDs, 6 faced + 3 pos-only
 - **batch_export_mb6.py**: 36 float2 IDs confirmed position-only
@@ -165,12 +184,17 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 1. **0 unknown MeshSize entries** 🎉 — All 268 OBJs are now fully classified with no unknowns.
 
-2. **Auto-face reconstruction**: 84 position-only OBJs have valid vertex data but no index streams. Could faces be generated algorithmically from vertex adjacency or strip topology?
+2. **Cross-MB recovery exhausted** (Phase 48): Audited all 84 pos-only OBJs — 5 have faced siblings in the same NIF (all MS=305, already paired), 0 have recoverable index streams at other MBs. No low-hanging fruit remains.
 
-3. **No probe targets remain**: All IDs in Exports/ with probe-accessible identifiers have been resolved. 71 entries in probe lookup, 29 MeshSize families mapped.
+3. **Auto-face reconstruction** (Phase 49) ✅ — Triangle fan fallback implemented for both `--experimental-position-source` (0-attribute-set) and `--export-obj` (attribute-set) paths. Batch export: 76/77 pos-only OBJs, **2,847 fan faces** across 15 families. 1 failure (`cf54e712ff57eaac` — missing from copied archives). Faces are approximate (vertex 0 hub), not ground-truth index-based.
+
+4. **No probe targets remain**: All IDs in Exports/ with probe-accessible identifiers have been resolved. 71 entries in probe lookup, 29 MeshSize families mapped.
+
+5. **Ghidra/NiDataStream proof-guard lane**: All promotion gates remain locked pending Ghidra static analysis proof.
 
 ### Known Limitations
 
+- **Triangle fan faces are approximate**: Vertex 0 as fan hub produces correct faces only for fan-like primitive shapes. For arbitrary game geometry, most faces will be self-intersecting. Useful as a visual hint but not renderable geometry.
 - **No faces for float2-paired meshes**: These fundamentally lack index streams.
 - **MeshSize not in OBJ headers**: Must be determined via probe or cross-reference.
 - **No asset ID in OBJ files**: ID recovery depends on directory structure. Regex now handles all known directory structures (Phase 45).
@@ -194,7 +218,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Document | Contents |
 |---|---|
-| `docs/roadmap/current-phase.md` | Living phase pointer + full history (47 phases) |
+| `docs/roadmap/current-phase.md` | Living phase pointer + full history (50 phases) |
 | `docs/roadmap/index-stream-family-map.md` | Per-MeshSize per-MB index stream reference |
 | `docs/roadmap/project-summary.md` | This document |
 
@@ -204,7 +228,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 | Metric | Value |
 |---|---|
-| Total phases | 47 |
+| Total phases | 51 |
 | Gates cleared | 7 |
 | Proof guards | 8 |
 | C# tests | 50 (all pass) |

@@ -48,7 +48,13 @@ def _matrix_row(asset_id: str, mesh_block: int, attr_sets: int, stream304: dict 
         "VertexCount": 22 if attr_sets else 0,
         "StreamsAt212": _stream_at212(),
         "StreamsAt220": {"block": 53, "payload": 552, "role": "normal-float3-ror1-lead", "conf": 75, "vectorCount": 46},
-        "StreamsAt296": {"block": 55, "payload": 136, "role": "u32-repeated-pattern-body", "conf": 60, "vectorCount": 34},
+        "StreamsAt296": {
+            "block": 55,
+            "payload": 136,
+            "role": "u32-repeated-pattern-body",
+            "conf": 60,
+            "vectorCount": 34,
+        },
         "StreamsAt304": stream304,
         "CandidateOnly": True,
     }
@@ -75,13 +81,26 @@ def _build_matrix(ids: list[str]) -> dict:
     rows: list[dict] = []
     pairs: list[dict] = []
     for asset_id in ids:
-        rows.append(_matrix_row(asset_id, 7, 1, {"block": 33, "payload": 176, "role": "uv-float2-ror1-lead", "conf": 75, "vectorCount": 22}))
+        rows.append(
+            _matrix_row(
+                asset_id,
+                7,
+                1,
+                {"block": 33, "payload": 176, "role": "uv-float2-ror1-lead", "conf": 75, "vectorCount": 22},
+            )
+        )
         rows.append(
             _matrix_row(
                 asset_id,
                 34,
                 0,
-                {"block": 57, "payload": 240, "role": PHASE1_M13_PRIMARY_ROLE, "conf": PHASE1_M13_MESH34_304_CONF, "vectorCount": 20},
+                {
+                    "block": 57,
+                    "payload": 240,
+                    "role": PHASE1_M13_PRIMARY_ROLE,
+                    "conf": PHASE1_M13_MESH34_304_CONF,
+                    "vectorCount": 20,
+                },
             )
         )
         pairs.append(_pair_row(asset_id, True))

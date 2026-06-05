@@ -73,11 +73,7 @@ for line_bytes in raw_lines:
         if val:
             current_dgr = val
 
-    if (
-        current_id in obj_ids
-        and "position" in current_role
-        and "float2" in current_dgr
-    ):
+    if current_id in obj_ids and "position" in current_role and "float2" in current_dgr:
         float2_mesh_keys.add((current_id, current_mb))
 
 print(f"Float2-position meshes found: {len(float2_mesh_keys)}")
@@ -203,9 +199,9 @@ for line_bytes in raw_lines:
 # Z-SOURCE ANALYSIS
 # =====================================================================
 
-print(f"\n{'='*80}")
+print(f"\n{'=' * 80}")
 print(f"Z-SOURCE ANALYSIS FOR {len(mesh_streams)} FLOAT2 MESHES")
-print(f"{'='*80}\n")
+print(f"{'=' * 80}\n")
 
 # For each mesh, classify its streams and look for Z-source candidates
 
@@ -237,9 +233,7 @@ for key in sorted(mesh_streams.keys()):
         bpv = ""
         if payload and meshsize and meshsize > 0:
             bpv = int(payload) / meshsize
-        print(
-            f'  FLOAT2-POS: payload={payload} mesh={meshsize} bpv={bpv:.2f} body16={s["body16"][:40]}'
-        )
+        print(f"  FLOAT2-POS: payload={payload} mesh={meshsize} bpv={bpv:.2f} body16={s['body16'][:40]}")
 
     # Analyze float3 position streams (if any - potential Z sources)
     for s in float3_pos:
@@ -247,9 +241,7 @@ for key in sorted(mesh_streams.keys()):
         bpv = ""
         if payload and meshsize and meshsize > 0:
             bpv = int(payload) / meshsize
-        print(
-            f'  FLOAT3-POS: payload={payload} mesh={meshsize} bpv={bpv:.2f} body16={s["body16"][:40]}'
-        )
+        print(f"  FLOAT3-POS: payload={payload} mesh={meshsize} bpv={bpv:.2f} body16={s['body16'][:40]}")
 
     # Look for Z-source candidates in non-position streams
     for s in non_pos_streams:
@@ -282,13 +274,11 @@ for key in sorted(mesh_streams.keys()):
 
         if is_candidate:
             print(
-                f'  {candidate_type:25s}: role={role[:30]:30s} dgr={dgr[:30]:30s} payload={payload:>5s} bpv={bpv:.2f} body16={s["body16"][:30]}'
+                f"  {candidate_type:25s}: role={role[:30]:30s} dgr={dgr[:30]:30s} payload={payload:>5s} bpv={bpv:.2f} body16={s['body16'][:30]}"
             )
         else:
             # Print all non-position streams with bpv info
-            print(
-                f'  {role[:35]:35s}: dgr={dgr[:30]:30s} payload={payload:>5s} bpv={bpv:.2f}'
-            )
+            print(f"  {role[:35]:35s}: dgr={dgr[:30]:30s} payload={payload:>5s} bpv={bpv:.2f}")
 
     print()
 
@@ -297,9 +287,9 @@ for key in sorted(mesh_streams.keys()):
 # AGGREGATE STATISTICS
 # =====================================================================
 
-print(f"\n{'='*80}")
+print(f"\n{'=' * 80}")
 print("AGGREGATE STATISTICS")
-print(f"{'='*80}\n")
+print(f"{'=' * 80}\n")
 
 total_streams = sum(len(v) for v in mesh_streams.values())
 total_pos = 0
@@ -347,16 +337,14 @@ for count in sorted(stream_count_dist):
 
 # Summary of Z-source findings
 print()
-print(f"{'='*80}")
+print(f"{'=' * 80}")
 print("Z-SOURCE SUMMARY")
-print(f"{'='*80}")
+print(f"{'=' * 80}")
 print()
 print("Key observation: All float2-position streams have:")
 print("  - DGR = descriptor-float2-uv (8 bytes/vertex = XY floats)")
 print("  - PrimaryRole = position-float3-lead or position-float3-ror1-lead")
-print(
-    "  - The Z coordinate in exported OBJs must come from outside this stream"
-)
+print("  - The Z coordinate in exported OBJs must come from outside this stream")
 print()
 print("Z-source resolved: SIBLING POSITION PAIRING")
 print()

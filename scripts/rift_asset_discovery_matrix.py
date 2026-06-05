@@ -101,19 +101,118 @@ def safe_file_name(value: str) -> str:
 
 def default_jobs(args: argparse.Namespace) -> list[DiscoveryJob]:
     return [
-        DiscoveryJob("signature-baseline", "inventory-asset-signatures", args.signature_max_total, limit=args.limit, timeout_seconds=args.timeout_seconds),
-        DiscoveryJob("semantic-xml-map-zone", "build-asset-semantic-index", args.xml_max_total, "xml", ("hint:map-zone",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-xml-ui", "build-asset-semantic-index", args.xml_max_total, "xml", ("hint:ui",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-xml-actor-object", "build-asset-semantic-index", args.xml_max_total, "xml", ("hint:actor-object",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-lua", "build-asset-semantic-index", args.max_total, "lua", limit=args.limit, timeout_seconds=args.timeout_seconds),
-        DiscoveryJob("semantic-txt", "build-asset-semantic-index", args.max_total, "txt", limit=args.limit, timeout_seconds=args.timeout_seconds),
-        DiscoveryJob("signature-riff-audio", "inventory-asset-signatures", args.max_total, "riff", limit=args.limit, timeout_seconds=args.timeout_seconds),
-        DiscoveryJob("semantic-bin-waypoint-poi", "build-asset-semantic-index", args.max_total, "bin", ("hint:waypoint-poi",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-bin-quest-objective", "build-asset-semantic-index", args.max_total, "bin", ("hint:quest-objective",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-bin-map-zone", "build-asset-semantic-index", args.max_total, "bin", ("hint:map-zone",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-bin-actor-object", "build-asset-semantic-index", args.max_total, "bin", ("hint:actor-object",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-nif-texture-refs", "build-asset-semantic-index", args.nif_max_total, "nif", ("ref:texture",), args.limit, args.timeout_seconds),
-        DiscoveryJob("semantic-nif-model-refs", "build-asset-semantic-index", args.nif_max_total, "nif", ("ref:model",), args.limit, args.timeout_seconds),
+        DiscoveryJob(
+            "signature-baseline",
+            "inventory-asset-signatures",
+            args.signature_max_total,
+            limit=args.limit,
+            timeout_seconds=args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-xml-map-zone",
+            "build-asset-semantic-index",
+            args.xml_max_total,
+            "xml",
+            ("hint:map-zone",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-xml-ui",
+            "build-asset-semantic-index",
+            args.xml_max_total,
+            "xml",
+            ("hint:ui",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-xml-actor-object",
+            "build-asset-semantic-index",
+            args.xml_max_total,
+            "xml",
+            ("hint:actor-object",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-lua",
+            "build-asset-semantic-index",
+            args.max_total,
+            "lua",
+            limit=args.limit,
+            timeout_seconds=args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-txt",
+            "build-asset-semantic-index",
+            args.max_total,
+            "txt",
+            limit=args.limit,
+            timeout_seconds=args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "signature-riff-audio",
+            "inventory-asset-signatures",
+            args.max_total,
+            "riff",
+            limit=args.limit,
+            timeout_seconds=args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-bin-waypoint-poi",
+            "build-asset-semantic-index",
+            args.max_total,
+            "bin",
+            ("hint:waypoint-poi",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-bin-quest-objective",
+            "build-asset-semantic-index",
+            args.max_total,
+            "bin",
+            ("hint:quest-objective",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-bin-map-zone",
+            "build-asset-semantic-index",
+            args.max_total,
+            "bin",
+            ("hint:map-zone",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-bin-actor-object",
+            "build-asset-semantic-index",
+            args.max_total,
+            "bin",
+            ("hint:actor-object",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-nif-texture-refs",
+            "build-asset-semantic-index",
+            args.nif_max_total,
+            "nif",
+            ("ref:texture",),
+            args.limit,
+            args.timeout_seconds,
+        ),
+        DiscoveryJob(
+            "semantic-nif-model-refs",
+            "build-asset-semantic-index",
+            args.nif_max_total,
+            "nif",
+            ("ref:model",),
+            args.limit,
+            args.timeout_seconds,
+        ),
     ]
 
 
@@ -186,7 +285,9 @@ def build_tool(args: argparse.Namespace) -> Path:
             raise RuntimeError(f"Build failed with exit code {run.returncode}.")
     tool_path = project.parent / "bin" / str(args.configuration) / str(args.framework) / "RiftAssetDumper.exe"
     if not tool_path.exists():
-        raise FileNotFoundError(f"Built tool not found at {tool_path}; run without --skip-build or adjust configuration/framework.")
+        raise FileNotFoundError(
+            f"Built tool not found at {tool_path}; run without --skip-build or adjust configuration/framework."
+        )
     return tool_path
 
 
@@ -225,7 +326,9 @@ def load_schema_validator(args: argparse.Namespace) -> Callable[[Any], None] | N
     return lambda report: jsonschema.validate(report, schema)
 
 
-def run_job(job: DiscoveryJob, tool_path: Path, root: Path, out_dir: Path, validate_schema: Callable[[Any], None] | None) -> DiscoveryResult:
+def run_job(
+    job: DiscoveryJob, tool_path: Path, root: Path, out_dir: Path, validate_schema: Callable[[Any], None] | None
+) -> DiscoveryResult:
     output_name = job.output or f"{safe_file_name(job.name)}.json"
     output_path = Path(output_name)
     if not output_path.is_absolute():
@@ -340,7 +443,9 @@ def run_privacy_scan(repo_root: Path) -> None:
             hits.extend(line for line in completed.stdout.splitlines() if line.strip())
         else:
             raise RuntimeError(completed.stderr.strip() or "git grep failed")
-    raw_hits = [hit for hit in hits if "%USERPROFILE%" not in hit and "%USERNAME%" not in hit and "<WindowsUser>" not in hit]
+    raw_hits = [
+        hit for hit in hits if "%USERPROFILE%" not in hit and "%USERNAME%" not in hit and "<WindowsUser>" not in hit
+    ]
     if raw_hits:
         print("Potential raw private path/account hits:", file=sys.stderr)
         print("\n".join(raw_hits[:20]), file=sys.stderr)

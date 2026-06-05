@@ -39,9 +39,7 @@ def _resolve_tool(config: dict[str, Any], name: str) -> tuple[str, str]:
         )
     if not tool.get("installed"):
         resolved_path = tool.get("resolved_path", "")
-        raise RuntimeError(
-            f"Tool '{name}' is not installed. Expected at: {resolved_path or tool.get('path', '?')}"
-        )
+        raise RuntimeError(f"Tool '{name}' is not installed. Expected at: {resolved_path or tool.get('path', '?')}")
     resolved = tool.get("resolved_path", "")
     home = tool.get("home", "")
     if home:
@@ -327,8 +325,7 @@ def main() -> None:
         sys.exit(1)
     except subprocess.TimeoutExpired:
         print(
-            f"ERROR: Ghidra timed out after {args.timeout}s. "
-            "First launch is slow (2-5 min). Try increasing --timeout.",
+            f"ERROR: Ghidra timed out after {args.timeout}s. First launch is slow (2-5 min). Try increasing --timeout.",
             file=sys.stderr,
         )
         sys.exit(1)

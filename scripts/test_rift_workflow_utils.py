@@ -1,4 +1,5 @@
 """Smoke test for rift_workflow_utils.py ported functions."""
+
 import io
 import json
 import sys
@@ -37,6 +38,7 @@ from scripts.rift_workflow_utils import (
 
 failed = 0
 
+
 def check(desc: str, actual: Any, expected: Any) -> None:
     global failed
     if actual == expected:
@@ -44,6 +46,7 @@ def check(desc: str, actual: Any, expected: Any) -> None:
     else:
         print(f"  FAIL: {desc}  expected={expected!r}  actual={actual!r}")
         failed += 1
+
 
 def check_raises(desc: str, fn: Callable[[], Any], exc_type: type[Exception] = ValueError) -> None:
     global failed
@@ -160,7 +163,16 @@ check("top_text empty", top_text([], lambda x: x), "none")
 check("format_nif_usage", format_nif_usage_access({"DataStreamUsage": 5, "DataStreamAccess": 19}), "usage=5 access=19")
 
 print("=== Vector sample ===")
-v_pos = {"Index": 0, "Components": 3, "X": 1.0, "Y": 2.0, "Z": 3.0, "Attribute": "position", "PreviousDistance": 0.5, "NextDistance": 1.0}
+v_pos = {
+    "Index": 0,
+    "Components": 3,
+    "X": 1.0,
+    "Y": 2.0,
+    "Z": 3.0,
+    "Attribute": "position",
+    "PreviousDistance": 0.5,
+    "NextDistance": 1.0,
+}
 check("vector pos", format_vector_sample(v_pos), "v0=(1.0,2.0,3.0) prev=0.5 next=1.0")
 
 v_norm = {"Index": 1, "Components": 3, "X": 0.0, "Y": 1.0, "Z": 0.0, "Attribute": "normal", "VectorLength": 1.0}
@@ -183,9 +195,13 @@ check("proof valid", format_proof_review_summary(review), "proofFlags=A,B planes
 print("=== Semantic hints ===")
 entry = {"NameCandidates": ["art/project/models/char/head.ma", "other/file.dds"]}
 check("primary model", semantic_hint_primary_model(entry), "art/project/models/char/head.ma")
-check("hint bucket", semantic_hint_bucket("art/project/models/characters/player/head.ma"), "models/characters/player/head.ma")
+check(
+    "hint bucket",
+    semantic_hint_bucket("art/project/models/characters/player/head.ma"),
+    "models/characters/player/head.ma",
+)
 
-print(f"\n{'='*50}")
+print(f"\n{'=' * 50}")
 if failed:
     print(f"FAILURES: {failed}")
     sys.exit(1)

@@ -28,17 +28,20 @@ Use Phase 4's proven descriptor data layer (integrity checks, classification, vi
 ## Proposed Milestones
 
 ### M5.1 — Descriptor Classification on Pairing Records ✅
+
 - Add `VertexDescriptorClassification` and `IndexDescriptorClassification` to `NifMeshProbePairing` and `NifMeshBindingPairingSample` records
 - Propagate during pairing construction
 - Show in probe-nif-mesh pairing console output
 
 ### M5.2 — Descriptor-Guided Pairing Confidence Adjustment
+
 - [x] AdjustConfidenceByDescriptor() helper (+5 boost for float match, -10 dampen for mismatch)
 - [x] Called in FindNifMeshProbePairings after compatibleVertexCount boost
 - [x] 10 xUnit tests (39/39 pass); refactored with shared IsFloatRole/IsFloatDescriptor/IsU16Descriptor helpers
 - [x] Candidate-only — does not change export behavior
 
 ### M5.3 — Descriptor-Based Stream Pre-Filter
+
 - [x] DescriptorClassification on NifLinkedStreamPositionCandidate record
 - [x] Propagated from stream summaries in both float32 and uint16 branches
 - [x] IsFloatDescriptor() boost sorting before lead candidate selection
@@ -46,10 +49,12 @@ Use Phase 4's proven descriptor data layer (integrity checks, classification, vi
 - [x] Behind `--experimental-position-source` gate; candidate-only
 
 ### M5.4 — Usage/Access × Descriptor Correlation (PLANNING)
+
 - Extend M4.5 cross-check to validate descriptor against Usage/Access fields
 - Add to CheckDescriptorRoleConsistency or create parallel checker
 
 ### M5.5 — Phase 5 Exit Consolidation (PLANNING)
+
 - Comprehensive handoff documenting all M5.x milestones
 - Phase 5 exit criteria assessment
 - Phase 6 entry planning

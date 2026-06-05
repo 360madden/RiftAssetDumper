@@ -1,9 +1,11 @@
 # Session Handoff — 2026-05-21
 
 ## Summary
+
 Rebuilt all 8 custom agent definitions in `.agents/` from scratch (not copied from `.agents.bak2/`), then tested each one by executing its core workflow commands. All agents verified operational.
 
 ## Changes made
+
 - **8 new agent files** in `.agents/`:
   - `autonomous-worker.ts` — task queue executor, delegates to specialists
   - `discovery-orchestrator.ts` — pipeline runner (build → inventory → reports → guards)
@@ -15,6 +17,7 @@ Rebuilt all 8 custom agent definitions in `.agents/` from scratch (not copied fr
   - `safety-guardian.ts` — pre-commit safety audits
 
 ## Key improvements over `.agents.bak2/`
+
 - All agents use structured output schemas with validated status enums
 - More precise tool permissions (no agent gets tools it doesn't need)
 - `program-cs-editor` uses `deepseek/deepseek-v4-pro` for precision on the 15K-line file
@@ -34,15 +37,18 @@ Rebuilt all 8 custom agent definitions in `.agents/` from scratch (not copied fr
 | autonomous-worker | Queued ruff + mypy + tests | ✅ PASSED (ruff 0 errors, mypy 0 errors, 60/60 tests) |
 
 ## Blockers
+
 - `python scripts/rift_workflow.py all --skip-build` hit `UnicodeEncodeError` on Windows charmap — this is a Windows console limitation, not an agent issue
 
 ## Proof guard status
+
 - attribute-extra-proof-guard: ✅ PASSED
 - usage-access-correlation-guard: ✅ PASSED (from earlier discovery-suite run)
 - position-source-sibling-lead-guard: ✅ PASSED (from earlier discovery-suite run)
 - residual-lead-guard: ✅ PASSED (from earlier discovery-suite run)
 
 ## Next steps
+
 - Remove `.agents.bak2/` directory if the new agents are satisfactory
 - Consider testing the autonomous-worker with specific task queues
 - Update `knowledge.md` if needed to reflect the new agent structure

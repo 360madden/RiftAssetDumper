@@ -80,10 +80,10 @@ def minimal_program(extra_decode_line: str = "", extra_pairing_line: str = "") -
             "  {\n"
             f"    {extra_pairing_line}\n"
             "    var indexStreams = streams\n"
-            "        .Where(static s => s.RoleStats.PrimaryRole.StartsWith(\"index-\", StringComparison.OrdinalIgnoreCase) && s.RoleStats.IndexMax is not null)\n"
+            '        .Where(static s => s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.IndexMax is not null)\n'
             "        .ToList();\n"
             "    var vertexStreams = streams\n"
-            "        .Where(static s => !s.RoleStats.PrimaryRole.StartsWith(\"index-\", StringComparison.OrdinalIgnoreCase) && s.RoleStats.VertexCountCandidates.Count > 0)\n"
+            '        .Where(static s => !s.RoleStats.PrimaryRole.StartsWith("index-", StringComparison.OrdinalIgnoreCase) && s.RoleStats.VertexCountCandidates.Count > 0)\n'
             "        .ToList();\n"
             "    return new List<NifMeshProbePairing>();\n"
             "  }\n",
@@ -96,7 +96,7 @@ def minimal_program(extra_decode_line: str = "", extra_pairing_line: str = "") -
         "  {\n"
         "    var ghidraPairings = FindNifMeshProbePairings(\n"
         "          BuildNifGhidraRoleStreamSummaries(streamSummaries),\n"
-        "          pairingSource: \"ghidra-sidecar\",\n"
+        '          pairingSource: "ghidra-sidecar",\n'
         "          candidateOnly: true);\n"
         "    return 0;\n"
         "  }\n"
@@ -147,7 +147,9 @@ with TemporaryDirectory() as temp_dir:
     check_raises("decode/export Ghidra use fails closed", lambda: ghidra_pairing_non_export_guard(unsafe_program))
 
     unmarked_program = temp_path / "Program.unmarked.cs"
-    unmarked_program.write_text(minimal_program().replace("          candidateOnly: true", "          candidateOnly: false"), encoding="utf-8")
+    unmarked_program.write_text(
+        minimal_program().replace("          candidateOnly: true", "          candidateOnly: false"), encoding="utf-8"
+    )
     check_raises("unmarked sidecar fails closed", lambda: ghidra_pairing_non_export_guard(unmarked_program))
 
 check("actual Program.cs guard", True, True)

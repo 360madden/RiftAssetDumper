@@ -25,10 +25,12 @@ Three commits this session, all on the @264 explicit-index lane:
 Added `--write-obj` support to `decode-nif-geometry` that produces actual triangle faces (not just point cloud) from `@264` UInt16BE degenerate-bridge triangle strip streams.
 
 **What changed:**
+
 - `Program.cs`: new `WriteObjGeometry` export path that decodes uint16 big-endian strip indices, handles degenerate bridges (ABBC pattern), generates face normals and UV coordinates, and writes a full Wavefront `.obj` with vertex positions, normals, UVs, and face groups per material/segment
 - Works for the known `meshSize=297` / `v=128` / `@264` sample (`6fc01704d4a509d5`), behind `--experimental` flag
 
 **Key details:**
+
 - Strips decoded with bridge-stitch handling: degenerate `A B B C` → `A B C` triangle
 - Segments delineated by restart patterns
 - Per-segment face groups in OBJ output
@@ -43,12 +45,14 @@ Added `--write-obj` support to `decode-nif-geometry` that produces actual triang
 Ported two PowerShell proof guards to Python modules with hardened type accessors.
 
 **What changed:**
+
 - `scripts/rift_workflow_guards.py`: new file with `attribute_extra_proof_guard()` (inventory-level) and `attribute_extra_sibling_proof_guard()` (per-asset deep proof)
 - `scripts/rift_workflow_utils.py`: added `required_json_boolean()` accessor, hardened `required_json_number()`/`required_json_integer()` with boolean rejection (bool is not number)
 - `scripts/rift_workflow.py`: added `attribute-extra-proof-guard` and `attribute-extra-sibling-proof-guard` command routing
 - `scripts/Invoke-RiftWorkflow.ps1`: updated thin wrapper with the two new Python commands
 
 **Guard details:**
+
 - `attribute_extra_proof_guard()`: validates `TopAttributeExtraMappingFitness` exists, checks 4 vertex-count groups (128/95/80/64) at `meshSize=297`, `extra@264`, role `index-u16be-strip-lead`. Asserts raw-zero-based is preferred, degenerate-bridge-stitch structure, sentinel/parity-break/dropped-cross at zero, positive edge/normal/area deltas.
 - `attribute_extra_sibling_proof_guard()`: deep per-asset proof of exact stream/block shape, index prefix, mapping candidates, stitch structure, first-segment triangle proof, and raw-vs-subtract-one fitness gaps.
 
@@ -61,6 +65,7 @@ Ported two PowerShell proof guards to Python modules with hardened type accessor
 Root-caused and fixed why `TopAttributeExtraMappingFitness` was not populating, then added dual-path routing to the proof guard.
 
 **What changed:**
+
 - `Program.cs`:
   - **Inventory loop (L3949):** `StartsWith("index-")` → `IndexStats is not null` — this was preventing `TopAttributeExtraMappingFitness` from populating for `uint16-compatible-body` extra streams
   - **Probe loop (L2602):** Same fix — `StartsWith("index-")` → `IndexStats is not null`
@@ -71,6 +76,7 @@ Root-caused and fixed why `TopAttributeExtraMappingFitness` was not populating, 
 - `docs/current-status.md`: updated with detailed notes on all changes
 
 **Validation:**
+
 - JSON field names verified against actual C# output — all match
 - Proof guard passes on both limited and full inventories
 - 49/49 Python unit tests pass
@@ -148,9 +154,11 @@ attribute-extra-sibling-proof-guard (run via Invoke-RiftWorkflow.ps1 or direct P
 
 Quick validation:
 ```
+
 dotnet build --nologo
 python scripts/rift_workflow.py attribute-extra-proof-guard --full --skip-build
 python scripts/rift_workflow.py attribute-extra-sibling-proof-guard --id 6fc01704d4a509d5 --skip-build
+
 ```
 ```
 

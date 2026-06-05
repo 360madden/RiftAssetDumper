@@ -59,6 +59,7 @@
 ## Key Findings
 
 ### Families with 100% faced OBJs (have index streams)
+
 These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 
 | MeshSize | Faced MBs | Total Faced |
@@ -83,6 +84,7 @@ These MeshSizes have mesh blocks carrying `index-u16be-strip-lead` streams:
 | 465 | 7 | 1 | MB=7 IS faced (69f, 23v) |
 
 ### Families with 0% faced OBJs (no index streams)
+
 These MeshSizes lack index streams entirely — all OBJs are position-only:
 
 | MeshSize | MBs | Total PosOnly | Notes |
@@ -102,6 +104,7 @@ These MeshSizes lack index streams entirely — all OBJs are position-only:
 | 465 | 8 | 17 | Largest pos-only family (but MB=7 IS faced!) |
 
 ### Mixed family: MeshSize 305
+
 The only MeshSize with both faced and position-only mesh blocks:
 
 | Mesh Block | Behavior | Root Cause |
@@ -115,6 +118,7 @@ The only MeshSize with both faced and position-only mesh blocks:
 | MB=27 | Always pos-only (12/12) | Float3 sibling pair, no index |
 
 ### Root Cause: MB=6 is the canonical geometry block
+
 MB=6 carries index streams for MeshSizes **240-361** but stops at **329 and 389**:
 
 - **Index stream present**: MB=6 in MeshSize 240, 267, 276, 280, 297, 301, 305, 309, 321, 325, 330, 345, 354, 361, 365, 367, 405
@@ -123,10 +127,12 @@ MB=6 carries index streams for MeshSizes **240-361** but stops at **329 and 389*
 This suggests a transition point around MeshSize 329+ where mesh blocks switch from explicit-indexed geometry to float2+float3 sibling-paired encoding.
 
 ### Phase 30 Discovery: MS=465 MB=7 IS faced
+
 Previously believed to be 0% faced, MS=465 **can** produce faced OBJs at MB=7 (69 faces, 23 vertices).
 The position-only MB=8 entries (17 IDs) are the float2 sibling-paired blocks.
 
 ### Phase 30 Discovery: MS=321 MB=7 is position-only
+
 While MS=321 MB=6 is 100% faced (7 IDs), MB=7 has no index stream.
 This means not all MB=7 blocks carry index streams — it depends on the MeshSize.
 
@@ -135,12 +141,14 @@ This means not all MB=7 blocks carry index streams — it depends on the MeshSiz
 ## Probe Methodology
 
 The findings are based on:
+
 1. Export manifest data (268 OBJs, 214 unique asset IDs, 0 unknowns)
 2. Direct `probe-nif-mesh` on representative assets at specific mesh blocks
 3. Phase 19 sibling pairing map cross-reference
 4. Phase 30 float3 batch export (9 IDs exported, 6 produced faced OBJs)
 
 Assets probed or batch-exported:
+
 - `0603cce7cee15eb8` MB=6 (MeshSize 240, @264-indexed)
 - `1674fb283ce86d95` MB=45 vs MB=7 (MeshSize 305, faced vs pos-only)
 - `6c6aae2cda8aebcf` MB=6 (MeshSize 361, 414-face family)

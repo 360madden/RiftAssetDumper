@@ -3,6 +3,7 @@
 **Status**: **M1.2 COMPLETE** (2026-06). Batch, analysis, and handoff lanes finished. Living pointer: `docs/roadmap/current-phase.md` (**M1.3 ACTIVE**). **M1.3 entry**: `docs/roadmap/phase1-m1.3-prep.md`.
 
 **Completed lanes**:
+
 - Attribute-extra-probe batch (8/8 informative negatives on #34 @304).
 - Analysis/quant: `Exports/phase1-m1.2-@304-analysis-initial.json` + `.md`.
 - Handoff: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` (finalized content; filename `draft-` per M1.1 precedent).
@@ -10,7 +11,9 @@
 All candidate-only, strictly 329-family (meshSize=329), matrix targets only. Reference `docs/roadmap/phase1-m1.2-prep.md` + `Exports/mesh329-family-attribute-role-matrix.json`.
 
 ## Target List (from M1.1 matrix + prep)
+
 Exact 8 top #34 from `Exports/mesh329-family-attribute-role-matrix.json` IDsCovered (prioritized per prep.md):
+
 1. 69da9507d49c42ff
 2. f2c347fe81a5e3b2
 3. 07c733b4eee3ed2e
@@ -21,7 +24,9 @@ Exact 8 top #34 from `Exports/mesh329-family-attribute-role-matrix.json` IDsCove
 8. 04de901531a091ab
 
 ## Batch Execution: attribute-extra-probe (Phase 1 M1.2)
+
 Executed exactly per task + prep (using existing command only; --skip-build; 329 family; candidate-only):
+
 - Command template (repeated for each): `python scripts/rift_workflow.py attribute-extra-probe --id <ID> --mesh-block 34 --extra-offset 304 --skip-build`
 
 All 8 runs produced the same class of valid result data: "ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh #34. No attribute extra streams were found for this mesh." (with JSON outputs in Exports/). This is key data for M1.2: the @304 "position" on #34 (from mesh-probe) is not a recognized "attribute extra" in the attr-probe logic (tied to attrSets=0 on #34).
@@ -29,12 +34,15 @@ All 8 runs produced the same class of valid result data: "ERROR: no attribute ex
 Additional M1.2 supporting runs: refreshed sibling-extra-pos + compare (shows extra on the 3 anchors); stream-bodies for 69da #34 (14 valid bodies, top payloads incl. 456 (@304), signatures); for f2c3 #34 (similar, top 456/768); stream-endianness for 69da #34 (mixed-u16-body=12, big-endian-u16-lead=2). Swarm (analysis + handoff drafter) ingesting for quant tables and draft.
 
 Swarm (analysis + handoff drafter) ingesting for quant tables and draft.
+
 ```
 ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh #34. No attribute extra streams were found for this mesh.
 ```
+
 (Full dotnet command logged per run; C# exit 1; python wrapper raised "Step failed" but continued batch; GeneratedOutputGuard passed on every invocation.)
 
 **Full per-ID command + outcome (from batch run logs):**
+
 - 69da9507d49c42ff: `... --id 69da9507d49c42ff --mesh-block 34 --extra-offset 304 --out %WORKSPACE%\Exports\probe-nif-attribute-extra-69da9507d49c42ff-mesh34-extra304.json` → ERROR no attribute extra stream @304 on #34. (No JSON written.)
 - f2c347fe81a5e3b2: `... --id f2c347fe81a5e3b2 ...probe-nif-attribute-extra-f2c347fe81a5e3b2-mesh34-extra304.json` → same ERROR.
 - 07c733b4eee3ed2e: same pattern → ERROR (would-be: probe-nif-attribute-extra-07c733b4eee3ed2e-mesh34-extra304.json)
@@ -45,12 +53,14 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
 - 04de901531a091ab: same → ERROR (probe-nif-attribute-extra-04de901531a091ab-mesh34-extra304.json)
 
 **Raw JSONs in Exports/ (note naming):**
+
 - No `probe-nif-attribute-extra-*-mesh34-extra304.json` written for any of the 8 (C# ProbeNifAttributeExtra returns before `File.WriteAllText` + report ctor when matches.Count==0 / attr extra not found at offset in attributeSets.ExtraStreams).
 - Expected naming (per rift_workflow.py + C# ResolveOutputPath when --out has .json ext): `Exports/probe-nif-attribute-extra-<id>-mesh34-extra304.json`
 - Existing related artifacts (from M1.1, used for cross-ref): `Exports/probe-nif-mesh-<id>-mesh34.json` (all 8 present), `Exports/mesh329-family-attribute-role-matrix.json` (and .md/.csv).
 - Guard note: GeneratedOutputGuard passed for each run (no improper staging of generated data).
 
 **Key fields extracted (from attribute-extra-probe outputs + cross-ref to mesh34 probe JSONs + matrix):**
+
 - any extra streams found: **0** (explicit "No attribute extra streams were found for this mesh." for all 8 #34). Matches matrix "AttrExtraStreamCount": 0 .
 - attributeSets (from mesh-probe JSONs + error context + matrix): 0 for all 8 (vs 1 on their #7 siblings).
 - role/fit for target @304 stream (from mesh-probe JSON + matrix rows for #34): consistently "position-float3-ror1-lead" c=75 (even without being parsed as "attr extra").
@@ -60,7 +70,7 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
   - @296/#32: u32-repeated-pattern-body c=25 , payload ~4*v (e.g. 308 for 77v)
   - (normal @220 varies per ID)
 - BodyFirst* (from mesh34 JSONs; detailed BodyFirst64/128 + histograms + samples are attribute-extra-probe JSON only and thus unavailable here):
-  - @304 BodyFirst16 (unique per-ID, position-like floats encoded): 
+  - @304 BodyFirst16 (unique per-ID, position-like floats encoded):
     - 69da9507d49c42ff: a92cc2fd1bcf402ca52cc2da04cf4036
     - f2c347fe81a5e3b2: 9988c12e8a8b403e9c88c18bb78f4087
     - 07c733b4eee3ed2e: 5226c22ebb12416a7d26c2ccb512415e
@@ -75,6 +85,7 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
 - Cross-ID consistency: 8/8 identical high-level pattern (attrSets=0 + @304 scored position c=75 + @296 u32 c=25 + primary pos@212 c=75). BodyFirst16 @304 vary (no obvious shared magic prefix in first16 across IDs).
 
 **Links to artifacts:**
+
 - Matrix (source of targets + @304 rows): `Exports/mesh329-family-attribute-role-matrix.json` (IDsCovered, MatrixRows for each with StreamsAt304 role/conf/payload/vec, AttrExtraStreamCount=0)
 - Per-ID mesh34 probes (raw, used for BodyFirst16/roles): `Exports/probe-nif-mesh-*-mesh34.json` (8 files; e.g. `probe-nif-mesh-69da9507d49c42ff-mesh34.json`)
 - Attribute probe attempt logs: captured in this coordination + terminal batch output (would-be JSON paths noted above)
@@ -83,6 +94,7 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
 - Roadmap: `docs/roadmap/project-roadmap.md` (Phase 1 M1.2)
 
 **Validation (per run + batch):**
+
 - GeneratedOutputGuard passed (8x).
 - Strictly candidate-only language + 329 scope.
 - Used only existing rift_workflow.py command.
@@ -91,9 +103,11 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
 - References Phase 1 M1.2, prep.md, matrix, current-phase.md, project-roadmap.md, task-routing-safety-policy.md (high-reasoning).
 
 ## M1.2 Exit (complete)
+
 Batch, analysis-initial quant, and M1.2 handoff finalized. Exit criteria per `docs/roadmap/project-roadmap.md` M1.2 satisfied at candidate-only level. Parallel extension lanes may continue in background; core M1.2 evidence is closed.
 
 ## M1.3 Handoff Pointer
+
 - **Prep**: `docs/roadmap/phase1-m1.3-prep.md` — sibling source-binding + variant attribute layout guards.
 - **Coordination (new stub)**: `docs/roadmap/phase1-m1.3-coordination.md` (swarm status, handoff ref, AGENTS summary).
 - **Handoff (initial draft created)**: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md` (full structure, M1.2 evidence, candidate guard sketch, pilot plan, artifacts, validation, AGENTS sections).
@@ -105,6 +119,7 @@ M1.1 reference: `docs/handoffs/draft-2026-06-m1.1-329-matrix.md` (finalized) + m
 **Human-readable summary of this milestone step (per AGENTS.md)**: Executed attribute-extra-probe batch on 8 top #34 (all informative "no attribute extra @304 on #34"; guard passed; key for parser path). Analysis delivered quant (8-ID PerID/aggs: 8/8 low plaus despite pos role, avg 0.405 ratio, 022bc2/c2 magic, classif, mixed endian, stride viable, diffs). Handoff drafter initial + main finalized (tables for 10 scoped incl low 066fa/91ea b16 extracts consistent pos c=75/attr=0; 12/12 matrix patterns; blockers cleaned; swarm launched for extensions). What changed: M1.2 batch+quant+classification delivered + handoff finalized with coverage. Why matters: Quantifies extra stream anomalies (body vs role conflict, distinct magic) on 329 #34 variants; refines role scoring, feeds M1.3 guards, advances Phase 1 evidence without promotion. Validated: 8/8+2 consistency, matrix match (python verified), 10/10 scoped, candidate-only, 329+matrix scope, guards, existing cmds/postproc, full refs to prep/matrix/roadmap Phase 1 M1.2 + AGENTS (summaries/tables/top10). Remains uncertain: deeper @304 bodies (hist etc limited by attr=0 path); @304 exact semantics (M1.3+); swarm extension outputs (bg). Ready for pointer advance + M1.3. Swarm used per user "always go agentic/swarm". (All per AGENTS + safety + anti-drift.)
 
 ## Handoff Drafter + Main Finalize Coordination Update
+
 - Initial M1.2 handoff draft created: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` (drafter 019e86d7-c7a0...)
 - Used: prep + M1.1 matrix + batch (errors/fields) + analysis-initial (PerID 8/Aggs/Patterns) + sibling/probes.
 - Main integration/finalize: added 10/10 tables + low-ID (066fa 0b27c2... / 91ea b728c2...) probe extracts, cleaned "initial"/placeholders, updated blockers (M1.2-specific resolved), artifacts, validation (12 probes consistent), human summary + top10 for finalize. Status: **finalized**. Swarm (analysis-extender 019e86ea-60a1..., magic 019e86ea-7589..., sibling 019e86ea-8603..., verify+M1.3 019e86ea-98ee...) launched for supporting full quant/magic/reports/prep.

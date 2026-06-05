@@ -54,18 +54,14 @@ def main() -> int:
 
     # Find faced entries with unknown MeshSize
     faced_unknown = [
-        e for e in entries
-        if e.get("faced")
-        and (not e.get("sibling_pair") or not e["sibling_pair"].get("mesh_size"))
+        e for e in entries if e.get("faced") and (not e.get("sibling_pair") or not e["sibling_pair"].get("mesh_size"))
     ]
 
     print(f"\nFaced unknown-MeshSize entries: {len(faced_unknown)}")
 
     # Load known probes as cluster templates
     known_probes = {
-        aid: info
-        for aid, info in probe_entries.items()
-        if info.get("faced") and isinstance(info.get("meshsize"), int)
+        aid: info for aid, info in probe_entries.items() if info.get("faced") and isinstance(info.get("meshsize"), int)
     }
 
     # For each known probe, find matching entries in the unknown set
@@ -120,8 +116,7 @@ def main() -> int:
         if cluster_matches:
             matches_found += 1
             new_inferences.extend(
-                (uid, probe_ms, probe_id, target_faces, target_verts, target_mb)
-                for uid in cluster_matches
+                (uid, probe_ms, probe_id, target_faces, target_verts, target_mb) for uid in cluster_matches
             )
 
     print(f"\nCluster patterns found: {matches_found}")

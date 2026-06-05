@@ -13,6 +13,7 @@
 ## Objective
 
 Resolve the remaining semantic blockers identified in Phase 7:
+
 - **Gate 1b** (`descriptor-field-semantics-complete`): What do bytes 1-2 encode? (element width? component count? stride hint?)
 - **Gate 2** (`descriptor-semantic-map`): What stream roles do the remaining 3/5 descriptor patterns map to?
 - **Gate 5** (`pairing-impact-proof`): Reframing evaluation (human review — documented but not autonomously actioned)
@@ -40,6 +41,7 @@ Resolve the remaining semantic blockers identified in Phase 7:
 ## Proposed Milestones
 
 ### M8.1 — Ghidra Byte 1-2 Analysis (PLANNING)
+
 - Target: what do descriptor bytes 1 and 2 encode?
 - Hypotheses: element width (0x04 = 4 bytes = float32), component count (0x03 = 3-component = vec3), stride hint, flags
 - Approach: Ghidra decompilation of NiDataStream registry/reading code in `rift_x64.exe`
@@ -58,11 +60,13 @@ Resolve the remaining semantic blockers identified in Phase 7:
 - [x] 3 patterns gain usage-level semantics (15020100=index, 10010400=vertex, 3c010400=vertex)
 
 ### M8.3 — Gate 5 Reframing Evaluation (PLANNING)
+
 - Human review of M7.4 recommendation: accept `attrSets=0` as architectural norm
 - Decision: CLEAR gate 5 on reframed criterion OR explicitly hold gate 5 with documented rationale
 - If CLEARED: 4th gate clearance in Phase 8
 
 ### M8.4 — Phase 8 Exit Consolidation
+
 - [x] Exit handoff: `docs/handoffs/2026-06-m8.4-phase8-exit-consolidation.md`
 - [x] Gate 2 advanced; M8.1 (Ghidra) and M8.3 (human review) deferred to Phase 9
 - [x] Phase 9 entry assessment with 6 recommendations

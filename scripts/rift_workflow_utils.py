@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # JSON access helpers (Get-JsonValueOrDash, Get-JsonValueOrNull, etc.)
 # ============================================================================
 
+
 def json_value_or_dash(obj: Any, key: str) -> Any:  # noqa: ANN401 - mirror PS flexibility
     """Safe JSON property access returning '-' when missing or None.
 
@@ -68,7 +69,7 @@ def safe_int(value: object) -> int:
     if isinstance(value, str):
         try:
             return int(value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return 0
     return 0
 
@@ -83,7 +84,7 @@ def json_double_or_none(obj: Any, key: str) -> float | None:
         return None
     try:
         return float(raw)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 
@@ -117,20 +118,17 @@ def json_array_count_or_dash(obj: Any, key: str) -> str:
 # Required / assertive JSON accessors
 # ============================================================================
 
+
 def required_json_value(obj: Any, key: str, context: str) -> Any:  # noqa: ANN401
     """Extract a required property, raising on absence.
 
     Mirrors: Get-RequiredJsonValue
     """
     if obj is None or not isinstance(obj, dict):
-        raise ValueError(
-            f"AttributeExtraProofGuard failed: missing {key} on {context}."
-        )
+        raise ValueError(f"AttributeExtraProofGuard failed: missing {key} on {context}.")
     value = obj.get(key)
     if value is None:
-        raise ValueError(
-            f"AttributeExtraProofGuard failed: missing {key} on {context}."
-        )
+        raise ValueError(f"AttributeExtraProofGuard failed: missing {key} on {context}.")
     return value
 
 
@@ -143,15 +141,11 @@ def required_json_number(obj: Any, key: str, context: str) -> float:
     """
     value = required_json_value(obj, key, context)
     if isinstance(value, bool):
-        raise ValueError(
-            f"AttributeExtraProofGuard failed: {key} on {context} is boolean, not numeric: {value}"
-        )
+        raise ValueError(f"AttributeExtraProofGuard failed: {key} on {context} is boolean, not numeric: {value}")
     try:
         return float(value)
     except (ValueError, TypeError) as exc:
-        raise ValueError(
-            f"AttributeExtraProofGuard failed: {key} on {context} is not numeric: {value}"
-        ) from exc
+        raise ValueError(f"AttributeExtraProofGuard failed: {key} on {context} is not numeric: {value}") from exc
 
 
 def required_json_integer(obj: Any, key: str, context: str) -> int:
@@ -187,25 +181,20 @@ def usage_access_guard_integer(obj: Any, key: str, context: str) -> int:
     Mirrors: Get-UsageAccessGuardInteger
     """
     if obj is None or not isinstance(obj, dict):
-        raise ValueError(
-            f"UsageAccessCorrelationGuard failed: {context} is missing {key}."
-        )
+        raise ValueError(f"UsageAccessCorrelationGuard failed: {context} is missing {key}.")
     raw = obj.get(key)
     if raw is None:
-        raise ValueError(
-            f"UsageAccessCorrelationGuard failed: {context} is missing {key}."
-        )
+        raise ValueError(f"UsageAccessCorrelationGuard failed: {context} is missing {key}.")
     try:
         return int(raw)
     except (ValueError, TypeError) as exc:
-        raise ValueError(
-            f"UsageAccessCorrelationGuard failed: {key} on {context} is not an integer: {raw}"
-        ) from exc
+        raise ValueError(f"UsageAccessCorrelationGuard failed: {key} on {context} is not an integer: {raw}") from exc
 
 
 # ============================================================================
 # Guard condition assertions
 # ============================================================================
+
 
 def assert_proof_guard(condition: bool, message: str) -> None:
     """Raise AttributeExtraProofGuard on false condition.
@@ -266,23 +255,24 @@ def generated_output_guard(repo_root: Path | None = None) -> None:
         capture_output=True,
     )
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"GeneratedOutputGuard failed: git ls-files exited with {completed.returncode}."
-        )
+        raise RuntimeError(f"GeneratedOutputGuard failed: git ls-files exited with {completed.returncode}.")
     tracked = completed.stdout.splitlines()
 
     completed = subprocess.run(
         [
-            "git", "-C", str(repo_root),
-            "diff", "--cached", "--name-only", "--diff-filter=ACMR",
+            "git",
+            "-C",
+            str(repo_root),
+            "diff",
+            "--cached",
+            "--name-only",
+            "--diff-filter=ACMR",
         ],
         text=True,
         capture_output=True,
     )
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"GeneratedOutputGuard failed: git diff --cached exited with {completed.returncode}."
-        )
+        raise RuntimeError(f"GeneratedOutputGuard failed: git diff --cached exited with {completed.returncode}.")
     staged = completed.stdout.splitlines()
 
     tracked_generated = [p for p in tracked if is_generated_output_path(p)]
@@ -317,6 +307,7 @@ def generated_output_guard(repo_root: Path | None = None) -> None:
 # Subprocess helper (Invoke-Checked)
 # ============================================================================
 
+
 def checked_run(label: str, args: list[str], cwd: Path | None = None) -> None:
     """Run a dotnet command, stream output, and raise on non-zero exit.
 
@@ -336,6 +327,7 @@ def checked_run(label: str, args: list[str], cwd: Path | None = None) -> None:
 # ============================================================================
 # Formatting helpers
 # ============================================================================
+
 
 def format_markdown_cell(value: Any) -> str:  # noqa: ANN401 - stringify anything
     """Escape pipes and return '-' for empty values for Markdown table cells.
@@ -392,9 +384,7 @@ def format_vector_sample(sample: dict[str, Any]) -> str:
         values = f"{json_value_or_dash(sample, 'X')},{json_value_or_dash(sample, 'Y')}"
     else:
         values = (
-            f"{json_value_or_dash(sample, 'X')},"
-            f"{json_value_or_dash(sample, 'Y')},"
-            f"{json_value_or_dash(sample, 'Z')}"
+            f"{json_value_or_dash(sample, 'X')},{json_value_or_dash(sample, 'Y')},{json_value_or_dash(sample, 'Z')}"
         )
 
     attribute = str(json_value_or_dash(sample, "Attribute"))
@@ -402,8 +392,7 @@ def format_vector_sample(sample: dict[str, Any]) -> str:
         suffix = f" len={json_value_or_dash(sample, 'VectorLength')}"
     else:
         suffix = (
-            f" prev={json_value_or_dash(sample, 'PreviousDistance')}"
-            f" next={json_value_or_dash(sample, 'NextDistance')}"
+            f" prev={json_value_or_dash(sample, 'PreviousDistance')} next={json_value_or_dash(sample, 'NextDistance')}"
         )
 
     index = sample.get("Index", "?") if isinstance(sample, dict) else "?"
@@ -427,11 +416,7 @@ def format_proof_review_summary(fitness: dict[str, Any]) -> str:
 
     plane_counts = review.get("DominantPlaneCounts")
     if plane_counts and isinstance(plane_counts, list):
-        plane_items = [
-            f"{p.get('Value', '?')}:{p.get('Count', 0)}"
-            for p in plane_counts[:3]
-            if isinstance(p, dict)
-        ]
+        plane_items = [f"{p.get('Value', '?')}:{p.get('Count', 0)}" for p in plane_counts[:3] if isinstance(p, dict)]
         planes = " | ".join(plane_items) if plane_items else "-"
     else:
         planes = "-"
@@ -441,15 +426,13 @@ def format_proof_review_summary(fitness: dict[str, Any]) -> str:
     zero = json_value_or_dash(review, "ZeroDominantSignedAreaCount")
     parity = json_value_or_dash(review, "NonAlternatingParityTransitionCount")
 
-    return (
-        f"proofFlags={flags} planes={planes} "
-        f"sign=+{pos}/-{neg}/{zero} parityBreaks={parity}"
-    )
+    return f"proofFlags={flags} planes={planes} sign=+{pos}/-{neg}/{zero} parityBreaks={parity}"
 
 
 # ============================================================================
 # Semantic hint helpers
 # ============================================================================
+
 
 def semantic_hint_primary_model(entry: dict[str, Any]) -> str:
     """Pick the primary .ma model from name candidates.
@@ -490,6 +473,7 @@ def semantic_hint_bucket(path: str) -> str:
 # ============================================================================
 # JSON load helper
 # ============================================================================
+
 
 def load_json_report(path: str | Path) -> Any:
     """Load a JSON report file, raising on missing/parse errors.
@@ -560,7 +544,7 @@ def load_tools_config(
     else:
         try:
             config = json.loads(config_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except json.JSONDecodeError, OSError:
             config = _default_tools_config()
 
     # Validate/repair schema
@@ -606,7 +590,7 @@ def show_tools_status(
 
     print()
     print(f"  {'Tool':<22} {'Status':<10} {'Category':<18} Path")
-    print(f"  {'-'*22} {'-'*10} {'-'*18} {'-'*40}")
+    print(f"  {'-' * 22} {'-' * 10} {'-' * 18} {'-' * 40}")
 
     installed_count = 0
     for name, info in sorted(tools.items()):

@@ -57,6 +57,7 @@ Commit: `bc36d51` — `fix: update .agent definitions with working package refer
 ## Smoke test — discovery pipeline
 
 `discovery-suite --quick --skip-build` ran in ~9.4s:
+
 - ✅ All pipeline stages completed
 - ✅ Usage-access-correlation guard: PASSED
 - ✅ Residual-lead guard: PASSED
