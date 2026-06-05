@@ -49,8 +49,10 @@ ROLE_PRIORITY: dict[str, int] = {
 }
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
 DEFAULT_LIVE_ROOT = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
 DEFAULT_INVENTORY = REPO_ROOT / "Exports" / "live-mesh-inventory-500.json"
+DEFAULT_OUT = REPO_ROOT / "Exports"
 
 
 def load_live_inventory(path: Path) -> dict[str, Any]:
@@ -134,31 +136,52 @@ def rank_families(families: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
     return ranked
 
 
+def _run_dotnet(args: list[str], timeout: int = 180) -> tuple[int, str, str]:
+    """Run dotnet CLI directly (no Python intermediary). Returns (exit_code, stdout, stderr)."""
+    cmd_str = "dotnet " + " ".join(args)
+    try:
+        proc = subprocess.run(
+            ["dotnet", *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(REPO_ROOT),
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired:
+        return -1, "", f"timeout after {timeout}s ({cmd_str[:100]}...)"
+    except FileNotFoundError:
+        return -1, "", "dotnet not found in PATH"
+    except Exception as exc:
+        return -1, "", str(exc)
+
+
+def _probe_output_path(aid: str, mb: int) -> Path:
+    """Return the JSON output path for a mesh probe, including mesh block to avoid overwrites."""
+    return DEFAULT_OUT / f"probe-nif-mesh-{aid}-mesh{mb}.json"
+
+
+def _decode_output_path(aid: str) -> Path:
+    """Return the JSON output path for geometry decode."""
+    return DEFAULT_OUT / f"decode-nif-geometry-{aid}.json"
+
+
 def probe_family(
     family: dict[str, Any],
     live_root: str,
-    skip_build: bool = True,
+    skip_build: bool = False,
 ) -> dict[str, Any]:
-    """Probe a single mesh-size family via the C# CLI.
+    """Probe a single mesh-size family via direct dotnet CLI call.
 
-    Returns probe result dict with viability assessment.
-
-    Reads the structured JSON probe output rather than parsing stdout for reliability.
+    Calls dotnet run directly (no Python intermediary), writes output to a
+    mesh-block-specific JSON path to avoid overwrites when probing multiple
+    blocks of the same NIF. Parses structured JSON output for deterministic results.
     """
     aid = family["id"]
     mb = family["mesh_block"]
-    cmd = [
-        sys.executable,
-        str(REPO_ROOT / "scripts" / "rift_workflow.py"),
-        "mesh-probe",
-        "--root", live_root,
-        "--id", aid,
-        "--mesh-block", str(mb),
-    ]
-    if skip_build:
-        cmd.append("--skip-build")
+    out_path = _probe_output_path(aid, mb)
 
-    result = {
+    result: dict[str, Any] = {
         "mesh_size": family["mesh_size"],
         "id": aid,
         "mesh_block": mb,
@@ -178,30 +201,26 @@ def probe_family(
         "error": "",
     }
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            cwd=str(REPO_ROOT),
-        )
-    except subprocess.TimeoutExpired:
-        result["error"] = "timeout after 180s"
-        return result
-    except Exception as exc:
-        result["error"] = str(exc)
-        return result
+    # Build dotnet args directly (no Python intermediary)
+    dotnet_args = [
+        "run", "--project", str(DEFAULT_PROJECT), "--",
+        "probe-nif-mesh",
+        "--root", live_root,
+        "--id", aid,
+        "--mesh-block", str(mb),
+        "--out", str(out_path),
+    ]
+    if skip_build:
+        dotnet_args.insert(1, "--no-build")
 
-    output = proc.stdout + proc.stderr
+    exit_code, stdout, stderr = _run_dotnet(dotnet_args, timeout=180)
+    output = stdout + stderr
 
-    # Try to read structured JSON probe output first (deterministic)
-    probe_path = REPO_ROOT / "Exports" / f"probe-nif-mesh-{aid}.json"
-    if probe_path.exists():
+    # Primary: parse structured JSON output (deterministic, mesh-block-specific)
+    if out_path.exists():
         try:
-            with open(probe_path, encoding="utf-8") as f:
+            with open(out_path, encoding="utf-8-sig") as f:
                 probe_data = json.load(f)
-            # Extract metrics from structured JSON
             if isinstance(probe_data, dict):
                 mesh_info = probe_data.get("MeshInfo", probe_data)
                 if isinstance(mesh_info, dict):
@@ -220,12 +239,14 @@ def probe_family(
                             result["has_uv"] = True
                         if "index-u16" in role:
                             result["has_index"] = True
-                result["pairings"] = len(probe_data.get("Pairings", probe_data.get("MeshPairings", [])))
-                result["attribute_sets"] = len(probe_data.get("AttributeSets", probe_data.get("MeshAttributeSets", [])))
+                pairings = probe_data.get("Pairings", probe_data.get("MeshPairings", []))
+                result["pairings"] = len(pairings) if isinstance(pairings, list) else 0
+                attr_sets = probe_data.get("AttributeSets", probe_data.get("MeshAttributeSets", []))
+                result["attribute_sets"] = len(attr_sets) if isinstance(attr_sets, list) else 0
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-            pass  # Fall back to regex parsing below
+            pass  # Fall back to regex below
 
-    # Fallback: regex parsing of stdout (less reliable, kept for resilience)
+    # Fallback: regex parsing of stdout (kept for resilience)
     if result["vertex_count"] == 0:
         vc_match = re.search(r"VertexCount[:\s]+(\d+)", output)
         if vc_match:
@@ -240,14 +261,11 @@ def probe_family(
     if not result["has_index"] and ("index-u16be" in output or "index-u16le" in output):
         result["has_index"] = True
 
-    result["probed"] = proc.returncode == 0
-    result["viable"] = (
-        result["has_position"]
-        and result["vertex_count"] > 0
-    )
+    result["probed"] = exit_code == 0
+    result["viable"] = result["has_position"] and result["vertex_count"] > 0
 
-    if proc.returncode != 0:
-        result["error"] = output[-500:] if output else f"exit code {proc.returncode}"
+    if exit_code != 0:
+        result["error"] = output[-500:] if output else f"exit code {exit_code}"
 
     return result
 
@@ -255,25 +273,20 @@ def probe_family(
 def export_family(
     family: dict[str, Any],
     live_root: str,
-    skip_build: bool = True,
+    skip_build: bool = False,
 ) -> dict[str, Any]:
-    """Export a viable mesh-size family to OBJ via --experimental-position-source."""
+    """Export a viable mesh-size family to OBJ via direct dotnet CLI call.
+
+    Calls dotnet run directly (no Python intermediary). Parses the structured
+    JSON decode report for deterministic vertex/face counts. Locates the OBJ
+    file via the known output directory convention.
+    """
     aid = family["id"]
     mb = family["mesh_block"]
-    cmd = [
-        sys.executable,
-        str(REPO_ROOT / "scripts" / "rift_workflow.py"),
-        "decode-geometry",
-        "--root", live_root,
-        "--id", aid,
-        "--mesh-block", str(mb),
-        "--experimental-position-source",
-        "--write-obj",
-    ]
-    if skip_build:
-        cmd.append("--skip-build")
+    decode_json_path = _decode_output_path(aid)
+    obj_dir = decode_json_path  # decode-nif-geometry writes OBJ into a subdir named after the JSON
 
-    result = {
+    result: dict[str, Any] = {
         "mesh_size": family["mesh_size"],
         "id": aid,
         "mesh_block": mb,
@@ -286,48 +299,67 @@ def export_family(
         "error": "",
     }
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            cwd=str(REPO_ROOT),
+    # Build dotnet args directly (no Python intermediary)
+    dotnet_args = [
+        "run", "--project", str(DEFAULT_PROJECT), "--",
+        "decode-nif-geometry",
+        "--root", live_root,
+        "--id", aid,
+        "--mesh-block", str(mb),
+        "--experimental-position-source",
+        "--write-obj",
+        "--out", str(decode_json_path),
+    ]
+    if skip_build:
+        dotnet_args.insert(1, "--no-build")
+
+    exit_code, stdout, stderr = _run_dotnet(dotnet_args, timeout=300)
+    output = stdout + stderr
+
+    # Primary: parse structured JSON decode report
+    if decode_json_path.exists():
+        try:
+            with open(decode_json_path, encoding="utf-8-sig") as f:
+                decode_data = json.load(f)
+            if isinstance(decode_data, dict):
+                result["vertices"] = int(decode_data.get("Positions", decode_data.get("VertexCount", 0)))
+                result["faces"] = int(decode_data.get("Faces", 0))
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            pass
+
+    # Find the OBJ file in the output directory
+    if isinstance(obj_dir, Path) and obj_dir.exists():
+        obj_candidates = sorted(
+            obj_dir.glob(f"decode-nif-geometry-mesh{mb}.obj"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
-    except subprocess.TimeoutExpired:
-        result["error"] = "timeout after 300s"
-        return result
-    except Exception as exc:
-        result["error"] = str(exc)
-        return result
-
-    output = proc.stdout + proc.stderr
-
-    v_match = re.search(r"Positions?[:\s]+(\d+)", output)
-    if v_match:
-        result["vertices"] = int(v_match.group(1))
-    f_match = re.search(r"Faces?[:\s]+(\d+)", output)
-    if f_match:
-        result["faces"] = int(f_match.group(1))
-
-    # Try to find the OBJ path
-    obj_match = re.search(
-        r"(Exports[/\\]decode-nif-geometry-[^/\s]+\.json[/\\]decode-nif-geometry-mesh\d+\.obj)",
-        output,
-    )
-    if obj_match:
-        result["obj_path"] = obj_match.group(1)
-        obj_full = REPO_ROOT / result["obj_path"]
-        if obj_full.exists():
+        if obj_candidates:
+            obj_full = obj_candidates[0]
+            result["obj_path"] = str(obj_full.relative_to(REPO_ROOT))
             result["file_size"] = obj_full.stat().st_size
             result["exported"] = True
-            # Check for NaN
             with open(obj_full, encoding="utf-8") as f:
                 content = f.read()
             result["nan_count"] = content.count("nan")
+            # Count vertices/faces from OBJ if JSON didn't provide them
+            if result["vertices"] == 0:
+                result["vertices"] = len(re.findall(r"^v ", content, re.MULTILINE))
+            if result["faces"] == 0:
+                result["faces"] = len(re.findall(r"^f ", content, re.MULTILINE))
 
-    if proc.returncode != 0 and not result["exported"]:
-        result["error"] = output[-500:] if output else f"exit code {proc.returncode}"
+    # Fallback: regex parsing of stdout
+    if result["vertices"] == 0:
+        v_match = re.search(r"Positions?[:\s]+(\d+)", output)
+        if v_match:
+            result["vertices"] = int(v_match.group(1))
+    if result["faces"] == 0:
+        f_match = re.search(r"Faces?[:\s]+(\d+)", output)
+        if f_match:
+            result["faces"] = int(f_match.group(1))
+
+    if exit_code != 0 and not result["exported"]:
+        result["error"] = output[-500:] if output else f"exit code {exit_code}"
 
     return result
 
@@ -429,6 +461,12 @@ def main() -> None:
         default=DEFAULT_LIVE_ROOT,
         help=f"Path to live RIFT install (default: {DEFAULT_LIVE_ROOT})",
     )
+    parser.add_argument(
+        "--skip-build",
+        action="store_true",
+        default=False,
+        help="Skip dotnet build before each probe/export (use after initial build for faster repeated runs)",
+    )
     args = parser.parse_args()
 
     if not args.inventory.exists():
@@ -456,7 +494,7 @@ def main() -> None:
         print("\nProbing families...")
         for i, family in enumerate(ranked):
             print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} id={family['id'][:16]} mb={family['mesh_block']} ...")
-            result = probe_family(family, live_root=args.live_root)
+            result = probe_family(family, live_root=args.live_root, skip_build=args.skip_build)
             probe_results.append(result)
             status = "VIABLE" if result["viable"] else ("probed" if result["probed"] else "FAILED")
             print(f"    -> {status} v={result['vertex_count']} pos={result['has_position']} norm={result['has_normal']} uv={result['has_uv']}")
@@ -478,7 +516,7 @@ def main() -> None:
                     "mesh_block": pr["mesh_block"],
                 }
                 print(f"  [{i+1}/{len(viable)}] MeshSize={pr['mesh_size']} ...")
-                result = export_family(family_info, live_root=args.live_root)
+                result = export_family(family_info, live_root=args.live_root, skip_build=args.skip_build)
                 export_results.append(result)
                 status = "OK" if result["exported"] else "FAIL"
                 print(f"    -> {status} v={result['vertices']} f={result['faces']} size={result['file_size']}")
