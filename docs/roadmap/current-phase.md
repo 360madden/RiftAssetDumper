@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 17 ✅; sibling pairing CONFIRMED — entry 544 has float2 MB=6 + float3 MB=34)
+**Last Updated**: 2026-06 (Phase 18 ✅; comprehensive sibling pairing database — 142 pairs, 10 shared MeshSizes)
 
 ---
 
@@ -78,8 +78,9 @@
 | **Phase 15.5** | **Float2 Z-Source Resolution** | **Z-source analysis** | **0** | **✅ COMPLETE** |
 | **Phase 16** | **Sibling Pairing Map** | **Pairing map** | **0** | **✅ COMPLETE** |
 | **Phase 17** | **Sibling Pair Verification** | **Probe confirmation** | **0** | **✅ COMPLETE** |
+| **Phase 18** | **Comprehensive Sibling Pairing Database** | **Full-inventory scan** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 18 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 19 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -148,6 +149,31 @@ TWAD entry. Other MeshSizes (325, 329) require cross-archive pairing via the
 NIF block reference system.
 
 See: `scripts/build_sibling_pairing_map.py` for the pairing map builder.
+
+### Phase 18: Comprehensive Sibling Pairing Database
+
+**Finding: Full-inventory analysis reveals 142 sibling pairs across 10 shared MeshSize families.**
+
+Extended the Phase 16 archive-proximity approach from 88 OBJ-only IDs to the full inventory:
+
+| Metric | Phase 16 (OBJ-only) | Phase 18 (Full) |
+|---|---|---|
+| Float2 position meshes | 36 | **230** |
+| Float3 position meshes | 20 | **176** |
+| Shared MeshSizes | 9 | **10** |
+| Archive-close sibling pairs | ~25 | **142** |
+| NIF files with cross-type (f2+f3) | — | **9** |
+
+**Newly discovered shared MeshSize: 389** (previously missed in OBJ-only scan).
+
+**9 NIF files contain BOTH float2 and float3 position streams** in different mesh blocks within the same NIF — this is the NIF-level sibling group that the C# `NifPositionSourceSiblingAccumulator` was designed to detect.
+
+**59 NIF files** have multiple position-stream mesh blocks requiring sibling resolution.
+
+The heuristic uses greedy nearest-entry matching (distance < 100 entries within same archive),
+so some float3 meshes may be 1:N paired with multiple float2 meshes.
+
+See: `scripts/build_sibling_pairing_v2.py` for the comprehensive database builder.
 
 ### Phase 17: Concrete Sibling Pair Verification
 
