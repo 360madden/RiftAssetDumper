@@ -1,5 +1,5 @@
 """
-Phase 21: Sibling-Aware Batch OBJ Export
+Phase 23: Sibling-Aware Batch OBJ Export (Extended)
 
 Reads the Phase 19 sibling pairing map and exports OBJs for float2 position
 meshes using their paired float3 sibling as the Z-source.
@@ -7,8 +7,13 @@ meshes using their paired float3 sibling as the Z-source.
 Uses `decode-nif-geometry --experimental-position-source` for each float2 mesh
 in DIST=0 pairs (strongest evidence of same-entry sibling pairing).
 
+With --include-close, also exports archive-close pairs (distance 1-99) for
+broader coverage. Note: most sibling-paired OBJs are position-only (0 faces)
+because the float2/float3 meshes in these pairs lack index streams.
+
 Usage:
     python scripts/batch_export_sibling.py [--skip-build] [--dry-run] [--output-dir PATH]
+    python scripts/batch_export_sibling.py --include-close [--skip-build]
 """
 
 import json
@@ -87,12 +92,13 @@ def run_decode_geometry(
 
 def main() -> int:
     print(SEP)
-    print("PHASE 22: SIBLING-AWARE BATCH OBJ EXPORT")
+    print("PHASE 23: SIBLING-AWARE BATCH OBJ EXPORT (EXTENDED)")
     print(SEP)
 
     # Parse args
     skip_build = "--skip-build" in sys.argv
     dry_run = "--dry-run" in sys.argv
+    include_close = "--include-close" in sys.argv
     project_root = str(REPO_ROOT / "Source")
     out_dir = "Exports/obj-exports"
     for i, arg in enumerate(sys.argv):
@@ -125,14 +131,21 @@ def main() -> int:
     if not build_project(skip_build):
         return 1
 
-    # Select pairs to export - start with DIST=0 pairs (strongest evidence)
+    # Select pairs to export
     dist0_pairs = [p for p in pairs if p.get("distance") == 0]
+    close_pairs = [p for p in pairs if 0 < p.get("distance", 999) < 100]
 
-    print(f"\nExporting {len(dist0_pairs)} DIST=0 pairs...")
+    to_export = list(dist0_pairs)
+    if include_close:
+        to_export.extend(close_pairs)
+        print(f"\nExporting {len(dist0_pairs)} DIST=0 + {len(close_pairs)} close pairs = {len(to_export)} total...")
+    else:
+        print(f"\nExporting {len(dist0_pairs)} DIST=0 pairs...")
+        print("  (use --include-close to also export distance=1-99 pairs)")
 
     results: list[dict] = []
 
-    for pair in dist0_pairs:
+    for pair in to_export:
         if dry_run:
             print(f"\n  [DRY RUN] Would export: {pair['float2_id']} MB={pair['float2_mb']}")
             print(f"    (paired with float3 MB={pair['float3_mb']} in {pair['archive']})")
@@ -174,12 +187,13 @@ def main() -> int:
         print(f"\n  Dry run: {len(results)} pairs would be exported")
         print("  Run without --dry-run to execute")
 
-        # Also show what would happen with distance>0 pairs
-        dist_other = [p for p in pairs if p.get("distance", 999) > 0 and p.get("distance", 999) < 100]
-        f2_ids = set(p["float2_id"] for p in dist0_pairs)
+        f2_ids = set(p["float2_id"] for p in to_export)
         total_f2 = len(f2_ids)
-        print(f"\n  Total DIST=0 pair IDs: {total_f2}")
-        print(f"  Remaining distance>0 pairs: {len(dist_other)}")
+        print(f"\n  Total unique float2 IDs: {total_f2}")
+        if include_close:
+            print(f"  Close pairs (distance=1-99) included: {len(close_pairs)}")
+        else:
+            print(f"  Archive-close pairs not exported (use --include-close): {len(close_pairs)}")
         return 0
 
     successes = [r for r in results if r.get("success")]
