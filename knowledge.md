@@ -46,6 +46,9 @@ All complex modes have been ported to Python.
 | Command | Purpose |
 |---------|---------|
 | `python scripts/batch_sweep.py` | 4-phase OBJ integrity + candidate discovery + batch export + manifest |
+| `python scripts/dedup_objs.py` | Safe SHA256-verified OBJ duplicate cleaner with dry-run mode |
+| `python scripts/live_family_scanner.py` | Exhaustive batch probe of live-archive families with auto-update registry |
+| `python scripts/build_export_manifest.py` | Full OBJ manifest with SHA256 hashing, provenance detection, mesh-size breakdown |
 | `python scripts/rift_asset_discovery_matrix.py --skip-build` | Run discovery matrix jobs |
 | `python scripts/rift_position_gap_report.py <inventory.json>` | Generate position gap report |
 | `python scripts/extract_live_nifs.py` | Extract NIFs from live TWAD archives |
@@ -134,11 +137,16 @@ Two parallel jobs on `windows-latest`:
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Phase 49 + Live Expansion)
+### Current project state (latest — Phase 49 + live-archive exhaustion)
 
-- **269 OBJs (215 unique), 184 faced, 85 position-only, 29,688 faces, 26,286 vertices across 30 MeshSize families. 0 structural issues. 0 unknowns remaining in copied set.**
-- **🔴 LIVE ARCHIVE BREAKTHROUGH: First OBJ exported from live RIFT archives** — meshSize=362 (`cf54e712ff57eaac` block 6, assets.002 entry 1191). 6,489 vertices, 6,487 fan faces, 776 KB, 0 NaN, clean structure. This is a **completely new MeshSize family** not present in the copied Source set.
-- **Live archive stats**: 244 archives (9× Source's 27), ~2.4M estimated entries, 19+ unique mesh sizes (max 417), 3 new families discovered (341, 357, 362)
+- **228 unique OBJs, 169 faced, 59 position-only, 24,722 faces, 18,148 vertices across 30+ MeshSize families. 0 structural issues. 0 unexported candidates remain.**
+- **350 raw OBJ files** (122 duplicates across 25 groups, 97 KB reclaimable via `scripts/dedup_objs.py`)
+- **5 live-archive OBJs** exported from 4 asset IDs across 5 mesh sizes (349, 357, 362, 417, 423)
+- **23 live-archive families exhaustively probed**: 5 position-enabled (exported), 18 confirmed no-position across all mesh blocks
+- **345 copied-source OBJs** maintaining the established families
+- `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner with dry-run mode and content-mismatch warnings
+- `scripts/live_family_scanner.py` — exhaustive batch probe mode (`--exhaustive`) with auto-update registry integration
+- `scripts/build_export_manifest.py` v3 — data-driven live provenance via `scripts/live-exported-ids.json`
 - `batch_sweep.py` — 4-phase tool for OBJ integrity (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, manifest building
 - All 8 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
