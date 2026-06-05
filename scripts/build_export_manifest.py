@@ -1,28 +1,33 @@
 """
-Phase 25: Export Manifest — catalog all 142 OBJs in Exports/obj-exports/
+Phase 26: Export Manifest — catalog all OBJs across Exports/
 
-Scans every .obj file under Exports/obj-exports/, parses header comments
+Scans .obj files under the given root directory, parses header comments
 for mesh block, vertex counts, face data, and descriptor. Cross-references
 with the Phase 19 sibling pairing map when the asset ID matches.
 
 Outputs:
   - Exports/export-manifest.json (full per-OBJ catalog)
-  - Console summary with aggregate stats
+  - Console summary with per-MeshSize faced/position-only breakdown
 
 Usage:
-    python scripts/build_export_manifest.py [--out DIR]
+    python scripts/build_export_manifest.py [--out DIR] [--obj-root PATH]
 """
 
 import json
+import re
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 SEP = "=" * 80
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OBJ_ROOT = REPO_ROOT / "Exports" / "obj-exports"
+DEFAULT_OBJ_ROOT = REPO_ROOT / "Exports"
 PAIRING_MAP_PATH = REPO_ROOT / "Exports" / "phase19-sibling-pairing-map.json"
 DEFAULT_OUT = REPO_ROOT / "Exports"
+
+# Known MeshSize for @264-indexed meshes
+MESHSIZE_264 = 297
 
 
 def _parse_int_header(line: str, split_idx: int = 2) -> int | None:
@@ -108,29 +113,48 @@ def extract_asset_id(filepath: Path) -> str | None:
     for part in filepath.parts:
         if part.startswith("decode-nif-geometry-"):
             candidate = part.replace("decode-nif-geometry-", "")
+            # Handle suffix like -mesh6 by stripping it
+            candidate = re.sub(r"-mesh\d+$", "", candidate)
             if len(candidate) == 16:
                 return candidate
     return None
 
 
+def classify_export_batch(obj_path: Path) -> str:
+    """Classify which batch/phase exported this OBJ based on its path."""
+    parts = obj_path.parts
+    for part in parts:
+        if part.startswith("decode-264-"):
+            return f"batch-264-{part.replace('decode-264-', '')}"
+        if part.startswith("decode-nif-geometry-"):
+            # Check if it's a sibling export by looking for obj-exports in path
+            if "obj-exports" in parts:
+                return "sibling-export"
+            return "individual-export"
+    return "unknown"
+
+
 def main() -> int:
     print(SEP)
-    print("PHASE 25: EXPORT MANIFEST — CATALOG ALL EXPORTED OBJs")
+    print("PHASE 26: EXPORT MANIFEST — COMPREHENSIVE OBJ CATALOG")
     print(SEP)
 
     # Parse args
     out_dir = DEFAULT_OUT
+    obj_root = DEFAULT_OBJ_ROOT
     for i, arg in enumerate(sys.argv):
         if arg == "--out" and i + 1 < len(sys.argv):
             out_dir = Path(sys.argv[i + 1])
+        if arg == "--obj-root" and i + 1 < len(sys.argv):
+            obj_root = Path(sys.argv[i + 1])
 
     # Find all OBJs
-    if not OBJ_ROOT.exists():
-        print(f"ERROR: OBJ root not found: {OBJ_ROOT}")
+    if not obj_root.exists():
+        print(f"ERROR: OBJ root not found: {obj_root}")
         return 1
 
-    obj_files = sorted(OBJ_ROOT.rglob("*.obj"))
-    print(f"\nFound {len(obj_files)} .obj files under {OBJ_ROOT}")
+    obj_files = sorted(obj_root.rglob("*.obj"))
+    print(f"\nFound {len(obj_files)} .obj files under {obj_root}")
 
     # Load pairing map if available
     pair_lookup: dict = {}  # asset_id -> pair info
@@ -152,9 +176,13 @@ def main() -> int:
     total_vertices = 0
     total_faces = 0
     total_bytes = 0
-    mesh_sizes: dict = {}
     descriptors: dict = {}
     asset_ids_found: set = set()
+
+    # Per-MeshSize breakdown (key: mesh_size_str, value: {faced, pos_only})
+    ms_breakdown: dict[str, dict] = {}
+    # Per-export-batch breakdown
+    batch_counts: Counter = Counter()
 
     start = time.time()
 
@@ -166,29 +194,45 @@ def main() -> int:
             meta["asset_id"] = asset_id
             asset_ids_found.add(asset_id)
 
-        # Cross-reference with pairing map
+        # Classify export batch
+        batch = classify_export_batch(obj_path)
+        meta["export_batch"] = batch
+        batch_counts[batch] += 1
+
+        # Determine MeshSize:
+        # 1. Check pairing map (sibling-paired OBJs)
+        # 2. Check if it's a @264 export (MeshSize 297)
+        # 3. Otherwise unknown
+        ms = None
         if asset_id and asset_id in pair_lookup:
             pair_info = pair_lookup[asset_id]
+            ms = pair_info.get("meshsize")
             meta["sibling_pair"] = {
                 "distance": pair_info.get("distance"),
                 "float3_id": pair_info.get("float3_id"),
                 "float3_mb": pair_info.get("float3_mb"),
                 "archive": pair_info.get("archive"),
-                "mesh_size": pair_info.get("mesh_size"),
+                "mesh_size": ms,
             }
-            ms = pair_info.get("mesh_size")
-            if ms:
-                mesh_sizes[ms] = mesh_sizes.get(ms, 0) + 1
-        elif asset_id:
+        elif batch.startswith("batch-264-"):
+            ms = MESHSIZE_264
+            meta["sibling_pair"] = None
+        else:
             meta["sibling_pair"] = None
 
         # Determine if faced or position-only
         has_faces = meta.get("faces", 0) > 0
         meta["faced"] = has_faces
 
+        # Track per-MeshSize breakdown
+        ms_key = str(ms) if ms else "unknown"
+        if ms_key not in ms_breakdown:
+            ms_breakdown[ms_key] = {"faced": 0, "position_only": 0}
         if has_faces:
+            ms_breakdown[ms_key]["faced"] += 1
             faced_count += 1
         else:
+            ms_breakdown[ms_key]["position_only"] += 1
             position_only_count += 1
 
         total_vertices += meta.get("vertex_count", 0)
@@ -211,21 +255,22 @@ def main() -> int:
 
     # Build manifest
     manifest = {
-        "schema": "export-manifest-v1",
+        "schema": "export-manifest-v2",
         "generated_output_notice": "Generated from local copied RIFT assets. Keep under ignored Exports/.",
         "scan_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "scan_duration_s": round(elapsed, 1),
-        "obj_root": str(OBJ_ROOT),
+        "obj_root": str(obj_root),
         "summary": {
             "total_obj_files": len(obj_files),
-            "total_asset_ids": len(asset_ids_found),
+            "total_unique_asset_ids": len(asset_ids_found),
             "faced": faced_count,
             "position_only": position_only_count,
             "total_vertices": total_vertices,
             "total_faces": total_faces,
             "total_bytes": total_bytes,
-            "mesh_sizes": dict(sorted(mesh_sizes.items())),
             "descriptors": descriptors,
+            "mesh_size_breakdown": ms_breakdown,
+            "export_batch_breakdown": dict(batch_counts.most_common()),
         },
         "entries": entries,
     }
@@ -248,9 +293,15 @@ def main() -> int:
     print(f"  Total faces: {total_faces:,}")
     print(f"  Total bytes: {total_bytes:,} ({total_bytes/1024:.0f} KB)")
 
-    print("\n  Mesh sizes (from pairing cross-ref):")
-    for ms, count in sorted(mesh_sizes.items()):
-        print(f"    MeshSize {ms}: {count}")
+    print("\n  Per-MeshSize Breakdown:")
+    for ms_key in sorted(ms_breakdown.keys()):
+        fb = ms_breakdown[ms_key]
+        pct = (fb["faced"] / (fb["faced"] + fb["position_only"]) * 100) if (fb["faced"] + fb["position_only"]) > 0 else 0
+        print(f"    MeshSize {ms_key}: {fb['faced']} faced + {fb['position_only']} pos-only = {fb['faced'] + fb['position_only']} ({pct:.0f}% faced)")
+
+    print("\n  Export Batch Breakdown:")
+    for batch, count in batch_counts.most_common():
+        print(f"    {batch}: {count}")
 
     if descriptors:
         print("\n  Position descriptors:")
