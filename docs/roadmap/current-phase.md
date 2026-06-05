@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 19 ✅; sibling pairing improved — 22 DIST=0 pairs, JSON output)
+**Last Updated**: 2026-06 (Phase 20 ✅; cross-type NIF verification — 9 NIFs with f2+f3 in same entry)
 
 ---
 
@@ -80,8 +80,9 @@
 | **Phase 17** | **Sibling Pair Verification** | **Probe confirmation** | **0** | **✅ COMPLETE** |
 | **Phase 18** | **Comprehensive Sibling Pairing Database** | **Full-inventory scan** | **0** | **✅ COMPLETE** |
 | **Phase 19** | **Sibling Pairing Improvements** | **DIST=0 tracking + JSON output** | **0** | **✅ COMPLETE** |
+| **Phase 20** | **Cross-Type NIF Verification** | **9 cross-type NIFs analyzed** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 20 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 21 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
@@ -175,6 +176,32 @@ The heuristic uses greedy nearest-entry matching (distance < 100 entries within 
 so some float3 meshes may be 1:N paired with multiple float2 meshes.
 
 See: `scripts/build_sibling_pairing_v2.py` for the comprehensive database builder.
+
+### Phase 20: Cross-Type NIF Verification
+
+**Finding: All 9 cross-type NIF files confirmed — float2+float3 co-reside in same archive entry.**
+
+Analyzed using Phase 19 pairing map data:
+
+| Group | NIF IDs | Structure |
+|---|---|---|
+| 1 (6 NIFs) | d703, c36e, 75d5, ec36, 1d7d, a6b2 | MB=7: **f2+f3** (shared); MB=27: f3 only |
+| 2 (1 NIF) | 45ef | MB=7: f2 only; MB=27: f3 only |
+| 3 (2 NIFs) | 0d9a, 3feb | MB=27: **f2+f3** (shared); MB=7: f3 only |
+
+**Key insight**: All 9 are MeshSize 305 — this family has the most complex
+sibling pairing infrastructure. MB=7 is the canonical float2 position block,
+paired with MB=7 or MB=27 for float3 Z-source.
+
+**3 NIF groups** (shared MBs = same mesh block has both f2+f3 roles):
+- Group 1 (6 NIFs): MB=7 has both float2 (descriptor-float2-uv) and float3 (descriptor-float3-generic)
+- Group 3 (2 NIFs): MB=27 has both
+- Group 2 (1 NIF): separate MBs for f2 vs f3
+
+This validates the C# `NifPositionSourceSiblingAccumulator` which handles
+in-NIF sibling discovery across different mesh blocks.
+
+See: `scripts/verify_cross_type_nifs.py`
 
 ### Phase 19: Sibling Pairing Improvements
 
