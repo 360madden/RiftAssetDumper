@@ -352,7 +352,114 @@ Each phase follows this template for focus:
 
 ---
 
-## Anti-Drift & Focus Mechanisms (Apply to All Phases)
+## Phase 13: Descriptor Consistency Proof Guard (COMPLETE ✅)
+
+**Objective**: Add a machine-checkable proof guard that validates descriptor-guided role consistency across the population inventory, classifying each stream's descriptor-vs-role alignment into hard errors, warnings, or ambiguous.
+
+**Entry Criteria**:
+- Phase 11 COMPLETE with population-scale inventory ✅
+- Phase 12 COMPLETE with 6-proven-pattern descriptor map ✅
+
+**Key Milestones**:
+1. **M13.1** ✅: Implement `descriptor_consistency_guard()` in `rift_workflow_guards.py` — 113 lines, tiered classification (hard error/warning/ambiguous).
+2. **M13.2** ✅: Wire guard into `rift_workflow.py` guard_tasks dispatch (8th proof guard).
+3. **M13.3** ✅: Generate consistency baseline from Phase 11 inventory. Guard PASS: 530 hard errors, 107 warnings, 7,515 ambiguous.
+
+**Exit Criteria**:
+- New guard function passing on full inventory ✅
+- Wired into workflow dispatch ✅
+- Ruff PASS, Mypy PASS, Build 0 errors, Tests 50/50 ✅
+
+---
+
+## Phase 14: Inventory Refresh + Baseline Update (COMPLETE ✅)
+
+**Objective**: Regenerate the descriptor-guided inventory and consistency baseline after Phase 12's 08010400 pattern addition, confirming full 6-pattern coverage.
+
+**Entry Criteria**:
+- Phase 12 COMPLETE with 08010400 added to C# classifier ✅
+- Phase 13 guard baseline generated ✅
+
+**Key Milestones**:
+1. **M14.1** ✅: Regenerate inventory with Phase 12 additions. 4,076/8,152 streams classified (+31 from 08010400).
+2. **M14.2** ✅: Update consistency baseline against refreshed inventory. Guard PASS with refreshed data.
+
+**Key Finding**: The 08010400 pattern correctly captures all 31 previously unknown streams. Descriptor map is 
+complete — no further pattern discovery needed in the copied set.
+
+---
+
+## Phase 15: Float2 Position Encoding Investigation (COMPLETE ✅)
+
+**Objective**: Cross-reference descriptor-guided roles against existing OBJ exports to discover and confirm 
+float2 position encoding as a real data format, not a classifier error.
+
+**Entry Criteria**:
+- Phase 14 COMPLETE with refreshed inventory ✅
+- 94 OBJ exports with manifest available ✅
+
+**Key Milestones**:
+1. **M15.1** ✅: Cross-reference OBJ manifest against inventory. Found 71 position streams from OBJ IDs.
+2. **M15.2** ✅: Probe float2-position mesh. Confirmed 8 bytes/vertex (XY pair) vs float3's 12 bytes/vertex (XYZ).
+3. **M15.3** ✅: Analyze encoding patterns. 51/71 (72%) use `descriptor-float2-uv`, 20/71 (28%) use `descriptor-float3-generic`.
+4. **M15.4** ✅: Document findings.
+
+**Key Finding**: **72% of OBJ positions use float2 encoding** (8 bytes/vertex = XY pairs). The heuristic
+classifier's `position-float3-lead` label was misleading — the descriptor correctly identifies the
+stream format, but role disambiguation requires pairing context.
+
+---
+
+## Phase 15.5: Float2 Z-Source Resolution (COMPLETE ✅)
+
+**Objective**: Determine where the Z coordinate comes from for float2-encoded position streams (which store
+XY only).
+
+**Entry Criteria**:
+- Phase 15 COMPLETE with 51 float2-position streams identified ✅
+- Phase 14 inventory with streaming parser available ✅
+
+**Key Milestones**:
+1. ✅ Build streaming JSON parser for 219MB inventory file (6.4M lines).
+2. ✅ Analyze 36 float2-position meshes (156 streams total).
+3. ✅ Disprove "separate Z stream" hypothesis: 48/48 position streams are ALL float2, 0 float3 co-resident.
+4. ✅ Disprove "mesh transform" hypothesis: probe confirms 0 direct position streams in target meshes.
+5. ✅ **Confirm sibling position pairing**: Z comes from sibling mesh via `NifPositionSourceSiblingAccumulator`.
+   C# code evidence: `ProbeNifPositionSource`, `NifPositionSourceSiblingGroup`.
+6. ✅ OBJ Z-value verification: 9/36 unique Z values (range 1.86) — consistent with sibling vertex mapping.
+
+**Key Finding**: **Z is sourced through sibling position pairing**, not from a separate stream or mesh
+transform. The OBJ exporter's `--experimental-position-source` path uses `NifPositionSourceSiblingAccumulator`
+to find a sibling mesh with full float3 XYZ data and pair it with the float2 XY data. This is a systematic
+encoding strategy: 9 MeshSize families (301-465) have both float2 and float3 meshes sharing the same
+archives, enabling cross-mesh pairing.
+
+**Script**: `scripts/analyze_z_source.py` — reusable streaming JSON parser for inventory analysis.
+
+---
+
+## Phase 16: Sibling Pairing Verification & OBJ Pipeline (Candidate)
+
+**Objective**: Build a concrete sibling pairing map — identify which specific float3 mesh provides Z for
+each float2 mesh — and design a descriptor-aware OBJ export pipeline that explicitly handles the
+float2+sibling Z mechanism.
+
+**Entry Criteria**:
+- Phase 15.5 COMPLETE with sibling pairing mechanism confirmed ✅
+- Streaming parser infrastructure available ✅
+- Probe and pairing data accessible ✅
+
+**Key Milestones (planned)**:
+1. Build per-MeshSize sibling pairing map (float2 → float3 mesh pairs).
+2. Cross-reference pairing confidence and archive proximity.
+3. Design descriptor-aware export pipeline that emits correct 3D vertices.
+
+**Anti-Drift Rules**:
+- Stay within sibling pairing analysis — no new archive format changes.
+- Use existing probe/inventory infrastructure; no new C# unless justified.
+- All analysis in Python.
+
+---
 
 1. **Always reference the current phase** in every handoff and major commit.
 2. **One lead at a time** (per Aggressive Evidence Workflow). New leads only after current phase milestone exit.
