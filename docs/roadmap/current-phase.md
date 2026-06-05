@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 27 ✅; bidirectional MeshSize resolution — float3 + probe lookup, 8 more IDs resolved)
+**Last Updated**: 2026-06 (Phase 28 ✅; MeshSize 305 mixed-family root cause identified — split is by mesh block, not by asset)
 
 ---
 
@@ -88,8 +88,9 @@
 | **Phase 25** | **Export Manifest** | **scripts/build_export_manifest.py — 142 OBJs catalogued: 94 faced, 48 position-only, 5,360 vertices, 6,682 faces** | **0** | **✅ COMPLETE** |
 | **Phase 26** | **Comprehensive Export Manifest** | **259 OBJs across all Exports/, per-MeshSize breakdown, export batch classification** | **0** | **✅ COMPLETE** |
 | **Phase 27** | **Bidirectional MeshSize Resolution** | **float3 + probe lookup; 8 IDs resolved; 4 new MeshSizes discovered** | **0** | **✅ COMPLETE** |
+| **Phase 28** | **MeshSize 305 Mixed-Family Investigation** | **Root cause: split by mesh block (MB=6,45,46→faced; MB=7,27→pos-only)** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 28 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 29 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
