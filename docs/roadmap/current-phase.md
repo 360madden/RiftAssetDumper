@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 38 ✅; regex bug fix recovered 33 hidden IDs; 15 probes resolved 3 new families: MS=280, 367, 405; unknowns 81→66)
+**Last Updated**: 2026-06 (Phase 39 ✅; project summary updated through Phase 38; health sweep all clean)
 
 ---
 
@@ -100,8 +100,9 @@
 | **Phase 36** | **Inference Script + Remaining Probes** | **scripts/infer_meshsizes_from_clusters.py; MS=276, 354 discovered; unknowns 83→79** | **0** | **✅ COMPLETE** |
 | **Phase 37** | **Remaining 12 Probes — 3 New Families** | **12 probes: MS=267, 297, 330 (new); MS=301 (6), MS=325 (1); unknowns 79→66** | **0** | **✅ COMPLETE** |
 | **Phase 38** | **Regex Bug Fix + Hidden ID Recovery** | **Fixed extract_asset_id regex; recovered 33 hidden IDs; 15 probes resolved MS=280, 367, 405 (new) + MS=276 (3), MS=301 (1), MS=321 (3); unknowns 81→66** | **0** | **✅ COMPLETE** |
+| **Phase 39** | **Project Summary Update** | **Updated docs/roadmap/project-summary.md through Phase 38; health sweep: ruff ✅, mypy ✅, build 0, tests 50/50 ✅** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 40 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 41 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
