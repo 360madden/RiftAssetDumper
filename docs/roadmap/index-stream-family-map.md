@@ -33,13 +33,23 @@
 | 321 | 7 | 0 | 1 | 0% | ❌ No | MB=7 has NO index stream (Phase 30) |
 | 325 | 6 | 45 | 0 | 100% | ✅ Yes | Canonical faced block (Phase 37: +1 ID confirmed) |
 | 325 | 31 | 2 | 0 | 100% | ✅ Yes | New MB data point (Phase 35); 18f/20v, 2 IDs, index stream present |
-| 329 | 6 | 0 | 2 | 0% | ❌ No | **No index stream at any MB** |
+| 329 | 6 | 0 | 3 | 0% | ❌ No | Expanded Phase 40 (+1 ID) |
+| 329 | 7 | 0 | 1 | 0% | ❌ No | Phase 40 pos-only ID |
+| 329 | 31 | 0 | 1 | 0% | ❌ No | Phase 40 pos-only ID (8e01613d7ce9e297) |
 | 345 | 6 | 3 | 0 | 100% | ✅ Yes | 2 unique IDs, all faced |
 | 361 | 6 | 1 | 0 | 100% | ✅ Yes | New family (from probe) |
 | 365 | 9 | 1 | 0 | 100% | ✅ Yes | MB=9 has index (464 faces) |
 | 370 | 66 | 0 | 1 | 0% | ❌ No | Position-only (6v, no index) |
 
 | 389 | 6 | 0 | 2 | 0% | ❌ No | **No index stream at any MB** (float3 probe confirmed) |
+| 193 | 7 | 0 | 2 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 197 | 17 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 214 | 12 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 272 | 6 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 275 | 7 | 0 | 3 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 307 | 35 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 326 | 6 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
+| 337 | 33 | 0 | 1 | 0% | ❌ No | New pos-only family (Phase 40) |
 | 465 | 7 | 1 | 0 | 100% | ✅ Yes | **MB=7 IS faced** (69 faces, 23v — Phase 30!) |
 | 465 | 8 | 0 | 17 | 0% | ❌ No | No index stream at MB=8 |
 
