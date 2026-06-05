@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 30 ✅; float3 batch export — 9 IDs exported, 6 faced OBJs produced, MS=465 MB=7 discovered as faced)
+**Last Updated**: 2026-06 (Phase 31 ✅; MB=6 batch export — 36 float2 IDs confirmed position-only; no faced-capable mesh blocks exist for these assets)
 
 ---
 
@@ -91,8 +91,9 @@
 | **Phase 28** | **MeshSize 305 Mixed-Family Investigation** | **Root cause: split by mesh block (MB=6,45,46→faced; MB=7,27→pos-only)** | **0** | **✅ COMPLETE** |
 | **Phase 29** | **Index Stream Family Map** | **docs/roadmap/index-stream-family-map.md — 11 MeshSize families, per-MB breakdown, key findings** | **0** | **✅ COMPLETE** |
 | **Phase 30** | **Float3 Batch Export** | **scripts/batch_export_float3.py — 9/9 exported (6 faced + 3 pos-only), MS=465 MB=7 discovered as faced** | **0** | **✅ COMPLETE** |
+| **Phase 31** | **MB=6 Batch Export** | **scripts/batch_export_mb6.py — 36 float2 IDs confirmed position-only; no MB=6/MB=7 blocks exist** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 31 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+**Project totals**: 32 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
 
 ### Phase 15 Key Finding
 
