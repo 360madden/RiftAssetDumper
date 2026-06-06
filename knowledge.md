@@ -69,7 +69,7 @@ All complex modes have been ported to Python.
 - **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`)
 - **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`
 - **Key commands (utility):** `hash-name`, `match-ids`, `match-names`, `list-paks`, `list-entries`, `scan-compression`, `mine-strings`
-- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (50 tests, all pass)
+- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (51 tests, all pass)
 
 ### Python scripts (`scripts/`)
 
@@ -114,20 +114,23 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 
 | Path | Contents |
 |------|----------|
-| `Source/` | Local copied game files (`assets.manifest`, `Assets/assets.###` archives) |
 | `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) and NIF texture bundles |
 | `Exports/` | JSON/JSONL reports, inventories, matrices, and OBJ exports |
 | `RecoveredNames/` | Generated filename matches (`recovered-names.jsonl`) |
 | `Candidates/` | Candidate filename lists for hash matching |
 | `docs/handoffs/` | Session handoff docs (AI-agent context resumption) |
 
+> **Note:** `Source/` (local copied game files, 166MB) was deleted 2026-06-06. All Python scripts now default to the live game path (`C:/Program Files (x86)/Glyph/Games/RIFT/Live`). The live archive (26GB, 244 archive files, 263,957 entries) is used directly.
+
 ### Data flow
 
-1. **Manifest** (`TWAM`) → parse header + tables (PAK listing, entry table)
+1. **Manifest** (`TWAM`) → parse header + tables (PAK listing, entry table) from live game directory
 2. **Archive** (`TWAD`) → parse entry table, decompress (zlib/LZMA2/raw), detect type
 3. **NIF probe** → parse Gamebryo block structure, extract `NiMesh` → `NiDataStream` bindings
 4. **Geometry decode** → decode positions/normals/UVs from float32 or uint16-packed streams
 5. **OBJ export** → behind `--experimental-position-source` (fallback) or `--export-obj` (attribute-set @264) flags
+
+All operations read directly from the live game install (see Key directories note above).
 
 ### CI pipeline (`.github/workflows/ci.yml`)
 
@@ -137,9 +140,11 @@ Two parallel jobs on `windows-latest`:
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Phase 49 + live-archive exhaustion)
+### Current project state (latest — Phase 51 + Ghidra proof lane)
 
-- **350 OBJ files, 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30 MeshSize families. 217 unique asset IDs. 345 copied + 5 live provenance. 0 structural issues. 0 unexported candidates remain.**
+- **350 OBJ files, 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30 MeshSize families. 217 unique asset IDs. 0 structural issues. 0 unexported candidates remain.**
+- **Live archive** (26GB, 244 files, 263,957 entries) used directly — `Source/` deleted (166MB reclaimed). All Python scripts default to live game path.
+- **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites).
 - `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner with dry-run mode and content-mismatch warnings
 - `scripts/live_family_scanner.py` — exhaustive batch probe mode (`--exhaustive`) with auto-update registry integration
 - `scripts/build_export_manifest.py` v3 — data-driven live provenance via `scripts/live-exported-ids.json`
@@ -148,7 +153,8 @@ Two parallel jobs on `windows-latest`:
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Cross-MB audit (Phase 48): no recoverable faced candidates found across all pos-only OBJs
-- CI green: build 0 errors, tests 50/50 (C#) + 50 (Python), ruff 0, mypy 0
+- Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
+- CI green: build 0 errors, tests 51/51 (C#), ruff 0, mypy 0
 
 ## Conventions
 
@@ -214,7 +220,6 @@ Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found ma
 
 | Scope | Count | Compression |
 |---|---|---:|---|
-| Copied TWAD entries | 40,203 | `0=203`, `1=40000`, `2=0` |
 | Full live TWAD entries | 263,957 | `0=22422`, `1=241535`, `2=0` |
 | Manifest Table 0 PAK rows | 2,076 | `0=736`, `2=1340` |
 
@@ -225,8 +230,7 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - `Program.cs` is extremely large (~15K lines) — prefer targeted `str_replace` edits over rewrites
 - All C# commands run via string matching in `Main()` — adding a new command requires adding an `if` block
 - The solution file is `.slnx` (new XML format) — not `.sln`
-- Local game data (`Source/`) must be manually copied; it is never committed
-- Live game install (`C:\Program Files (x86)\Glyph\Games\RIFT\Live`) is read-only; use `--live-root`
+- `Source/` (local copied game files) has been **deleted** — all scripts read directly from the live game install at `C:\Program Files (x86)\Glyph\Games\RIFT\Live` (read-only)
 - Python scripts are all in `scripts/` root (no subpackages) with flat module structure
 - `ruff` ignores E501 (line length) since it's enforced by formatter; several naming conventions relaxed for PS→Py ports
 - Always use `--experimental-position-source` for meshes without direct attribute sets

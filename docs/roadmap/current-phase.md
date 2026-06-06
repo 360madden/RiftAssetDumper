@@ -1,22 +1,21 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06 (Phase 49 ✅ — triangle fan fallback batch export; 76/77 pos-only OBJs exported with 2,847 fan faces)
+**Last Updated**: 2026-06-06 (Ghidra proof lane complete; Source/ deleted; live game path default)
 
 ---
 
 ## Current State
 
-**Phase 49 complete** — triangle fan fallback batch export for all pos-only OBJs.
+**Ghidra proof lane complete** — all 3 steps done. Source/ deleted (166MB reclaimed). All Python scripts default to live game path.
 
-**Results**:
+**Session summary (2026-06-06)**:
 
-- **76/77** pos-only OBJs exported with **2,847** approximate fan faces
-- **15 families** covered: MS=193, 197, 214, 272, 275, 280, 305, 307, 321, 326, 329, 337, 370, 389, 465
-- **1 failure**: `cf54e712ff57eaac` (MS=272, MB=6) — missing from copied archives (known issue)
-- Fan fallback now works for **both** `--experimental-position-source` (0-attribute-set) and `--export-obj` (attribute-set) paths
-- Dynamic OBJ header annotation: accurately reports "fallback triangle fan (approximate)" in OBJ header
+- **Ghidra proof lane** (3/3): parser field proof guard, sample-byte agreement (184/184 blocks), narrow parser patch (`--ghidra-body-offset` flag wired through 4 body-slicing sites)
+- **Source/ deleted**: 166MB reclaimed. All 9 Python scripts now default to `C:/Program Files (x86)/Glyph/Games/RIFT/Live` (26GB, 244 archive files, 263,957 entries)
+- **Discovery suite**: 5/7 steps pass against live archive (gap report needs inventory rebuild)
+- **CI**: .NET 51/51, ruff 0, mypy 0, 5 guards passing
 
-**Conclusion**: All recoverable pos-only OBJs now have approximate faces for visual inspection.
+**Conclusion**: The Ghidra descriptor table approach is exhausted (0 nonzero rows in 768+6,915 sampled entries). The narrow parser patch is complete but opt-in behind `--ghidra-body-offset`. No new autonomous decode paths available — further progress requires human direction.
 
 ---
 
@@ -24,10 +23,11 @@
 
 | # | Action | Status | Reference |
 |---|---|---|---|
-| 1 | **Auto-face reconstruction**: triangle fan fallback batch export | ✅ Complete | 76/77 pos-only OBJs exported; 2,847 fan faces across 15 families |
-| 2 | **Cross-MB pairing audit** (Phase 48) | ✅ Complete | All 84 pos-only OBJs audited; 0 recoverable faced candidates found |
-| 3 | **Ghidra/NiDataStream proof-guard lane** | 🔬 Active | Ghidra evidence stays candidate-only until parser/export promotion gates are executable |
-| 4 | **Parser/export promotion** | 🚫 Blocked | All promotion gates remain locked; no decoder behavior changes pending Ghidra proof |
+| 1 | **Ghidra proof lane** | ✅ Complete | 3/3 steps: field proof, sample-byte agreement, narrow parser patch |
+| 2 | **Source/ deletion + live path switch** | ✅ Complete | 9 Python scripts updated; 166MB reclaimed; live archive used directly |
+| 3 | **Live memory scanning** | ⏳ Pending | Attach x64dbg to RIFT process, observe runtime stream decoding (highest potential reward) |
+| 4 | **Stream body hex analysis** | ⏳ Pending | Fresh ImHex analysis of zero-attr stream bodies with new decode hypotheses |
+| 5 | **New Ghidra targets** | ⏳ Pending | Decompile renderer vertex-buffer setup functions (not LoadBinary/descriptor path) |
 
 ---
 
