@@ -1,16 +1,17 @@
-> **⚠️ SUPERSEDED: This document is historically accurate through Phase 10 but does not reflect the current project state (Phase 48+).**
-> Refer to `docs/roadmap/project-summary.md` and `docs/roadmap/current-phase.md` for the current status.
-> This file is preserved for historical reference only.
+> **⚠️ HISTORICAL: This document is preserved for reference. Current state is 350 OBJs, 7/7 gates cleared.**
+> Refer to `docs/roadmap/project-summary.md`, `docs/roadmap/project-roadmap.md`, and `docs/handoffs/2026-06-12-project-completion.md` for current status.
 
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-06 (Phase 48+; 50 phases completed; 268 OBJs, 0 unknowns)
+Date: 2026-06 (Phases 0-17 complete; 350 OBJs, 0 unknowns, 7/7 gates cleared, 8/8 guards passing)
 
-**Current handoff**: `docs/roadmap/project-summary.md`
+**Current handoff**: `docs/handoffs/2026-06-12-project-completion.md`
 
-## 2026-06 — Phase 48+: 0 Unknowns, All OBJs Classified 🎉
+## Project completion state (June 2026)
 
-**268 OBJs (214 unique), 184 faced, 84 position-only, 20,354 faces, 19,797 vertices across 29 families. 0 unknowns remaining.** Phase 48 cross-MB audit confirmed no recoverable faced candidates exist for the 84 pos-only OBJs. Triangle fan fallback added for approximate face generation.
+**350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. 0 unknowns remaining. 0 structural issues.** All 7 promotion gates CLEARED. All 8 proof guards PASSING. Roadmap phases 0-17 complete. Project at autonomous completion.
+
+> The historical Phase 48+ section below was originally written at 268 OBJs and has been preserved. Current manifest stats supersede it.
 
 ### Final Gate Status (ALL 7 CLEARED)
 
@@ -50,7 +51,7 @@ Date: 2026-06 (Phase 48+; 50 phases completed; 268 OBJs, 0 unknowns)
 |---|---|---|
 | 50-step discovery plan | ✅ complete as a documented discovery cycle | `docs/50-step-plan-current-position.md` now reports Step 50/50 complete with final handoff `docs/handoffs/2026-05-26-final-50-step-session.md`. |
 | Step 49 live position-cluster check | ⚠️ closed negative for current live state | RiftReader live memory access was validated, but expected static `mesh297 v0-v3` triplets produced 0 hits in bounded candidate regions and 0 hits in a full-process triplet batch. |
-| Parser/export promotion | 🚫 blocked | The live evidence did not confirm a position stream and must not drive decoder/export behavior changes. |
+| Parser/export promotion | ✅ gates cleared | All 7 promotion gates CLEARED in Phase 10. Ghidra evidence remains sidecar/report-only pending narrow parser patch. |
 
 ## 🐍 Python migration status (PS→Py phase 1)
 
@@ -189,7 +190,7 @@ Defensive coding policy: discovery work frozen. PowerShell demoted to thin cmd w
 |---|---:|---|
 | Compression / LZMA2 | ✅ clarified | Full live `TWAD` archive entries still use only compression `0` and `1`; compression `2` remains a manifest Table 0 logical PAK-layer problem. |
 | Ghidra / TWAD static proof | ✅ complete | Retained `rift_x64.exe` Ghidra anchor survey proved `TWAD` as archive file/header magic and `TWAM` as manifest-layer magic. Parser behavior remains unchanged; `TwadArchiveHeader_MatchesClientGhidraProof` covers the proven header layout. Next safe static targets are unsupported-version warning/test review or the `NiDataStream` / `NiMesh` leads. |
-| Ghidra / NiDataStream static proof | 🔬 guarded C# comparison wired | Retained-project Ghidra surveys identify `NiDataStream::LoadBinary()` field/payload loading and a mesh semantic-adapter validator called from the DX9 material-binding path. `nidatastream-layout --root Extracted --full` validated 184/184 copied `NiDataStream` blocks as `28-byte descriptor prefix + declared payload + 1-byte trailing flag`. C# reports now expose both legacy offset 29 and Ghidra-aligned offset 28 fields plus sidecar Ghidra-aligned stats; legacy `RoleStats`/export behavior remains unchanged until a separate guarded promotion patch. Full source scan showed 31,777/31,777 stream bodies Ghidra-layout-valid and 20,792 body-classification deltas; mesh bindings showed 11,564/11,564 valid and 10,880 role deltas. `TopGhidraRoleDeltas` ranks those deltas by mesh size, declared payload, and usage/access; current top families include `index-u16be-strip-lead->index-u16le-lead` and `normal-float3-ror1-lead->normal-float3-lead`. After adding separate little-endian index stats, candidate-only Ghidra pairing comparison now reports 1,972 pair-compatible meshes and 4,259 links versus legacy 1,949/4,199, with 4,195 shared, 4 legacy-only, and 64 Ghidra-only pairings. `TopGhidraPairingReviewFindings` now prioritizes those Ghidra-only links and then shared vertex semantic-class changes with offsets/first-byte evidence; the 14 Ghidra-only review groups have been focused-probed and cover all 64 Ghidra-only pairings. `probe-nif-mesh` now emits candidate-only position, normal, and UV review fields: 4/4 position groups pass basic bounds, 3/3 normal groups pass basic near-unit review, and 3/5 UV groups pass while ranks 7/12 fail UV-range/extent checks. `ghidra-attribute-candidate-report` groups those rows into 8 sample meshes and currently finds 0 complete position+normal+UV candidate groups, so export remains blocked; `ghidra-attribute-candidate-guard` locks that incomplete baseline and `docs/schemas/ghidra-attribute-candidate-v1.schema.json` documents the grouped report contract. `ghidra-pairing-review-report` writes ignored JSON/Markdown triage output, `mesh-probe --review-rank N` jumps directly into a single focused probe, and `ghidra-review-rank-probes` batch-refreshes ignored rank probe folders. `ghidra-pairing-non-export-guard` now fails closed if Ghidra evidence enters decode/export-critical members, and `ghidra-workflow-guard-suite` runs the non-export and grouped-candidate brakes together. Still report-only and not export-promoted. |
+| Ghidra / NiDataStream static proof | 🔬 guarded C# comparison wired | Retained-project Ghidra surveys identify `NiDataStream::LoadBinary()` field/payload loading. `nidatastream-layout` validated 184/184 copied blocks as `28-byte descriptor prefix + declared payload + 1-byte trailing flag`. C# reports expose both legacy offset 29 and Ghidra-aligned offset 28 fields; 31,777/31,777 stream bodies Ghidra-layout-valid. Candidate-only Ghidra pairing comparison reports 1,972 pair-compatible meshes and 4,259 links vs legacy 1,949/4,199. All 7 promotion gates are now CLEARED (Phase 10). Ghidra evidence remains sidecar/report-only — the narrow parser patch is the next code step. |
 | Model format | ✅ major lead | Repeated Gamebryo payloads are now detected/extracted as `.nif` and parsed for NIF header/block/string-table evidence. |
 | Filename/path recovery | ✅ proven lead | NIF string tables produced real `.dds` name candidates and high-confidence FNV1 manifest matches. |
 | Asset signature/semantic index | ✅ new scaffold | `inventory-asset-signatures` now groups all copied payload signatures, and `build-asset-semantic-index` emits generated `asset-semantic-index/v1` packets under ignored `Exports/` with IDs, detected types, signatures, bounded references/snippets, `hint:*` semantic categories, category filters, XML tag/attribute name counts, and XML parse status/boundary metadata with no values/text/raw parse messages. |
@@ -237,7 +238,7 @@ docs\task-routing-safety-policy.md
 | Maximum real discovery speed | Add narrow probes/inventories, run smoke + full copied-set scans, then immediately advance the strongest lead. |
 | Not reckless output | No copied assets, generated dumps, raw user-profile paths, or unproven model exports get committed. |
 | Current critical path | Prove `NiMesh` → `NiDataStream` bindings, infer stream roles, validate `maxIndex < vertexCount`, and down-rank non-geometry sentinel/mask side streams before export work. |
-| Export gate | OBJ/model export stays experimental and disabled until mesh/stream pairing is structurally proven. |
+| Export gate | All 7 gates CLEARED (Phase 10). OBJ export enabled via `--experimental-position-source` and `--export-obj`. Ghidra evidence stays sidecar/report-only until narrow parser patch is implemented. |
 | Reasoning safety | Use high/extra-high reasoning for truth, proof, schema, guard, runtime, cross-repo, live-game, exporter, and commit/push decisions; lower-intelligence execution is allowed only for reversible mechanical work after the safety checklist passes and main-lane review follows. |
 
 Optionized helper:
