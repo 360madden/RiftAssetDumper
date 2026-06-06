@@ -18,6 +18,7 @@
     "ValidDeclaredPayloadBlocks",
     "GhidraStyleLayoutValidBlocks",
     "LegacyOffsetShiftedBlocks",
+    "SampleByteAgreementBlocks",
     "TopPayloadPrefixBytes",
     "TopPayloadTrailerBytes",
     "TopTrailingFlags",
@@ -47,6 +48,7 @@
     "ValidDeclaredPayloadBlocks": { "type": "integer", "minimum": 0 },
     "GhidraStyleLayoutValidBlocks": { "type": "integer", "minimum": 0 },
     "LegacyOffsetShiftedBlocks": { "type": "integer", "minimum": 0 },
+    "SampleByteAgreementBlocks": { "type": "integer", "minimum": 0 },
     "TopPayloadPrefixBytes": { "$ref": "#/$defs/counterRows" },
     "TopPayloadTrailerBytes": { "$ref": "#/$defs/counterRows" },
     "TopTrailingFlags": { "$ref": "#/$defs/counterRows" },
@@ -128,6 +130,8 @@
         "LegacyOffsetMinusGhidraOffset",
         "LegacyBodyFirst16",
         "GhidraBodyFirst16",
+        "SampleByteAgreement",
+        "SampleByteAgreementDetail",
         "Warning"
       ],
       "properties": {
@@ -158,6 +162,8 @@
         "LegacyOffsetMinusGhidraOffset": { "$ref": "#/$defs/nullableInteger" },
         "LegacyBodyFirst16": { "type": "string" },
         "GhidraBodyFirst16": { "type": "string" },
+        "SampleByteAgreement": { "type": "boolean" },
+        "SampleByteAgreementDetail": { "type": "string" },
         "Warning": { "$ref": "#/$defs/nullableString" }
       },
       "additionalProperties": false

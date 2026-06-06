@@ -88,6 +88,8 @@ with TemporaryDirectory() as temp_dir:
     check("trailing flag", block["TrailingFlag"], 1)
     check("legacy shift", block["LegacyOffsetMinusGhidraOffset"], 1)
     check("ghidra valid", block["GhidraStyleLayoutValid"], True)
+    check("sample byte agreement", block["SampleByteAgreement"], True)
+    check("sample byte agreement detail", block["SampleByteAgreementDetail"], "First 7 bytes agree (1-byte shift)")
 
     report = build_report(temp_path, max_files=None)
     jsonschema.validate(report, layout_schema)
@@ -95,6 +97,7 @@ with TemporaryDirectory() as temp_dir:
     check("report block count", report["NiDataStreamBlocks"], 1)
     check("report valid count", report["GhidraStyleLayoutValidBlocks"], 1)
     check("report shifted count", report["LegacyOffsetShiftedBlocks"], 1)
+    check("report byte agreement count", report["SampleByteAgreementBlocks"], 1)
     check("report second uint32 counter", report["TopSecondUInt32"][0]["Value"], 123)
     check("report pair record offset counter", report["TopPairRecordOffsets"][0]["Value"], 12)
     check("report descriptor record bytes counter", report["TopFirstDescriptorRecordBytes"][0]["Value"], "aa 00 00 00")

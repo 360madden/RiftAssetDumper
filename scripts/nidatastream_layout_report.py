@@ -220,6 +220,20 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
         else b""
     )
 
+    # Sample-byte agreement proof: ghidra_body[i+1] should equal legacy_body[i]
+    # because the Ghidra offset is exactly 1 byte earlier than the legacy offset.
+    sample_byte_agreement = False
+    sample_byte_agreement_detail = ""
+    if legacy_body and ghidra_body and len(ghidra_body) >= 2:
+        overlap = min(len(legacy_body), len(ghidra_body) - 1)
+        if legacy_body[:overlap] == ghidra_body[1 : 1 + overlap]:
+            sample_byte_agreement = True
+            sample_byte_agreement_detail = f"First {overlap} bytes agree (1-byte shift)"
+        else:
+            sample_byte_agreement_detail = f"First {overlap} bytes DISAGREE"
+    else:
+        sample_byte_agreement_detail = "Insufficient data for comparison"
+
     return {
         "DeclaredPayloadBytes": declared,
         "ValidDeclaredPayload": valid_declared,
@@ -244,6 +258,8 @@ def _analyze_block(payload: bytes) -> dict[str, Any]:
         ),
         "LegacyBodyFirst16": _hex_prefix(legacy_body),
         "GhidraBodyFirst16": _hex_prefix(ghidra_body),
+        "SampleByteAgreement": sample_byte_agreement,
+        "SampleByteAgreementDetail": sample_byte_agreement_detail,
         "Warning": warning,
     }
 
@@ -314,6 +330,7 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
     valid_declared = [block for block in all_blocks if block.get("ValidDeclaredPayload")]
     ghidra_valid = [block for block in all_blocks if block.get("GhidraStyleLayoutValid")]
     shifted = [block for block in all_blocks if block.get("LegacyOffsetMinusGhidraOffset") not in (None, 0)]
+    byte_agreement = [block for block in all_blocks if block.get("SampleByteAgreement")]
 
     prefix_counts: Counter[Any] = Counter(block.get("PayloadPrefixBytes") for block in all_blocks)
     trailer_counts: Counter[Any] = Counter(block.get("PayloadTrailerBytes") for block in all_blocks)
@@ -346,6 +363,7 @@ def build_report(root: Path, *, max_files: int | None = 100, sample_limit: int =
         "ValidDeclaredPayloadBlocks": len(valid_declared),
         "GhidraStyleLayoutValidBlocks": len(ghidra_valid),
         "LegacyOffsetShiftedBlocks": len(shifted),
+        "SampleByteAgreementBlocks": len(byte_agreement),
         "TopPayloadPrefixBytes": _counter_rows(prefix_counts),
         "TopPayloadTrailerBytes": _counter_rows(trailer_counts),
         "TopTrailingFlags": _counter_rows(flag_counts),
@@ -380,6 +398,7 @@ def report_to_markdown(report: Mapping[str, Any]) -> str:
         f"| Valid declared payload blocks | {markdown_cell(report.get('ValidDeclaredPayloadBlocks'))} |",
         f"| Ghidra-style layout valid blocks | {markdown_cell(report.get('GhidraStyleLayoutValidBlocks'))} |",
         f"| Legacy offset shifted blocks | {markdown_cell(report.get('LegacyOffsetShiftedBlocks'))} |",
+        f"| Sample-byte agreement blocks | {markdown_cell(report.get('SampleByteAgreementBlocks'))} |",
         "",
         "## Distribution summary",
         "",
