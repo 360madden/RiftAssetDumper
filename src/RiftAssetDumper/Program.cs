@@ -1906,7 +1906,7 @@ internal static class Program
       }
 
       var meshPayload = SliceNifBlockPayload(payload, meshBlock);
-      var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+      var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock, options.GhidraBodyOffset);
       var pairings = FindNifMeshProbePairings(streamSummaries);
       var ghidraPairings = FindNifMeshProbePairings(
           BuildNifGhidraRoleStreamSummaries(streamSummaries),
@@ -2086,7 +2086,7 @@ internal static class Program
     }
 
     var meshPayload = SliceNifBlockPayload(payload, meshBlock);
-    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock, options.GhidraBodyOffset);
     var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
 
@@ -2711,7 +2711,7 @@ internal static class Program
     }
 
     var meshPayload = SliceNifBlockPayload(payload, meshBlock);
-    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock, options.GhidraBodyOffset);
     var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
 
@@ -2978,7 +2978,7 @@ internal static class Program
     }
 
     var meshPayload = SliceNifBlockPayload(payload, meshBlock);
-    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+    var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock, options.GhidraBodyOffset);
     var attributeSets = FindNifMeshAttributeSets(null, null, null, meshBlock, streamSummaries);
     var matches = new List<NifAttributeExtraProbeMatch>();
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
@@ -3247,7 +3247,7 @@ internal static class Program
     foreach (var meshBlock in allMeshBlocks)
     {
       var meshPayload = SliceNifBlockPayload(payload, meshBlock);
-      var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock);
+      var streamSummaries = BuildNifMeshBoundStreamSummaries(payload, header, meshBlock, options.GhidraBodyOffset);
 
       var inlineCandidates = FindNifInlinePositionCandidates(meshPayload, streamSummaries);
       var orphanCandidates = FindNifOrphanPositionCandidates(payload, header, meshBlock, streamSummaries);
@@ -11323,7 +11323,8 @@ internal static class Program
   private static List<NifMeshBoundStreamSummary> BuildNifMeshBoundStreamSummaries(
       byte[] payload,
       NifHeaderInfo header,
-      NifBlockInfo meshBlock)
+      NifBlockInfo meshBlock,
+      bool ghidraBodyOffset = false)
   {
     var blocksByIndex = header.Blocks.ToDictionary(static b => b.Index);
     var streamSummaries = new List<NifMeshBoundStreamSummary>();
@@ -11341,15 +11342,29 @@ internal static class Program
       NifMeshStreamRoleStats? ghidraRoleStats = null;
       var layout = AnalyzeNifDataStreamLayout(targetPayload);
       declaredPayloadBytes = layout.DeclaredPayloadBytes;
-      headerBytes = layout.LegacyPayloadOffset;
+      headerBytes = ghidraBodyOffset && layout.PayloadPrefixBytes is not null
+          ? layout.PayloadPrefixBytes
+          : layout.LegacyPayloadOffset;
       if (layout.ValidDeclaredPayload)
       {
-        var body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+        ReadOnlySpan<byte> body;
+        ReadOnlySpan<byte> ghidraBody;
+        if (ghidraBodyOffset && layout.GhidraStyleLayoutValid)
+        {
+          body = SliceNifDataStreamGhidraBody(targetPayload, layout);
+          ghidraBody = SliceNifDataStreamLegacyBody(targetPayload, layout);
+        }
+        else
+        {
+          body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+          ghidraBody = layout.GhidraStyleLayoutValid
+              ? SliceNifDataStreamGhidraBody(targetPayload, layout)
+              : ReadOnlySpan<byte>.Empty;
+        }
         bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
         roleStats = AnalyzeNifMeshBoundStreamRole(body);
-        if (layout.GhidraStyleLayoutValid)
+        if (!ghidraBody.IsEmpty)
         {
-          var ghidraBody = SliceNifDataStreamGhidraBody(targetPayload, layout);
           ghidraBodyFirst16 = ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]);
           ghidraRoleStats = AnalyzeNifMeshBoundStreamRole(ghidraBody);
         }
@@ -14310,7 +14325,8 @@ internal static class Program
       bool Experimental,
       bool ExperimentalPositionSource,
       bool ExportObj,
-      bool WriteObj)
+      bool WriteObj,
+      bool GhidraBodyOffset)
   {
     public static AppOptions Parse(string[] args)
     {
@@ -14350,6 +14366,7 @@ internal static class Program
       var experimentalPositionSource = false;
       var exportObj = false;
       var writeObj = false;
+      var ghidraBodyOffset = false;
 
       for (var i = 0; i < args.Length; i++)
       {
@@ -14577,6 +14594,9 @@ internal static class Program
           case "--export-obj":
             exportObj = true;
             break;
+          case "--ghidra-body-offset":
+            ghidraBodyOffset = true;
+            break;
           case "--write-obj":
             writeObj = true;
             break;
@@ -14662,6 +14682,7 @@ internal static class Program
           experimental,
           experimentalPositionSource,
           exportObj,
+          ghidraBodyOffset,
           writeObj);
     }
 
