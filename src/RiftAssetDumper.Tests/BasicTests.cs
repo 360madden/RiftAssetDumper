@@ -701,4 +701,38 @@ public class BasicTests
     Assert.True(warnings.Count >= 3); // low vertex + zero faces + u16 descriptor
   }
 
+  [Fact]
+  public void NifDataStreamLayout_VerifyOneByteShiftRelationship()
+  {
+    // Verify the 1-byte shift: PayloadPrefixBytes + 1 == LegacyPayloadOffset (narrow parser patch foundation)
+    var declaredPayload = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11, 0x22 };
+    var blockPayload = new byte[4 + 4 + 4 + 8 + 4 + 4 + declaredPayload.Length + 1];
+    var off = 0;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), (uint)declaredPayload.Length);
+    off += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), 123);
+    off += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), 1);
+    off += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), 4);
+    off += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), 5);
+    off += 4;
+    BinaryPrimitives.WriteUInt32LittleEndian(blockPayload.AsSpan(off, 4), 1);
+    off += 4;
+    declaredPayload.CopyTo(blockPayload.AsSpan(off));
+    off += declaredPayload.Length;
+    blockPayload[off] = 1;
+
+    var layout = Program.AnalyzeNifDataStreamLayout(blockPayload);
+
+    // Key proof: the Ghidra prefix is exactly 1 byte before the legacy offset
+    Assert.True(layout.GhidraStyleLayoutValid);
+    Assert.NotNull(layout.LegacyPayloadOffset);
+    Assert.NotNull(layout.PayloadPrefixBytes);
+    Assert.Equal(layout.PayloadPrefixBytes.Value + 1, layout.LegacyPayloadOffset.Value);
+    Assert.Equal(1, layout.LegacyOffsetMinusPayloadPrefixBytes);
+  }
+
+
 }
