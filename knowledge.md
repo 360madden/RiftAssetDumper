@@ -69,7 +69,7 @@ All complex modes have been ported to Python.
 - **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`)
 - **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`
 - **Key commands (utility):** `hash-name`, `match-ids`, `match-names`, `list-paks`, `list-entries`, `scan-compression`, `mine-strings`
-- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (6 tests, all pass)
+- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (50 tests, all pass)
 
 ### Python scripts (`scripts/`)
 
@@ -140,10 +140,6 @@ Two parallel jobs on `windows-latest`:
 ### Current project state (latest — Phase 49 + live-archive exhaustion)
 
 - **350 OBJ files, 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30 MeshSize families. 217 unique asset IDs. 345 copied + 5 live provenance. 0 structural issues. 0 unexported candidates remain.**
-- `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner (25 duplicate groups, 14 SHA256-exact files deletable, 11 content-mismatch warnings preserved)
-- **5 live-archive OBJs** exported from 4 asset IDs across 5 mesh sizes (349, 357, 362, 417, 423)
-- **23 live-archive families exhaustively probed**: 5 position-enabled (exported), 18 confirmed no-position across all mesh blocks
-- **345 copied-source OBJs** maintaining the established families
 - `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner with dry-run mode and content-mismatch warnings
 - `scripts/live_family_scanner.py` — exhaustive batch probe mode (`--exhaustive`) with auto-update registry integration
 - `scripts/build_export_manifest.py` v3 — data-driven live provenance via `scripts/live-exported-ids.json`
@@ -151,7 +147,7 @@ Two parallel jobs on `windows-latest`:
 - All 8 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
-- Cross-MB audit (Phase 48): no recoverable faced candidates found across 84 pos-only OBJs
+- Cross-MB audit (Phase 48): no recoverable faced candidates found across all pos-only OBJs
 - CI green: build 0 errors, tests 50/50 (C#) + 50 (Python), ruff 0, mypy 0
 
 ## Conventions
