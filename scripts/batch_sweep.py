@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ROOT = REPO_ROOT / "Source"
+DEFAULT_ROOT = Path("C:/Program Files (x86)/Glyph/Games/RIFT/Live")
 DEFAULT_OUT = REPO_ROOT / "Exports"
 DEFAULT_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
 DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"

@@ -2583,7 +2583,7 @@ def residual_position_classifier_report(report_path: str | Path) -> None:
     representative_probe_rows: list[dict[str, object]] = []
     report_dir = Path(report_path).parent
     project_path = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
-    root_path = REPO_ROOT / "Source"
+    root_path = Path("C:/Program Files (x86)/Glyph/Games/RIFT/Live")
 
     for payload, spr_items in sorted(rep_payload_groups.items()):
         # Pick first by sorted IdPrefix

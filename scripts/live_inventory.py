@@ -113,7 +113,7 @@ def main():
 
         # Copy manifest files
         for mf in ["assets64.manifest", "manifest64.txt"]:
-            shutil.copy2(f"Source/{mf}", f"{LIVE_NIFS}/{mf}")
+            shutil.copy2(f"{LIVE_ROOT}/{mf}", f"{LIVE_NIFS}/{mf}")
         print("Copied manifest files")
 
     print("\n=== Running C# mesh-binding inventory ===")

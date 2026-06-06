@@ -107,7 +107,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO_ROOT))
 
 # Default paths (mirrors PS $Root, $Out, $Project, $Solution)
-DEFAULT_ROOT = REPO_ROOT / "Source"
+DEFAULT_ROOT = Path("C:/Program Files (x86)/Glyph/Games/RIFT/Live")
 DEFAULT_OUT = REPO_ROOT / "Exports"
 DEFAULT_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
 DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"

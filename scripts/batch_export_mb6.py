@@ -99,7 +99,7 @@ def main() -> int:
     # Parse args
     skip_build = "--skip-build" in sys.argv
     dry_run = "--dry-run" in sys.argv
-    project_root = str(REPO_ROOT / "Source")
+    project_root = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
     out_dir = REPO_ROOT / "Exports" / "mb6-exports"
     for i, arg in enumerate(sys.argv):
         if arg == "--root" and i + 1 < len(sys.argv):

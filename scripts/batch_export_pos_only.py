@@ -228,7 +228,7 @@ def main() -> int:
     dry_run = "--dry-run" in sys.argv
     limit: int | None = None
     families_filter: set[int] | None = None
-    project_root = str(REPO_ROOT / "Source")
+    project_root = "C:/Program Files (x86)/Glyph/Games/RIFT/Live"
     out_dir = "Exports/posonly-fan-exports"
 
     args = sys.argv[1:]
