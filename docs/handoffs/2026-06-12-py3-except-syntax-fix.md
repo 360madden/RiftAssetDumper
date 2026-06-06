@@ -32,8 +32,9 @@
 
 | Metric | Value |
 |---|---|
-| Unique OBJs | 228 (169 faced, 59 pos-only) |
-| Total faces/vertices | 24,722 / 18,148 |
+| OBJ files | 350 (270 faced, 80 pos-only) |
+| Total faces/vertices | 30,864 / 23,421 |
+| Unique asset IDs | 217 |
 | MeshSize families | 30+ |
 | Live archive OBJs | 5 (349, 357, 362, 417, 423) |
 | Unexported candidates | 0 |

@@ -2,7 +2,7 @@
 
 This repo uses a Codex-first autonomous milestone loop for safe asset-discovery work.
 
-Canonical stage label: the historical geometry/export pipeline is **Phase 48+ complete** (268 OBJs, 0 unknowns). Current active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane**; do not renumber this as a new Stage 4. Treat dated stage tables in older status docs as historical unless refreshed by current git state, CI, and latest handoffs.
+Canonical stage label: the historical geometry/export pipeline is **Phase 49 complete** (350 OBJs, 0 unknowns). Current active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane** — all 7 promotion gates CLEARED. Do not renumber this as a new Stage 4. Treat dated stage tables in older status docs as historical unless refreshed by current git state, CI, and latest handoffs.
 
 Original 50-step plan position: `docs/discovery-plan-50.md` is revived as a historical-to-current checklist. Use `fifty-step-plan-status --list-json` for the machine-readable position. As of the Step 50 handoff, the original plan is **50/50 complete as a documented discovery cycle**. Step 49 closed as `closed-negative-current-live-state`: RiftReader live memory access worked, but the expected static `mesh297 v0-v3` triplets produced 0 hits in bounded candidate regions and 0 hits in a full-process triplet batch. Treat that as negative current-session evidence, not parser/export truth. Parser/export promotion remains blocked until a separate guard-backed promotion patch.
 
