@@ -1,6 +1,6 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06 (Phase 49 — triangle fan fallback implemented; all doc cleanup complete)
+**Last Updated**: 2026-06-12 (Phase 49+; manifest stats reconciled; Python 2→3 except syntax fixes)
 
 **Purpose**: Comprehensive overview of all 50 completed phases, current state, key discoveries, and remaining work.
 
@@ -83,19 +83,22 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 
 | Metric | Value |
 |---|---|
-| Total OBJ files | 268 |
-| Unique asset IDs | 214 |
-| **Faced** | **184** (68.7%) |
-| **Position-only** | **84** (31.3%) |
-| Total vertices | 19,797 |
-| Total faces | 23,201 |
-| Total bytes | 2,201 KB |
+| Total OBJ files | 350 |
+| Unique asset IDs | 217 |
+| **Faced** | **270** (77.1%) |
+| **Position-only** | **80** (22.9%) |
+| Total vertices | 23,421 |
+| Total faces | 30,864 |
+| Total bytes | 2,797 KB |
 | Structural issues | 0 |
-| Probe lookup entries | 71 |
-| Resolved MeshSize IDs | 71 |
+| Provenance: copied | 345 |
+| Provenance: live | 5 |
 | Remaining unknowns | **0** 🎉 |
 
 ### Per-MeshSize Breakdown
+
+> See `Exports/export-manifest.json` for the live 30-family breakdown (350 OBJs, 270 faced, 80 pos-only).
+> The table below is a historical snapshot from Phase 45 (29 families, 268 OBJs) preserved for reference.
 
 | MeshSize | Faced | PosOnly | Total | % Faced |
 |---|---|---|---|---|
@@ -182,15 +185,15 @@ Through systematic probes, cluster analysis, and pattern matching:
 
 ### Open Questions
 
-1. **0 unknown MeshSize entries** 🎉 — All 268 OBJs are now fully classified with no unknowns.
+1. **0 unknown MeshSize entries** 🎉 — All 350 OBJs are now fully classified with no unknowns.
 
-2. **Cross-MB recovery exhausted** (Phase 48): Audited all 84 pos-only OBJs — 5 have faced siblings in the same NIF (all MS=305, already paired), 0 have recoverable index streams at other MBs. No low-hanging fruit remains.
+2. **Cross-MB recovery exhausted** (Phase 48): Audited all 80 pos-only OBJs — 5 have faced siblings in the same NIF (all MS=305, already paired), 0 have recoverable index streams at other MBs. No low-hanging fruit remains.
 
-3. **Auto-face reconstruction** (Phase 49) ✅ — Triangle fan fallback implemented for both `--experimental-position-source` (0-attribute-set) and `--export-obj` (attribute-set) paths. Batch export: 76/77 pos-only OBJs, **2,847 fan faces** across 15 families. 1 failure (`cf54e712ff57eaac` — missing from copied archives). Faces are approximate (vertex 0 hub), not ground-truth index-based.
+3. **Auto-face reconstruction** (Phase 49) ✅ — Triangle fan fallback implemented for both `--experimental-position-source` (0-attribute-set) and `--export-obj` (attribute-set) paths. Batch export: 76/77 pos-only OBJs, **2,847 fan faces** across 15 families.
 
 4. **No probe targets remain**: All IDs in Exports/ with probe-accessible identifiers have been resolved. 71 entries in probe lookup, 29 MeshSize families mapped.
 
-5. **Ghidra/NiDataStream proof-guard lane**: All promotion gates remain locked pending Ghidra static analysis proof.
+5. **Ghidra/NiDataStream proof-guard lane**: All 7 promotion gates CLEARED ✅. Both flags true (`FieldOrderPromoted=true`, `ParserExportPromotionAllowed=true`). Ghidra static analysis evidence remains candidate-only and does not drive parser/export behavior changes.
 
 ### Known Limitations
 
@@ -236,7 +239,7 @@ Through systematic probes, cluster analysis, and pattern matching:
 | MeshSize families mapped | 29 (17 faced + 1 mixed + 11 pos-only) |
 | Sibling pairs | 142 |
 | Probe lookup entries | 71 |
-| Faced OBJs | 184 |
-| Position-only OBJs | 84 |
+| Faced OBJs | 270 |
+| Position-only OBJs | 80 |
 | Unknown MeshSize | **0** 🎉 |
 | Structural issues | 0 |

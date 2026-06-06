@@ -139,8 +139,8 @@ Two parallel jobs on `windows-latest`:
 
 ### Current project state (latest — Phase 49 + live-archive exhaustion)
 
-- **228 unique OBJs, 169 faced, 59 position-only, 24,722 faces, 18,148 vertices across 30+ MeshSize families. 0 structural issues. 0 unexported candidates remain.**
-- **350 raw OBJ files** (122 duplicates across 25 groups, 97 KB reclaimable via `scripts/dedup_objs.py`)
+- **350 OBJ files, 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30 MeshSize families. 217 unique asset IDs. 345 copied + 5 live provenance. 0 structural issues. 0 unexported candidates remain.**
+- `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner (25 duplicate groups, 14 SHA256-exact files deletable, 11 content-mismatch warnings preserved)
 - **5 live-archive OBJs** exported from 4 asset IDs across 5 mesh sizes (349, 357, 362, 417, 423)
 - **23 live-archive families exhaustively probed**: 5 position-enabled (exported), 18 confirmed no-position across all mesh blocks
 - **345 copied-source OBJs** maintaining the established families
