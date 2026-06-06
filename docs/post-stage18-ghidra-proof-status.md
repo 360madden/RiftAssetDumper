@@ -28,7 +28,7 @@ Current gate truth:
 - Sample-byte agreement: ✅ **PROOF PASSING** — 184/184 Ghidra-style-valid blocks show `SampleByteAgreement: true` with per-block `SampleByteAgreementDetail` fields (all show "First N bytes agree (1-byte shift)"). Schema-backed in `nidatastream-layout-report-v1.schema.json`, reported by `python scripts/rift_workflow.py nidatastream-layout`. Not yet promoted to parser/export behavior — gated behind `--ghidra-body-offset` flag (Step 3).
 - Pairing impact proof: local ignored attribute-candidate report has 0 complete Ghidra-only position+normal+UV groups across 14 groups; guarded and still candidate-only, not promoted.
 - Export isolation: guarded by `ghidra-workflow-guard-suite` / `nidatastream-parser-field-proof-guard` / `ghidra-pairing-non-export-guard`.
-- Narrow parser patch: not started.
+- Narrow parser patch: ✅ **IMPLEMENTED** — `--ghidra-body-offset` flag wired through all 4 body-slicing sites. Gated behind explicit opt-in flag; default behavior unchanged.
 
 ## Current decision
 
@@ -38,4 +38,4 @@ Parser/export behavior remains unchanged. Ghidra evidence is useful for client-c
 
 1. ✅ Keep `nidatastream-parser-field-proof-guard` passing as a no-premature-promotion guard.
 2. ✅ **DONE (2026-06-06)** — Added concrete sample-byte proof fields to `nidatastream-layout` (`SampleByteAgreement`, `SampleByteAgreementDetail`, `SampleByteAgreementBlocks`). Proof passes: 184/184 blocks agree.
-3. Implement the narrow parser patch — add `--ghidra-body-offset` flag to `AppOptions`, wire it through `decode-nif-geometry` / `probe-nif-mesh` / inventory commands to use `PayloadPrefixBytes` (28) as the primary body offset instead of `LegacyPayloadOffset` (29).
+3. ✅ **DONE (2026-06-06)** — Narrow parser patch: added `--ghidra-body-offset` flag to `AppOptions`, wired through all 4 body-slicing sites (`BuildNifMeshBoundStreamSummaries`, `ProbeNifMesh` stream probe, `inventory-nif-stream-bodies`, `probe-nif-stream-body`). When set, `PayloadPrefixBytes` (28-byte Ghidra-aligned) becomes the primary body offset; legacy body becomes sidecar. Builds + 50/50 tests pass.
