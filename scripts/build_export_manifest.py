@@ -151,7 +151,7 @@ def _load_live_exported_ids() -> set[str]:
             data = json.load(f)
         ids = data.get("ids", {})
         return set(ids.keys())
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return set()
 
 

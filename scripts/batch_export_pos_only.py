@@ -36,7 +36,9 @@ def build_project(skip_build: bool) -> bool:
     print("\nBuilding .NET project...")
     result = subprocess.run(
         ["dotnet", "build", str(SOLUTION), "--nologo"],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     if result.returncode != 0:
         print("BUILD FAILED:")
@@ -93,7 +95,7 @@ def get_pos_only_targets(
             continue
         try:
             mesh_block = int(mesh_block_str)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
 
         # Get mesh size from sibling_pair (or other fields)
@@ -116,17 +118,18 @@ def get_pos_only_targets(
                 try:
                     p_mb_int = int(p_mb)
                     if p_mb_int != mesh_block:
-                        print(f"    [debug] {aid[:16]}: manifest MB={mesh_block} "
-                              f"overridden by probe MB={p_mb_int}")
+                        print(f"    [debug] {aid[:16]}: manifest MB={mesh_block} overridden by probe MB={p_mb_int}")
                         mesh_block = p_mb_int
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
 
-        targets.append({
-            "id": aid,
-            "mesh_size": mesh_size,
-            "mesh_block": mesh_block,
-        })
+        targets.append(
+            {
+                "id": aid,
+                "mesh_size": mesh_size,
+                "mesh_block": mesh_block,
+            }
+        )
 
     # Deduplicate by (id, mesh_block)
     seen: set[tuple[str, int]] = set()
@@ -157,15 +160,23 @@ def export_mesh(
     """Export one pos-only mesh with fan fallback faces."""
     asset_out = os.path.join(out_dir, f"posonly-{asset_id}-mb{mesh_block}")
     cmd = [
-        "dotnet", "run", "--project", "src/RiftAssetDumper/RiftAssetDumper.csproj",
-        "--no-build", "--",
+        "dotnet",
+        "run",
+        "--project",
+        "src/RiftAssetDumper/RiftAssetDumper.csproj",
+        "--no-build",
+        "--",
         "decode-nif-geometry",
-        "--id", asset_id,
-        "--mesh-block", str(mesh_block),
+        "--id",
+        asset_id,
+        "--mesh-block",
+        str(mesh_block),
         "--experimental-position-source",
         "--write-obj",
-        "--root", project_root,
-        "--out", asset_out,
+        "--root",
+        project_root,
+        "--out",
+        asset_out,
     ]
 
     if dry_run:
@@ -202,11 +213,9 @@ def export_mesh(
             "returncode": result.returncode,
         }
     except subprocess.TimeoutExpired:
-        return {"id": asset_id, "mb": mesh_block, "mesh_size": mesh_size,
-                "success": False, "error": "TIMEOUT"}
+        return {"id": asset_id, "mb": mesh_block, "mesh_size": mesh_size, "success": False, "error": "TIMEOUT"}
     except Exception as e:
-        return {"id": asset_id, "mb": mesh_block, "mesh_size": mesh_size,
-                "success": False, "error": str(e)}
+        return {"id": asset_id, "mb": mesh_block, "mesh_size": mesh_size, "success": False, "error": str(e)}
 
 
 def main() -> int:
@@ -336,8 +345,7 @@ def main() -> int:
 
         for ms in sorted(family_stats):
             s = family_stats[ms]
-            print(f"    MS={ms}: {s['with_faces']}/{s['total']} with faces, "
-                  f"{s['faces']} total faces")
+            print(f"    MS={ms}: {s['with_faces']}/{s['total']} with faces, {s['faces']} total faces")
 
     if failures:
         print("\n  Failed IDs:")
@@ -353,10 +361,7 @@ def main() -> int:
         "total_faces_generated": total_faces,
         "objs_with_faces": faced_count,
         "per_family": {str(ms): stats for ms, stats in sorted(family_stats.items())},
-        "failures": [
-            {"id": f["id"], "mb": f["mb"], "error": f.get("error", "?")}
-            for f in failures
-        ],
+        "failures": [{"id": f["id"], "mb": f["mb"], "error": f.get("error", "?")} for f in failures],
     }
     with open(results_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
