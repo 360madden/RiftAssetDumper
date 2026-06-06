@@ -3591,18 +3591,31 @@ internal static class Program
       var blockPayload = SliceNifBlockPayload(payload, block);
       var layout = AnalyzeNifDataStreamLayout(blockPayload);
       var declaredPayloadBytes = layout.DeclaredPayloadBytes;
-      var headerBytes = layout.LegacyPayloadOffset;
+      var headerBytes = options.GhidraBodyOffset && layout.PayloadPrefixBytes is not null
+          ? layout.PayloadPrefixBytes
+          : layout.LegacyPayloadOffset;
       ReadOnlySpan<byte> body = ReadOnlySpan<byte>.Empty;
       ReadOnlySpan<byte> ghidraBody = ReadOnlySpan<byte>.Empty;
       NifStreamBodyStats? stats = null;
       NifStreamBodyStats? ghidraStats = null;
       if (layout.ValidDeclaredPayload)
       {
-        body = SliceNifDataStreamLegacyBody(blockPayload, layout);
-        stats = AnalyzeNifStreamBody(body);
-        if (layout.GhidraStyleLayoutValid)
+        if (options.GhidraBodyOffset && layout.GhidraStyleLayoutValid)
         {
-          ghidraBody = SliceNifDataStreamGhidraBody(blockPayload, layout);
+          body = SliceNifDataStreamGhidraBody(blockPayload, layout);
+          ghidraBody = SliceNifDataStreamLegacyBody(blockPayload, layout);
+        }
+        else
+        {
+          body = SliceNifDataStreamLegacyBody(blockPayload, layout);
+          if (layout.GhidraStyleLayoutValid)
+          {
+            ghidraBody = SliceNifDataStreamGhidraBody(blockPayload, layout);
+          }
+        }
+        stats = AnalyzeNifStreamBody(body);
+        if (!ghidraBody.IsEmpty)
+        {
           ghidraStats = AnalyzeNifStreamBody(ghidraBody);
         }
       }
@@ -4385,17 +4398,31 @@ internal static class Program
               NifMeshStreamRoleStats? ghidraRoleStats = null;
               var layout = AnalyzeNifDataStreamLayout(targetPayload);
               declaredPayloadBytes = layout.DeclaredPayloadBytes;
-              headerBytes = layout.LegacyPayloadOffset;
+              headerBytes = options.GhidraBodyOffset && layout.PayloadPrefixBytes is not null
+                  ? layout.PayloadPrefixBytes
+                  : layout.LegacyPayloadOffset;
               if (layout.ValidDeclaredPayload)
               {
-                var body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+                ReadOnlySpan<byte> body;
+                ReadOnlySpan<byte> ghidraBody;
+                if (options.GhidraBodyOffset && layout.GhidraStyleLayoutValid)
+                {
+                  body = SliceNifDataStreamGhidraBody(targetPayload, layout);
+                  ghidraBody = SliceNifDataStreamLegacyBody(targetPayload, layout);
+                }
+                else
+                {
+                  body = SliceNifDataStreamLegacyBody(targetPayload, layout);
+                  ghidraBody = layout.GhidraStyleLayoutValid
+                      ? SliceNifDataStreamGhidraBody(targetPayload, layout)
+                      : ReadOnlySpan<byte>.Empty;
+                }
                 bodyFirst16 = ToHex(body[..Math.Min(16, body.Length)]);
                 roleStats = AnalyzeNifMeshBoundStreamRole(body);
                 validDeclaredStreamBodies++;
-                if (layout.GhidraStyleLayoutValid)
+                if (!ghidraBody.IsEmpty)
                 {
                   ghidraStyleLayoutValidStreamBodies++;
-                  var ghidraBody = SliceNifDataStreamGhidraBody(targetPayload, layout);
                   ghidraBodyFirst16 = ToHex(ghidraBody[..Math.Min(16, ghidraBody.Length)]);
                   ghidraRoleStats = AnalyzeNifMeshBoundStreamRole(ghidraBody);
                   if (!string.Equals(roleStats.PrimaryRole, ghidraRoleStats.PrimaryRole, StringComparison.OrdinalIgnoreCase))
@@ -5990,20 +6017,37 @@ internal static class Program
             }
 
             var declaredPayloadBytes = layout.DeclaredPayloadBytes.Value;
-            var bodyOffset = layout.LegacyPayloadOffset!.Value;
-            var body = SliceNifDataStreamLegacyBody(blockPayload, layout);
+            var bodyOffset = options.GhidraBodyOffset && layout.PayloadPrefixBytes is not null
+                ? layout.PayloadPrefixBytes!.Value
+                : layout.LegacyPayloadOffset!.Value;
+            ReadOnlySpan<byte> body;
+            ReadOnlySpan<byte> ghidraBody;
+            if (options.GhidraBodyOffset && layout.GhidraStyleLayoutValid)
+            {
+              body = SliceNifDataStreamGhidraBody(blockPayload, layout);
+              ghidraBody = SliceNifDataStreamLegacyBody(blockPayload, layout);
+            }
+            else
+            {
+              body = SliceNifDataStreamLegacyBody(blockPayload, layout);
+              ghidraBody = layout.GhidraStyleLayoutValid
+                  ? SliceNifDataStreamGhidraBody(blockPayload, layout)
+                  : ReadOnlySpan<byte>.Empty;
+            }
+            NifStreamBodyStats? ghidraStats;
             var stats = AnalyzeNifStreamBody(body);
-            ReadOnlySpan<byte> ghidraBody = ReadOnlySpan<byte>.Empty;
-            NifStreamBodyStats? ghidraStats = null;
-            if (layout.GhidraStyleLayoutValid)
+            if (!ghidraBody.IsEmpty)
             {
               ghidraStyleLayoutValidStreamBodies++;
-              ghidraBody = SliceNifDataStreamGhidraBody(blockPayload, layout);
               ghidraStats = AnalyzeNifStreamBody(ghidraBody);
               if (!string.Equals(stats.Classification, ghidraStats.Classification, StringComparison.OrdinalIgnoreCase))
               {
                 ghidraClassificationDeltaStreamBodies++;
               }
+            }
+            else
+            {
+              ghidraStats = null;
             }
 
             if (layout.LegacyOffsetMinusPayloadPrefixBytes is not null and not 0)
