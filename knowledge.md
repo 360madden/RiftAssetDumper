@@ -6,6 +6,8 @@ Read-only **RIFT** game asset archive research workspace. Reverse-engineers the 
 
 The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-discovery-workflow.md`) — small focused probes → smoke runs → full copied-set inventory → ranked evidence → documented truth → commit → next lead. All task routing follows a safety policy (see `docs/task-routing-safety-policy.md`) that reserves high/extra-high reasoning for truth, proof, guards, runtime, and commit decisions.
 
+**Consumer app**: `C:\RIFT MODDING\RiftFlythrough` (sibling project, v1.35.0, Phase 21/50 of its own roadmap) consumes this Assets repo's output (merged.obj + PNG textures). The **Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`, FT-1..FT-8) is the next active work track; **FT-1 (DDS→PNG at scale)** is the next active phase.
+
 ## Quickstart
 
 ### .NET (main dumper CLI)

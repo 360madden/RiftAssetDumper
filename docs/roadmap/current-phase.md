@@ -1,10 +1,15 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-06 (Ghidra proof lane complete; Source/ deleted; live game path default)
+**Last Updated**: 2026-06-08 (Flythrough Bridge Plan created; FT-1 is the next active phase)
 
 ---
 
 ## Current State
+
+**Two parallel active plans**:
+
+1. **Existing Phase 0–49 plan** (`docs/roadmap/project-roadmap.md`): NIF parser/descriptor work. Phases 0–49 complete; project at autonomous completion.
+2. **New Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`): Consumer-app integration to make RiftFlythrough production-ready. **FT-1 is the next active phase.**
 
 **Ghidra proof lane complete** — all 3 steps done. Source/ deleted (166MB reclaimed). All Python scripts default to live game path.
 
@@ -29,6 +34,14 @@
 | 4 | **Live memory scanning** | ⏳ Pending | Attach x64dbg to RIFT process, observe runtime stream decoding (highest potential reward) |
 | 5 | **Stream body hex analysis** | ⏳ Pending | Fresh ImHex analysis of zero-attr stream bodies with new decode hypotheses |
 | 6 | **New Ghidra targets** | ⏳ Pending | Decompile renderer vertex-buffer setup functions (not LoadBinary/descriptor path) |
+| **FT-1** | **DDS → PNG at scale (Flythrough bridge)** | ⏳ **Next active** | **`docs/roadmap/flythrough-bridge-plan.md` FT-1** |
+| FT-2 | Bulk NIF → OBJ export | ⏳ Pending | Plan FT-2 |
+| FT-3 | Per-OBJ metadata sidecar | ⏳ Pending | Plan FT-3 |
+| **FT-4** | **World placement / scene graph (keystone)** | ⏳ Pending | **Plan FT-4** |
+| FT-5 | Pipeline integration | ⏳ Pending | Plan FT-5 |
+| FT-6 | Flythrough validation suite | ⏳ Pending | Plan FT-6 |
+| FT-7 | Zone / LOD variants | ⏳ Pending | Plan FT-7 |
+| FT-8 | Mod-replacement bridge (optional) | ⏳ Pending | Plan FT-8 |
 
 ---
 
@@ -39,6 +52,7 @@
 - Heuristic classifier remains as fallback — descriptor-guided is supplementary
 - Both promotion flags remain true (already cleared)
 - One lead at a time per Aggressive Evidence Workflow
+- **For Flythrough Bridge Plan (FT-1..FT-8)**: see drift-prevention rules in `docs/roadmap/flythrough-bridge-plan.md`
 
 ---
 
@@ -100,6 +114,24 @@
 | **Phase 49** | **Triangle Fan Fallback Batch Export** | **Fan fallback extended to --export-obj path; batch export 76/77 pos-only OBJs with 2,847 fan faces across 15 families** | **0** | **✅ COMPLETE** |
 
 **Project totals**: 51 phases complete, 7 gates cleared, 6 descriptor patterns proven, 8 proof guards.
+
+### Flythrough Bridge Plan (FT-1..FT-8) — separate from Phase 0–49
+
+**Created**: 2026-06-08 to extend the Assets repo's purpose beyond NIF parsing into RiftFlythrough consumer-app integration.
+
+| FT phase | Name | Status |
+|---|---|---|
+| FT-1 | DDS → PNG at scale | ⏳ Next active |
+| FT-2 | Bulk NIF → OBJ export | ⏳ Pending |
+| FT-3 | Per-OBJ metadata sidecar | ⏳ Pending |
+| **FT-4** | **World placement / scene graph (keystone)** | ⏳ Pending |
+| FT-5 | Pipeline integration | ⏳ Pending |
+| FT-6 | Flythrough validation suite | ⏳ Pending |
+| FT-7 | Zone / LOD variants | ⏳ Pending |
+| FT-8 | Mod-replacement bridge (optional) | ⏳ Pending |
+
+**Full plan**: `docs/roadmap/flythrough-bridge-plan.md`
+**Why this is a separate plan**: existing Phase 0–49 covers NIF parser/descriptor work (now at autonomous completion); this plan covers consumer-app integration (RiftFlythrough production-readiness) and uses FT-prefix to avoid collision.
 
 ### Phase 15 Key Finding
 
