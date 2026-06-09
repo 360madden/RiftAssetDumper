@@ -231,8 +231,9 @@ def run_decode_geometry(
     project: Path,
     root: Path,
     timeout_sec: int,
+    mesh_block: int = 0,
 ) -> tuple[bool, str, str, float]:
-    """Run `dotnet run --project ... --no-build -- decode-nif-geometry --id <id> --export-obj`.
+    """Run `dotnet run --project ... --no-build -- decode-nif-geometry --id <id> --mesh-block <mb> --export-obj`.
 
     Returns (success, stdout_tail, stderr_tail, elapsed_sec).
     """
@@ -246,6 +247,8 @@ def run_decode_geometry(
         "decode-nif-geometry",
         "--id",
         asset_id,
+        "--mesh-block",
+        str(mesh_block),
         "--export-obj",
         "--root",
         str(root),
@@ -413,7 +416,7 @@ def bulk_export_for_flythrough(
 
         log.info("[%d/%d] exporting %s...", idx + 1, total, asset_id)
         ok, stdout_tail, stderr_tail, elapsed = run_decode_geometry(
-            asset_id, project=project, root=root, timeout_sec=timeout_sec
+            asset_id, project=project, root=root, timeout_sec=timeout_sec, mesh_block=0
         )
 
         # Find the OBJ file (decode-nif-geometry writes to <output>/decode-nif-geometry-<id>/*.obj)
