@@ -73,17 +73,99 @@ def _rotate_normal(
     return rn_x, rn_y, rn_z
 
 
-def _extract_transform(world_data: dict[str, Any]) -> tuple[list[float], list[float], float]:
-    """Extract (Translation, Rotation, Scale) from world.json data."""
+def _mat_mul(a: list[float], b: list[float]) -> list[float]:
+    """Multiply two 3x3 row-major matrices."""
+    result = [0.0] * 9
+    for i in range(3):
+        for j in range(3):
+            result[i * 3 + j] = sum(a[i * 3 + k] * b[k * 3 + j] for k in range(3))
+    return result
+
+
+def _compute_world_transform(world_data: dict[str, Any]) -> tuple[list[float], list[float], float]:
+    """Compute the accumulated world transform for the first mesh in the scene graph.
+
+    Walks from the mesh's parent node up to the root, accumulating
+    scale, rotation (matrix multiply), and translation (rotate + add)
+    at each step in the hierarchy.
+    """
     nodes = world_data.get("Nodes", [])
+    meshes = world_data.get("Meshes", [])
+
+    if not nodes:
+        return IDENTITY_TRANSLATION[:], IDENTITY_ROTATION[:], IDENTITY_SCALE
+
+    node_by_index: dict[int, dict[str, Any]] = {n["BlockIndex"]: n for n in nodes}
+
+    # Build blockIndex -> parent blockIndex map from Children[] arrays
+    parent_map: dict[int, int] = {}
+    for n in nodes:
+        for child_idx in n.get("Children", []):
+            parent_map[child_idx] = n["BlockIndex"]
+
+    # Try each mesh, find one with a valid parent chain
+    for mesh in meshes:
+        parent_idx = mesh.get("ParentNiNodeIndex")
+        if parent_idx is None or parent_idx not in node_by_index:
+            continue
+
+        # Walk up to root, collecting node transforms
+        chain: list[dict[str, Any]] = []
+        curr: int | None = parent_idx
+        while curr is not None and curr in node_by_index:
+            chain.append(node_by_index[curr])
+            curr = parent_map.get(curr)
+
+        if not chain:
+            continue
+
+        # Reverse so chain[0] is root, chain[-1] is mesh parent
+        chain.reverse()
+
+        # Accumulate: root -> child1 -> child2 -> ... -> mesh_parent
+        acc_trans = IDENTITY_TRANSLATION[:]
+        acc_rot = IDENTITY_ROTATION[:]
+        acc_scale = IDENTITY_SCALE
+
+        for node in chain:
+            c_trans = node.get("Translation", IDENTITY_TRANSLATION[:])
+            c_rot = node.get("Rotation", IDENTITY_ROTATION[:])
+            c_scale = node.get("Scale", IDENTITY_SCALE)
+
+            # child_trans * parent_scale
+            ct_scaled = [c_trans[0] * acc_scale, c_trans[1] * acc_scale, c_trans[2] * acc_scale]
+
+            # parent_rot * (child_trans * parent_scale)
+            rotated_ct = [
+                acc_rot[0] * ct_scaled[0] + acc_rot[1] * ct_scaled[1] + acc_rot[2] * ct_scaled[2],
+                acc_rot[3] * ct_scaled[0] + acc_rot[4] * ct_scaled[1] + acc_rot[5] * ct_scaled[2],
+                acc_rot[6] * ct_scaled[0] + acc_rot[7] * ct_scaled[1] + acc_rot[8] * ct_scaled[2],
+            ]
+
+            # new_trans = parent_trans + parent_rot * (child_trans * parent_scale)
+            acc_trans = [
+                acc_trans[0] + rotated_ct[0],
+                acc_trans[1] + rotated_ct[1],
+                acc_trans[2] + rotated_ct[2],
+            ]
+
+            # new_rot = parent_rot * child_rot
+            acc_rot = _mat_mul(acc_rot, c_rot)
+
+            # new_scale = parent_scale * child_scale
+            acc_scale *= c_scale
+
+        return acc_trans, acc_rot, acc_scale
+
+    # Fallback: use Nodes[0] if no valid mesh parent chain found
     if nodes:
-        node = nodes[0]
+        n = nodes[0]
         return (
-            node.get("Translation", IDENTITY_TRANSLATION[:]),
-            node.get("Rotation", IDENTITY_ROTATION[:]),
-            node.get("Scale", IDENTITY_SCALE),
+            n.get("Translation", IDENTITY_TRANSLATION[:]),
+            n.get("Rotation", IDENTITY_ROTATION[:]),
+            n.get("Scale", IDENTITY_SCALE),
         )
-    return (IDENTITY_TRANSLATION[:], IDENTITY_ROTATION[:], IDENTITY_SCALE)
+    return IDENTITY_TRANSLATION[:], IDENTITY_ROTATION[:], IDENTITY_SCALE
 
 
 def _process_obj(
@@ -223,10 +305,12 @@ def main() -> None:
             world_path = WORLDS_DIR / f"{asset_id}.world.json"
 
         world_data = _load_json(world_path, encoding="utf-8-sig")
-        trans, rot, scale = _extract_transform(world_data)
+        trans, rot, scale = _compute_world_transform(world_data)
 
         if _is_identity(trans, rot, scale):
             identity_count += 1
+        else:
+            print(f"  Non-identity transform for {asset_id}")
 
         has_faces, v_added = _process_obj(
             obj_path,
