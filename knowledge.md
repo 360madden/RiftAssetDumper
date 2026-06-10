@@ -57,6 +57,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/ft7_lod_detector.py` | LOD variant detector (same-NIF, MeshSize-family, descriptor-based) | FT-7 |
 | `python scripts/ft8_final_manifest.py` | Unified `flythrough-index.json` combining all FT-1..FT-7 outputs | FT-8 |
 | `python scripts/infer_meshsizes.py` | Pattern-matching mesh_size inference from (vertex_count, face_count) | FT-8 |
+| `python scripts/build_world_placed_merge.py` | Hierarchy-aware world-placed merged OBJ builder — applies world.json transforms, builds `world-placed-merged.obj` for RiftFlythrough | FT-8 |
+| `python scripts/validate_meshsize_inference.py` | Cross-validates vc_proximity mesh_size inferences against ground truth (100% high-confidence) | FT-8 |
 | `pytest tests/test_bulk_export_for_flythrough.py` | Bulk export unit tests (13) | FT-2 |
 | `pytest tests/test_dump_textures_for_flythrough.py` | Texture dump unit tests (3) | FT-1 |
 | `pytest tests/test_ft6_validation.py` | FT-6 validation unit tests | FT-6 |
@@ -77,6 +79,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/flatten_nifs.py` | Flatten NIFs into single directory |
 | `python scripts/live_inventory.py` | Live archive NIF inventory |
 | `python scripts/discovery_workbench.py` | Aggregated discovery workbench |
+| `python scripts/build_world_placed_merge.py` | Hierarchy-aware world-placed merged OBJ for RiftFlythrough — applies world.json Scale→Rotate→Translate transforms to 217 OBJs |
+| `python scripts/validate_meshsize_inference.py` | Cross-validation of vc_proximity mesh_size inferences against ground truth |
 
 ## Architecture
 
@@ -153,7 +157,7 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 |------|----------|
 | `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) and NIF texture bundles |
 | `Exports/` | JSON/JSONL reports, inventories, matrices, and OBJ exports |
-| `Assets/build/flythrough/` | FT pipeline output: `objs/`, `textures/converted/`, `bulk-export-manifest.json`, `.state.json`, `evidence/ft{N}.{M}/` |
+| `Assets/build/flythrough/` | FT pipeline output: `objs/`, `textures/converted/`, `flythrough-index.json`, `world-placed-merged.obj`, `lod-manifest.json`, `scene-graph-manifest.json`, `.state.json`, `evidence/ft{N}.{M}/`, `riftflythrough/transform_loader.js` |
 | `RecoveredNames/` | Generated filename matches (`recovered-names.jsonl`) |
 | `Candidates/` | Candidate filename lists for hash matching |
 | `docs/handoffs/` | Session handoff docs (AI-agent context resumption) |
@@ -168,6 +172,7 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 4. **Geometry decode** → decode positions/normals/UVs from float32 or uint16-packed streams
 5. **OBJ export** → behind `--experimental-position-source` (fallback) or `--export-obj` (attribute-set @264) flags
 6. **FT-4:** scene graph probe → per-NIF `world.json` with NiNode transforms + parent/child tree
+7. **FT-8 closure:** `build_world_placed_merge.py` → hierarchy-aware world transform accumulation → `world-placed-merged.obj` for RiftFlythrough
 
 All operations read directly from the live game install (see Key directories note above).
 
@@ -185,7 +190,7 @@ Two parallel jobs on `windows-latest`:
 - **FT-1 ✅** — 12,954 DDS → PNG converted, 83s wall-clock, 19MB output, loaded into RiftFlythrough cleanly
 - **FT-2 ✅** — `bulk_export_for_flythrough.py` pipeline ships; 7/56 (12.5%) on probe-lookup subset; two-pass decode (export-obj → experimental), mesh-block retry chain `[6,7,8,9,10,27,31,25,17,0]`, atomic manifest writes, dedup, resume via `.state.json`
 - **FT-3 ✅** — `asset-mesh-manifest-v1.schema.json` (20+ fields) + sidecar emitter integrated into bulk exporter; FT-4/FT-7 fields pre-wired as nulls
-- **FT-4 ✅** — `probe-nif-scene-graph` C# command shipped (NiNode transforms, parent-child tree, mesh attachment map); `scene-graph-v1.schema.json`; 50-NIF pilot; 141/217 assets (65%) have world.json; record types smoke-tested (4 new xUnit tests)
+- **FT-4 ✅** — `probe-nif-scene-graph` C# command shipped (NiNode transforms, parent-child tree, mesh attachment map); `scene-graph-v1.schema.json`; 50-NIF pilot; **217/217 assets (100%) have world.json** with `ParentNiNodeIndex` mesh-parent references; `build_world_placed_merge.py` hierarchy-aware world transform accumulation (Scale→Rotate→Translate) identifying 4 assets with non-identity transforms; record types smoke-tested (4 new xUnit tests)
 - **FT-5 ✅** — `flythrough_plan.py` state machine with phase exit criteria, `.state.json` transitions
 - **FT-6 ✅** — `ft6_validation.py` suite: OBJ integrity (SHA256, bounds, NaN), scene-graph cross-reference, byte bounds; 100% pass
 - **FT-7 ✅** — `ft7_lod_detector.py` 3-axis LOD detector: **10 high-confidence MeshSize-family groups**, 1 same-NIF chain (158x reduction), 2 descriptor LOD groups; **193/217 (88.9%)** assets classified after mesh_size enrichment
@@ -198,7 +203,8 @@ Two parallel jobs on `windows-latest`:
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
 - **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, textures for RiftFlythrough Phase 21
-- CI green: build 0 errors, tests 55/55 (C#), pytest 73/73, ruff 0, mypy 0
+- **RiftFlythrough bridge**: `build_world_placed_merge.py` → `world-placed-merged.obj` (2.5MB, 72,976 lines, 217 assets, 4 non-identity transforms) copied to `C:\RIFT MODDING\RiftFlythrough\merged.obj`; `transform_loader.js` (4KB) copied to `RiftFlythrough/js/` for runtime manifest-based transform application
+- CI green: build 0 errors, tests 55/55 (C#), pytest 88/88, ruff 0, mypy 0
 
 ## Conventions
 
@@ -295,6 +301,7 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - `asset-mesh-manifest-v1.schema.json` requires `nif_hash` (`^[0-9a-f]{16}$`) and `obj_sha1` (`^[0-9a-f]{40}$`) patterns
 - FT-2 probe-lookup subset success rate is data-limited (probe lookup built from deleted `Source/`), not pipeline-limited — pipeline proven functional
 - For multi-mesh NIFs, the `probe-nif-scene-graph` command may emit child refs into both `Children` and `Effects` lists — the parser walks both and resolves to the block type
+- `world.json` mesh-parent relationships use `ParentNiNodeIndex` (direct node index reference), NOT `Children[]` arrays. `build_world_placed_merge.py` uses this field to walk the scene graph hierarchy from mesh → parent node → root, accumulating Scale×Rotate×Translate at each step
 
 ## Agent model strategy
 
