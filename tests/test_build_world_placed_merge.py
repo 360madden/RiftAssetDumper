@@ -277,8 +277,24 @@ def test_compute_world_transform_falls_back_to_nodes0() -> None:
 
 
 # =============================================================================
-# Integration tests — output OBJ integrity
+# Integration tests — shared helpers
 # =============================================================================
+
+
+def _extract_group_vertices(merged_lines: list[str], asset_id: str) -> list[tuple[float, float, float]]:
+    """Extract vertex positions for a group by asset ID from merged OBJ lines."""
+    in_group = False
+    vertices: list[tuple[float, float, float]] = []
+    for line in merged_lines:
+        if line.startswith("o ") and asset_id in line:
+            in_group = True
+            continue
+        if line.startswith("o ") and in_group:
+            break
+        if in_group and line.startswith("v ") and len(line.split()) >= 4:
+            parts = line.split()
+            vertices.append((float(parts[1]), float(parts[2]), float(parts[3])))
+    return vertices
 
 
 @pytest.fixture(scope="module")
@@ -401,21 +417,6 @@ class TestNonIdentityTransforms:
         "593ea328978bde38",
     ]
 
-    def _get_group_vertices(self, merged_lines: list[str], asset_id: str) -> list[tuple[float, float, float]]:
-        """Extract vertex positions for a group by asset ID."""
-        in_group = False
-        vertices: list[tuple[float, float, float]] = []
-        for line in merged_lines:
-            if line.startswith("o ") and asset_id in line:
-                in_group = True
-                continue
-            if line.startswith("o ") and in_group:
-                break  # Next group started
-            if in_group and line.startswith("v ") and len(line.split()) >= 4:
-                parts = line.split()
-                vertices.append((float(parts[1]), float(parts[2]), float(parts[3])))
-        return vertices
-
     def test_non_identity_assets_present(self, merged_lines: list[str]) -> None:
         """All 4 known non-identity assets appear in the output."""
         group_names = {line[2:].strip() for line in merged_lines if line.startswith("o ")}
@@ -426,7 +427,7 @@ class TestNonIdentityTransforms:
     def test_non_identity_assets_have_vertices(self, merged_lines: list[str]) -> None:
         """Each non-identity asset has at least 1 vertex."""
         for aid in self.NON_ID_ASSETS:
-            verts = self._get_group_vertices(merged_lines, aid)
+            verts = _extract_group_vertices(merged_lines, aid)
             assert len(verts) > 0, f"Asset {aid} has 0 vertices"
 
     def test_non_identity_vertices_differ_from_source(self, merged_lines: list[str]) -> None:
@@ -439,7 +440,7 @@ class TestNonIdentityTransforms:
 
         for aid in self.NON_ID_ASSETS:
             asset_data = assets.get(aid, {})
-            merged_verts = self._get_group_vertices(merged_lines, aid)
+            merged_verts = _extract_group_vertices(merged_lines, aid)
             if not merged_verts:
                 continue
 
@@ -493,6 +494,107 @@ class TestNonIdentityTransforms:
                 f"Asset {aid}: all {len(merged_verts)} vertices identical to source — "
                 "non-identity transform was NOT applied"
             )
+
+
+class TestOrphanMeshResolution:
+    """Verify the 6 known orphan-mesh world.jsons resolve correctly.
+
+    These NIFs have Mesh#7 with ParentNiNodeIndex=0 but Node#0's Children/Effects
+    omit block 7. The pipeline resolves via ParentNiNodeIndex — not a fallback.
+    All 6 have identity transforms (root-level meshes).
+    """
+
+    ORPHAN_ASSETS = [
+        "14725270559e6860",
+        "42024b768fcd2e2b",
+        "6cc30b261e38cd3a",
+        "c10a3107712da43d",
+        "c5a0a6c64f3bdfd0",
+        "df69187ac7474403",
+    ]
+
+    def test_orphan_assets_present(self, merged_lines: list[str]) -> None:
+        """All 6 orphan assets appear in the merged OBJ."""
+        group_names = {line[2:].strip() for line in merged_lines if line.startswith("o ")}
+        for aid in self.ORPHAN_ASSETS:
+            found = any(aid in name for name in group_names)
+            assert found, f"Orphan asset {aid} not found in output"
+
+    def test_orphan_world_jsons_have_parentniodeindex(self) -> None:
+        """Each orphan world.json has Mesh#7 with ParentNiNodeIndex=0."""
+        for aid in self.ORPHAN_ASSETS:
+            wpath = WORLDS_DIR / f"{aid}.world.json"
+            if not wpath.exists():
+                pytest.skip(f"{aid}.world.json not found")
+            with open(wpath, encoding="utf-8-sig") as f:
+                world_data: dict[str, Any] = json.load(f)
+            meshes = world_data.get("Meshes", [])
+            assert len(meshes) >= 1, f"{aid}: no meshes in world.json"
+            mesh7 = [m for m in meshes if m.get("BlockIndex") == 7]
+            assert mesh7, f"{aid}: no Mesh#7 found"
+            pni = mesh7[0].get("ParentNiNodeIndex")
+            assert pni == 0, f"{aid}: expected ParentNiNodeIndex=0, got {pni}"
+
+    def test_orphan_transforms_are_identity(self) -> None:
+        """All 6 orphan meshes resolve to identity transforms (root-level, no displacement)."""
+        for aid in self.ORPHAN_ASSETS:
+            wpath = WORLDS_DIR / f"{aid}.world.json"
+            if not wpath.exists():
+                pytest.skip(f"{aid}.world.json not found")
+            with open(wpath, encoding="utf-8-sig") as f:
+                world_data: dict[str, Any] = json.load(f)
+            trans, rot, scale = _compute_world_transform(world_data)
+            assert _is_identity(trans, rot, scale), (
+                f"{aid}: expected identity transform, got trans={trans[:3]}"
+            )
+
+    def test_orphan_vertices_match_source(self, merged_lines: list[str]) -> None:
+        """Orphan meshes with identity transforms should have vertices matching source OBJ."""
+        if not INDEX_PATH.exists():
+            pytest.skip("flythrough-index.json not available")
+        with open(INDEX_PATH, encoding="utf-8") as f:
+            index: dict[str, Any] = json.load(f)
+        assets = index.get("assets", {})
+
+        mismatches = []
+        checked = 0
+        for aid in self.ORPHAN_ASSETS:
+            asset_data = assets.get(aid, {})
+            obj_path_str = asset_data.get("obj_path", "")
+            if not obj_path_str:
+                continue
+            obj_path = Path(obj_path_str)
+            if not obj_path.exists():
+                continue
+            checked += 1
+
+            # Get source vertices
+            source_verts: list[tuple[float, float, float]] = []
+            with open(obj_path, encoding="utf-8", errors="replace") as sf:
+                for line in sf:
+                    if line.startswith("v ") and len(line.split()) >= 4:
+                        parts = line.split()
+                        source_verts.append((float(parts[1]), float(parts[2]), float(parts[3])))
+
+            # Get merged vertices using the shared helper
+            merged_verts = _extract_group_vertices(merged_lines, aid)
+
+            if len(source_verts) != len(merged_verts):
+                mismatches.append(f"{aid}: source={len(source_verts)} merged={len(merged_verts)}")
+                continue
+
+            for sv, mv in zip(source_verts, merged_verts, strict=False):
+                if abs(sv[0] - mv[0]) > 0.001 or abs(sv[1] - mv[1]) > 0.001 or abs(sv[2] - mv[2]) > 0.001:
+                    mismatches.append(
+                        f"{aid}: vertex differs — source=({sv[0]:.3f},{sv[1]:.3f},{sv[2]:.3f}) "
+                        f"merged=({mv[0]:.3f},{mv[1]:.3f},{mv[2]:.3f})"
+                    )
+                    break
+
+        assert checked > 0, "No orphan source OBJs found — nothing verified"
+        assert not mismatches, (
+            f"{len(mismatches)} orphan assets have mismatched vertices: {mismatches[:3]}"
+        )
 
 
 class TestIdempotency:
