@@ -1,15 +1,15 @@
 # Flythrough Bridge Plan — Assets-repo work to make RiftFlythrough production-ready
 
-**Status**: 🟡 Active plan, FT-1 is the next active phase
+**Status**: ✅ **COMPLETE** — FT-1 through FT-7 done, FT-8 skipped (see `docs/handoffs/2026-06-10-flythrough-bridge-closure.md`)
 **Version**: 2.0 (agentic rewrite)
 **Created**: 2026-06-08
-**Last updated**: 2026-06-08
+**Last updated**: 2026-06-10 (closure)
 **Owner**: Assets repo (`RiftAssetDumper`)
 **Consumer**: `C:\RIFT MODDING\RiftFlythrough` (sibling, v1.35.0, Phase 21/50 of its own roadmap)
 
 **Naming convention**: This plan uses the **FT-1..FT-8** prefix to avoid collision with the existing **Phase 0..49** numbering in `docs/roadmap/project-roadmap.md`. The two plans are independent and address different problem spaces — the existing 0–49 plan covers NIF parser/descriptor work; this FT plan covers consumer-app integration.
 
-**Agentic contract**: This document is a self-contained, machine-checkable plan. Any sub-agent can pick it up cold, find the current step via `.state.json`, execute it, mark it done, and move to the next. No chat history required.
+**Plan status**: All 7 core phases are complete. FT-8 (mod-replacement bridge) was skipped as it conflicts with the project's read-only archive research mandate. The unified `flythrough-index.json` (217 assets, 100% cross-referenced) is the closure deliverable for RiftFlythrough consumption.
 
 ---
 
@@ -24,22 +24,23 @@ The current plan state is stored at `Assets/build/flythrough/.state.json`. An ag
   "current_phase": "FT-1",
   "current_step": "FT-1.1",
   "phase_status": {
-    "FT-1": "pending",
-    "FT-2": "pending",
-    "FT-3": "pending",
-    "FT-4": "pending",
-    "FT-5": "pending",
-    "FT-6": "pending",
-    "FT-7": "pending",
-    "FT-8": "pending"
+    "FT-1": "done",
+    "FT-2": "done",
+    "FT-3": "done",
+    "FT-4": "done",
+    "FT-5": "done",
+    "FT-6": "done",
+    "FT-7": "done",
+    "FT-8": "skipped"
   },
   "step_status": {
-    "FT-1.1": "pending",
-    "FT-1.2": "pending",
+    "FT-1.1": "done",
+    "FT-1.2": "done",
     "..."
   },
-  "last_handoff": "docs/handoffs/2026-XX-XX-ft1-exit.md",
-  "last_updated": "2026-06-08T00:00:00Z",
+  "plan_status": "complete",
+  "last_handoff": "docs/handoffs/2026-06-10-flythrough-bridge-closure.md",
+  "last_updated": "2026-06-10T04:00:00Z",
   "build_hash": null,
   "blocked_reason": null
 }
