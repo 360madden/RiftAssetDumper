@@ -6,7 +6,7 @@ Read-only **RIFT** game asset archive research workspace. Reverse-engineers the 
 
 The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-discovery-workflow.md`) — small focused probes → smoke runs → full copied-set inventory → ranked evidence → documented truth → commit → next lead. All task routing follows a safety policy (see `docs/task-routing-safety-policy.md`) that reserves high/extra-high reasoning for truth, proof, guards, runtime, and commit decisions.
 
-**Consumer app**: `C:\RIFT MODDING\RiftFlythrough` (sibling project, v1.35.0, Phase 21/50 of its own roadmap) consumes this Assets repo's output (merged.obj + PNG textures). The **Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`, FT-1..FT-8) is the next active work track; **FT-1 (DDS→PNG at scale)** is the next active phase.
+**Consumer app**: `C:\RIFT MODDING\RiftFlythrough` (sibling project, v1.35.0, Phase 21/50 of its own roadmap) consumes this Assets repo's output (merged.obj + PNG textures). The **Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`, FT-1..FT-8) is **COMPLETE** — all 7 phases delivered, FT-8 skipped (mod-injection contradicts read-only mandate).
 
 ## Quickstart
 
@@ -18,6 +18,7 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 | `dotnet test RiftAssetDumper.slnx --nologo` | Run xUnit tests |
 | `dotnet format RiftAssetDumper.slnx --verify-no-changes` | Check formatting |
 | `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- --help` | Run CLI |
+| `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- probe-nif-scene-graph --id <hex>` | Extract NIF scene graph (transforms, parent-child) to JSON (FT-4.2) |
 
 ### PowerShell workflow helper (thin wrapper)
 
@@ -25,7 +26,7 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts/Invoke-RiftWorkflow.ps1" -Mode <Mode> [options]
 ```
 
-All complex modes have been ported to Python.
+All complex modes have been ported to Python. **No new PowerShell or CMD scripting** (see `AGENTS.md`).
 
 ### Python (scripting/discovery orchestration — primary orchestrator)
 
@@ -42,6 +43,25 @@ All complex modes have been ported to Python.
 | `ruff check scripts/` | Python lint |
 | `mypy scripts/ --no-error-summary` | Python type check |
 | `python scripts/test_rift_workflow_utils.py` | Python tests |
+
+### Flythrough Bridge (FT) pipeline scripts (Python, `scripts/`)
+
+| Command | Purpose | FT |
+|---------|---------|:---:|
+| `python scripts/dump_textures_for_flythrough.py [--limit N] [--dry-run]` | DDS → PNG conversion at scale for RiftFlythrough | FT-1 |
+| `python scripts/bulk_export_for_flythrough.py run [--limit N] [--use-probe-lookup] [--resume] [--out <dir>]` | Bulk NIF → OBJ export with two-pass decode, mesh-block retry, dedup | FT-2 |
+| `python scripts/bulk_export_for_flythrough.py status / verify / clean` | Inspect / verify / clean a bulk-export run | FT-2 |
+| `python scripts/bulk_export_for_flythrough.py --help` | Full subcommand help | FT-2 |
+| `python scripts/flythrough_plan.py` | Machine-checkable FT plan state machine with phase exit criteria | FT-all |
+| `python scripts/ft6_validation.py` | FT-6 validation suite (OBJ integrity, cross-reference, byte bounds) | FT-6 |
+| `python scripts/ft7_lod_detector.py` | LOD variant detector (same-NIF, MeshSize-family, descriptor-based) | FT-7 |
+| `python scripts/ft8_final_manifest.py` | Unified `flythrough-index.json` combining all FT-1..FT-7 outputs | FT-8 |
+| `python scripts/infer_meshsizes.py` | Pattern-matching mesh_size inference from (vertex_count, face_count) | FT-8 |
+| `pytest tests/test_bulk_export_for_flythrough.py` | Bulk export unit tests (13) | FT-2 |
+| `pytest tests/test_dump_textures_for_flythrough.py` | Texture dump unit tests (3) | FT-1 |
+| `pytest tests/test_ft6_validation.py` | FT-6 validation unit tests | FT-6 |
+| `pytest tests/test_ft7_lod.py` | FT-7 LOD detector unit tests (23) | FT-7 |
+| `pytest tests/test_flythrough_plan.py` | FT plan state machine tests | FT-all |
 
 ### Python helper scripts (direct)
 
@@ -67,22 +87,22 @@ All complex modes have been ported to Python.
 - **Single-file entry point:** `Program.cs` (~15K lines, contains ALL command handlers inline)
 - **Commands** dispatched via `AppOptions.Parse(args)` then `if/else if` chain in `Main()`
 - **Key commands (inventory):** `inventory-nif-mesh-bindings`, `inventory-nif-mesh-streams`, `inventory-nif-stream-headers`, `inventory-nif-stream-bodies`, `inventory-nif-stream-endianness`, `inventory-nif-index-candidates`, `inventory-nif-blocks`, `inventory-asset-signatures`, `inventory-archives`
-- **Key commands (probe):** `probe-nif-mesh`, `probe-nif-streams`, `probe-nif-stream-body`, `probe-nif-attribute-extra`, `probe-nif`, `probe-binary`, `probe`
-- **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`)
+- **Key commands (probe):** `probe-nif-mesh`, `probe-nif-streams`, `probe-nif-stream-body`, `probe-nif-attribute-extra`, `probe-nif`, `probe-nif-scene-graph` (FT-4.2), `probe-binary`, `probe`
+- **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`, `--out`)
 - **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`
 - **Key commands (utility):** `hash-name`, `match-ids`, `match-names`, `list-paks`, `list-entries`, `scan-compression`, `mine-strings`
-- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (51 tests, all pass)
+- **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (55 tests, all pass — includes 4 NifSceneGraph record smoke tests for FT-4.2)
 
 ### Python scripts (`scripts/`)
 
 - **Target:** Python 3.14 (ruff + mypy strict)
-- **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports, batch sweep
+- **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports, batch sweep, FT pipeline
 - **Entry point:** `scripts/rift_workflow.py` — kebab-case command dispatch with 30+ commands
 - **Guards:** `scripts/rift_workflow_guards.py` — 4 proof guards (attribute-extra, usage-access-correlation, position-source-sibling-lead, residual-lead)
 - **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
 - **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
 - **Batch sweep:** `scripts/batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building
-- **Tests:** `scripts/test_rift_workflow_utils.py` (49 unit tests)
+- **Tests:** `scripts/test_rift_workflow_utils.py` (49) + `tests/test_bulk_export_for_flythrough.py` (13) + `tests/test_dump_textures_for_flythrough.py` (3) + `tests/test_ft6_validation.py` + `tests/test_ft7_lod.py` (23) + `tests/test_flythrough_plan.py` = 88+ Python tests
 - **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
 
 ### Proof guards (Python, `scripts/rift_workflow_guards.py`)
@@ -112,12 +132,28 @@ A unified 7-step pipeline orchestrator in `rift_workflow.py`:
 
 Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all 7 stages.
 
+### Flythrough Bridge (FT) plan overview
+
+`docs/roadmap/flythrough-bridge-plan.md` v2.0 — an agentic, machine-checkable plan. State lives in `Assets/build/flythrough/.state.json` (gitignored). Each phase has its own handoff in `docs/handoffs/2026-MM-DD-ft{N}-exit.md`.
+
+| Phase | Topic | Status |
+|-------|-------|:---:|
+| FT-1 | DDS → PNG texture pipeline at scale | ✅ DONE (12,954 textures, 83s, 19 MB) |
+| FT-2 | Bulk NIF → OBJ export | ✅ DONE (pipeline ships; 7/56 on probe-lookup subset) |
+| FT-3 | Per-OBJ metadata sidecar (`asset-mesh-manifest-v1`) | ✅ DONE (schema + emitter) |
+| FT-4 | Scene graph / world placement (KEYSTONE) | ✅ DONE (`probe-nif-scene-graph`, `world.json`, 50-NIF pilot, 65% coverage) |
+| FT-5 | Single-command pipeline integration | ✅ DONE (`flythrough_plan.py` state machine) |
+| FT-6 | Flythrough-specific validation suite | ✅ DONE (OBJ integrity + scene graph + cross-reference + byte bounds) |
+| FT-7 | Zone boundaries, LOD variants | ✅ DONE (7→10 high-confidence LOD groups, 193/217 assets classified) |
+| FT-8 | Mod-replacement bridge (optional, safety-gated) | ⏭️ SKIPPED (contradicts read-only mandate) |
+
 ### Key directories (gitignored)
 
 | Path | Contents |
 |------|----------|
 | `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) and NIF texture bundles |
 | `Exports/` | JSON/JSONL reports, inventories, matrices, and OBJ exports |
+| `Assets/build/flythrough/` | FT pipeline output: `objs/`, `textures/converted/`, `bulk-export-manifest.json`, `.state.json`, `evidence/ft{N}.{M}/` |
 | `RecoveredNames/` | Generated filename matches (`recovered-names.jsonl`) |
 | `Candidates/` | Candidate filename lists for hash matching |
 | `docs/handoffs/` | Session handoff docs (AI-agent context resumption) |
@@ -131,6 +167,7 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 3. **NIF probe** → parse Gamebryo block structure, extract `NiMesh` → `NiDataStream` bindings
 4. **Geometry decode** → decode positions/normals/UVs from float32 or uint16-packed streams
 5. **OBJ export** → behind `--experimental-position-source` (fallback) or `--export-obj` (attribute-set @264) flags
+6. **FT-4:** scene graph probe → per-NIF `world.json` with NiNode transforms + parent/child tree
 
 All operations read directly from the live game install (see Key directories note above).
 
@@ -142,21 +179,26 @@ Two parallel jobs on `windows-latest`:
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
 - **Final job:** aggregates both results (Ubuntu)
 
-### Current project state (latest — Phase 51 + Ghidra proof lane)
+### Current project state (Flythrough Bridge Plan COMPLETE)
 
 - **350 OBJ files, 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30 MeshSize families. 217 unique asset IDs. 0 structural issues. 0 unexported candidates remain.**
+- **FT-1 ✅** — 12,954 DDS → PNG converted, 83s wall-clock, 19MB output, loaded into RiftFlythrough cleanly
+- **FT-2 ✅** — `bulk_export_for_flythrough.py` pipeline ships; 7/56 (12.5%) on probe-lookup subset; two-pass decode (export-obj → experimental), mesh-block retry chain `[6,7,8,9,10,27,31,25,17,0]`, atomic manifest writes, dedup, resume via `.state.json`
+- **FT-3 ✅** — `asset-mesh-manifest-v1.schema.json` (20+ fields) + sidecar emitter integrated into bulk exporter; FT-4/FT-7 fields pre-wired as nulls
+- **FT-4 ✅** — `probe-nif-scene-graph` C# command shipped (NiNode transforms, parent-child tree, mesh attachment map); `scene-graph-v1.schema.json`; 50-NIF pilot; 141/217 assets (65%) have world.json; record types smoke-tested (4 new xUnit tests)
+- **FT-5 ✅** — `flythrough_plan.py` state machine with phase exit criteria, `.state.json` transitions
+- **FT-6 ✅** — `ft6_validation.py` suite: OBJ integrity (SHA256, bounds, NaN), scene-graph cross-reference, byte bounds; 100% pass
+- **FT-7 ✅** — `ft7_lod_detector.py` 3-axis LOD detector: **10 high-confidence MeshSize-family groups**, 1 same-NIF chain (158x reduction), 2 descriptor LOD groups; **193/217 (88.9%)** assets classified after mesh_size enrichment
+- **FT-8 ⏭️** — Skipped: mod-injection bridge contradicts read-only mandate. `ft8_final_manifest.py` built unified `flythrough-index.json` (118.5 KB, 217 assets, 100% cross-referenced) as plan closure artifact
+- **MeshSize enrichment** — `infer_meshsizes.py` boosted probe lookup from 176→318 entries, **100% coverage** (43 exact matches, 87 VC-proximity, 12 sibling-pair)
 - **Live archive** (26GB, 244 files, 263,957 entries) used directly — `Source/` deleted (166MB reclaimed). All Python scripts default to live game path.
-- **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites).
-- `scripts/dedup_objs.py` — safe SHA256-verified duplicate cleaner with dry-run mode and content-mismatch warnings
-- `scripts/live_family_scanner.py` — exhaustive batch probe mode (`--exhaustive`) with auto-update registry integration
-- `scripts/build_export_manifest.py` v3 — data-driven live provenance via `scripts/live-exported-ids.json`
-- `batch_sweep.py` — 4-phase tool for OBJ integrity (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, manifest building
+- **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites)
 - All 8 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
-- Cross-MB audit (Phase 48): no recoverable faced candidates found across all pos-only OBJs
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
-- CI green: build 0 errors, tests 51/51 (C#), ruff 0, mypy 0
+- **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, textures for RiftFlythrough Phase 21
+- CI green: build 0 errors, tests 55/55 (C#), pytest 73/73, ruff 0, mypy 0
 
 ## Conventions
 
@@ -173,6 +215,11 @@ Two parallel jobs on `windows-latest`:
 - **CI:** Runs both .NET (build, format, test) and Python (ruff, mypy, test) on push/PR
 - **Command naming:** Kebab-case for Python CLI (e.g., `mesh-bindings`), PascalCase for PS mode names (e.g., `MeshBindings`)
 - **OBJ face generation:** Uses degenerate-bridge triangle-strip walking with raw-zero-based (+1 OBJ) indexing for @264 indexed meshes; pairing-based for 0-attribute-set meshes with index streams
+- **Schemas:** JSON Schema 2020-12, `additionalProperties: false`, `const` for `SchemaVersion` discriminators, `^[0-9a-f]{16}$` for NIF hashes. New schemas go in `docs/schemas/`.
+- **Commit prefix convention:** `ft{N}.{M}: <short description>` for FT-plan work; `docs: <title>` for handoffs; `ft2.5: <title>` style for phase-exit commits
+- **No new PowerShell/CMD scripts** — Python only (see `AGENTS.md`)
+- **FT plan state:** `Assets/build/flythrough/.state.json` (gitignored) is the single source of truth for "what's next"
+- **FT evidence:** Every FT step writes evidence to `Assets/build/flythrough/evidence/ft{N}.{M}/`
 
 ## Key discoveries
 
@@ -211,7 +258,7 @@ Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found ma
 
 5 shared-source sibling groups confirmed:
 | Mesh size | Groups | Decision |
-|---|---|---:|---|
+|---|---|---:|
 | 329 | 23 | repeated source-binding family |
 | 305 | 15 | repeated source-binding family |
 | 321 | 11 | repeated source-binding family |
@@ -221,7 +268,7 @@ Deep probe of 5 payload variants (96, 180, 192, 288, 396) at stream@188 found ma
 ### Compression truth
 
 | Scope | Count | Compression |
-|---|---|---:|---|
+|---|---|---:|
 | Full live TWAD entries | 263,957 | `0=22422`, `1=241535`, `2=0` |
 | Manifest Table 0 PAK rows | 2,076 | `0=736`, `2=1340` |
 
@@ -230,7 +277,7 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 ## Gotchas
 
 - `Program.cs` is extremely large (~15K lines) — prefer targeted `str_replace` edits over rewrites
-- All C# commands run via string matching in `Main()` — adding a new command requires adding an `if` block
+- All C# commands run via string matching in `Main()` — adding a new command requires adding an `if` block (see `probe-nif-scene-graph` precedent in `Program.cs`)
 - The solution file is `.slnx` (new XML format) — not `.sln`
 - `Source/` (local copied game files) has been **deleted** — all scripts read directly from the live game install at `C:\Program Files (x86)\Glyph\Games\RIFT\Live` (read-only)
 - Python scripts are all in `scripts/` root (no subpackages) with flat module structure
@@ -241,8 +288,13 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - `dotnet build` is implicit for most workflow commands unless `--skip-build` is passed
 - The `generated_output_guard` runs at the start of every Python command — it checks that no generated/ignored files have been accidentally committed
 - `.agents/` directory contains Codebuff agent type definitions (`types/agent-definition.ts`, `types/tools.ts`, `util-types.ts`) — the schema types for building custom Codebuff agents
-- Agent definition files were rebuilt from scratch in `.agents/` (see `.agents.bak2/` for original reference)
 - `batch_sweep.py` is a standalone 4-phase script (not a workflow command) for OBJ integrity, candidate discovery, batch export, and manifest generation
+- `bulk_export_for_flythrough.py` two-pass decode: tries `--export-obj` (attribute-set @264 indexed, faced) first; on "no attribute sets" stderr, falls back to `--experimental-position-source --write-obj` (fan faces, pos-only)
+- The bulk exporter's mesh-block retry chain `[6, 7, 8, 9, 10, 27, 31, 25, 17, 0]` runs when the probe-lookup value fails with "not found" — the first successful non-"not found" response wins
+- `Assets/build/flythrough/.state.json` is gitignored but never deleted — it's the resume token for the FT plan
+- `asset-mesh-manifest-v1.schema.json` requires `nif_hash` (`^[0-9a-f]{16}$`) and `obj_sha1` (`^[0-9a-f]{40}$`) patterns
+- FT-2 probe-lookup subset success rate is data-limited (probe lookup built from deleted `Source/`), not pipeline-limited — pipeline proven functional
+- For multi-mesh NIFs, the `probe-nif-scene-graph` command may emit child refs into both `Children` and `Effects` lists — the parser walks both and resolves to the block type
 
 ## Agent model strategy
 
@@ -267,6 +319,7 @@ The `.agents/` directory contains 10 custom agent definitions with a tiered mode
 - Deploy `cs-architect-gpt` when a C# change requires multi-step reasoning across the ~15K-line `Program.cs` (complex algorithm changes, subtle stream classification bugs, new geometry decode paths)
 - Deploy `investigator-gpt` for binary stream analysis requiring pattern recognition and experimental decode prototyping
 - DeepSeek V4 Pro is not yet available — once it is, upgrade `program-cs-editor` to Pro
+- **FT-4 keystone phase:** all new C# work should use `cs-architect-gpt`; all binary investigation should use `investigator-gpt`
 
 ## Third-party tools integration
 

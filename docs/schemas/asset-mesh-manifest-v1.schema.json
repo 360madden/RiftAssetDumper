@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/asset-mesh-manifest-v1.schema.json",
+  "title": "RIFT Asset Mesh Manifest v1",
+  "description": "Per-OBJ metadata sidecar for RiftFlythrough. One manifest per exported OBJ file, recording provenance, geometry stats, and sibling/linkage data.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "nif_hash",
+    "mesh_block",
+    "vertex_count",
+    "face_count",
+    "export_timestamp",
+    "export_command"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "asset-mesh-manifest/v1" },
+    "nif_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "16-char lowercase hex NIF asset identifier"
+    },
+    "obj_filename": {
+      "type": "string",
+      "description": "Filename of the OBJ file this manifest is paired with"
+    },
+    "mesh_block": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "NiMesh block index within the NIF"
+    },
+    "mesh_size": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "MeshSize family ID (null if unknown)"
+    },
+    "vertex_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of vertices in the OBJ"
+    },
+    "face_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of faces in the OBJ (0 = position-only, no faces)"
+    },
+    "faced": {
+      "type": "boolean",
+      "description": "Whether the mesh has index-based faces"
+    },
+    "position_descriptor": {
+      "type": ["string", "null"],
+      "description": "Descriptor classification of the position stream (e.g., 'descriptor-float2-uv', 'descriptor-float3-generic')"
+    },
+    "export_mode": {
+      "type": "string",
+      "enum": ["export-obj", "experimental"],
+      "description": "Which decode mode produced this OBJ"
+    },
+    "export_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of export"
+    },
+    "export_command": {
+      "type": "string",
+      "description": "Full decode-nif-geometry command that produced this OBJ"
+    },
+    "obj_sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "SHA-1 hash of the OBJ file content"
+    },
+    "obj_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Size of the OBJ file in bytes"
+    },
+    "export_duration_sec": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Wall-clock seconds for the decode subprocess"
+    },
+    "parent_node": {
+      "type": ["string", "null"],
+      "description": "Parent NiNode name or hash (null = root or unknown; populated in FT-4)"
+    },
+    "sibling_meshes": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "description": "Sibling mesh NIF hashes for position-source pairing"
+    },
+    "linked_textures": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "description": "Linked texture asset IDs"
+    },
+    "original_path_candidates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Candidate original paths within the TWAD archive"
+    },
+    "bounding_box": {
+      "type": ["object", "null"],
+      "properties": {
+        "min": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[x, y, z] minimum corner"
+        },
+        "max": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[x, y, z] maximum corner"
+        }
+      },
+      "description": "Axis-aligned bounding box (optional, populated in FT-4)"
+    },
+    "transform": {
+      "type": ["object", "null"],
+      "properties": {
+        "translation": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rotation": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 9,
+          "maxItems": 9,
+          "description": "3x3 rotation matrix row-major [r11, r12, r13, r21, r22, r23, r31, r32, r33] (sourced from scene-graph NiNode rotation)"
+        },
+        "scale": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "description": "World transform (optional, populated in FT-4)"
+    },
+    "zone_id": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Zone/terrain tile ID (optional, populated in FT-7)"
+    },
+    "lod_index": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Level-of-detail index (optional, populated in FT-7)"
+    },
+    "probe_note": {
+      "type": ["string", "null"],
+      "description": "Note from probe-meshsize-lookup.json entry"
+    }
+  },
+  "additionalProperties": false
+}

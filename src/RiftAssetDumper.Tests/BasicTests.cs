@@ -735,4 +735,101 @@ public class BasicTests
   }
 
 
+
+  // FT-4.2: probe-nif-scene-graph record type smoke tests
+  [Fact]
+  public void NifSceneGraphNodeInfo_ConstructsWithAllFields()
+  {
+    var node = new NifSceneGraphNodeInfo(
+        BlockIndex: 0,
+        Name: "SceneNode",
+        Translation: new[] { 1.0f, 2.0f, 3.0f },
+        Rotation: new[] { 1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f },
+        Scale: 1.0f,
+        ExtraData: new List<int>(),
+        Controller: -1,
+        Children: new List<int> { 6, 31 },
+        Effects: new List<int>(),
+        ChildNodes: new List<NifSceneGraphChildInfo>(),
+        NodeSize: 106u);
+
+    Assert.Equal(0, node.BlockIndex);
+    Assert.Equal("SceneNode", node.Name);
+    Assert.Equal(3, node.Translation.Length);
+    Assert.Equal(9, node.Rotation.Length);
+    Assert.Equal(1.0f, node.Scale);
+    Assert.Equal(2, node.Children.Count);
+    Assert.Equal(106u, node.NodeSize);
+  }
+
+  [Fact]
+  public void NifSceneGraphChildInfo_StoresFields()
+  {
+    var child = new NifSceneGraphChildInfo(
+        BlockIndex: 6,
+        TypeName: "NiMesh",
+        Size: 329u);
+
+    Assert.Equal(6, child.BlockIndex);
+    Assert.Equal("NiMesh", child.TypeName);
+    Assert.Equal(329u, child.Size);
+  }
+
+  [Fact]
+  public void NifSceneGraphMeshInfo_StoresFields()
+  {
+    var mesh = new NifSceneGraphMeshInfo(
+        BlockIndex: 6,
+        Size: 329u,
+        ParentNiNodeIndex: 0);
+
+    Assert.Equal(6, mesh.BlockIndex);
+    Assert.Equal(329u, mesh.Size);
+    Assert.Equal(0, mesh.ParentNiNodeIndex);
+  }
+
+  [Fact]
+  public void NifSceneGraphReport_RoundtripSerialization()
+  {
+    var nodes = new List<NifSceneGraphNodeInfo>
+    {
+      new(
+        BlockIndex: 0,
+        Name: "SceneNode",
+        Translation: new[] { 0f, 0f, 0f },
+        Rotation: new[] { 1f,0f,0f, 0f,1f,0f, 0f,0f,1f },
+        Scale: 1.0f,
+        ExtraData: new List<int>(),
+        Controller: -1,
+        Children: new List<int> { 6 },
+        Effects: new List<int>(),
+        ChildNodes: new List<NifSceneGraphChildInfo>
+        {
+          new(6, "NiMesh", 329u)
+        },
+        NodeSize: 106u)
+    };
+
+    var meshes = new List<NifSceneGraphMeshInfo>
+    {
+      new(6, 329u, 0)
+    };
+
+    var report = new NifSceneGraphReport(
+        NifVersion: "20.6.0.0",
+        NodeCount: 1,
+        MeshCount: 1,
+        MeshesAttached: 1,
+        Nodes: nodes,
+        Meshes: meshes);
+
+    Assert.Equal("20.6.0.0", report.NifVersion);
+    Assert.Equal(1, report.NodeCount);
+    Assert.Equal(1, report.MeshCount);
+    Assert.Equal(1, report.MeshesAttached);
+    Assert.Single(report.Nodes);
+    Assert.Single(report.Meshes);
+  }
+
+
 }

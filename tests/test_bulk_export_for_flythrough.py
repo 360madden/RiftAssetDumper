@@ -28,11 +28,13 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from bulk_export_for_flythrough import (  # noqa: E402
     ASSET_ID_RE,
     _atomic_write_json,
+    _enrich_sidecar_with_scene_graph,
     _index_existing_entries,
     bulk_export_for_flythrough,
     filter_by_mesh_size,
     load_asset_ids_from_file,
     load_asset_ids_from_inventory,
+    run_probe_scene_graph,
 )
 
 SAMPLE_INVENTORY: dict[str, Any] = {
@@ -155,9 +157,10 @@ def test_single_mesh_export_writes_one_entry(tmp_path, monkeypatch) -> None:
     out = tmp_path / "objs"
     manifest = tmp_path / "m.json"
 
-    def fake_decode(asset_id, *, project, root, timeout_sec):
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
         # Simulate decode-nif-geometry writing a fake OBJ file
-        asset_subdir = out / f"decode-nif-geometry-{asset_id}"
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
         obj_file = asset_subdir / "mesh.obj"
         _write_obj(obj_file, b"# fake OBJ for " + asset_id.encode() + b"\nv 0 0 0\n")
         return True, "wrote mesh.obj", "", 0.1
@@ -185,11 +188,12 @@ def test_error_on_one_mesh_with_skip_on_error_continues(tmp_path, monkeypatch) -
     out = tmp_path / "objs"
     manifest = tmp_path / "m.json"
 
-    def fake_decode(asset_id, *, project, root, timeout_sec):
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
         if asset_id == "1111111111111111":
             return False, "", "decode error: corrupt NIF", 0.1
         # Succeed by writing a fake OBJ
-        asset_subdir = out / f"decode-nif-geometry-{asset_id}"
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
         obj_file = asset_subdir / "mesh.obj"
         _write_obj(obj_file, b"# fake OBJ\nv 0 0 0\n")
         return True, "wrote mesh.obj", "", 0.1
@@ -236,8 +240,9 @@ def test_resume_after_error_skips_already_exported(tmp_path, monkeypatch) -> Non
         },
     )
 
-    def fake_decode(asset_id, *, project, root, timeout_sec):
-        asset_subdir = out / f"decode-nif-geometry-{asset_id}"
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
         obj_file = asset_subdir / "mesh.obj"
         _write_obj(obj_file, b"# new\n")
         return True, "wrote mesh.obj", "", 0.1
@@ -263,8 +268,9 @@ def test_limit_caps_input_in_bulk_export(tmp_path, monkeypatch) -> None:
     out = tmp_path / "objs"
     manifest = tmp_path / "m.json"
 
-    def fake_decode(asset_id, *, project, root, timeout_sec):
-        asset_subdir = out / f"decode-nif-geometry-{asset_id}"
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
         obj_file = asset_subdir / "mesh.obj"
         _write_obj(obj_file, b"# " + asset_id.encode() + b"\n")
         return True, "ok", "", 0.01
@@ -292,9 +298,10 @@ def test_dedupe_collapses_identical_content(tmp_path, monkeypatch) -> None:
     manifest = tmp_path / "m.json"
     same_content = b"# identical OBJ bytes\nv 1 2 3\nv 4 5 6\n"
 
-    def fake_decode(asset_id, *, project, root, timeout_sec):
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
         # Both NIFs produce the same bytes — this simulates a shared texture/MIP
-        asset_subdir = out / f"decode-nif-geometry-{asset_id}"
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
         obj_file = asset_subdir / "mesh.obj"
         _write_obj(obj_file, same_content)
         return True, "ok", "", 0.01
@@ -321,3 +328,183 @@ def test_asset_id_regex_rejects_garbage() -> None:
     assert ASSET_ID_RE.match("not-a-hex") is None
     assert ASSET_ID_RE.match("abc") is None  # too short
     assert ASSET_ID_RE.match("abcdef01234567890") is None  # too long
+
+
+# =============================================================================
+# FT-4.4: Scene graph integration tests
+# =============================================================================
+
+
+def test_run_probe_scene_graph_invokes_dotnet(tmp_path) -> None:
+    """run_probe_scene_graph calls dotnet with correct arguments."""
+    out_path = tmp_path / "sg.json"
+    with patch("bulk_export_for_flythrough.subprocess.run") as mock_run:
+        # Simulate successful completion + file write
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        # Also need the file to "exist" after the mock
+        out_path.write_text(
+            '{"NifVersion":"20.6.0.0","NodeCount":1,"MeshCount":2,"MeshesAttached":2,"Nodes":[],"Meshes":[]}',
+            encoding="utf-8",
+        )
+        ok, stdout, stderr, elapsed = run_probe_scene_graph(
+            "abcdef0123456789",
+            project=Path("fake.csproj"),
+            root=Path("C:/fake"),
+            out_path=out_path,
+        )
+        assert ok
+        mock_run.assert_called_once()
+        args_list = mock_run.call_args[0][0]
+        assert "probe-nif-scene-graph" in args_list
+        assert "abcdef0123456789" in args_list
+        assert "--out" in args_list
+
+
+def test_enrich_sidecar_with_scene_graph_populates_transform(tmp_path) -> None:
+    """Enrichment copies parent_node and transform from scene graph."""
+    sidecar_path = tmp_path / "test.obj.manifest.json"
+    initial: dict[str, Any] = {
+        "SchemaVersion": "asset-mesh-manifest/v1",
+        "nif_hash": "abcdef0123456789",
+        "mesh_block": 6,
+        "vertex_count": 80,
+        "face_count": 78,
+        "export_timestamp": "2026-01-01T00:00:00Z",
+        "export_command": "decode-nif-geometry --id abc",
+        "parent_node": None,
+        "transform": None,
+    }
+    _atomic_write_json(sidecar_path, initial)
+
+    sg_data: dict[str, Any] = {
+        "Nodes": [
+            {
+                "BlockIndex": 0,
+                "Name": "head_JNT",
+                "Translation": [0.0, 1.84, -0.013],
+                "Rotation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                "Scale": 1.0,
+            },
+        ],
+        "Meshes": [
+            {"BlockIndex": 6, "Size": 329, "ParentNiNodeIndex": 0},
+        ],
+    }
+
+    _enrich_sidecar_with_scene_graph(sidecar_path, sg_data, mesh_block=6)
+
+    enriched = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    assert enriched["parent_node"] == "head_JNT"
+    assert enriched["transform"] is not None
+    assert enriched["transform"]["translation"] == [0.0, 1.84, -0.013]
+    assert enriched["transform"]["rotation"] == [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    assert enriched["transform"]["scale"] == 1.0
+
+
+def test_enrich_sidecar_skips_scene_node_named_parent(tmp_path) -> None:
+    """Root node named 'SceneNode' → parent_node stays None."""
+    sidecar_path = tmp_path / "test.obj.manifest.json"
+    initial: dict[str, Any] = {
+        "SchemaVersion": "asset-mesh-manifest/v1",
+        "nif_hash": "abcdef0123456789",
+        "mesh_block": 6,
+        "vertex_count": 80,
+        "face_count": 78,
+        "export_timestamp": "2026-01-01T00:00:00Z",
+        "export_command": "decode-nif-geometry --id abc",
+        "parent_node": None,
+        "transform": None,
+    }
+    _atomic_write_json(sidecar_path, initial)
+
+    sg_data: dict[str, Any] = {
+        "Nodes": [
+            {
+                "BlockIndex": 0,
+                "Name": "SceneNode",
+                "Translation": [0.0, 0.0, 0.0],
+                "Rotation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                "Scale": 1.0,
+            },
+        ],
+        "Meshes": [
+            {"BlockIndex": 6, "Size": 329, "ParentNiNodeIndex": 0},
+        ],
+    }
+
+    _enrich_sidecar_with_scene_graph(sidecar_path, sg_data, mesh_block=6)
+
+    enriched = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    assert enriched["parent_node"] is None  # SceneNode is the default root
+    assert enriched["transform"] is not None  # transform still populated
+
+
+def test_bulk_export_with_scene_graph_invokes_probe(tmp_path, monkeypatch) -> None:
+    """When world_dir is set, bulk_export_for_flythrough runs scene graph probe."""
+    out = tmp_path / "objs"
+    world_dir = tmp_path / "worlds"
+    manifest = tmp_path / "m.json"
+
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
+        obj_file = asset_subdir / "mesh.obj"
+        _write_obj(obj_file, b"# fake OBJ\nv 0 0 0\n")
+        return True, "ok", "", 0.1
+
+    def fake_probe(asset_id, *, project, root, out_path, timeout_sec=60):
+        # Write a minimal valid scene graph JSON
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        sg = {
+            "NifVersion": "20.6.0.0",
+            "NodeCount": 1,
+            "MeshCount": 1,
+            "MeshesAttached": 1,
+            "Nodes": [
+                {
+                    "BlockIndex": 0,
+                    "Name": "head_JNT",
+                    "Translation": [0.0, 1.84, -0.013],
+                    "Rotation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                    "Scale": 1.0,
+                    "ExtraData": [],
+                    "Controller": -1,
+                    "Children": [],
+                    "Effects": [6],
+                    "ChildNodes": [],
+                    "NodeSize": 94,
+                }
+            ],
+            "Meshes": [
+                {"BlockIndex": 6, "Size": 329, "ParentNiNodeIndex": 0},
+            ],
+        }
+        out_path.write_text(json.dumps(sg), encoding="utf-8")
+        return True, "", "", 0.2
+
+    monkeypatch.setattr("bulk_export_for_flythrough.run_decode_geometry", fake_decode)
+    monkeypatch.setattr("bulk_export_for_flythrough.run_probe_scene_graph", fake_probe)
+
+    result = bulk_export_for_flythrough(
+        asset_ids=["abcdef0123456789"],
+        output_dir=out,
+        manifest_path=manifest,
+        project=Path("."),
+        root=Path("."),
+        world_dir=world_dir,
+    )
+    assert result.stats["exported"] == 1
+    # Verify world.json was written
+    wj = world_dir / "abcdef0123456789.world.json"
+    assert wj.exists()
+    sg = json.loads(wj.read_text(encoding="utf-8"))
+    assert sg["SchemaVersion"] == "scene-graph/v1"
+    assert sg["nif_hash"] == "abcdef0123456789"
+    # Verify FT-3 sidecar was enriched
+    sidecar = out / "decode-nif-geometry-abcdef0123456789" / "mesh.obj.manifest.json"
+    assert sidecar.exists()
+    sc = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert sc["parent_node"] == "head_JNT"
+    assert sc["transform"]["translation"] == [0.0, 1.84, -0.013]

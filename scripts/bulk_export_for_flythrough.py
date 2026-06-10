@@ -41,6 +41,7 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs"
 DEFAULT_MANIFEST = REPO_ROOT / "Assets" / "build" / "flythrough" / "bulk-export-manifest.json"
 DEFAULT_DOTNET_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
 DEFAULT_LIVE_ROOT = Path("C:/Program Files (x86)/Glyph/Games/RIFT/Live")
+DEFAULT_PROBE_LOOKUP = REPO_ROOT / "Exports" / "probe-meshsize-lookup.json"
 
 ASSET_ID_RE = re.compile(r"^[0-9a-f]{16}$", re.IGNORECASE)
 
@@ -171,6 +172,39 @@ def load_asset_ids_from_file(path: Path) -> list[str]:
     return out
 
 
+def load_mesh_block_map(lookup_path: Path) -> dict[str, int]:
+    """Load per-asset mesh_block from probe-meshsize-lookup.json.
+
+    Returns {asset_id_lower: mesh_block}. Entries without mesh_block are skipped.
+    """
+    if not lookup_path.exists():
+        log.warning("probe lookup not found; all mesh_blocks will default to 0: %s", lookup_path)
+        return {}
+    with open(lookup_path, encoding="utf-8-sig") as f:
+        data = json.load(f)
+    entries = data.get("entries", {}) if isinstance(data, dict) else {}
+    out: dict[str, int] = {}
+    for aid, val in entries.items():
+        if isinstance(val, dict) and "mesh_block" in val:
+            try:
+                out[aid.lower()] = int(val["mesh_block"])
+            except ValueError, TypeError:
+                # Skip inferred or non-numeric mesh_block values
+                continue
+    log.info("loaded %d mesh_block entries from %s", len(out), lookup_path)
+    return out
+
+
+def load_asset_ids_from_probe_lookup(lookup_path: Path) -> list[str]:
+    """Extract asset IDs from probe-meshsize-lookup.json keys.
+
+    Each key is a 16-char hex asset ID. Only includes entries with a numeric
+    mesh_block (skips "inferred" entries).
+    """
+    mb_map = load_mesh_block_map(lookup_path)
+    return sorted(mb_map.keys())
+
+
 def filter_by_mesh_size(
     asset_ids: list[str],
     inventory_path: Path,
@@ -225,6 +259,51 @@ def filter_by_mesh_size(
 # =============================================================================
 
 
+def run_probe_scene_graph(
+    asset_id: str,
+    *,
+    project: Path,
+    root: Path,
+    out_path: Path,
+    timeout_sec: int = 60,
+) -> tuple[bool, str, str, float]:
+    """Run `dotnet run ... probe-nif-scene-graph` and capture the JSON output.
+
+    Returns (success, stdout_tail, stderr_tail, elapsed_sec).
+    """
+    args = [
+        "dotnet",
+        "run",
+        "--project",
+        str(project),
+        "--no-build",
+        "--",
+        "probe-nif-scene-graph",
+        "--id",
+        asset_id,
+        "--root",
+        str(root),
+        "--out",
+        str(out_path),
+    ]
+    start = _now()
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=timeout_sec)
+    except subprocess.TimeoutExpired:
+        return False, "", f"TIMEOUT after {timeout_sec}s", _now() - start
+    except Exception as exc:  # pragma: no cover - defensive
+        return False, "", f"ERROR: {exc}", _now() - start
+    elapsed = _now() - start
+    # probe-nif-scene-graph may return non-zero for benign reasons (e.g. warnings);
+    # success is determined by whether the output JSON file exists and is valid.
+    return (
+        result.returncode == 0,
+        (result.stdout or "")[-500:],
+        (result.stderr or "")[-500:],
+        elapsed,
+    )
+
+
 def run_decode_geometry(
     asset_id: str,
     *,
@@ -232,8 +311,14 @@ def run_decode_geometry(
     root: Path,
     timeout_sec: int,
     mesh_block: int = 0,
+    mode: str = "export-obj",
+    out_dir: Path | None = None,
 ) -> tuple[bool, str, str, float]:
-    """Run `dotnet run --project ... --no-build -- decode-nif-geometry --id <id> --mesh-block <mb> --export-obj`.
+    """Run `dotnet run ... decode-nif-geometry`.
+
+    mode='export-obj': uses --export-obj (attribute-set @264 indexed, faced OBJs)
+    mode='experimental': uses --experimental-position-source --write-obj (fan faces, pos-only fallback)
+    out_dir: passed as --out <dir> to control OBJ output location
 
     Returns (success, stdout_tail, stderr_tail, elapsed_sec).
     """
@@ -249,10 +334,15 @@ def run_decode_geometry(
         asset_id,
         "--mesh-block",
         str(mesh_block),
-        "--export-obj",
         "--root",
         str(root),
     ]
+    if out_dir is not None:
+        args.extend(["--out", str(out_dir)])
+    if mode == "experimental":
+        args.extend(["--experimental-position-source", "--write-obj"])
+    else:
+        args.append("--export-obj")
     start = _now()
     try:
         result = subprocess.run(args, capture_output=True, text=True, timeout=timeout_sec)
@@ -312,20 +402,117 @@ def _write_manifest(manifest_path: Path, manifest: dict[str, Any]) -> None:
     _atomic_write_json(manifest_path, manifest)
 
 
-def _write_obj_sidecar(obj_path: Path, entry: dict[str, Any]) -> Path:
+def _enrich_sidecar_with_scene_graph(
+    sidecar_path: Path,
+    sg_data: dict[str, Any],
+    *,
+    mesh_block: int = 0,
+) -> None:
+    """Enrich an FT-3 sidecar with FT-4 scene graph data (parent_node, transform).
+
+    Finds the NiMesh with matching mesh_block in the scene graph, locates its
+    parent NiNode, and copies the parent's transform into the sidecar.
+    """
+    if not sidecar_path.exists():
+        return
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    meshes: list[dict[str, Any]] = sg_data.get("Meshes", [])
+    nodes: list[dict[str, Any]] = sg_data.get("Nodes", [])
+
+    # Find the mesh entry matching mesh_block
+    mesh_info: dict[str, Any] | None = None
+    for m in meshes:
+        if m.get("BlockIndex") == mesh_block:
+            mesh_info = m
+            break
+    if mesh_info is None and meshes:
+        # Fallback: use first mesh with a parent
+        for m in meshes:
+            if m.get("ParentNiNodeIndex") is not None:
+                mesh_info = m
+                break
+
+    if mesh_info is not None:
+        parent_idx = mesh_info.get("ParentNiNodeIndex")
+        if parent_idx is not None:
+            # Find the parent NiNode
+            parent_node: dict[str, Any] | None = None
+            for n in nodes:
+                if n.get("BlockIndex") == parent_idx:
+                    parent_node = n
+                    break
+            if parent_node is not None:
+                parent_name = parent_node.get("Name")
+                if parent_name and parent_name != "SceneNode":
+                    sidecar["parent_node"] = parent_name
+                sidecar["transform"] = {
+                    "translation": parent_node.get("Translation"),
+                    "rotation": parent_node.get("Rotation"),  # 3x3 matrix row-major [r11..r33]
+                    "scale": parent_node.get("Scale"),
+                }
+
+    _atomic_write_json(sidecar_path, sidecar)
+
+
+def _parse_obj_stats(obj_path: Path) -> tuple[int, int]:
+    """Extract vertex and face counts from an OBJ file.
+
+    Returns (vertex_count, face_count). One-pass read, skips blank/comment lines.
+    """
+    v_count, f_count = 0, 0
+    with open(obj_path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped[0] == "v" and (len(stripped) == 1 or stripped[1] == " "):
+                v_count += 1
+            elif stripped[0] == "f" and (len(stripped) == 1 or stripped[1] == " "):
+                f_count += 1
+    return v_count, f_count
+
+
+def _write_obj_sidecar(
+    obj_path: Path,
+    entry: dict[str, Any],
+    *,
+    probe_lookup: dict[str, Any] | None = None,
+) -> Path:
+    """Write an FT-3 asset-mesh-manifest/v1 sidecar next to the OBJ."""
+    vertex_count, face_count = _parse_obj_stats(obj_path)
+    nif_hash = entry["nif_hash"]
+
+    # Probe lookup enrichment
+    probe_entry: dict[str, Any] = {}
+    if probe_lookup:
+        probe_entry = probe_lookup.get("entries", {}).get(nif_hash, {})
+
     sidecar = obj_path.with_suffix(".obj.manifest.json")
-    payload = {
-        "SchemaVersion": "flythrough-obj-sidecar/v1",
-        "nif_hash": entry["nif_hash"],
+    payload: dict[str, Any] = {
+        "SchemaVersion": "asset-mesh-manifest/v1",
+        "nif_hash": nif_hash,
         "obj_filename": obj_path.name,
         "mesh_block": entry.get("mesh_block", 0),
-        "mesh_size": entry.get("mesh_size"),
-        "vertex_count": entry.get("vertex_count", 0),
-        "face_count": entry.get("face_count", 0),
+        "mesh_size": entry.get("mesh_size") or probe_entry.get("meshsize"),
+        "vertex_count": vertex_count,
+        "face_count": face_count,
+        "faced": face_count > 0,
+        "position_descriptor": None,
+        "export_mode": entry.get("export_mode", "export-obj"),
         "export_timestamp": entry.get("exported_at", _now_iso()),
         "export_command": entry.get("command", ""),
-        "obj_sha1": entry.get("obj_sha1"),
+        "obj_sha1": entry.get("obj_sha1", ""),
         "obj_bytes": entry.get("obj_bytes", 0),
+        "export_duration_sec": entry.get("export_duration_sec", 0),
+        "parent_node": None,
+        "sibling_meshes": [],
+        "linked_textures": [],
+        "original_path_candidates": [],
+        "bounding_box": None,
+        "transform": None,
+        "zone_id": None,
+        "lod_index": None,
+        "probe_note": probe_entry.get("note"),
     }
     _atomic_write_json(sidecar, payload)
     return sidecar
@@ -348,9 +535,16 @@ def bulk_export_for_flythrough(
     resume: bool = False,
     dry_run: bool = False,
     skip_build: bool = True,
+    mesh_block_map: dict[str, int] | None = None,
+    probe_lookup_data: dict[str, Any] | None = None,
+    world_dir: Path | None = None,
     on_progress: Callable[[ExportProgress], None] | None = None,
 ) -> BulkExportResult:
     """Export OBJs for the given asset IDs through the C# decode-nif-geometry CLI.
+
+    If world_dir is set (FT-4.4), also runs probe-nif-scene-graph per NIF,
+    stores scene-graph/v1 world.json sidecars, and enriches FT-3 sidecars
+    with parent_node + transform from the scene graph.
 
     See `docs/roadmap/ft-designs/ft2.1-bulk-export-driver-design.md` for the full contract.
     """
@@ -414,10 +608,46 @@ def bulk_export_for_flythrough(
             stats["skipped"] += 1
             continue
 
-        log.info("[%d/%d] exporting %s...", idx + 1, total, asset_id)
-        ok, stdout_tail, stderr_tail, elapsed = run_decode_geometry(
-            asset_id, project=project, root=root, timeout_sec=timeout_sec, mesh_block=0
-        )
+        mb = mesh_block_map.get(asset_id, 0) if mesh_block_map else 0
+
+        # Mesh-block retry chain: if lookup value fails with "not found", try common alternatives
+        MB_RETRY_CHAIN = [6, 7, 8, 9, 10, 27, 31, 25, 17, 0]
+        tried_mb: set[int] = set()
+        best_mb = mb
+
+        def _attempt_decode(mb: int, mode: str, out_dir: Path, aid: str = asset_id) -> tuple[bool, str, str, float]:
+            ok, stdout, stderr, elapsed = run_decode_geometry(
+                aid, project=project, root=root, timeout_sec=timeout_sec, mesh_block=mb, mode=mode, out_dir=out_dir
+            )
+            return ok, stdout, stderr, elapsed
+
+        # Try lookup value first
+        tried_mb.add(best_mb)
+        asset_out_dir = output_dir / f"decode-nif-geometry-{asset_id}"
+        ok, stdout_tail, stderr_tail, elapsed = _attempt_decode(best_mb, "export-obj", asset_out_dir)
+
+        # If "not found", try retry chain
+        if not ok and "not found" in (stderr_tail or "").lower():
+            for alt_mb in MB_RETRY_CHAIN:
+                if alt_mb in tried_mb:
+                    continue
+                tried_mb.add(alt_mb)
+                log.info("  mesh_block %d not found; trying %d...", best_mb, alt_mb)
+                ok, stdout_tail, stderr_tail, retry_elapsed = _attempt_decode(alt_mb, "export-obj", asset_out_dir)
+                if ok or "not found" not in (stderr_tail or "").lower():
+                    best_mb = alt_mb
+                    elapsed = retry_elapsed
+                    break
+
+        # Track export mode as state (not inferred from output text)
+        export_mode = "export-obj"
+
+        # Two-pass: if "no attribute sets", fall back to experimental
+        if not ok and "no attribute sets" in (stderr_tail or ""):
+            export_mode = "experimental"
+            log.info("  no attribute sets at mb=%d; retrying with --experimental-position-source...", best_mb)
+            ok, stdout_tail, stderr_tail, exp_elapsed = _attempt_decode(best_mb, "experimental", asset_out_dir)
+            elapsed = exp_elapsed
 
         # Find the OBJ file (decode-nif-geometry writes to <output>/decode-nif-geometry-<id>/*.obj)
         # We accept any .obj under output_dir whose full path contains the asset_id.
@@ -440,6 +670,18 @@ def bulk_export_for_flythrough(
             errors.append(err)
             stats["failed"] += 1
             log.warning("[%d/%d] FAIL %s: %s", idx + 1, total, asset_id, err["error"])
+            # Write failure entry to manifest for diagnosis
+            fail_entry = {
+                "nif_hash": asset_id,
+                "mesh_block": best_mb,
+                "status": "failed",
+                "error_message": stderr_tail or "no obj produced",
+                "export_duration_sec": round(elapsed, 1),
+                "command": f"decode-nif-geometry --id {asset_id} --mesh-block {best_mb} --export-obj",
+            }
+            manifest["Entries"].append(fail_entry)
+            manifest["Stats"] = stats
+            _write_manifest(manifest_path, manifest)
             if not skip_on_error:
                 break
             continue
@@ -457,9 +699,8 @@ def bulk_export_for_flythrough(
         status = "exported"
         if obj_sha1 in seen_sha1:
             first_hash = seen_sha1[obj_sha1]
+            dedup_target: Path | None = None
             try:
-                # Replace the just-written file with a hardlink to the first
-                obj_path.unlink()
                 target = output_dir / f"{first_hash[:8]}_dedup_link.obj"
                 if not target.exists():
                     # Find the prior file by its entry
@@ -471,14 +712,24 @@ def bulk_export_for_flythrough(
                         prior_obj = output_dir / prior_entry["obj_path"]
                         if prior_obj.exists():
                             os.link(prior_obj, target)
-                obj_path = target
+                if target.exists():
+                    dedup_target = target
             except OSError:
                 # Fall back to copy
                 target = output_dir / f"{first_hash[:8]}_dedup_copy.obj"
                 shutil.copy2(obj_path, target)
+                dedup_target = target
+            if dedup_target is not None:
+                obj_path = dedup_target
+                stats["deduped"] += 1
+                status = "deduped"
+            else:
+                # Hardlink/copy fallback: create a copy to dedup link path
+                target = output_dir / f"{first_hash[:8]}_dedup_copy.obj"
+                shutil.copy2(obj_path, target)
                 obj_path = target
-            stats["deduped"] += 1
-            status = "deduped"
+                stats["deduped"] += 1
+                status = "deduped"
         else:
             seen_sha1[obj_sha1] = asset_id
             stats["exported"] += 1
@@ -487,22 +738,53 @@ def bulk_export_for_flythrough(
         # Build entry
         entry = {
             "nif_hash": asset_id,
-            "mesh_block": 0,
+            "mesh_block": best_mb,
             "mesh_size": None,
             "status": status,
+            "export_mode": export_mode,
             "obj_path": obj_path.name,
             "obj_sha1": obj_sha1,
             "obj_bytes": obj_bytes,
             "export_duration_sec": round(elapsed, 1),
             "exported_at": _now_iso(),
-            "command": f"decode-nif-geometry --id {asset_id} --export-obj",
+            "command": f"decode-nif-geometry --id {asset_id} --mesh-block {best_mb} --export-obj",
             "stdout_tail": stdout_tail,
             "stderr_tail": stderr_tail,
         }
         manifest["Entries"].append(entry)
         manifest["Stats"] = stats
         _write_manifest(manifest_path, manifest)
-        _write_obj_sidecar(obj_path, entry)
+        sidecar_path = _write_obj_sidecar(obj_path, entry, probe_lookup=probe_lookup_data)
+
+        # FT-4.4: optionally run scene graph probe and enrich sidecar
+        if world_dir is not None:
+            world_dir.mkdir(parents=True, exist_ok=True)
+            world_json = world_dir / f"{asset_id}.world.json"
+            sg_ok, sg_out, sg_err, sg_elapsed = run_probe_scene_graph(
+                asset_id,
+                project=project,
+                root=root,
+                out_path=world_json,
+                timeout_sec=min(timeout_sec, 60),
+            )
+            if sg_ok and world_json.exists() and world_json.stat().st_size > 0:
+                try:
+                    sg_data = json.loads(world_json.read_text(encoding="utf-8-sig"))
+                    sg_data["SchemaVersion"] = "scene-graph/v1"
+                    sg_data["nif_hash"] = asset_id
+                    sg_data["generated_at"] = _now_iso()
+                    sg_data["probe_command"] = f"probe-nif-scene-graph --id {asset_id}"
+                    _atomic_write_json(world_json, sg_data)
+
+                    # Enrich FT-3 sidecar with scene-graph data
+                    _enrich_sidecar_with_scene_graph(sidecar_path, sg_data, mesh_block=best_mb)
+                    log.info(
+                        "  scene-graph: %d nodes, %d meshes", sg_data.get("NodeCount", 0), sg_data.get("MeshCount", 0)
+                    )
+                except (json.JSONDecodeError, KeyError, OSError) as exc:
+                    log.warning("  scene-graph parse failed for %s: %s", asset_id, exc)
+            else:
+                log.warning("  scene-graph probe failed for %s: %s", asset_id, sg_err[:120] if sg_err else "no output")
 
     duration = _now() - start
     manifest["Stats"] = stats
@@ -543,6 +825,11 @@ def _build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--limit", type=int, default=50)
     run_p.add_argument("--mesh-size-families", default="")
     run_p.add_argument("--asset-ids", default="")
+    run_p.add_argument(
+        "--use-probe-lookup",
+        action="store_true",
+        help="Use probe-meshsize-lookup.json keys as asset ID list (guarantees known mesh_block)",
+    )
     run_p.add_argument("--dry-run", action="store_true")
     run_p.add_argument("--skip-build", action="store_true")
     run_p.add_argument("--timeout", type=int, default=120)
@@ -551,6 +838,17 @@ def _build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("--resume", action="store_true")
     run_p.add_argument("--workers", type=int, default=1)
     run_p.add_argument("--randomize", action="store_true")
+    run_p.add_argument(
+        "--scene-graph",
+        action="store_true",
+        help="FT-4.4: Run probe-nif-scene-graph per NIF and store world.json sidecars",
+    )
+    run_p.add_argument(
+        "--world-dir",
+        type=Path,
+        default=None,
+        help="Directory for world.json scene graph output (default: <output-dir>/worlds)",
+    )
 
     # status
     status_p = sub.add_parser("status", parents=[common], help="Show current state")
@@ -564,14 +862,31 @@ def _build_parser() -> argparse.ArgumentParser:
     clean_p = sub.add_parser("clean", parents=[common], help="Remove all OBJs and manifest")
     clean_p.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
 
+    # scene-graph-only (FT-4.6)
+    sgo_p = sub.add_parser(
+        "scene-graph-only",
+        parents=[common],
+        help="FT-4.6: Run scene graph probes on already-exported OBJs (skips export)",
+    )
+    sgo_p.add_argument("--limit", type=int, default=0, help="Max NIFs to process (0=all)")
+    sgo_p.add_argument("--timeout", type=int, default=60)
+    sgo_p.add_argument(
+        "--world-dir", type=Path, default=None, help="Directory for world.json output (default: <output-dir>/worlds)"
+    )
+
     return parser
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    # Load mesh-block lookup from existing probe data (loaded once, used for mesh_block resolution)
+    mesh_block_map: dict[str, int] = load_mesh_block_map(DEFAULT_PROBE_LOOKUP)
+
     if args.input_file:
         asset_ids = load_asset_ids_from_file(args.input_file)
     elif args.asset_ids:
         asset_ids = [a.strip().lower() for a in args.asset_ids.split(",") if a.strip()]
+    elif args.use_probe_lookup:
+        asset_ids = sorted(mesh_block_map.keys())
     else:
         asset_ids = load_asset_ids_from_inventory(args.inventory)
 
@@ -599,6 +914,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
             p.current_id,
         )
 
+    # Load full probe lookup for sidecar enrichment
+    probe_lookup_data: dict[str, Any] | None = None
+    if args.use_probe_lookup:
+        try:
+            with open(DEFAULT_PROBE_LOOKUP, encoding="utf-8-sig") as f:
+                probe_lookup_data = json.load(f)
+        except Exception as exc:
+            log.warning("could not load probe lookup for sidecar enrichment: %s", exc)
+
+    # FT-4.4: resolve world.json output directory
+    world_dir: Path | None = None
+    if args.scene_graph:
+        world_dir = args.world_dir or (args.output_dir / "worlds")
+        log.info("FT-4.4 scene-graph enabled; world.json → %s", world_dir)
+
     result = bulk_export_for_flythrough(
         asset_ids=asset_ids,
         output_dir=args.output_dir,
@@ -610,6 +940,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         resume=args.resume,
         dry_run=args.dry_run,
         skip_build=args.skip_build,
+        mesh_block_map=mesh_block_map,
+        probe_lookup_data=probe_lookup_data,
+        world_dir=world_dir,
         on_progress=_on_progress,
     )
     log.info("FT-2 done: %s in %.1fs", result.stats, result.duration_sec)
@@ -685,6 +1018,92 @@ def _cmd_clean(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_scene_graph_only(args: argparse.Namespace) -> int:
+    """FT-4.6: Run scene graph probes on already-exported OBJs only.
+
+    Reads the existing manifest, finds all exported/deduped entries,
+    runs probe-nif-scene-graph on each, writes world.json, and
+    enriches the FT-3 sidecar with parent_node + transform.
+    """
+    if not args.manifest.exists():
+        log.error("No manifest at %s; run 'bulk_export_for_flythrough.py run' first.", args.manifest)
+        return 1
+
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    entries = [
+        e for e in manifest.get("Entries", []) if e.get("status") in ("exported", "deduped") and e.get("obj_path")
+    ]
+    if args.limit > 0:
+        entries = entries[: args.limit]
+
+    world_dir = args.world_dir or (args.output_dir / "worlds")
+    world_dir.mkdir(parents=True, exist_ok=True)
+
+    log.info("FT-4.6 scene-graph-only: %d entries → %s", len(entries), world_dir)
+
+    enriched, failed, skipped = 0, 0, 0
+    for idx, entry in enumerate(entries):
+        nif_hash = entry["nif_hash"]
+        mesh_block = entry.get("mesh_block", 0)
+        obj_path = args.output_dir / entry["obj_path"]
+        sidecar_path = obj_path.with_suffix(".obj.manifest.json")
+
+        # Skip if already enriched
+        if sidecar_path.exists():
+            try:
+                sc = json.loads(sidecar_path.read_text(encoding="utf-8"))
+                if sc.get("transform") is not None:
+                    skipped += 1
+                    log.info("[%d/%d] skip %s (already enriched)", idx + 1, len(entries), nif_hash)
+                    continue
+            except json.JSONDecodeError, OSError:
+                pass  # Corrupt sidecar — re-probe
+
+        world_json = world_dir / f"{nif_hash}.world.json"
+        sg_ok, sg_out, sg_err, sg_elapsed = run_probe_scene_graph(
+            nif_hash,
+            project=args.project,
+            root=args.root,
+            out_path=world_json,
+            timeout_sec=args.timeout,
+        )
+        if not sg_ok or not world_json.exists() or world_json.stat().st_size == 0:
+            failed += 1
+            log.warning("[%d/%d] FAIL %s: %s", idx + 1, len(entries), nif_hash, sg_err[:120] if sg_err else "no output")
+            continue
+
+        try:
+            sg_data = json.loads(world_json.read_text(encoding="utf-8-sig"))
+            sg_data["SchemaVersion"] = "scene-graph/v1"
+            sg_data["nif_hash"] = nif_hash
+            sg_data["generated_at"] = _now_iso()
+            sg_data["probe_command"] = f"probe-nif-scene-graph --id {nif_hash}"
+            _atomic_write_json(world_json, sg_data)
+
+            # Write FT-3 sidecar if OBJ exists (may not if manifest references lost file)
+            if obj_path.exists():
+                if not sidecar_path.exists():
+                    _write_obj_sidecar(obj_path, entry)
+                _enrich_sidecar_with_scene_graph(sidecar_path, sg_data, mesh_block=mesh_block)
+
+            enriched += 1
+            log.info(
+                "[%d/%d] OK %s: %d nodes, %d meshes (%.1fs)",
+                idx + 1,
+                len(entries),
+                nif_hash,
+                sg_data.get("NodeCount", 0),
+                sg_data.get("MeshCount", 0),
+                sg_elapsed,
+            )
+        except (json.JSONDecodeError, KeyError, OSError) as exc:
+            failed += 1
+            log.warning("[%d/%d] PARSE %s: %s", idx + 1, len(entries), nif_hash, exc)
+
+    log.info("FT-4.6 done: %d enriched, %d failed, %d skipped", enriched, failed, skipped)
+    return 0 if failed == 0 else 1
+
+
 def main() -> int:
     logging.basicConfig(
         level=logging.INFO,
@@ -700,6 +1119,8 @@ def main() -> int:
         return _cmd_verify(args)
     if args.command == "clean":
         return _cmd_clean(args)
+    if args.command == "scene-graph-only":
+        return _cmd_scene_graph_only(args)
     parser.error(f"Unknown command: {args.command}")
     return 2
 

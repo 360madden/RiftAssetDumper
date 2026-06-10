@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/scene-graph-v1.schema.json",
+  "title": "RIFT NIF Scene Graph v1",
+  "description": "Per-NIF scene graph sidecar for RiftFlythrough. One world.json per NIF, recording NiNode transforms, parent-child tree, and NiMesh attachments.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "NifVersion",
+    "nif_hash",
+    "NodeCount",
+    "MeshCount",
+    "MeshesAttached",
+    "Nodes",
+    "Meshes"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "scene-graph/v1" },
+    "NifVersion": {
+      "type": "string",
+      "description": "Gamebryo NIF version string (e.g., '20.6.0.0')"
+    },
+    "nif_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "16-char lowercase hex NIF asset identifier"
+    },
+    "NodeCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of NiNode blocks in the NIF"
+    },
+    "MeshCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of NiMesh blocks in the NIF"
+    },
+    "MeshesAttached": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of NiMesh blocks successfully attached to a parent NiNode"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of scene graph extraction"
+    },
+    "probe_command": {
+      "type": "string",
+      "description": "Full probe-nif-scene-graph command that produced this output"
+    },
+    "Nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/NodeInfo" },
+      "description": "All NiNode blocks in block-index order"
+    },
+    "Meshes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/MeshInfo" },
+      "description": "All NiMesh blocks with parent-node attachment"
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "NodeInfo": {
+      "type": "object",
+      "required": [
+        "BlockIndex",
+        "Translation",
+        "Rotation",
+        "Scale",
+        "Children",
+        "Effects",
+        "ChildNodes",
+        "NodeSize"
+      ],
+      "properties": {
+        "BlockIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "NIF block index of this NiNode"
+        },
+        "Name": {
+          "type": ["string", "null"],
+          "description": "NiNode name (null or 'SceneNode' for unnamed root)"
+        },
+        "Translation": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "[x, y, z] translation in local space"
+        },
+        "Rotation": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 9,
+          "maxItems": 9,
+          "description": "3x3 rotation matrix flattened row-major [r11, r12, r13, r21, r22, r23, r31, r32, r33]"
+        },
+        "Scale": {
+          "type": "number",
+          "description": "Uniform scale factor (1.0 = identity)"
+        },
+        "ExtraData": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Extra data refs attached to this node"
+        },
+        "Controller": {
+          "type": "integer",
+          "description": "Controller ref (-1 = none)"
+        },
+        "Children": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Raw block indices referenced as children (properties, sub-nodes, meshes)"
+        },
+        "Effects": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Raw block indices referenced as effects (sub-nodes, meshes)"
+        },
+        "ChildNodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ChildRef" },
+          "description": "Resolved child block references with type names"
+        },
+        "NodeSize": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the NiNode block in bytes"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "ChildRef": {
+      "type": "object",
+      "required": ["BlockIndex", "TypeName", "Size"],
+      "properties": {
+        "BlockIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "NIF block index of the child"
+        },
+        "TypeName": {
+          "type": "string",
+          "description": "Gamebryo block type (e.g., 'NiMesh', 'NiNode', 'NiMaterialProperty')"
+        },
+        "Size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the child block in bytes"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "MeshInfo": {
+      "type": "object",
+      "required": ["BlockIndex", "Size", "ParentNiNodeIndex"],
+      "properties": {
+        "BlockIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "NIF block index of this NiMesh"
+        },
+        "Size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the NiMesh block in bytes"
+        },
+        "ParentNiNodeIndex": {
+          "type": ["integer", "null"],
+          "description": "Block index of the parent NiNode (null if unattached, resolved via Effects list)"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

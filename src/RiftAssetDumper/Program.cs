@@ -211,6 +211,11 @@ internal static class Program
         return PlanNifBundleArchives(options);
       }
 
+      if (options.Command == "probe-nif-scene-graph")
+      {
+        return ProbeNifSceneGraph(options);
+      }
+
       var report = Probe(options.RootDirectory);
       PrintReport(report, options.RedactPaths);
 
@@ -2012,6 +2017,228 @@ internal static class Program
 
     Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
     return header.Warnings.Count == 0 ? 0 : 2;
+  }
+
+  /// <summary>
+  /// Extracts the scene graph from a NIF by parsing NiNode blocks for transforms
+  /// and parent-child hierarchy. Outputs a JSON report with the full tree.
+  /// </summary>
+  private static int ProbeNifSceneGraph(AppOptions options)
+  {
+    var rootDirectory = Path.GetFullPath(options.RootDirectory);
+    var (payload, _) = LoadPayloadForProbe(options, rootDirectory);
+    var detected = DetectFileType(payload);
+    if (detected.Extension != "nif")
+    {
+      Console.Error.WriteLine($"ERROR: target payload is detected as '{detected.Extension}', not 'nif'.");
+      return 1;
+    }
+
+    var header = ParseNifHeader(payload);
+    var nodeInfos = new List<NifSceneGraphNodeInfo>();
+
+    // Find all NiNode blocks
+    var niNodeBlocks = header.Blocks
+        .Where(static b => string.Equals(b.TypeName, "NiNode", StringComparison.OrdinalIgnoreCase))
+        .OrderBy(static b => b.Index)
+        .ToList();
+
+    // Find all NiMesh blocks for attachment reference
+    var niMeshBlocks = header.Blocks
+        .Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase))
+        .OrderBy(static b => b.Index)
+        .ToList();
+
+    // Resolve string references
+    var stringTable = header.Strings.Select(static s => s.Value).ToList();
+
+    foreach (var nodeBlock in niNodeBlocks)
+    {
+      var nodePayload = SliceNifBlockPayload(payload, nodeBlock);
+      // Minimum NiNode size: Name(4) + NumExtraData(4) + Controller(4) +
+      //   Flags(2) + Translation(12) + Rotation(36) + Scale(4) + NumChildren(4) = 70 bytes
+      if (nodePayload.Length < 0x40)
+      {
+        Console.Error.WriteLine($"WARNING: NiNode #{nodeBlock.Index} payload too short ({nodePayload.Length} bytes), skipping.");
+        continue;
+      }
+
+      // Parse NiObjectNET fields (dynamically, since ExtraData list is variable-length)
+      var nameStrIdx = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload[..4]);
+      var numExtraData = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(4, 4));
+
+      // Resolve name via string table (nameStrIdx is a string table index)
+      string? nodeName = null;
+      if (nameStrIdx < stringTable.Count)
+      {
+        nodeName = stringTable[checked((int)nameStrIdx)];
+      }
+
+      // Parse extra data refs (variable-length list starts at +0x08)
+      var extraDataRefs = new List<int>();
+      var offset = 8;
+      for (var i = 0; i < (int)Math.Min(numExtraData, 32) && offset + 4 <= nodePayload.Length; i++)
+      {
+        var edRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
+        extraDataRefs.Add(edRef);
+        offset += 4;
+      }
+
+      // Controller (4 bytes, int32, -1 = no controller)
+      var controller = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
+      offset += 4;
+
+      // Flags (2 bytes, uint16 — NOT 4 bytes, which was the root cause of the 2-byte offset shift)
+      // Skip past flags (we don't decode them currently)
+      offset += 2;
+
+      // Translation (12 bytes = 3 × float32 LE)
+      var tx = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset, 4));
+      var ty = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + 4, 4));
+      var tz = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + 8, 4));
+      offset += 12;
+
+      // Rotation (36 bytes = 9 × float32 LE, 3×3 row-major matrix)
+      var rotation = new float[9];
+      for (var r = 0; r < 9; r++)
+      {
+        rotation[r] = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + r * 4, 4));
+      }
+      offset += 36;
+
+      // Scale (4 bytes = 1 × float32 LE)
+      var scale = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset, 4));
+      offset += 4;
+
+      // Parse children list (starts after scale)
+      var numChildren = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(offset, 4));
+      offset += 4;
+      var childrenRefs = new List<int>();
+      for (var i = 0; i < (int)Math.Min(numChildren, 128) && offset + 4 <= nodePayload.Length; i++)
+      {
+        var childRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
+        childrenRefs.Add(childRef);
+        offset += 4;
+      }
+
+      // Parse effects list (after children + sentinel -1)
+      var effectsRefs = new List<int>();
+      // Skip sentinel (-1 = 0xFFFFFFFF) if present
+      if (offset + 4 <= nodePayload.Length)
+      {
+        var sentinel = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
+        if (sentinel == -1)
+        {
+          offset += 4;
+        }
+      }
+
+      // Read num effects
+      if (offset + 4 <= nodePayload.Length)
+      {
+        var numEffects = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(offset, 4));
+        offset += 4;
+        for (var i = 0; i < (int)Math.Min(numEffects, 128) && offset + 4 <= nodePayload.Length; i++)
+        {
+          var effectRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
+          effectsRefs.Add(effectRef);
+          offset += 4;
+        }
+      }
+
+      // Build child node info by resolving block indices to types
+      var childNodes = new List<NifSceneGraphChildInfo>();
+      foreach (var childIdx in childrenRefs.Concat(effectsRefs))
+      {
+        if (childIdx < 0 || childIdx >= header.Blocks.Count)
+        {
+          continue;
+        }
+
+        var childBlock = header.Blocks[childIdx];
+        childNodes.Add(new NifSceneGraphChildInfo(
+            childIdx, childBlock.TypeName, childBlock.Size));
+      }
+
+      nodeInfos.Add(new NifSceneGraphNodeInfo(
+          BlockIndex: nodeBlock.Index,
+          Name: nodeName,
+          Translation: new[] { tx, ty, tz },
+          Rotation: rotation,
+          Scale: scale,
+          ExtraData: extraDataRefs,
+          Controller: controller,
+          Children: childrenRefs,
+          Effects: effectsRefs,
+          ChildNodes: childNodes,
+          NodeSize: nodeBlock.Size));
+    }
+
+    // Build mesh attachment map: which NiNode each NiMesh belongs to
+    var meshAttachments = new List<NifSceneGraphMeshInfo>();
+    foreach (var meshBlock in niMeshBlocks)
+    {
+      int? parentNode = null;
+      foreach (var nodeInfo in nodeInfos)
+      {
+        if (nodeInfo.Effects.Contains(meshBlock.Index))
+        {
+          parentNode = nodeInfo.BlockIndex;
+          break;
+        }
+
+        if (nodeInfo.Children.Contains(meshBlock.Index))
+        {
+          parentNode = nodeInfo.BlockIndex;
+          break;
+        }
+      }
+
+      meshAttachments.Add(new NifSceneGraphMeshInfo(
+          BlockIndex: meshBlock.Index,
+          Size: meshBlock.Size,
+          ParentNiNodeIndex: parentNode));
+    }
+
+    // Fallback: if mesh has no explicit parent, attach to first NiNode
+    for (var i = 0; i < meshAttachments.Count; i++)
+    {
+      if (meshAttachments[i].ParentNiNodeIndex is null && nodeInfos.Count > 0)
+      {
+        meshAttachments[i] = meshAttachments[i] with { ParentNiNodeIndex = nodeInfos[0].BlockIndex };
+      }
+    }
+
+    var report = new NifSceneGraphReport(
+        NifVersion: header.VersionText,
+        NodeCount: nodeInfos.Count,
+        MeshCount: niMeshBlocks.Count,
+        MeshesAttached: meshAttachments.Count(static m => m.ParentNiNodeIndex is not null),
+        Nodes: nodeInfos,
+        Meshes: meshAttachments);
+
+    var outPath = ResolveOutputPath(rootDirectory, options.OutDirectory, "nif-scene-graph.json");
+    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
+
+    Console.WriteLine($"NIF scene graph: version={header.VersionText}");
+    Console.WriteLine($"NiNode blocks: {nodeInfos.Count}");
+    Console.WriteLine($"NiMesh blocks: {niMeshBlocks.Count}");
+    Console.WriteLine($"Meshes attached: {meshAttachments.Count(static m => m.ParentNiNodeIndex is not null)}");
+    Console.WriteLine();
+    foreach (var node in nodeInfos)
+    {
+      Console.WriteLine($"NiNode #{node.BlockIndex}: name=\"{node.Name}\" translation=({node.Translation[0]:F4},{node.Translation[1]:F4},{node.Translation[2]:F4}) scale={node.Scale:F4} children={node.Children.Count} effects={node.Effects.Count}");
+    }
+
+    foreach (var mesh in meshAttachments)
+    {
+      Console.WriteLine($"NiMesh #{mesh.BlockIndex}: size={mesh.Size} parent=#{mesh.ParentNiNodeIndex}");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
+    return 0;
   }
 
   /// <summary>
@@ -14267,7 +14494,12 @@ internal static class Program
     var options = new JsonSerializerOptions
     {
       WriteIndented = true,
-      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+      DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+      // Allow NaN / +Infinity / -Infinity in float fields (e.g. NiNode rotation matrix
+      // cells) to be serialized as the named JSON literals "NaN", "Infinity", "-Infinity"
+      // instead of throwing. Required for probe-nif-scene-graph where some RIFT NiNode
+      // blocks carry non-finite rotation/scale floats (FT-4.3 pilot fix).
+      NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
     };
     if (redactPaths)
     {
@@ -14453,6 +14685,7 @@ internal static class Program
           case "inventory-nif-bundles":
           case "probe-nif-position-source":
           case "plan-nif-bundle-archives":
+          case "probe-nif-scene-graph":
           case "validate-uint16-positions":
             command = arg;
             break;
@@ -15629,6 +15862,37 @@ internal sealed record NifStringInfo(int Index, string Value);
 internal sealed record NifReferenceInfo(int StringIndex, string Value);
 
 internal sealed record TextureCandidate(string Candidate, string Kind);
+
+internal sealed record NifSceneGraphReport(
+    string NifVersion,
+    int NodeCount,
+    int MeshCount,
+    int MeshesAttached,
+    List<NifSceneGraphNodeInfo> Nodes,
+    List<NifSceneGraphMeshInfo> Meshes);
+
+internal sealed record NifSceneGraphNodeInfo(
+    int BlockIndex,
+    string? Name,
+    float[] Translation,
+    float[] Rotation,
+    float Scale,
+    List<int> ExtraData,
+    int Controller,
+    List<int> Children,
+    List<int> Effects,
+    List<NifSceneGraphChildInfo> ChildNodes,
+    uint NodeSize);
+
+internal sealed record NifSceneGraphChildInfo(
+    int BlockIndex,
+    string TypeName,
+    uint Size);
+
+internal sealed record NifSceneGraphMeshInfo(
+    int BlockIndex,
+    uint Size,
+    int? ParentNiNodeIndex);
 
 internal sealed record NifInventoryReport(
     string RootDirectory,
