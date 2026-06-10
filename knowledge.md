@@ -19,6 +19,8 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 | `dotnet format RiftAssetDumper.slnx --verify-no-changes` | Check formatting |
 | `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- --help` | Run CLI |
 | `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- probe-nif-scene-graph --id <hex>` | Extract NIF scene graph (transforms, parent-child) to JSON (FT-4.2) |
+| `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- link-nif-textures --root <live>` | Extract NIF→texture reference links via FNV1 hash matching (9,434 links) |
+| `dotnet run --project src/RiftAssetDumper/RiftAssetDumper.csproj -- extract-linked-textures --root <live> --input <links.jsonl>` | Extract DDS textures from archives for linked references |
 
 ### PowerShell workflow helper (thin wrapper)
 
@@ -49,6 +51,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | Command | Purpose | FT |
 |---------|---------|:---:|
 | `python scripts/dump_textures_for_flythrough.py [--limit N] [--dry-run]` | DDS → PNG conversion at scale for RiftFlythrough | FT-1 |
+| `python scripts/link_flythrough_textures.py` | Texture-linking bridge: converts extracted DDS→PNG, populates `linked_textures` in flythrough-index.json | FT-textures |
+| `python scripts/link_flythrough_textures.py --status` | Show texture-link coverage stats for flythrough models | FT-textures |
 | `python scripts/bulk_export_for_flythrough.py run [--limit N] [--use-probe-lookup] [--resume] [--out <dir>]` | Bulk NIF → OBJ export with two-pass decode, mesh-block retry, dedup | FT-2 |
 | `python scripts/bulk_export_for_flythrough.py status / verify / clean` | Inspect / verify / clean a bulk-export run | FT-2 |
 | `python scripts/bulk_export_for_flythrough.py --help` | Full subcommand help | FT-2 |
@@ -93,7 +97,7 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 - **Key commands (inventory):** `inventory-nif-mesh-bindings`, `inventory-nif-mesh-streams`, `inventory-nif-stream-headers`, `inventory-nif-stream-bodies`, `inventory-nif-stream-endianness`, `inventory-nif-index-candidates`, `inventory-nif-blocks`, `inventory-asset-signatures`, `inventory-archives`
 - **Key commands (probe):** `probe-nif-mesh`, `probe-nif-streams`, `probe-nif-stream-body`, `probe-nif-attribute-extra`, `probe-nif`, `probe-nif-scene-graph` (FT-4.2), `probe-binary`, `probe`
 - **Key commands (export):** `decode-nif-geometry` (supports `--experimental-position-source`, `--write-obj`, `--export-obj`, `--out`)
-- **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`
+- **Key commands (bundle):** `extract-nif-bundle`, `extract-nif-bundles`, `plan-nif-bundle-archives`, `link-nif-textures`, `extract-linked-textures`
 - **Key commands (utility):** `hash-name`, `match-ids`, `match-names`, `list-paks`, `list-entries`, `scan-compression`, `mine-strings`
 - **Tests:** xUnit in `src/RiftAssetDumper.Tests/` (55 tests, all pass — includes 4 NifSceneGraph record smoke tests for FT-4.2)
 
@@ -202,9 +206,10 @@ Two parallel jobs on `windows-latest`:
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
-- **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, textures for RiftFlythrough Phase 21
+- **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, **textures** (207/217 assets, 626 linked PNGs) for RiftFlythrough Phase 21
+- **Texture discovery pipeline**: `link-nif-textures` → 9,434 NIF→texture links → filtered to 650 flythrough links (222 unique DDS) → `extract-linked-textures` (222 DDS extracted, 0 failures) → `link_flythrough_textures.py` (DDS→PNG conversion, populates `linked_textures` in flythrough-index.json)
 - **RiftFlythrough bridge**: `build_world_placed_merge.py` → `world-placed-merged.obj` (2.5MB, 72,976 lines, 217 assets, 4 non-identity transforms) copied to `C:\RIFT MODDING\RiftFlythrough\merged.obj`; `transform_loader.js` (4KB) copied to `RiftFlythrough/js/` for runtime manifest-based transform application
-- CI green: build 0 errors, tests 55/55 (C#), pytest 88/88, ruff 0, mypy 0
+- CI green: build 0 errors, tests 55/55 (C#), pytest all green, ruff 0, mypy 0
 
 ## Conventions
 
