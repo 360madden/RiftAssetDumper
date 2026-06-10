@@ -53,6 +53,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/dump_textures_for_flythrough.py [--limit N] [--dry-run]` | DDS → PNG conversion at scale for RiftFlythrough | FT-1 |
 | `python scripts/link_flythrough_textures.py` | Texture-linking bridge: converts extracted DDS→PNG, populates `linked_textures` in flythrough-index.json | FT-textures |
 | `python scripts/link_flythrough_textures.py --status` | Show texture-link coverage stats for flythrough models | FT-textures |
+| `python scripts/build_texture_map.py` | Build RiftFlythrough `texture_map.js` from flythrough-index.json linked_textures (626 entries, 207 assets) | FT-textures |
+| `python scripts/build_texture_map.py --copy-textures` | Also sync linked PNG textures to RiftFlythrough `textures/converted/` | FT-textures |
 | `python scripts/bulk_export_for_flythrough.py run [--limit N] [--use-probe-lookup] [--resume] [--out <dir>]` | Bulk NIF → OBJ export with two-pass decode, mesh-block retry, dedup | FT-2 |
 | `python scripts/bulk_export_for_flythrough.py status / verify / clean` | Inspect / verify / clean a bulk-export run | FT-2 |
 | `python scripts/bulk_export_for_flythrough.py --help` | Full subcommand help | FT-2 |
