@@ -103,7 +103,7 @@ Each asset entry links to its world.json, OBJ path, LOD level, and MeshSize fami
 
 | Gap | Detail | Impact |
 |---|---|---|
-| 6 orphan-mesh world.jsons | Single-node single-mesh NIFs: Mesh#7 has ParentNiNodeIndex=0 but Node#0's Children/Effects omit block 7. Pipeline resolves via ParentNiNodeIndex → correct identity transform. | Zero visual impact — these are root-level meshes, identity is correct |
+| 6 orphan-mesh world.jsons | ✅ RESOLVED — all 6 are single-node single-mesh NIFs where Mesh#7 has ParentNiNodeIndex=0 but Node#0's Children/Effects omit block 7. Pipeline resolves correctly via ParentNiNodeIndex (not a fallback). 4 regression tests added (`TestOrphanMeshResolution`). | Zero visual impact — root-level meshes, identity is correct |
 | Probe-lookup subset limited | 7/56 (12.5%) export success; inventory built from deleted Source/ | Pipeline proven; needs fresh live-archive inventory for full coverage |
 | Zone partitioning skipped | Zone metadata is render config, not terrain partitioning (FT-7.1 negative) | Deferred to RiftFlythrough-side zone discovery |
 | FT-8 mod-injection skipped | Conflicts with read-only archive research mandate | Can be resurrected with safety review if needed |
