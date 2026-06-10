@@ -63,6 +63,9 @@ disable_error_code = [
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+disable_error_code = [
+    "no-untyped-def",   # pytest fixture parameters and test helpers
+]
 
 [[tool.mypy.overrides]]
 module = "src.*"

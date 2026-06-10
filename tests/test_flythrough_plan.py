@@ -180,11 +180,11 @@ class _FakeArgsBuild:
             setattr(self, k, v)
 
 
-def test_cmd_build_with_skip_textures_runs_only_bulk_export(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_cmd_build_with_skip_textures_runs_only_bulk_export(monkeypatch) -> None:
     """Verify build with --skip-textures only runs bulk-export stage."""
     stages_run: list[str] = []
 
-    def _fake_run(cmd, **_: object):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **_: object):
         cmd_str = " ".join(str(c) for c in cmd)
         stages_run.append(cmd_str)
         import subprocess as sp
@@ -211,11 +211,11 @@ def test_cmd_build_with_skip_textures_runs_only_bulk_export(monkeypatch) -> None
         assert reloaded["build_stages"]["bulk_export"] == "done"
 
 
-def test_cmd_build_resume_skips_done_stages(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_cmd_build_resume_skips_done_stages(monkeypatch) -> None:
     """Verify --resume skips already-completed stages."""
     stages_run: list[str] = []
 
-    def _fake_run(cmd, **_: object):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **_: object):
         cmd_str = " ".join(str(c) for c in cmd)
         stages_run.append(cmd_str)
         import subprocess as sp
@@ -240,10 +240,10 @@ def test_cmd_build_resume_skips_done_stages(monkeypatch) -> None:  # type: ignor
         assert len(stages_run) == 0
 
 
-def test_cmd_build_failure_sets_failed_and_returns_one(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_cmd_build_failure_sets_failed_and_returns_one(monkeypatch) -> None:
     """Verify build failure records error and returns 1."""
 
-    def _fake_run(cmd, **_: object):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **_: object):
         import subprocess as sp
 
         return sp.CompletedProcess(cmd, 1, stdout="", stderr="SIMULATED FAILURE")
@@ -264,10 +264,10 @@ def test_cmd_build_failure_sets_failed_and_returns_one(monkeypatch) -> None:  # 
         assert "bulk_export_error" in reloaded["build_stages"]
 
 
-def test_cmd_build_populates_build_stages(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_cmd_build_populates_build_stages(monkeypatch) -> None:
     """Verify build stages are recorded in state with full pipeline (textures + bulk)."""
 
-    def _fake_run(cmd, **_: object):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **_: object):
         import subprocess as sp
 
         return sp.CompletedProcess(cmd, 0, stdout="", stderr="")
