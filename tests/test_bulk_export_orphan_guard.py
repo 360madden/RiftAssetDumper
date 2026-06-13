@@ -39,25 +39,22 @@ from scripts.bulk_export_for_flythrough import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def test_force_orphan_guard_flag_recognized_on_run():
+@pytest.mark.parametrize(
+    "subcommand,extra_args",
+    [
+        pytest.param("run", ["--limit", "1"], id="run"),
+        pytest.param("status", [], id="status"),
+        pytest.param("scene-graph-only", [], id="scene_graph_only"),
+    ],
+)
+def test_force_orphan_guard_flag_recognized_on_subcommand(subcommand: str, extra_args: list[str]) -> None:
+    """--force-orphan-guard is recognized on every subcommand that uses it."""
     parser = _build_parser()
-    args = parser.parse_args(["run", "--force-orphan-guard", "--limit", "1"])
+    args = parser.parse_args([subcommand, "--force-orphan-guard", *extra_args])
     assert args.force_orphan_guard is True
 
 
-def test_force_orphan_guard_flag_recognized_on_status():
-    parser = _build_parser()
-    args = parser.parse_args(["status", "--force-orphan-guard"])
-    assert args.force_orphan_guard is True
-
-
-def test_force_orphan_guard_flag_recognized_on_scene_graph_only():
-    parser = _build_parser()
-    args = parser.parse_args(["scene-graph-only", "--force-orphan-guard"])
-    assert args.force_orphan_guard is True
-
-
-def test_force_orphan_guard_default_false():
+def test_force_orphan_guard_default_false() -> None:
     parser = _build_parser()
     args = parser.parse_args(["run", "--limit", "1"])
     assert args.force_orphan_guard is False
@@ -68,13 +65,13 @@ def test_force_orphan_guard_default_false():
 # ---------------------------------------------------------------------------
 
 
-def test_bypass_set_includes_read_only_commands():
+def test_bypass_set_includes_read_only_commands() -> None:
     assert "status" in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS
     assert "verify" in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS
     assert "clean" in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS
 
 
-def test_bypass_set_excludes_long_running_commands():
+def test_bypass_set_excludes_long_running_commands() -> None:
     assert "run" not in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS
     assert "scene-graph-only" not in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS
 
@@ -84,60 +81,37 @@ def test_bypass_set_excludes_long_running_commands():
 # ---------------------------------------------------------------------------
 
 
-def test_main_runs_guard_for_run_subcommand(monkeypatch):
-    """run subcommand must invoke the guard (since it spawns RiftAssetDumper)."""
-    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "run", "--limit", "1"])
+@pytest.mark.parametrize(
+    "subcommand,handler_name,extra_args,should_invoke",
+    [
+        pytest.param("run", "_cmd_run", ["--limit", "1"], True, id="run"),
+        pytest.param("scene-graph-only", "_cmd_scene_graph_only", ["--limit", "1"], True, id="scene_graph_only"),
+        pytest.param("status", "_cmd_status", [], False, id="status"),
+        pytest.param("verify", "_cmd_verify", [], False, id="verify"),
+        pytest.param("clean", "_cmd_clean", ["--yes"], False, id="clean"),
+    ],
+)
+def test_main_guard_invocation(
+    monkeypatch: pytest.MonkeyPatch,
+    subcommand: str,
+    handler_name: str,
+    extra_args: list[str],
+    should_invoke: bool,
+) -> None:
+    """run/scene-graph-only invoke the guard; status/verify/clean bypass it."""
+    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", subcommand, *extra_args])
     with patch("scripts.bulk_export_for_flythrough._orphan_process_guard", return_value=0) as mock_guard:
-        with patch("scripts.bulk_export_for_flythrough._cmd_run", return_value=0):
+        with patch(f"scripts.bulk_export_for_flythrough.{handler_name}", return_value=0):
             rc = main()
     assert rc == 0
-    mock_guard.assert_called_once()
-    # Without --force-orphan-guard, force should be False
-    assert mock_guard.call_args.kwargs.get("force") is False
+    if should_invoke:
+        mock_guard.assert_called_once()
+        assert mock_guard.call_args.kwargs.get("force") is False
+    else:
+        mock_guard.assert_not_called()
 
 
-def test_main_runs_guard_for_scene_graph_only(monkeypatch):
-    """scene-graph-only spawns dotnet run probe-nif-scene-graph — must be guarded."""
-    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "scene-graph-only", "--limit", "1"])
-    with patch("scripts.bulk_export_for_flythrough._orphan_process_guard", return_value=0) as mock_guard:
-        with patch("scripts.bulk_export_for_flythrough._cmd_scene_graph_only", return_value=0):
-            rc = main()
-    assert rc == 0
-    mock_guard.assert_called_once()
-    assert mock_guard.call_args.kwargs.get("force") is False
-
-
-def test_main_bypasses_guard_for_status(monkeypatch):
-    """status is read-only and must not invoke the guard."""
-    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "status"])
-    with patch("scripts.bulk_export_for_flythrough._orphan_process_guard") as mock_guard:
-        with patch("scripts.bulk_export_for_flythrough._cmd_status", return_value=0):
-            rc = main()
-    assert rc == 0
-    mock_guard.assert_not_called()
-
-
-def test_main_bypasses_guard_for_verify(monkeypatch):
-    """verify is read-only (just SHA1s existing OBJs) and must not invoke the guard."""
-    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "verify"])
-    with patch("scripts.bulk_export_for_flythrough._orphan_process_guard") as mock_guard:
-        with patch("scripts.bulk_export_for_flythrough._cmd_verify", return_value=0):
-            rc = main()
-    assert rc == 0
-    mock_guard.assert_not_called()
-
-
-def test_main_bypasses_guard_for_clean(monkeypatch):
-    """clean is local-only filesystem deletion and must not invoke the guard."""
-    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "clean", "--yes"])
-    with patch("scripts.bulk_export_for_flythrough._orphan_process_guard") as mock_guard:
-        with patch("scripts.bulk_export_for_flythrough._cmd_clean", return_value=0):
-            rc = main()
-    assert rc == 0
-    mock_guard.assert_not_called()
-
-
-def test_main_propagates_system_exit_when_guard_refuses(monkeypatch):
+def test_main_propagates_system_exit_when_guard_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
     """If the guard calls sys.exit(2), main() must propagate that exit code."""
     monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", "run", "--limit", "1"])
     with patch("scripts.bulk_export_for_flythrough._orphan_process_guard", side_effect=SystemExit(2)):
@@ -146,7 +120,7 @@ def test_main_propagates_system_exit_when_guard_refuses(monkeypatch):
     assert exc_info.value.code == 2
 
 
-def test_main_force_orphan_guard_forwards_force_true(monkeypatch):
+def test_main_force_orphan_guard_forwards_force_true(monkeypatch: pytest.MonkeyPatch) -> None:
     """--force-orphan-guard must be forwarded to the guard as force=True."""
     monkeypatch.setattr(
         sys,
@@ -222,9 +196,7 @@ def test_bypass_command_does_not_spawn_riftassetdumper_detection(monkeypatch, co
         for call in _BULK_FAKE_SUBPROCESS_CALLS
         if "tasklist" in call or ("pgrep" in call and "riftassetdumper" in call)
     ]
-    assert not offending, (
-        f"Bypass command {command!r} triggered RiftAssetDumper detection: {offending}"
-    )
+    assert not offending, f"Bypass command {command!r} triggered RiftAssetDumper detection: {offending}"
 
 
 @pytest.mark.parametrize("command", sorted(_BULK_ORPHAN_GUARD_BYPASS_COMMANDS))
