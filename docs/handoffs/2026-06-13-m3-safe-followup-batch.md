@@ -60,7 +60,7 @@ The 4-commit batch was selected from the 10-item M3-safety matrix with these cri
 - **Reversible** — every change can be undone via `git revert` (or `git tag -d` / `gh secret delete` for tag-style changes).
 - **Bounded** — single-file or single-config-block changes; no cross-cutting refactors.
 - **Testable** — each change has a clear validation gate (markdownlint for docs, ruff + mypy + test run for Python, yaml.safe_load for ci.yml).
-- **Single-file or minimal cross-file** — knowledge.md is one file; ci.yml is one config; invariant test is one new file; handoff is one new file.
+- **Single-file** — knowledge.md is one file; ci.yml is one config; invariant test is one new file; handoff is one new file.
 
 Deferred (not M3-safe for the M3 lane):
 

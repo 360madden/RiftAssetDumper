@@ -25,26 +25,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from rift_workflow import POST50_POSITION_SOURCE_REPORTS  # noqa: E402
 
-REPORT_FILENAMES: set[str] = set(POST50_POSITION_SOURCE_REPORTS.values())
+
+def get_report_filenames() -> set[str]:
+    """Return a fresh snapshot of POST50_POSITION_SOURCE_REPORTS filenames.
+
+    Encapsulated as a function so callers always see the current state of
+    the registry rather than a frozen module-level snapshot.
+    """
+    return set(POST50_POSITION_SOURCE_REPORTS.values())
 
 
-def _collect_fixture_writes(test_file: Path) -> set[str]:
+def _collect_fixture_writes(test_file: Path, report_filenames: set[str]) -> set[str]:
     """Parse a Python file and collect all string literals that look like
     fixture filenames (matching known POST50 report filenames).
 
     This intentionally uses AST (not regex) to be robust against cosmetic
     changes like quoting, line wrapping, and trailing punctuation.
     """
+    source = test_file.read_text(encoding="utf-8")
+    tree = ast.parse(source)
     fixture_files: set[str] = set()
-    try:
-        source = test_file.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-    except SyntaxError, UnicodeDecodeError, OSError:
-        return fixture_files
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            if node.value in REPORT_FILENAMES:
+            if node.value in report_filenames:
                 fixture_files.add(node.value)
     return fixture_files
 
@@ -54,14 +58,15 @@ def test_all_reports_have_fixtures() -> None:
     in some scripts/test_post50_*.py file."""
     test_dir = Path(__file__).resolve().parent
     test_files = sorted(test_dir.glob("test_post50_*.py"))
+    report_filenames = get_report_filenames()
 
     per_file: dict[str, set[str]] = {}
     all_fixtures: set[str] = set()
     for tf in test_files:
-        per_file[tf.name] = _collect_fixture_writes(tf)
+        per_file[tf.name] = _collect_fixture_writes(tf, report_filenames)
         all_fixtures.update(per_file[tf.name])
 
-    missing = REPORT_FILENAMES - all_fixtures
+    missing = report_filenames - all_fixtures
     assert not missing, (
         f"Reports in POST50_POSITION_SOURCE_REPORTS with no fixture writer in "
         f"any test_post50_*.py file: {sorted(missing)}\n"
@@ -75,11 +80,12 @@ def test_no_orphan_fixtures() -> None:
     whose fixture was left behind."""
     test_dir = Path(__file__).resolve().parent
     test_files = sorted(test_dir.glob("test_post50_*.py"))
+    report_filenames = get_report_filenames()
 
     orphans: list[tuple[str, str]] = []
     for tf in test_files:
-        for fixture in _collect_fixture_writes(tf):
-            if fixture not in REPORT_FILENAMES:
+        for fixture in _collect_fixture_writes(tf, report_filenames):
+            if fixture not in report_filenames:
                 orphans.append((tf.name, fixture))
 
     assert not orphans, f"Test files referencing fixtures not in POST50_POSITION_SOURCE_REPORTS: {orphans}"
@@ -87,6 +93,7 @@ def test_no_orphan_fixtures() -> None:
 
 if __name__ == "__main__":
     test_all_reports_have_fixtures()
-    print(f"PASS: all {len(REPORT_FILENAMES)} reports in POST50_POSITION_SOURCE_REPORTS have fixture writers")
+    report_filenames = get_report_filenames()
+    print(f"PASS: all {len(report_filenames)} reports in POST50_POSITION_SOURCE_REPORTS have fixture writers")
     test_no_orphan_fixtures()
     print("PASS: no orphan fixture references in test_post50_*.py files")

@@ -320,8 +320,8 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 ## Recent Phase 1 milestones
 
 - **M1.1 (329-family attribute/role matrix)** — ✅ COMPLETE. 12 IDs / 12 paired comparisons / 24 matrix rows. Handoff: `docs/handoffs/draft-2026-06-m1.1-329-matrix.md`. Artifacts: `Exports/mesh329-family-attribute-role-matrix.{json,md,csv}`. Schema: `docs/schemas/329-family-attribute-role-matrix-v1.schema.json`. Key finding: mesh#7 variants have `AttributeSets=1`, mesh#34 variants have `AttributeSets=0` with @304 re-scored as position-float3-ror1-lead (c=75) in 12/12 paired cases.
-- **M1.2 (@304 extra stream classification on mesh#34)** — 🔄 IN PROGRESS. Builds on M1.1 matrix. Handoff: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md`. Uses M1.1 `IDsCovered` as controlled target list.
-- **M1.3 (sibling source-binding guard)** — 📝 DRAFT. Builds on M1.1 + M1.2. Handoff: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md`. Uses M1.1 matrix IDs as targets.
+- **M1.2 (@304 extra stream classification on mesh#34)** — ⏳ IN PROGRESS. Builds on M1.1 matrix. Handoff: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md`. Uses M1.1 `IDsCovered` as controlled target list.
+- **M1.3 (sibling source-binding guard)** — ⏳ DRAFT. Builds on M1.1 + M1.2. Handoff: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md`. Uses M1.1 matrix IDs as targets.
 
 ## Agent model strategy
 
