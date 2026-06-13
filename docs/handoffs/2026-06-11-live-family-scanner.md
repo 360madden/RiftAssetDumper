@@ -17,6 +17,7 @@ All from `assets.002` in the live install, all using `--experimental-position-so
 ## Live Family Scanner (`scripts/live_family_scanner.py`)
 
 New Python script that:
+
 - Reads live mesh-binding inventory (handles UTF-8 BOM)
 - Extracts families not in the 29 known copied-set families
 - Ranks by export viability (position > normal > UV > index)
