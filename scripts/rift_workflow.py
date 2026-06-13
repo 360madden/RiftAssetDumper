@@ -9031,58 +9031,9 @@ from scripts.rift_orphan_guard import (  # noqa: E402,F401
 # ``tests/test_rift_workflow_orphan_guard.py`` parameterizes over this
 # set and asserts no ``tasklist``/``pgrep RiftAssetDumper`` subprocess
 # is spawned for any member.
-_ORPHAN_GUARD_BYPASS_COMMANDS: frozenset[str] = frozenset(
-    {
-        # CLI meta
-        "--help",
-        "-h",
-        # Tooling inspection
-        "tools-status",
-        "ghidra-dry-run",
-        # Ghidra read-only guards/reports
-        "ghidra-pairing-non-export-guard",
-        "ghidra-attribute-candidate-report",
-        "ghidra-attribute-candidate-guard",
-        "ghidra-workflow-guard-suite",
-        "ghidra-function-site-target-guard",
-        "ghidra-function-site-status",
-        "ghidra-summarize",
-        "ghidra-review-rank-probes-summary",
-        # Plan / post-50 read-only status
-        "fifty-step-plan-status",
-        "post50-position-source-status",
-        "post50-mesh34-negative-binding-status",
-        "post50-mesh34-complete-binding-negative-proof",
-        "post50-mesh329-family-proof",
-        "post50-mesh329-source-binding-compare",
-        "mesh329-attribute-role-matrix",
-        "phase1-m1.2-304-magic-analysis",
-        "phase1-m1.3-329-variant-layout-guard",
-        "post50-promotion-readiness-status",
-        "post50-validation-suite",
-        "post50-residual-strict-threshold-delta",
-        # Python-only analysis reports
-        "position-gap-report",
-        "triage-fallback-candidates",
-        "semantic-hint-crosstab",
-        "discovery-workbench",
-        "generated-output-guard",
-        # NiDataStream read-only status / evidence
-        "nidatastream-descriptor-table-sample",
-        "nidatastream-descriptor-table-sample-status",
-        "nidatastream-descriptor-table-sample-compare",
-        "nidatastream-descriptor-neighborhood-scan",
-        "nidatastream-descriptor-reference-classify",
-        "nidatastream-descriptor-base-model-review",
-        "nidatastream-descriptor-proof-status",
-        "nidatastream-descriptor-sample-compare",
-        "nidatastream-evidence-status",
-        "nidatastream-promotion-status",
-        "nidatastream-promotion-dashboard",
-        "nidatastream-parser-field-proof-guard",
-        "nidatastream-parser-export-non-consumption-guard",
-    }
-)
+_ORPHAN_GUARD_BYPASS_COMMANDS: frozenset[str] = (
+    frozenset()
+)  # see scripts/rift_read_only.py for the peer entry point that owns the 40 read-only commands
 
 
 # ============================================================================

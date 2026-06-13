@@ -81,20 +81,45 @@ jobs:
             *.md
           config: .markdownlint.json
 
+  orphan-guard:
+    name: Orphan Guard Regression
+    runs-on: windows-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run orphan-guard regression tests
+        run: |
+          python -m pytest tests/test_rift_workflow_orphan_guard.py tests/test_rift_workflow_orphan_guard_bypass.py tests/test_bulk_export_orphan_guard.py tests/test_rift_read_only_no_spawn.py -v --no-header
+
   final:
     name: Summary
-    needs: [dotnet, python, lint-docs]
+    needs: [dotnet, python, lint-docs, orphan-guard]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check status
         run: |
-          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ] && [ "${{ needs.lint-docs.result }}" = "success" ]; then
+          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ] && [ "${{ needs.lint-docs.result }}" = "success" ] && [ "${{ needs.orphan-guard.result }}" = "success" ]; then
             echo "✅ All CI checks passed"
           else
             echo "❌ Some CI checks failed"
             echo "  dotnet: ${{ needs.dotnet.result }}"
             echo "  python: ${{ needs.python.result }}"
             echo "  lint-docs: ${{ needs.lint-docs.result }}"
+            echo "  orphan-guard: ${{ needs.orphan-guard.result }}"
             exit 1
           fi
