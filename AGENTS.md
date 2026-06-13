@@ -2,7 +2,8 @@
 
 - After finishing a task, include a short optional section with practical next steps or improvement ideas.
 - Keep next steps brief, relevant, and non-repetitive.
-- Always include optional top 10 suggestions for next best recommended action.
+- Always include optional top 10 followups for the next best recommended action.
+- When invoking the `suggest_followups` tool, default to 10 followups sorted by priority with the highest-leverage followups for the current workflow first.
 - Use emojis and tables when they improve clarity, especially in status reports, milestone summaries, risk summaries, and validation results.
 - After major milestones, provide a detailed human-readable summary that explains what changed, why it matters, what was validated, and what remains uncertain.
 - Continue autonomously on the next safe, relevant task when the user has opened that lane; keep the pace aggressive but preserve safety boundaries around destructive actions, live game interaction, copied assets, and public/privacy-sensitive output.
