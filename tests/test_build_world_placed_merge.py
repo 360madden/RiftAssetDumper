@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -375,9 +376,7 @@ class TestOutputIntegrity:
                         max_idx = max_vals[pos]
                         if idx > max_idx + 4:
                             labels = ["v", "vt", "vn"]
-                            out_of_bounds.append(
-                                (i + 1, f"index {idx} > {max_idx}+4 ({labels[pos]})")
-                            )
+                            out_of_bounds.append((i + 1, f"index {idx} > {max_idx}+4 ({labels[pos]})"))
         # Document but don't fail — these are source OBJ data issues
         if out_of_bounds:
             print(f"\n  [INFO] {len(out_of_bounds)} face indices > max+4 (source OBJ off-by-one, not merge fault)")
@@ -477,8 +476,7 @@ class TestNonIdentityTransforms:
                 if all(abs(v) < 0.001 for v in wtrans):
                     # Translation is zero; rotation of near-origin vertices won't show
                     all_near_origin = all(
-                        abs(v[0]) < 0.01 and abs(v[1]) < 0.01 and abs(v[2]) < 0.01
-                        for v in source_verts
+                        abs(v[0]) < 0.01 and abs(v[1]) < 0.01 and abs(v[2]) < 0.01 for v in source_verts
                     )
                     if all_near_origin:
                         continue  # Expected: rotation doesn't move origin vertices
@@ -544,9 +542,7 @@ class TestOrphanMeshResolution:
             with open(wpath, encoding="utf-8-sig") as f:
                 world_data: dict[str, Any] = json.load(f)
             trans, rot, scale = _compute_world_transform(world_data)
-            assert _is_identity(trans, rot, scale), (
-                f"{aid}: expected identity transform, got trans={trans[:3]}"
-            )
+            assert _is_identity(trans, rot, scale), f"{aid}: expected identity transform, got trans={trans[:3]}"
 
     def test_orphan_vertices_match_source(self, merged_lines: list[str]) -> None:
         """Orphan meshes with identity transforms should have vertices matching source OBJ."""
@@ -592,39 +588,40 @@ class TestOrphanMeshResolution:
                     break
 
         assert checked > 0, "No orphan source OBJs found — nothing verified"
-        assert not mismatches, (
-            f"{len(mismatches)} orphan assets have mismatched vertices: {mismatches[:3]}"
-        )
+        assert not mismatches, f"{len(mismatches)} orphan assets have mismatched vertices: {mismatches[:3]}"
 
 
 class TestIdempotency:
     """Verify the build script produces consistent output."""
 
     def test_second_run_produces_same_output(self) -> None:
-        """Running build_world_placed_merge.py twice produces identical output."""
-        output_path = FLYTHROUGH_DIR / "world-placed-merged.obj"
+        """Running build_world_placed_merge.py twice produces identical output.
+
+        Runs the build twice at the current HEAD and compares the two outputs.
+        Comparing the pre-existing file (from an unknown prior HEAD) to a fresh
+        build at the current HEAD would falsely report a regression whenever
+        the producer_version stamp (git describe) changes between commits.
+        """
+        output_path: Path = FLYTHROUGH_DIR / "world-placed-merged.obj"
         if not output_path.exists():
             pytest.skip("world-placed-merged.obj not built")
 
-        # Read current output
-        lines1 = output_path.read_text(encoding="utf-8")
+        def _run_build() -> str:
+            result = subprocess.run(
+                [sys.executable, str(SCRIPTS_DIR / "build_world_placed_merge.py")],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO_ROOT),
+                timeout=120,
+            )
+            if result.returncode != 0:
+                pytest.skip(f"build_world_placed_merge.py failed: {result.stderr[:200]}")
+            return output_path.read_text(encoding="utf-8")
 
-        # Run build again
-        import subprocess
+        lines1 = _run_build()
+        lines2 = _run_build()
 
-        result = subprocess.run(
-            [sys.executable, str(SCRIPTS_DIR / "build_world_placed_merge.py")],
-            capture_output=True,
-            text=True,
-            cwd=str(REPO_ROOT),
-            timeout=120,
-        )
-        if result.returncode != 0:
-            pytest.skip(f"build_world_placed_merge.py failed: {result.stderr[:200]}")
-
-        lines2 = output_path.read_text(encoding="utf-8")
-
-        # OBJ vertex precision: 6 decimal places
+        # OBJ vertex precision: 6 decimal places (deterministic for a given HEAD)
         assert lines1 == lines2, "Second run produced different output (not idempotent)"
 
 
