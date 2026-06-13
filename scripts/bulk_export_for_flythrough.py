@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 DEFAULT_INVENTORY = REPO_ROOT / "Exports" / "nif-mesh-binding-inventory.json"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs"
 DEFAULT_MANIFEST = REPO_ROOT / "Assets" / "build" / "flythrough" / "bulk-export-manifest.json"
@@ -45,7 +46,22 @@ DEFAULT_PROBE_LOOKUP = REPO_ROOT / "Exports" / "probe-meshsize-lookup.json"
 
 ASSET_ID_RE = re.compile(r"^[0-9a-f]{16}$", re.IGNORECASE)
 
+# Deferred import: scripts.rift_orphan_guard lives outside this script's package
+# and needs REPO_ROOT on sys.path (set above).
+from scripts.rift_orphan_guard import _orphan_process_guard  # noqa: E402
+
 log = logging.getLogger("bulk_export_for_flythrough")
+
+
+# ============================================================================
+# Orphan-process guard
+# ============================================================================
+
+# Bulk-pipeline subcommands that do not spawn a new RiftAssetDumper — they are
+# read-only inspections (status, verify) or local-only filesystem operations
+# (clean). They should bypass the orphan guard so the user can still inspect
+# state, verify OBJs, and clean up while orphans are present.
+_BULK_ORPHAN_GUARD_BYPASS_COMMANDS: frozenset[str] = frozenset({"status", "verify", "clean"})
 
 
 # =============================================================================
@@ -819,6 +835,15 @@ def _build_parser() -> argparse.ArgumentParser:
     common.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     common.add_argument("--project", type=Path, default=DEFAULT_DOTNET_PROJECT)
     common.add_argument("--root", type=Path, default=DEFAULT_LIVE_ROOT)
+    common.add_argument(
+        "--force-orphan-guard",
+        action="store_true",
+        help=(
+            "Override the orphan-process guard and proceed even if other "
+            "RiftAssetDumper.exe processes are running. Use when you have "
+            "confirmed the other processes are benign or have been accounted for."
+        ),
+    )
 
     # run
     run_p = sub.add_parser("run", parents=[common], help="Run a fresh export (or resume)")
@@ -1111,6 +1136,11 @@ def main() -> int:
     )
     parser = _build_parser()
     args = parser.parse_args()
+    # Orphan-process guard — refuse to spawn a new RiftAssetDumper if a previous
+    # Codebuff session left children behind. Read-only subcommands (status,
+    # verify, clean) bypass the guard. --force-orphan-guard overrides.
+    if args.command not in _BULK_ORPHAN_GUARD_BYPASS_COMMANDS:
+        _orphan_process_guard(force=args.force_orphan_guard)
     if args.command == "run":
         return _cmd_run(args)
     if args.command == "status":
