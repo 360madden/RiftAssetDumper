@@ -232,6 +232,39 @@ with tempfile.TemporaryDirectory() as tmp:
         ),
         encoding="utf-8",
     )
+    (out_dir / "mesh329-family-attribute-role-matrix.json").write_text(
+        json.dumps(
+            {
+                "Schema": "329-family-attribute-role-matrix/v1",
+                "CandidateOnly": True,
+                "MeshSize": 329,
+                "TargetMeshBlocks": [7, 34],
+                "IDsCovered": [],
+                "ProbeCount": 0,
+                "MatrixRows": [],
+                "PairComparisons": [],
+                "PatternQuantification": {
+                    "IDsWithBothProbes": 0,
+                    "IDsWithMesh7Attr1": 0,
+                    "IDsWithMesh34Attr0": 0,
+                    "IDsWithMesh34_304ScoredAsPosition": 0,
+                    "IDsWithMesh7UVPresent": 0,
+                    "IDsWithMesh34UVAbsent": 0,
+                    "ConsistentPatterns": [],
+                    "QuantifiedNotes": {},
+                },
+                "Interpretation": "minimal test fixture",
+                "ParserExportPromotionAllowed": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    matrix_schema = json.loads(
+        Path("docs/schemas/329-family-attribute-role-matrix-v1.schema.json").read_text(encoding="utf-8")
+    )
+    matrix_report = json.loads((out_dir / "mesh329-family-attribute-role-matrix.json").read_text(encoding="utf-8"))
+    jsonschema.validate(matrix_report, matrix_schema)
+    print("  PASS: attribute-role-matrix report schema validation")
     (out_dir / "post50-mesh34-complete-binding-negative-proof.json").write_text(
         json.dumps(
             {
@@ -325,8 +358,8 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: post-50 status schema validation")
     check("schema version", status["SchemaVersion"], "post50-position-source-status/v1")
     check("candidate only", status["CandidateOnly"], True)
-    check("report status count", len(status["ReportStatuses"]), 10)
-    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 10)
+    check("report status count", len(status["ReportStatuses"]), 11)
+    check("freshness existing reports", status["ReportFreshness"]["ExistingReportCount"], 11)
     check("freshness missing reports", status["ReportFreshness"]["MissingReportCount"], 0)
     check("freshness unreadable reports", status["ReportFreshness"]["UnreadableReportCount"], 0)
     check("freshness missing keys", status["ReportFreshness"]["MissingOrUnreadableKeys"], [])
@@ -371,7 +404,7 @@ with tempfile.TemporaryDirectory() as tmp:
     print("  PASS: missing-report status schema validation")
     check("missing report lanes", missing_status["CandidateLanes"], [])
     check("missing freshness existing reports", missing_status["ReportFreshness"]["ExistingReportCount"], 0)
-    check("missing freshness missing reports", missing_status["ReportFreshness"]["MissingReportCount"], 10)
+    check("missing freshness missing reports", missing_status["ReportFreshness"]["MissingReportCount"], 11)
     check(
         "missing report evidence levels",
         {report_status["EvidenceLevel"] for report_status in missing_status["ReportStatuses"]},
