@@ -325,6 +325,44 @@ def checked_run(label: str, args: list[str], cwd: Path | None = None) -> None:
 
 
 # ============================================================================
+# Producer version stamp (git describe)
+# ============================================================================
+
+
+def producer_version(cwd: Path | None = None) -> str:
+    """Return the RiftAssetDumper producer version via `git describe --tags --always`.
+
+    Stamped into generated output headers (e.g., merged.obj, texture_map.js) so
+    consumers (RiftFlythrough) can verify which RiftAssetDumper build produced
+    the artifact. Returns 'unknown' if git is unavailable, the cwd is invalid,
+    or no tag exists at HEAD.
+
+    Args:
+        cwd: Working directory for the git invocation. Defaults to REPO_ROOT
+             (this script's parent dir, the Assets repo root) so the stamp
+             always reflects the Assets repo state, not the caller's cwd.
+
+    Returns:
+        Tag name (e.g. "v1.0.0") when HEAD is tagged, "v1.0.0-3-gabcdef" when
+        HEAD is N commits past a tag, short SHA (e.g. "abcdef0") when no tag
+        exists, or "unknown" on any failure.
+    """
+    target = str(cwd) if cwd is not None else str(REPO_ROOT)
+    try:
+        out = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        ).stdout.strip()
+        return out if out else "unknown"
+    except subprocess.SubprocessError, OSError:
+        return "unknown"
+
+
+# ============================================================================
 # Formatting helpers
 # ============================================================================
 
