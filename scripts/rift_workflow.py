@@ -117,6 +117,7 @@ DEFAULT_SOLUTION = REPO_ROOT / "RiftAssetDumper.slnx"
 # ---------------------------------------------------------------------------
 
 from scripts.phase1_m12_304_magic_analysis import phase1_m12_304_magic_analysis  # noqa: E402
+from scripts.rift_read_only import READ_ONLY_COMMANDS as _READ_ONLY_COMMANDS  # noqa: E402,F401
 from scripts.rift_workflow_guards import (  # noqa: E402
     attribute_extra_proof_guard,
     attribute_extra_sibling_proof_guard,
@@ -9500,6 +9501,14 @@ Examples:
     # --force-orphan-guard bypass the guard. The guard itself calls sys.exit(2)
     # when it decides to refuse, so this call only returns when we may proceed.
     _first_non_flag = next((a for a in sys.argv[1:] if not a.startswith("-")), "")
+
+    # Per-invocation deprecation notice: the 41 read-only commands have moved
+    # to scripts/rift_read_only.py, which dispatches them without invoking
+    # the orphan-process guard. Fires before the guard so users with a stale
+    # RiftAssetDumper process still discover the new entry point.
+    if _first_non_flag and _first_non_flag in _READ_ONLY_COMMANDS:
+        print(f"NOTE: {_first_non_flag} moved to scripts/rift_read_only.py", file=sys.stderr)
+
     if _first_non_flag and _first_non_flag not in _ORPHAN_GUARD_BYPASS_COMMANDS:
         _orphan_process_guard(force=args.force_orphan_guard)
 
