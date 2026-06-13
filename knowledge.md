@@ -32,9 +32,12 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 
 ### Python (scripting/discovery orchestration — primary orchestrator)
 
+**Entry points:** `scripts/rift_workflow.py` is the **spawner** entry point (33 commands that invoke `dotnet` / `RiftAssetDumper`, protected by the orphan-process guard). `scripts/rift_read_only.py` is the **read-only** peer entry point (41 commands: guards, reports, status checks — no `dotnet` spawns, no orphan guard). Use `rift_read_only.py` for read-only commands; use `rift_workflow.py` for spawner commands.
+
 | Command | Purpose |
 |---------|---------|
-| `python scripts/rift_workflow.py <command> [options]` | Run any workflow command (kebab-case) |
+| `python scripts/rift_workflow.py <command> [options]` | Run any spawner command (kebab-case). Read-only commands on this entry point print a deprecation notice to stderr pointing at `rift_read_only.py`. |
+| `python scripts/rift_read_only.py <command> [options]` | Run any of the 41 read-only commands (guard-free, no `dotnet` spawns). |
 | `python scripts/rift_workflow.py discovery-suite --full` | Run unified 7-step pipeline |
 | `python scripts/rift_workflow.py all --full` | Run all inventory commands |
 | `python scripts/rift_workflow.py decode-geometry --id <hex> --mesh-block <n> --experimental-position-source --write-obj` | Decode + export OBJ |

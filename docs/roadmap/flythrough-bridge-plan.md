@@ -774,6 +774,10 @@ If `.state.json` is missing or corrupt, treat all steps as `pending` and start w
 
 ---
 
+## 17. Post-plan refinements
+
+- **Entry-point split** — the 41 read-only workflow commands (guards, reports, status checks, Ghidra summaries, NiDataStream evidence) moved from `scripts/rift_workflow.py` to a new peer entry point `scripts/rift_read_only.py` (see [2026-06-13 rift_read_only handoff](../handoffs/2026-06-13-rift-read-only-entry-point.md)). The bypass set on `rift_workflow.py` is now empty; the orphan-process guard fires for every command on that entry point. Spawner commands (the 33 that invoke `dotnet` / `RiftAssetDumper`, including all FT-1..FT-7 pipeline commands) remain on `rift_workflow.py`. Read-only commands invoked via `rift_workflow.py` print a deprecation notice to stderr pointing at `rift_read_only.py`.
+
 ## 18. Related documents
 
 - `docs/roadmap/current-phase.md` — pointer to active phase
