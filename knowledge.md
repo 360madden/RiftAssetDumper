@@ -187,11 +187,14 @@ All operations read directly from the live game install (see Key directories not
 
 ### CI pipeline (`.github/workflows/ci.yml`)
 
-Two parallel jobs on `windows-latest`:
+Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summary job:
 
 - **.NET job:** `dotnet build`, `dotnet format --verify-no-changes`, `dotnet test` (pwsh shell)
 - **Python job:** syntax check, `ruff check`, `mypy --no-error-summary`, Python tests (`py_compile` + pytest)
-- **Final job:** aggregates both results (Ubuntu)
+- **Orphan Guard Regression job:** `test_rift_workflow_orphan_guard*`, `test_bulk_export_orphan_guard`, `test_rift_read_only_no_spawn`
+- **Docs Lint job:** `markdownlint-cli2` via `DavidAnson/markdownlint-cli2-action@v19`
+- **Summary job:** aggregates all 4 results (Ubuntu); fails if any job fails
+- **Triggers:** `push` to main, `pull_request` to main, and `workflow_dispatch` (added 2026-06-13 for manual CI re-runs via `gh workflow run`)
 
 ### Current project state (Flythrough Bridge Plan COMPLETE)
 
@@ -215,6 +218,7 @@ Two parallel jobs on `windows-latest`:
 - **Texture discovery pipeline**: `link-nif-textures` → 9,434 NIF→texture links → filtered to 650 flythrough links (222 unique DDS) → `extract-linked-textures` (222 DDS extracted, 0 failures) → `link_flythrough_textures.py` (DDS→PNG conversion, populates `linked_textures` in flythrough-index.json)
 - **RiftFlythrough bridge**: `build_world_placed_merge.py` → `world-placed-merged.obj` (2.5MB, 72,976 lines, 217 assets, 4 non-identity transforms) copied to `C:\RIFT MODDING\RiftFlythrough\merged.obj`; `transform_loader.js` (4KB) copied to `RiftFlythrough/js/` for runtime manifest-based transform application
 - CI green: build 0 errors, tests 55/55 (C#), pytest all green, ruff 0, mypy 0
+- **CI green sequence (2026-06-13, 4 commits)**: `910b168` (MD032 docs fix) → `88af1a9` (test1 fixture) → `ac7db4c` (test2 fixture) → `4187892` (test3 fixture) resolved pre-existing Python test fixture gaps masked by the Docs Lint failure. The `POST50_POSITION_SOURCE_REPORTS` registry in `rift_workflow.py:6235` grew from 10 to 11 reports (added `mesh329-family-attribute-role-matrix.json` from Phase 1 M1.1); 3 affected test files patched. Handoff: `docs/handoffs/2026-06-13-ci-green-4-commit-sequence.md`.
 
 ## Conventions
 
@@ -312,6 +316,12 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - FT-2 probe-lookup subset success rate is data-limited (probe lookup built from deleted `Source/`), not pipeline-limited — pipeline proven functional
 - For multi-mesh NIFs, the `probe-nif-scene-graph` command may emit child refs into both `Children` and `Effects` lists — the parser walks both and resolves to the block type
 - `world.json` mesh-parent relationships use `ParentNiNodeIndex` (direct node index reference), NOT `Children[]` arrays. `build_world_placed_merge.py` uses this field to walk the scene graph hierarchy from mesh → parent node → root, accumulating Scale×Rotate×Translate at each step
+
+## Recent Phase 1 milestones
+
+- **M1.1 (329-family attribute/role matrix)** — ✅ COMPLETE. 12 IDs / 12 paired comparisons / 24 matrix rows. Handoff: `docs/handoffs/draft-2026-06-m1.1-329-matrix.md`. Artifacts: `Exports/mesh329-family-attribute-role-matrix.{json,md,csv}`. Schema: `docs/schemas/329-family-attribute-role-matrix-v1.schema.json`. Key finding: mesh#7 variants have `AttributeSets=1`, mesh#34 variants have `AttributeSets=0` with @304 re-scored as position-float3-ror1-lead (c=75) in 12/12 paired cases.
+- **M1.2 (@304 extra stream classification on mesh#34)** — 🔄 IN PROGRESS. Builds on M1.1 matrix. Handoff: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md`. Uses M1.1 `IDsCovered` as controlled target list.
+- **M1.3 (sibling source-binding guard)** — 📝 DRAFT. Builds on M1.1 + M1.2. Handoff: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md`. Uses M1.1 matrix IDs as targets.
 
 ## Agent model strategy
 
