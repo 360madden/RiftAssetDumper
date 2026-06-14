@@ -88,6 +88,10 @@ The implementation is a single-string conditional: detect whether any of `ScanRe
 - **m3 follow-up batch cross-ref** (deferred side): `docs/handoffs/2026-06-13-m3-safe-followup-batch.md` §"Deferred items" — one-line cross-reference row added 2026-06-14 pointing back at this handoff.
 - **Parser widening commit** (originating): the prior commit that lifted the region-flags restriction from `--scan-float-triplet` only to the three-mode set; the code-reviewer sign-off in round 2 flagged the missing UX hint.
 
+## Filename-deviation protocol
+
+If at Phase 3 invocation time the operator's `--output` paths deviate from the §5.1 `phase3-bounded-triplet-<UTC>-vN.json` recipe, the operator pastes back either the four actual paths (`ACTUAL_PHASE3_FILENAMES: v0 = ..., v1 = ..., v2 = ..., v3 = ...`) or a shared prefix pattern (`PREFIX_PATTERN = <pattern>`), and the AI applies a one-line patch to `docs/handoffs/2026-06-14-phase3-fail-mode-b-surrogate-lead.md` line 16 — the only direct filename-pattern reference in the §8.4 chain. The per-vertex tables in the PASS/FAIL templates use `TBD` placeholders anchored on the v0–v3 row labels, so the per-vertex mapping is immune to filename deviation. The patch and the §8.4 decision fill land atomically in the same commit, with no cross-reference chain repair needed because the §8.4 templates are still DRAFT, unfilled, and uncommitted at the time of any deviation.
+
 ## Decision log
 
 - 2026-06-14: Filed as a non-blocking UX follow-up. Originated in the parser widening commit code-review (round 2). Not blocking the Phase 1/2/3 invocation chain. Scheduled in a separate docs commit after the §8.4 Step 49 status-update path completes. Cross-references added to the §8.4 PASS/FAIL templates and the m3 follow-up batch.
