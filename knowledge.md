@@ -217,8 +217,9 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, **textures** (207/217 assets, 626 linked PNGs) for RiftFlythrough Phase 21
 - **Texture discovery pipeline**: `link-nif-textures` → 9,434 NIF→texture links → filtered to 650 flythrough links (222 unique DDS) → `extract-linked-textures` (222 DDS extracted, 0 failures) → `link_flythrough_textures.py` (DDS→PNG conversion, populates `linked_textures` in flythrough-index.json)
 - **RiftFlythrough bridge**: `build_world_placed_merge.py` → `world-placed-merged.obj` (2.5MB, 72,976 lines, 217 assets, 4 non-identity transforms) copied to `C:\RIFT MODDING\RiftFlythrough\merged.obj`; `transform_loader.js` (4KB) copied to `RiftFlythrough/js/` for runtime manifest-based transform application
-- CI green: build 0 errors, tests 55/55 (C#), pytest all green, ruff 0, mypy 0
+- CI green: build 0 errors, dotnet test 55/55 (C#), pytest 332/332 (Python), ruff 0, mypy 0, dotnet format clean, markdownlint 233 files, generated-output guard clean
 - **CI green sequence (2026-06-13, 4 commits)**: `910b168` (MD032 docs fix) → `88af1a9` (test1 fixture) → `ac7db4c` (test2 fixture) → `4187892` (test3 fixture) resolved pre-existing Python test fixture gaps masked by the Docs Lint failure. The `POST50_POSITION_SOURCE_REPORTS` registry in `rift_workflow.py:6235` grew from 10 to 11 reports (added `mesh329-family-attribute-role-matrix.json` from Phase 1 M1.1); 3 affected test files patched. Handoff: `docs/handoffs/2026-06-13-ci-green-4-commit-sequence.md`.
+- **Documentation alignment (2026-06-13, 6 commits)**: `a1ab091` (6 draft- handoff filenames finalized) → `31b1839` (stale note fixes) → `210624d` (7 handoff deliverables ticked) → `ef7525b` (19 convention/CI items ticked) → `673a3d2` (18 CI/build/format items ticked) → current. Total: 44 `[ ]` → `[x]` across 20+ planning docs. 1 intentional forward reference (`2026-06-12-cycle-2-phase-1-exit.md` in cycle-2 prompt template).
 
 ## Conventions
 

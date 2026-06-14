@@ -131,7 +131,7 @@ Per `docs/nidatastream-parser-export-promotion-decision-template.md`, before ANY
 - [ ] New targeted tests pass
 - [x] `dotnet format --verify-no-changes` clean
 - [x] CI green (both .NET and Python)
-- [ ] Generated-output guard clean
+- [x] Generated-output guard clean
 
 ---
 

@@ -92,8 +92,8 @@ python scripts/rift_workflow.py ghidra-run --ghidra-project-name RiftPhase8 \
 - [x] Build: 0 errors
 - [x] Tests: 49/49 pass
 - [x] `dotnet format --verify-no-changes` clean
-- [ ] `FieldOrderPromoted` still false (gate 6 blocks)
-- [ ] `ParserExportPromotionAllowed` still false (gate 6 blocks)
+- [x] `FieldOrderPromoted` still false (gate 6 blocks)
+- [x] `ParserExportPromotionAllowed` still false (gate 6 blocks)
 - [ ] At least 1 semantic finding documented (byte 1-2 or role mapping)
 - [ ] Gate 5 reframing decision recorded
 

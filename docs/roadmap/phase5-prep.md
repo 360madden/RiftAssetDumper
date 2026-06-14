@@ -87,7 +87,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 - [x] ruff 0, mypy 0
 - [x] `FieldOrderPromoted` still false
 - [x] `ParserExportPromotionAllowed` still false
-- [ ] Generated-output guard clean
+- [x] Generated-output guard clean
 
 ---
 
