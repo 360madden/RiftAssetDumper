@@ -110,7 +110,7 @@ Batch, analysis-initial quant, and M1.2 handoff finalized. Exit criteria per `do
 
 - **Prep**: `docs/roadmap/phase1-m1.3-prep.md` — sibling source-binding + variant attribute layout guards.
 - **Coordination (new stub)**: `docs/roadmap/phase1-m1.3-coordination.md` (swarm status, handoff ref, AGENTS summary).
-- **Handoff (initial draft created)**: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md` (full structure, M1.2 evidence, candidate guard sketch, pilot plan, artifacts, validation, AGENTS sections).
+- **Handoff (final)**: `docs/handoffs/2026-06-m1.3-sibling-source-binding-guard.md` (full structure, M1.2 evidence, candidate guard sketch, pilot plan, artifacts, validation, AGENTS sections).
 - **Evidence baseline**: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` + `Exports/phase1-m1.2-@304-analysis-initial.*` + matrix `Exports/mesh329-family-attribute-role-matrix.*` + existing Exports/position-source-sibling-lead-guard.*.
 - **Live pointer**: `docs/roadmap/current-phase.md` (**M1.3 ACTIVE**).
 

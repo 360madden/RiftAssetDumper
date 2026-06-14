@@ -1,6 +1,6 @@
 # Phase 1 M1.3 Coordination — Sibling Source-Binding + Variant Attribute Layout Guards
 
-**Status**: M1.2 COMPLETE; M1.3 ACTIVE per `docs/roadmap/current-phase.md`. Prep: `docs/roadmap/phase1-m1.3-prep.md` (complete). Initial M1.3 handoff draft created: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md` (main agent). Guard prototype + report swarm active (general-purpose, task 019e86ec-b6b8-7d90-bffd-b51939dffba0 + related updater/verify). Baseline from existing `Exports/position-source-sibling-lead-guard.*` + M1.2 artifacts. All candidate-only, strictly 329-family (matrix IDsCovered), Python-only. Reference `docs/roadmap/project-roadmap.md` (Phase 1 M1.3) + prep + M1.2 handoff + matrix.
+**Status**: M1.3 COMPLETE per `docs/roadmap/current-phase.md`. Prep: `docs/roadmap/phase1-m1.3-prep.md` (complete). Handoff: `docs/handoffs/2026-06-m1.3-sibling-source-binding-guard.md` (final, 12/12 guards PASS, validation suite 9/9 PASS). Guard prototype + report delivered via swarm (general-purpose, task 019e86ec-b6b8-7d90-bffd-b51939dffba0 + related updater/verify). Baseline from existing `Exports/position-source-sibling-lead-guard.*` + M1.2 artifacts. All candidate-only, strictly 329-family (matrix IDsCovered), Python-only. Reference `docs/roadmap/project-roadmap.md` (Phase 1 M1.3) + prep + M1.2 handoff + matrix.
 
 ## Target List (from M1.2 Matrix + Prep)
 
@@ -28,7 +28,7 @@ Core evidence to guard (M1.2 10/10 scoped + 12/12 matrix):
 
 **Current live pointer**: `docs/roadmap/current-phase.md` (M1.3 active).
 
-**Handoff**: `docs/handoffs/draft-2026-06-m1.3-sibling-source-binding-guard.md` (initial + integrated; references prep (enhanced), M1.2, existing guard, delivered candidate guard prototype + pilot run, artifacts, validation, AGENTS summary + top10). **Safety verification**: `Exports/phase1-m1.2-safety-drift-verification.md` (CLEAN/PASS for M1.2 post-swarm; supports transition).
+**Handoff**: `docs/handoffs/2026-06-m1.3-sibling-source-binding-guard.md` (final; references prep, M1.2, existing guard, delivered candidate guard prototype + pilot run, artifacts, validation, AGENTS summary + top10). **Safety verification**: `Exports/phase1-m1.2-safety-drift-verification.md` (CLEAN/PASS for M1.2 post-swarm; supports transition).
 
 **M1.2 reference**: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` (finalized, now refs full) + `Exports/phase1-m1.2-@304-analysis-initial.*` + full N=10 `phase1-m1.2-@304-analysis-full.*` (subagent 019e86ea-60a1...) + matrix.
 

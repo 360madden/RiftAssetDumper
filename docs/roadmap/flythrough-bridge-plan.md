@@ -195,12 +195,12 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-1 phase exit criteria
 
-- [ ] All 5 sub-steps ✅ in `.state.json`
-- [ ] `Assets/build/flythrough/textures/converted/` populated with PNGs
-- [ ] `RiftFlythrough/check.py` passes after texture drop
-- [ ] Phase-exit handoff committed
-- [ ] `python scripts/test_rift_workflow_utils.py` + new tests pass
-- [ ] CI green (build 0 errors, ruff 0, mypy 0)
+- [x] All 5 sub-steps ✅ in `.state.json`
+- [x] `Assets/build/flythrough/textures/converted/` populated with PNGs
+- [x] `RiftFlythrough/check.py` passes after texture drop
+- [x] Phase-exit handoff committed
+- [x] `python scripts/test_rift_workflow_utils.py` + new tests pass
+- [x] CI green (build 0 errors, ruff 0, mypy 0)
 
 ---
 
@@ -280,12 +280,12 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-2 phase exit criteria
 
-- [ ] All 5 sub-steps ✅
-- [ ] `Assets/build/flythrough/merged.obj` generated and validated
-- [ ] ≥1,000 OBJs (or the live install's full decodable NIF count, whichever is smaller)
-- [ ] Failure rate documented; known failures triaged
-- [ ] Phase-exit handoff committed
-- [ ] CI green
+- [x] All 5 sub-steps ✅
+- [x] `Assets/build/flythrough/merged.obj` generated and validated
+- [x] ≥1,000 OBJs (or the live install's full decodable NIF count, whichever is smaller)
+- [x] Failure rate documented; known failures triaged
+- [x] Phase-exit handoff committed
+- [x] CI green
 
 ---
 
@@ -351,11 +351,11 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-3 phase exit criteria
 
-- [ ] All 4 sub-steps ✅
-- [ ] Every OBJ has a valid `.manifest.json` sibling
-- [ ] RiftFlythrough `catalog.js` consumes them without error
-- [ ] Phase-exit handoff committed
-- [ ] CI green
+- [x] All 4 sub-steps ✅
+- [x] Every OBJ has a valid `.manifest.json` sibling
+- [x] RiftFlythrough `catalog.js` consumes them without error
+- [x] Phase-exit handoff committed
+- [x] CI green
 
 ---
 
@@ -451,12 +451,12 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-4 phase exit criteria
 
-- [ ] All 6 sub-steps ✅
-- [ ] Keystones: Three.js round-trip shows distributed geometry; ≥70% multi-mesh NIF coverage
-- [ ] `world.json` schema committed and validated
-- [ ] Phase-exit handoff committed
-- [ ] CI green
-- [ ] **This is the keystone phase** — do NOT proceed to FT-5 without explicit pass
+- [x] All 6 sub-steps ✅
+- [x] Keystones: Three.js round-trip shows distributed geometry; ≥70% multi-mesh NIF coverage
+- [x] `world.json` schema committed and validated
+- [x] Phase-exit handoff committed
+- [x] CI green
+- [x] **This is the keystone phase** — do NOT proceed to FT-5 without explicit pass
 
 ---
 
@@ -521,12 +521,12 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-5 phase exit criteria
 
-- [ ] All 4 sub-steps ✅
-- [ ] `python scripts/build_flythrough_build.py` runs end-to-end
-- [ ] Cold build <30 min, warm build <30 sec
-- [ ] BUILD_INFO.json emitted
-- [ ] Phase-exit handoff committed
-- [ ] CI green
+- [x] All 4 sub-steps ✅
+- [x] `python scripts/build_flythrough_build.py` runs end-to-end
+- [x] Cold build <30 min, warm build <30 sec
+- [x] BUILD_INFO.json emitted
+- [x] Phase-exit handoff committed
+- [x] CI green
 
 ---
 
@@ -578,10 +578,10 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-6 phase exit criteria
 
-- [ ] All 3 sub-steps ✅
-- [ ] Visual regression baseline exists
-- [ ] Production-readiness verdict in handoff
-- [ ] CI green
+- [x] All 3 sub-steps ✅
+- [x] Visual regression baseline exists
+- [x] Production-readiness verdict in handoff
+- [x] CI green
 
 ---
 
@@ -633,10 +633,10 @@ When any agent (or human) opens this repo to make progress, in this order:
 
 ### FT-7 phase exit criteria
 
-- [ ] All 3 sub-steps ✅
-- [ ] Either zone-partitioned builds exist, or the gap is documented
-- [ ] Phase-exit handoff committed
-- [ ] CI green
+- [x] All 3 sub-steps ✅
+- [x] Either zone-partitioned builds exist, or the gap is documented
+- [x] Phase-exit handoff committed
+- [x] CI green
 
 ---
 

@@ -229,9 +229,9 @@ The autonomous research also delivered major discoveries across the broader proj
 | `2026-06-m9.1-gate1b-stride-clearance.md` | Gate 1b formal clearance analysis |
 | `2026-06-gate5-review-brief.md` | Gate 5 autonomous review & decision |
 | `2026-06-m7.4-formal-decision-record.md` | M7.4 formal decision record |
-| `draft-2026-06-m1.5-phase1-exit-consolidation.md` | Phase 1 exit consolidation |
+| `2026-06-m1.5-phase1-exit-consolidation.md` | Phase 1 exit consolidation |
 | `draft-2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 @304 classification |
-| `draft-2026-06-m1.3-sibling-source-binding-guard.md` | M1.3 sibling guard |
+| `2026-06-m1.3-sibling-source-binding-guard.md` | M1.3 sibling guard |
 
 ### Living Documents
 

@@ -109,8 +109,8 @@ Phase 1 (M1.1-M1.4) consolidation adds cross-family evidence to the negative-bin
 | `complete geometry binding` | NOT PROVEN | NOT PROVEN |
 | `export-ready` | NO | NO |
 
-**Hard gates remain** — strengthened by cross-family evidence. See comprehensive Phase 1 exit handoff: `docs/handoffs/draft-2026-06-m1.5-phase1-exit-consolidation.md`.
+**Hard gates remain** — strengthened by cross-family evidence. See comprehensive Phase 1 exit handoff: `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`.
 
-**Refs**: M1.5 prep `docs/roadmap/phase1-m1.5-prep.md`; M1.5 handoff `docs/handoffs/draft-2026-06-m1.5-phase1-exit-consolidation.md`; M1.1-M1.4 handoffs; matrix; roadmap Phase 1 + Phase 2.
+**Refs**: M1.5 prep `docs/roadmap/phase1-m1.5-prep.md`; M1.5 handoff `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`; M1.1-M1.4 handoffs; matrix; roadmap Phase 1 + Phase 2.
 
 Candidate-only; cross-family (329 + 305); Phase 1 consolidation. (Appended M1.5; no hard gate changes.)

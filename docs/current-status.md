@@ -1,5 +1,4 @@
-> **⚠️ HISTORICAL: This document is preserved for reference. Current state is 350 OBJs, 7/7 gates cleared.**
-> Refer to `docs/roadmap/project-summary.md`, `docs/roadmap/project-roadmap.md`, and `docs/handoffs/2026-06-12-project-completion.md` for current status.
+> **Current state**: 350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. All 7 promotion gates CLEARED. All 8 proof guards PASSING. Phase 1 (Position Source Family Proof) COMPLETE with M1.1-M1.5. Flythrough Bridge Plan (FT-1 through FT-8) COMPLETE. See `docs/roadmap/project-roadmap.md` for full roadmap.
 
 # Current Status — High-impact RIFT asset discoveries 🚀
 

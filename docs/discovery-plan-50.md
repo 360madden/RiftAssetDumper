@@ -146,7 +146,7 @@
 
 ### Step 15 — Stage 1 handoff
 
-- [ ] Write `docs/handoffs/2026-05-20-stage1-geometry-decode.md`
+- [x] Write `docs/handoffs/2026-05-21-stage1-geometry-decode.md` (actual)
 - [ ] Commit: "Stage 1: OBJ face export + UInt16 position cross-validation"
 - **Exit:** Clean commit
 
@@ -224,7 +224,7 @@
 
 ### Step 25 — Stage 2 handoff
 
-- [ ] Write `docs/handoffs/2026-05-20-stage2-position-discovery.md`
+- [x] Write `docs/handoffs/2026-06-02-stage2-position-source-enhanced-findings.md` (actual)
 - [ ] Commit: "Stage 2: Position source discovery for indexed NIF mesh families"
 - **Exit:** Clean commit
 
@@ -304,7 +304,7 @@
 
 ### Step 35 — Stage 3 handoff
 
-- [ ] Write `docs/handoffs/2026-05-20-stage3-guard-migration.md`
+- [x] Write `docs/handoffs/2026-05-20-stage2-ps-py-guards-migration.md` (actual)
 - [ ] Commit: "Stage 3: Complete PS→Python guard migration"
 - **Exit:** Clean commit
 
@@ -385,7 +385,7 @@
 
 ### Step 45 — Stage 4 handoff
 
-- [ ] Write `docs/handoffs/2026-05-20-stage4-automation.md`
+- [x] Write `docs/handoffs/2026-05-22-035126-stage14-discovery-resume.md` (actual; discovery-suite + Stage 14+)
 - [ ] Commit: "Stage 4: Automated discovery suite with regression detection"
 - **Exit:** Clean commit
 

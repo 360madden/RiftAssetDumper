@@ -83,7 +83,7 @@ but does NOT clear any promotion gates:
 
 **Bottom line**: Phase 1 was discovery/documentation only. No promotion gates cleared.
 `parser-export-promotion-not-allowed` remains in force. See comprehensive Phase 1 exit
-handoff: `docs/handoffs/draft-2026-06-m1.5-phase1-exit-consolidation.md`.
+handoff: `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`.
 
 ---
 

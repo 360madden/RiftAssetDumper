@@ -185,7 +185,7 @@ d5a5251 docs(phase11): M11.3 descriptor→role mismatch analysis
 | Artifact | Path |
 |---|---|
 | Phase 11 exit handoff | `docs/handoffs/2026-06-phase11-exit-descriptor-guided-role-classification.md` |
-| Phase 11-14 session handoff | `docs/handoffs/2026-06-phase11-14-session-handoff.md` (this file) |
+| Phase 11-15 session handoff | `docs/handoffs/2026-06-phase11-15-session-handoff.md` (this file) |
 | Refreshed inventory | `Exports/phase14-refreshed-inventory.jsonl` |
 | Consistency baseline | `Exports/phase13-descriptor-consistency-baseline.json` |
 | Roadmap (updated) | `docs/roadmap/current-phase.md` |
