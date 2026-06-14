@@ -16,6 +16,36 @@
       ],
       "PromotionStatus": "candidate-only",
       "RecommendedDryRunCommand": "python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json"
+    },
+    {
+      "Label": "stage5_step50_asset_id_ascii_6fc01704d4a509d5",
+      "Step": 50,
+      "Purpose": "Asset-load proof: detect the ASCII 16-byte NIF asset ID for the proven @264/#15 topology anchor mesh in live process memory. If this returns 0 hits, the target asset is not loaded; do not run Phases 2 or 3.",
+      "Hex": "36666330313730346434613530396435",
+      "ByteLength": 16,
+      "SourceEvidence": [
+        "docs/discovery-plan-50.md Step 48",
+        "docs/live-memory-step48-status.json",
+        "docs/current-status.md @264/#15 confirmed-sibling section",
+        "docs/handoffs/2026-06-13-scoped-live-scan-asset-load-proof.md"
+      ],
+      "PromotionStatus": "candidate-only",
+      "RecommendedDryRunCommand": "python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json"
+    },
+    {
+      "Label": "stage5_step50_asset_id_ascii_caa9a88e94ec8db0",
+      "Step": 50,
+      "Purpose": "Sibling positive control: detect the ASCII 16-byte NIF asset ID for the proven @264/#15 sibling mesh in live process memory. Confirms the load table contains mesh#6 assets and the asset-id scan is not a single-asset coincidence.",
+      "Hex": "63616139613838653934656338646230",
+      "ByteLength": 16,
+      "SourceEvidence": [
+        "docs/discovery-plan-50.md Step 48",
+        "docs/live-memory-step48-status.json",
+        "docs/current-status.md @264/#15 confirmed-sibling section",
+        "docs/handoffs/2026-06-13-scoped-live-scan-asset-load-proof.md"
+      ],
+      "PromotionStatus": "candidate-only",
+      "RecommendedDryRunCommand": "python scripts/rift_workflow.py scan-live-memory --live-pattern-file docs/live-memory-scan-targets.json --list-json"
     }
   ]
 }

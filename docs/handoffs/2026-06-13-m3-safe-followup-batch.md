@@ -68,6 +68,7 @@ Deferred (not M3-safe for the M3 lane):
 - DRY refactor of the 25-line matrix fixture across 3 test files — touches 3 files, more risk (deferred).
 - Pre-commit hook addition — affects local dev workflow, M3 might pick a bad trigger event (deferred).
 - Deprecation notice investigation — requires judgment on whether to remove or finish migration (deferred).
+- Parser UX: hint at missing process identifier when --scan-region-base is set — see `docs/handoffs/2026-06-14-parser-ux-region-pin-hint.md` (non-blocking UX follow-up, deferred to single-purpose docs commit after the §8.4 Step 49 status decision lands; live-read tooling must not be in flux during the decision window).
 
 ## Validation
 
