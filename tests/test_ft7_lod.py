@@ -1,10 +1,15 @@
-"""Unit tests for FT-7.2 LOD variant detector."""
+"""Unit tests for FT-7.2 LOD variant detector.
+
+15 test functions, 23 effective cases (4 parametrized groups).
+"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -16,24 +21,17 @@ import ft7_lod_detector as f7  # noqa: E402
 # ── _sibling_key ──────────────────────────────────────────────
 
 
-def test_sibling_key_dict() -> None:
-    result = f7._sibling_key({"mesh_size": 280, "note": "resolved via probe lookup pattern (MB=7,"})
-    assert result == "ms=280|note=resolved via probe lookup pattern (MB=7,"
-
-
-def test_sibling_key_dict_long_note_truncates() -> None:
-    result = f7._sibling_key({"mesh_size": 305, "note": "a" * 80})
-    assert result == f"ms=305|note={'a' * 40}"
-
-
-def test_sibling_key_string() -> None:
-    result = f7._sibling_key("plain_string")
-    assert result == "plain_string"
-
-
-def test_sibling_key_empty() -> None:
-    result = f7._sibling_key("")
-    assert result == ""
+@pytest.mark.parametrize(
+    ("input_value", "expected"),
+    [
+        pytest.param({"mesh_size": 280, "note": "resolved via probe lookup pattern (MB=7,"}, "ms=280|note=resolved via probe lookup pattern (MB=7,", id="dict_short_note"),
+        pytest.param({"mesh_size": 305, "note": "a" * 80}, f"ms=305|note={'a' * 40}", id="dict_long_note_truncates"),
+        pytest.param("plain_string", "plain_string", id="string"),
+        pytest.param("", "", id="empty"),
+    ],
+)
+def test_sibling_key(input_value: Any, expected: str) -> None:
+    assert f7._sibling_key(input_value) == expected
 
 
 # ── enrich_with_meshsize ──────────────────────────────────────
@@ -69,25 +67,22 @@ def test_enrich_preserves_existing_meshsize() -> None:
 # ── detect_same_nif_lod ───────────────────────────────────────
 
 
-def test_same_nif_lod_empty() -> None:
-    result = f7.detect_same_nif_lod([])
-    assert result == []
-
-
-def test_same_nif_lod_single_entry() -> None:
-    entries: list[dict[str, Any]] = [{"asset_id": "abcd1234abcd1234", "mesh_block": 6, "vertex_count": 100}]
-    result = f7.detect_same_nif_lod(entries)
-    assert result == []
-
-
-def test_same_nif_lod_no_significant_reduction() -> None:
-    """Two meshes same NIF but only 1.1x reduction — not classified as LOD."""
-    entries: list[dict[str, Any]] = [
-        {"asset_id": "abcd1234abcd1234", "mesh_block": 6, "vertex_count": 100, "face_count": 98, "faced": True},
-        {"asset_id": "abcd1234abcd1234", "mesh_block": 7, "vertex_count": 90, "face_count": 88, "faced": True},
-    ]
-    result = f7.detect_same_nif_lod(entries)
-    assert result == []
+@pytest.mark.parametrize(
+    "entries",
+    [
+        pytest.param([], id="empty"),
+        pytest.param([{"asset_id": "abcd1234abcd1234", "mesh_block": 6, "vertex_count": 100}], id="single_entry"),
+        pytest.param(
+            [
+                {"asset_id": "abcd1234abcd1234", "mesh_block": 6, "vertex_count": 100, "face_count": 98, "faced": True},
+                {"asset_id": "abcd1234abcd1234", "mesh_block": 7, "vertex_count": 90, "face_count": 88, "faced": True},
+            ],
+            id="no_significant_reduction",
+        ),
+    ],
+)
+def test_same_nif_lod_returns_empty_for_ungrouped(entries: list[dict[str, Any]]) -> None:
+    assert f7.detect_same_nif_lod(entries) == []
 
 
 def test_same_nif_lod_clear_chain() -> None:
@@ -106,15 +101,22 @@ def test_same_nif_lod_clear_chain() -> None:
 # ── detect_meshsize_family_lod ────────────────────────────────
 
 
-def test_meshsize_family_empty() -> None:
-    result = f7.detect_meshsize_family_lod([])
-    assert result == []
-
-
-def test_meshsize_family_single_entry() -> None:
-    entries: list[dict[str, Any]] = [{"mesh_size": 301, "vertex_count": 100, "face_count": 98, "faced": True}]
-    result = f7.detect_meshsize_family_lod(entries)
-    assert result == []
+@pytest.mark.parametrize(
+    "entries",
+    [
+        pytest.param([], id="empty"),
+        pytest.param([{"mesh_size": 301, "vertex_count": 100, "face_count": 98, "faced": True}], id="single_entry"),
+        pytest.param(
+            [
+                {"mesh_size": 999, "vertex_count": 50, "face_count": 48, "faced": True},
+                {"mesh_size": 999, "vertex_count": 50, "face_count": 48, "faced": True},
+            ],
+            id="below_threshold",
+        ),
+    ],
+)
+def test_meshsize_family_returns_empty_for_ungrouped(entries: list[dict[str, Any]]) -> None:
+    assert f7.detect_meshsize_family_lod(entries) == []
 
 
 def test_meshsize_family_with_staircase() -> None:
@@ -135,61 +137,49 @@ def test_meshsize_family_with_staircase() -> None:
     assert len(result[0]["levels"]) >= 3
 
 
-def test_meshsize_family_below_threshold() -> None:
-    """Only 2 entries with same vertex count — should be below threshold."""
+def test_meshsize_family_with_duplicates() -> None:
+    """Duplicate asset_ids within a level should be deduplicated."""
     entries: list[dict[str, Any]] = [
-        {"mesh_size": 999, "vertex_count": 50, "face_count": 48, "faced": True},
-        {"mesh_size": 999, "vertex_count": 50, "face_count": 48, "faced": True},
+        {"mesh_size": 301, "vertex_count": 72, "face_count": 70, "faced": True, "asset_id": "dup1"},
+        {"mesh_size": 301, "vertex_count": 72, "face_count": 70, "faced": True, "asset_id": "dup1"},
+        {"mesh_size": 301, "vertex_count": 6, "face_count": 4, "faced": True, "asset_id": "dup2"},
+        {"mesh_size": 301, "vertex_count": 6, "face_count": 4, "faced": True, "asset_id": "dup2"},
     ]
     result = f7.detect_meshsize_family_lod(entries)
-    assert result == []
+    assert len(result) == 1
+    for level in result[0]["levels"]:
+        # Each level should have unique asset_ids
+        assert len(level["asset_ids"]) == len(set(level["asset_ids"]))
 
 
 # ── detect_descriptor_lod ─────────────────────────────────────
 
 
-def test_descriptor_lod_empty() -> None:
-    result = f7.detect_descriptor_lod([])
-    assert result == []
+@pytest.mark.parametrize(
+    "entries",
+    [
+        pytest.param([], id="empty"),
+        pytest.param(
+            [
+                {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 148, "asset_id": "aaaabbbbccccdddd"},
+                {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 48, "asset_id": "eeeeffffgggghhhh"},
+            ],
+            id="no_descriptor_variety",
+        ),
+    ],
+)
+def test_descriptor_lod_returns_empty(entries: list[dict[str, Any]]) -> None:
+    assert f7.detect_descriptor_lod(entries) == []
 
 
 def test_descriptor_lod_vec3_vec2_siblings() -> None:
     entries: list[dict[str, Any]] = [
-        {
-            "sibling_pair": {"mesh_size": 305},
-            "descriptor": "float32xvec3 (position/normal/UV vertex data)",
-            "vertex_count": 148,
-            "asset_id": "aaaabbbbccccdddd",
-        },
-        {
-            "sibling_pair": {"mesh_size": 305},
-            "descriptor": "float32xvec2 (UV coordinates)",
-            "vertex_count": 48,
-            "asset_id": "eeeeffffgggghhhh",
-        },
+        {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 148, "asset_id": "aaaabbbbccccdddd"},
+        {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec2 (UV coordinates)", "vertex_count": 48, "asset_id": "eeeeffffgggghhhh"},
     ]
     result = f7.detect_descriptor_lod(entries)
     assert len(result) == 1
     assert "descriptor-sibling" in result[0]["lod_type"]
-
-
-def test_descriptor_lod_no_descriptor_variety() -> None:
-    entries: list[dict[str, Any]] = [
-        {
-            "sibling_pair": {"mesh_size": 305},
-            "descriptor": "float32xvec3 (position/normal/UV vertex data)",
-            "vertex_count": 148,
-            "asset_id": "aaaabbbbccccdddd",
-        },
-        {
-            "sibling_pair": {"mesh_size": 305},
-            "descriptor": "float32xvec3 (position/normal/UV vertex data)",
-            "vertex_count": 48,
-            "asset_id": "eeeeffffgggghhhh",
-        },
-    ]
-    result = f7.detect_descriptor_lod(entries)
-    assert result == []
 
 
 # ── build_lod_manifest ────────────────────────────────────────
@@ -260,19 +250,7 @@ def test_build_manifest_with_data() -> None:
     assert stats["assets_with_lod_info"] == 4  # 1 same-nif + 3 family
 
 
-def test_meshsize_family_with_duplicates() -> None:
-    """Duplicate asset_ids within a level should be deduplicated."""
-    entries: list[dict[str, Any]] = [
-        {"mesh_size": 301, "vertex_count": 72, "face_count": 70, "faced": True, "asset_id": "dup1"},
-        {"mesh_size": 301, "vertex_count": 72, "face_count": 70, "faced": True, "asset_id": "dup1"},
-        {"mesh_size": 301, "vertex_count": 6, "face_count": 4, "faced": True, "asset_id": "dup2"},
-        {"mesh_size": 301, "vertex_count": 6, "face_count": 4, "faced": True, "asset_id": "dup2"},
-    ]
-    result = f7.detect_meshsize_family_lod(entries)
-    assert len(result) == 1
-    for level in result[0]["levels"]:
-        # Each level should have unique asset_ids
-        assert len(level["asset_ids"]) == len(set(level["asset_ids"]))
+# ── generate_report ───────────────────────────────────────────
 
 
 def test_generate_report_contains_keywords() -> None:

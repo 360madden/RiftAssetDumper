@@ -82,33 +82,49 @@ def test_bypass_set_excludes_long_running_commands() -> None:
 
 
 @pytest.mark.parametrize(
-    "subcommand,handler_name,extra_args,should_invoke",
+    "subcommand,handler_name,extra_args",
     [
-        pytest.param("run", "_cmd_run", ["--limit", "1"], True, id="run"),
-        pytest.param("scene-graph-only", "_cmd_scene_graph_only", ["--limit", "1"], True, id="scene_graph_only"),
-        pytest.param("status", "_cmd_status", [], False, id="status"),
-        pytest.param("verify", "_cmd_verify", [], False, id="verify"),
-        pytest.param("clean", "_cmd_clean", ["--yes"], False, id="clean"),
+        pytest.param("run", "_cmd_run", ["--limit", "1"], id="run"),
+        pytest.param("scene-graph-only", "_cmd_scene_graph_only", ["--limit", "1"], id="scene_graph_only"),
     ],
 )
-def test_main_guard_invocation(
+def test_main_guard_invoked(
     monkeypatch: pytest.MonkeyPatch,
     subcommand: str,
     handler_name: str,
     extra_args: list[str],
-    should_invoke: bool,
 ) -> None:
-    """run/scene-graph-only invoke the guard; status/verify/clean bypass it."""
+    """Long-running subcommands invoke the orphan guard with force=False."""
     monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", subcommand, *extra_args])
     with patch("scripts.bulk_export_for_flythrough._orphan_process_guard", return_value=0) as mock_guard:
         with patch(f"scripts.bulk_export_for_flythrough.{handler_name}", return_value=0):
             rc = main()
     assert rc == 0
-    if should_invoke:
-        mock_guard.assert_called_once()
-        assert mock_guard.call_args.kwargs.get("force") is False
-    else:
-        mock_guard.assert_not_called()
+    mock_guard.assert_called_once()
+    assert mock_guard.call_args.kwargs.get("force") is False
+
+
+@pytest.mark.parametrize(
+    "subcommand,handler_name,extra_args",
+    [
+        pytest.param("status", "_cmd_status", [], id="status"),
+        pytest.param("verify", "_cmd_verify", [], id="verify"),
+        pytest.param("clean", "_cmd_clean", ["--yes"], id="clean"),
+    ],
+)
+def test_main_guard_bypassed(
+    monkeypatch: pytest.MonkeyPatch,
+    subcommand: str,
+    handler_name: str,
+    extra_args: list[str],
+) -> None:
+    """Read-only subcommands do not invoke the orphan guard."""
+    monkeypatch.setattr(sys, "argv", ["bulk_export_for_flythrough.py", subcommand, *extra_args])
+    with patch("scripts.bulk_export_for_flythrough._orphan_process_guard", return_value=0) as mock_guard:
+        with patch(f"scripts.bulk_export_for_flythrough.{handler_name}", return_value=0):
+            rc = main()
+    assert rc == 0
+    mock_guard.assert_not_called()
 
 
 def test_main_propagates_system_exit_when_guard_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
