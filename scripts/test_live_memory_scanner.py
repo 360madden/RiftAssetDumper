@@ -69,11 +69,16 @@ print("=== target manifest ===")
 target_manifest = json.loads(Path("docs/live-memory-scan-targets.json").read_text(encoding="utf-8"))
 jsonschema.validate(target_manifest, target_schema)
 manifest_specs = load_pattern_specs_from_file(Path("docs/live-memory-scan-targets.json"))
-check("manifest target count", len(manifest_specs), 1)
-check(
-    "manifest first pattern",
-    manifest_specs[0],
+expected_manifest_specs = [
     "stage5_step48_at264_index_strip_prefix=00010002000200010003000400050006",
+    "stage5_step50_asset_id_ascii_6fc01704d4a509d5=36666330313730346434613530396435",
+    "stage5_step50_asset_id_ascii_caa9a88e94ec8db0=63616139613838653934656338646230",
+]
+check("manifest target count", len(manifest_specs), len(expected_manifest_specs))
+check(
+    "manifest patterns",
+    manifest_specs,
+    expected_manifest_specs,
 )
 check("manifest candidate-only", target_manifest["CandidateOnly"], True)
 check("manifest live read not executed", target_manifest["LiveReadExecuted"], False)
@@ -138,6 +143,7 @@ jsonschema.validate(cli_plan, schema)
 check("CLI schema version", cli_plan["SchemaVersion"], "live-memory-scan-plan/v1")
 check("CLI list-json does not execute", cli_plan["LiveProcessReadExecuted"], False)
 check("CLI loaded manifest pattern", cli_plan["Patterns"][0]["Label"], "stage5_step48_at264_index_strip_prefix")
+check("CLI loaded manifest target count", len(cli_plan["Patterns"]), len(expected_manifest_specs))
 
 print("=== fixture scan core ===")
 fixture = FixtureProcessReader([(0x1000, (b"A" * (SCAN_CHUNK_SIZE - 2)) + b"\xde\xad\xbe\xef" + b"B" * 16, "fixture")])
