@@ -127,7 +127,7 @@ python -m pytest scripts/ -v --tb=short
 ## Deliverables
 
 - [ ] `docs/roadmap/phase1-m1.4-prep.md` (this file)
-- [ ] `docs/handoffs/2026-06-m1.4-305-family-comparison.md` (M1.4 handoff)
+- [x] `docs/handoffs/2026-06-m1.4-305-family-comparison.md` (M1.4 handoff)
 - [ ] `docs/roadmap/phase1-m1.4-coordination.md` (coordination log)
 - [ ] Updated `docs/roadmap/current-phase.md` (M1.4 COMPLETE → M1.5 ACTIVE)
 

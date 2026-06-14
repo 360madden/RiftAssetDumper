@@ -86,7 +86,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.3-prep.md` (this file)
-- [ ] `docs/handoffs/2026-06-m2.3-role-descriptor-integration.md`
+- [x] `docs/handoffs/2026-06-m2.3-role-descriptor-integration.md`
 - [ ] Unified role↔descriptor↔block table
 - [ ] Gap analysis
 - [ ] Updated current-phase.md

@@ -122,7 +122,7 @@ python -m pytest scripts/ -v --tb=short
 ## Deliverables
 
 - [ ] `docs/roadmap/phase1-m1.5-prep.md` (this file)
-- [ ] `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` (comprehensive Phase 1 exit handoff)
+- [x] `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` (comprehensive Phase 1 exit handoff)
 - [ ] Updated `docs/post50-mesh34-negative-binding-proof-checklist.md` (cross-family blocker append)
 - [ ] Updated `docs/post50-parser-export-promotion-readiness-checklist.md` (Phase 1 evidence)
 - [ ] Refreshed `Exports/post50-validation-suite.*` (9/9 PASS expected)

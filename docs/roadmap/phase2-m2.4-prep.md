@@ -153,7 +153,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.4-prep.md` (this file)
-- [ ] `docs/handoffs/2026-06-m2.4-promotion-gate-evaluation.md`
+- [x] `docs/handoffs/2026-06-m2.4-promotion-gate-evaluation.md`
 - [ ] Per-gate evaluation table (6 gates assessed against M2.1-M2.3 evidence)
 - [ ] Updated current-phase.md (M2.4 IN PROGRESS)
 - [ ] Updated `docs/post50-parser-export-promotion-readiness-checklist.md` with Phase 2 evidence summary

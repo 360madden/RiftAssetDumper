@@ -66,7 +66,7 @@
 
 ### Step 5 — Stage 0 handoff
 
-- [ ] Write `docs/handoffs/2026-05-20-stage0-baseline.md`
+- [x] Write `docs/handoffs/2026-05-20-stage0-baseline.md`
 - [ ] Commit: "Stage 0 baseline: build, tests, proof guards, command inventory"
 - **Exit:** Clean commit with baseline snapshots
 

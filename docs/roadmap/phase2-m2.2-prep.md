@@ -149,7 +149,7 @@ python -m pytest scripts/ -v --tb=short
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.2-prep.md` (this file)
-- [ ] `docs/handoffs/2026-06-m2.2-binding-proofs.md` (M2.2 handoff)
+- [x] `docs/handoffs/2026-06-m2.2-binding-proofs.md` (M2.2 handoff)
 - [ ] Binding proof table: 329 family (12 IDs × per-mesh attribute → stream block)
 - [ ] Cross-family binding comparison (329 vs 305)
 - [ ] Descriptor byte cross-reference (binding → descriptor pattern)
