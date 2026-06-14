@@ -65,7 +65,7 @@ The 4-commit batch was selected from the 10-item M3-safety matrix with these cri
 Deferred (not M3-safe for the M3 lane):
 
 - Tag v1.x release — version selection is a judgment call M3 might get wrong (deferred to higher-reasoning lane).
-- DRY refactor of the 25-line matrix fixture across 3 test files — touches 3 files, more risk (deferred).
+- DRY refactor of the 25-line matrix fixture across 3 test files — **resolved 2026-06-14** by `d5a0a07` (`test: share POST50 mesh329 matrix fixture`).
 - Pre-commit hook addition — affects local dev workflow, M3 might pick a bad trigger event (deferred).
 - Deprecation notice investigation — **resolved 2026-06-14** by `7097c12` (`ci: update GitHub Actions to Node 24 majors`); remote CI stayed green in `27514610185`, `27514690400`, and `27514768077`.
 - Parser UX: hint at missing process identifier when --scan-region-base is set — see `docs/handoffs/2026-06-14-parser-ux-region-pin-hint.md` (non-blocking UX follow-up, deferred to single-purpose docs commit after the §8.4 Step 49 status decision lands; live-read tooling must not be in flux during the decision window).
@@ -96,6 +96,7 @@ Three changes from this batch add durable protections:
 Follow-on resolution:
 
 - **CI action deprecation path** (commit `7097c12`) — GitHub Actions were upgraded to Node 24-compatible majors (`actions/checkout@v6`, `actions/setup-dotnet@v5`, `actions/setup-python@v6`, `DavidAnson/markdownlint-cli2-action@v23`). This resolves the deferred "Deprecation notice investigation" without changing build/test commands.
+- **POST50 matrix fixture DRY refactor** (commit `d5a0a07`) — the repeated mesh329 attribute-role matrix payload was extracted to `scripts/post50_test_fixtures.py` and reused by the three POST50 status tests. Report filenames and assertions stayed in the tests, preserving registry-invariant coverage.
 
 ## Related
 
