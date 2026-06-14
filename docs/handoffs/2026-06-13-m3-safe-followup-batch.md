@@ -67,7 +67,7 @@ Deferred (not M3-safe for the M3 lane):
 - Tag v1.x release — version selection is a judgment call M3 might get wrong (deferred to higher-reasoning lane).
 - DRY refactor of the 25-line matrix fixture across 3 test files — touches 3 files, more risk (deferred).
 - Pre-commit hook addition — affects local dev workflow, M3 might pick a bad trigger event (deferred).
-- Deprecation notice investigation — requires judgment on whether to remove or finish migration (deferred).
+- Deprecation notice investigation — **resolved 2026-06-14** by `7097c12` (`ci: update GitHub Actions to Node 24 majors`); remote CI stayed green in `27514610185`, `27514690400`, and `27514768077`.
 - Parser UX: hint at missing process identifier when --scan-region-base is set — see `docs/handoffs/2026-06-14-parser-ux-region-pin-hint.md` (non-blocking UX follow-up, deferred to single-purpose docs commit after the §8.4 Step 49 status decision lands; live-read tooling must not be in flux during the decision window).
 
 ## Validation
@@ -92,6 +92,10 @@ Three changes from this batch add durable protections:
 1. **`scripts/test_post50_registry_invariant.py`** (commit `54e5f43`) — machine-checkable invariant that fails CI if a 12th report is added to `POST50_POSITION_SOURCE_REPORTS` without updating test fixtures. AST-based, robust to cosmetic changes.
 2. **`.github/workflows/ci.yml` `workflow_dispatch` trigger** (commit `2d7b9c7`) — manual re-runs are now possible via `gh workflow run ci.yml --ref main`. Useful for testing CI changes without waiting for a push or PR.
 3. **`knowledge.md` updates** (commit `45fac63`) — durable project knowledge now records the CI pipeline structure, the CI green sequence, and Phase 1 milestone status. Future agents see current state.
+
+Follow-on resolution:
+
+- **CI action deprecation path** (commit `7097c12`) — GitHub Actions were upgraded to Node 24-compatible majors (`actions/checkout@v6`, `actions/setup-dotnet@v5`, `actions/setup-python@v6`, `DavidAnson/markdownlint-cli2-action@v23`). This resolves the deferred "Deprecation notice investigation" without changing build/test commands.
 
 ## Related
 
