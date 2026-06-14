@@ -77,7 +77,7 @@ M1.2 (final handoff + analysis + matrix) adds quantified support to the negative
 
 **Hard gates remain** (now strengthened): complete attr+UV binding + attr-extra path agreement + proof packet + reviewed promotion decision still required before any consumption of #34 @304.
 
-**Refs**: M1.2 handoff `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md`; analysis `Exports/phase1-m1.2-@304-analysis-initial.*` + final-summary; matrix `Exports/mesh329-family-attribute-role-matrix.*`; roadmap `docs/roadmap/project-roadmap.md` Phase 1 M1.3/M1.2 + preps; `docs/roadmap/phase1-m1.3-prep.md`.
+**Refs**: M1.2 handoff `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md`; analysis `Exports/phase1-m1.2-@304-analysis-initial.*` + final-summary; matrix `Exports/mesh329-family-attribute-role-matrix.*`; roadmap `docs/roadmap/project-roadmap.md` Phase 1 M1.3/M1.2 + preps; `docs/roadmap/phase1-m1.3-prep.md`.
 
 Candidate-only; 329 family only. Supports M1.3 guard work on sibling source-binding + variant attribute layout. (Appended post M1.2; redacted; no active phase or main M1.2 handoff edited.)
 

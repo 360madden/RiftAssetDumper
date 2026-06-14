@@ -3,7 +3,7 @@
 **Date**: 2026-06
 **Type**: Milestone Prep — Phase 2 M2.2
 **Status**: **ACTIVE**
-**Parent(s)**: `docs/roadmap/project-roadmap.md` (Phase 2 M2.2), `docs/roadmap/current-phase.md` (Phase 2 ACTIVE), `docs/handoffs/draft-2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 evidence gathered)
+**Parent(s)**: `docs/roadmap/project-roadmap.md` (Phase 2 M2.2), `docs/roadmap/current-phase.md` (Phase 2 ACTIVE), `docs/handoffs/2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 evidence gathered)
 **Entry**: M2.1 evidence gathered — descriptor is per-block embedded (4 bytes at offset 24, not static table); 5 consistent patterns; `37 04 03 00` spans position/normal/UV; all promotion brakes intact
 
 **Roadmap Reference**: This prep supports **M2.2** — the second milestone of **Phase 2: NiDataStream Descriptor & Binding Proof System**. Per the roadmap: "Build/validate 'NiMesh offset → NiDataStream block' binding proofs at scale."
@@ -149,7 +149,7 @@ python -m pytest scripts/ -v --tb=short
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.2-prep.md` (this file)
-- [ ] `docs/handoffs/draft-2026-06-m2.2-binding-proofs.md` (M2.2 handoff)
+- [ ] `docs/handoffs/2026-06-m2.2-binding-proofs.md` (M2.2 handoff)
 - [ ] Binding proof table: 329 family (12 IDs × per-mesh attribute → stream block)
 - [ ] Cross-family binding comparison (329 vs 305)
 - [ ] Descriptor byte cross-reference (binding → descriptor pattern)
@@ -178,6 +178,6 @@ python -m pytest scripts/ -v --tb=short
 
 ---
 
-See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/draft-2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 evidence), `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` (Phase 1 exit).
+See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 evidence), `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` (Phase 1 exit).
 
 **End of M2.2 prep.**

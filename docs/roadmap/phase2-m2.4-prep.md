@@ -153,7 +153,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.4-prep.md` (this file)
-- [ ] `docs/handoffs/draft-2026-06-m2.4-promotion-gate-evaluation.md`
+- [ ] `docs/handoffs/2026-06-m2.4-promotion-gate-evaluation.md`
 - [ ] Per-gate evaluation table (6 gates assessed against M2.1-M2.3 evidence)
 - [ ] Updated current-phase.md (M2.4 IN PROGRESS)
 - [ ] Updated `docs/post50-parser-export-promotion-readiness-checklist.md` with Phase 2 evidence summary
@@ -171,4 +171,4 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 
 ---
 
-See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/draft-2026-06-m2.3-role-descriptor-integration.md`, `docs/nidatastream-promotion-readiness-checklist.md`, `docs/post50-parser-export-promotion-readiness-checklist.md`.
+See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/2026-06-m2.3-role-descriptor-integration.md`, `docs/nidatastream-promotion-readiness-checklist.md`, `docs/post50-parser-export-promotion-readiness-checklist.md`.

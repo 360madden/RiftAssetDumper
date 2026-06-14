@@ -157,7 +157,7 @@ python -m pytest scripts/ -v --tb=short
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.1-prep.md` (this file)
-- [ ] `docs/handoffs/draft-2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 handoff)
+- [ ] `docs/handoffs/2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 handoff)
 - [ ] Refreshed `Exports/ghidra-reports/nidatastream_descriptor_reference_classify.*` (with Phase 1 anchor context)
 - [ ] Refreshed `Exports/ghidra-reports/nidatastream_descriptor_base_model_review.*`
 - [ ] Candidate field-order table (descriptor byte → Phase 1 role mapping)

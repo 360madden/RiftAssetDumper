@@ -110,7 +110,7 @@ Current live pointer: docs/roadmap/current-phase.md
 - Executed exact command: `python scripts/rift_workflow.py mesh329-attribute-role-matrix --skip-build` (GeneratedOutputGuard passed; no build).
 - Read latest: Exports/mesh329-family-attribute-role-matrix.json (IDsCovered=12, ProbeCount=23, PairComparisons=11, full rows+quants) and .md (tables).
 - Updated Exports/phase1-m1.1-initial-matrix-rows.md with the latest full table, pair comparisons, and quantification (integrated complete comparative + flat rows + 12/12 patterns; references command, schema, roadmap, candidate-only).
-- Ensured docs/handoffs/draft-2026-06-m1.1-329-matrix.md references latest matrix artifacts (mesh329-*.json/md/csv) and has accurate numbers: 12 IDs covered, 12 pairs, key patterns (attr=0 / @304 position 12/12), IDsCovered list, FAMILY scope note.
+- Ensured docs/handoffs/2026-06-m1.1-329-matrix.md references latest matrix artifacts (mesh329-*.json/md/csv) and has accurate numbers: 12 IDs covered, 12 pairs, key patterns (attr=0 / @304 position 12/12), IDsCovered list, FAMILY scope note.
 - Coordinated via this update to phase1-m1.1-coordination.md (references Phase 1 M1.1, project-roadmap.md, current-phase.md, task-routing safety, all candidate-only, anti-drift).
 - Validation: Numbers cross-checked (e.g. IDs: 0364ea...,f2c3...,07c7...,83df...,4eb7...,69da...,7f3e...,b576... etc.; patterns: mesh#34 attrSets=0 + secondary pos@304 consistent in 12/12); no scope creep; Python only; Exports/ as generated data.
 - Result: Full matrix tooling output now integrated for milestone handoff. M1.1 matrix deliverable complete/refreshable.
@@ -121,7 +121,7 @@ Current live pointer: docs/roadmap/current-phase.md
 - Block 34 Prober (019e8655-c7c6-7d10-9735-aed099b85052): full 8-ID #34 batch + table (attr=0 + @304 pos pattern).
 - Main-line probes: #7 data for 8+ top IDs via mesh-probe (plain .json) + anchors.
 - Matrix Synthesizer (019e8655-d929-7bc3-a10a-680221f8bbba): initial + final refresh (after batch #7 naming); produced 12 IDs / 12 paired / 24 rows, 12/12 pattern confirmation. Block7 batch directly fed via suffixed probes.
-- Handoff finalized: `docs/handoffs/draft-2026-06-m1.1-329-matrix.md` (full tables, refs to subagents/tasks, artifacts, validation).
+- Handoff finalized: `docs/handoffs/2026-06-m1.1-329-matrix.md` (full tables, refs to subagents/tasks, artifacts, validation).
 - Coordination + current-phase updated with M1.1 complete status + M1.2 pointer.
 - 12/12 paired confirmation of the core 329-family attr/role split (maximized by this #7 batch).
 

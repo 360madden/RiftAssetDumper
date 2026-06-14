@@ -6,7 +6,7 @@
 
 - Attribute-extra-probe batch (8/8 informative negatives on #34 @304).
 - Analysis/quant: `Exports/phase1-m1.2-@304-analysis-initial.json` + `.md`.
-- Handoff: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` (finalized content; filename `draft-` per M1.1 precedent).
+- Handoff: `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` (finalized content; filename `draft-` per M1.1 precedent).
 
 All candidate-only, strictly 329-family (meshSize=329), matrix targets only. Reference `docs/roadmap/phase1-m1.2-prep.md` + `Exports/mesh329-family-attribute-role-matrix.json`.
 
@@ -90,7 +90,7 @@ ERROR: no attribute extra stream was found at mesh payload offset @304 on NiMesh
 - Per-ID mesh34 probes (raw, used for BodyFirst16/roles): `Exports/probe-nif-mesh-*-mesh34.json` (8 files; e.g. `probe-nif-mesh-69da9507d49c42ff-mesh34.json`)
 - Attribute probe attempt logs: captured in this coordination + terminal batch output (would-be JSON paths noted above)
 - Prep ref: `docs/roadmap/phase1-m1.2-prep.md` (lists the exact 8, rationale, command, what to quantify)
-- M1.1 parent: `docs/roadmap/phase1-m1.1-coordination.md` + handoff `docs/handoffs/draft-2026-06-m1.1-329-matrix.md`
+- M1.1 parent: `docs/roadmap/phase1-m1.1-coordination.md` + handoff `docs/handoffs/2026-06-m1.1-329-matrix.md`
 - Roadmap: `docs/roadmap/project-roadmap.md` (Phase 1 M1.2)
 
 **Validation (per run + batch):**
@@ -111,16 +111,16 @@ Batch, analysis-initial quant, and M1.2 handoff finalized. Exit criteria per `do
 - **Prep**: `docs/roadmap/phase1-m1.3-prep.md` — sibling source-binding + variant attribute layout guards.
 - **Coordination (new stub)**: `docs/roadmap/phase1-m1.3-coordination.md` (swarm status, handoff ref, AGENTS summary).
 - **Handoff (final)**: `docs/handoffs/2026-06-m1.3-sibling-source-binding-guard.md` (full structure, M1.2 evidence, candidate guard sketch, pilot plan, artifacts, validation, AGENTS sections).
-- **Evidence baseline**: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` + `Exports/phase1-m1.2-@304-analysis-initial.*` + matrix `Exports/mesh329-family-attribute-role-matrix.*` + existing Exports/position-source-sibling-lead-guard.*.
+- **Evidence baseline**: `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` + `Exports/phase1-m1.2-@304-analysis-initial.*` + matrix `Exports/mesh329-family-attribute-role-matrix.*` + existing Exports/position-source-sibling-lead-guard.*.
 - **Live pointer**: `docs/roadmap/current-phase.md` (**M1.3 ACTIVE**).
 
-M1.1 reference: `docs/handoffs/draft-2026-06-m1.1-329-matrix.md` (finalized) + matrix artifacts.
+M1.1 reference: `docs/handoffs/2026-06-m1.1-329-matrix.md` (finalized) + matrix artifacts.
 
 **Human-readable summary of this milestone step (per AGENTS.md)**: Executed attribute-extra-probe batch on 8 top #34 (all informative "no attribute extra @304 on #34"; guard passed; key for parser path). Analysis delivered quant (8-ID PerID/aggs: 8/8 low plaus despite pos role, avg 0.405 ratio, 022bc2/c2 magic, classif, mixed endian, stride viable, diffs). Handoff drafter initial + main finalized (tables for 10 scoped incl low 066fa/91ea b16 extracts consistent pos c=75/attr=0; 12/12 matrix patterns; blockers cleaned; swarm launched for extensions). What changed: M1.2 batch+quant+classification delivered + handoff finalized with coverage. Why matters: Quantifies extra stream anomalies (body vs role conflict, distinct magic) on 329 #34 variants; refines role scoring, feeds M1.3 guards, advances Phase 1 evidence without promotion. Validated: 8/8+2 consistency, matrix match (python verified), 10/10 scoped, candidate-only, 329+matrix scope, guards, existing cmds/postproc, full refs to prep/matrix/roadmap Phase 1 M1.2 + AGENTS (summaries/tables/top10). Remains uncertain: deeper @304 bodies (hist etc limited by attr=0 path); @304 exact semantics (M1.3+); swarm extension outputs (bg). Ready for pointer advance + M1.3. Swarm used per user "always go agentic/swarm". (All per AGENTS + safety + anti-drift.)
 
 ## Handoff Drafter + Main Finalize Coordination Update
 
-- Initial M1.2 handoff draft created: `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` (drafter 019e86d7-c7a0...)
+- Initial M1.2 handoff draft created: `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` (drafter 019e86d7-c7a0...)
 - Used: prep + M1.1 matrix + batch (errors/fields) + analysis-initial (PerID 8/Aggs/Patterns) + sibling/probes.
 - Main integration/finalize: added 10/10 tables + low-ID (066fa 0b27c2... / 91ea b728c2...) probe extracts, cleaned "initial"/placeholders, updated blockers (M1.2-specific resolved), artifacts, validation (12 probes consistent), human summary + top10 for finalize. Status: **finalized**. Swarm (analysis-extender 019e86ea-60a1..., magic 019e86ea-7589..., sibling 019e86ea-8603..., verify+M1.3 019e86ea-98ee...) launched for supporting full quant/magic/reports/prep.
 - Draft now finalized (draft- prefix per precedent); all candidate-only, 329+matrix, Phase 1 M1.2 refs.

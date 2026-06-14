@@ -125,7 +125,7 @@ proof work. It strengthens the evidence landscape but does NOT clear any promoti
 **Final tally**: 3 strengthened, 1 reclassified, 2 unchanged, **0 cleared**.
 `FieldOrderPromoted` = false, `ParserExportPromotionAllowed` = false — both must remain false.
 
-See comprehensive M2.4 handoff: `docs/handoffs/draft-2026-06-m2.4-promotion-gate-evaluation.md`.
+See comprehensive M2.4 handoff: `docs/handoffs/2026-06-m2.4-promotion-gate-evaluation.md`.
 
 ---
 

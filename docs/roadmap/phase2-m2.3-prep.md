@@ -86,7 +86,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 ## Deliverables
 
 - [ ] `docs/roadmap/phase2-m2.3-prep.md` (this file)
-- [ ] `docs/handoffs/draft-2026-06-m2.3-role-descriptor-integration.md`
+- [ ] `docs/handoffs/2026-06-m2.3-role-descriptor-integration.md`
 - [ ] Unified role↔descriptor↔block table
 - [ ] Gap analysis
 - [ ] Updated current-phase.md
@@ -101,4 +101,4 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 
 ---
 
-See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/draft-2026-06-m2.2-binding-proofs.md`, `docs/handoffs/draft-2026-06-m2.1-nidatastream-descriptor-mapping.md`.
+See `docs/roadmap/project-roadmap.md` (Phase 2), `docs/handoffs/2026-06-m2.2-binding-proofs.md`, `docs/handoffs/2026-06-m2.1-nidatastream-descriptor-mapping.md`.

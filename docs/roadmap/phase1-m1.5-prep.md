@@ -164,8 +164,8 @@ python -m pytest scripts/ -v --tb=short
 
 - `docs/roadmap/project-roadmap.md` — Phase 1 definition + exit criteria
 - `docs/roadmap/current-phase.md` — Living pointer (M1.5 ACTIVE)
-- `docs/handoffs/draft-2026-06-m1.1-329-matrix.md` — M1.1: 329 family matrix
-- `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` — M1.2: @304 deep classification
+- `docs/handoffs/2026-06-m1.1-329-matrix.md` — M1.1: 329 family matrix
+- `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` — M1.2: @304 deep classification
 - `docs/handoffs/2026-06-m1.3-sibling-source-binding-guard.md` — M1.3: sibling-binding guards
 - `docs/handoffs/2026-06-m1.4-305-family-comparison.md` — M1.4: 305 light comparison
 - `docs/post50-mesh34-negative-binding-proof-checklist.md` — Negative binding proof

@@ -230,7 +230,7 @@ The autonomous research also delivered major discoveries across the broader proj
 | `2026-06-gate5-review-brief.md` | Gate 5 autonomous review & decision |
 | `2026-06-m7.4-formal-decision-record.md` | M7.4 formal decision record |
 | `2026-06-m1.5-phase1-exit-consolidation.md` | Phase 1 exit consolidation |
-| `draft-2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 @304 classification |
+| `2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 @304 classification |
 | `2026-06-m1.3-sibling-source-binding-guard.md` | M1.3 sibling guard |
 
 ### Living Documents

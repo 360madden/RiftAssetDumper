@@ -48,8 +48,8 @@ Multiple documentation inconsistencies were found:
 
 ### Kept unchanged
 
-- `docs/handoffs/draft-2026-06-m1.1-329-matrix.md` — only version, prefix intentional per file note
-- `docs/handoffs/draft-2026-06-m1.2-@304-extra-stream-classification.md` — only version, prefix intentional per file note
+- `docs/handoffs/2026-06-m1.1-329-matrix.md` — only version, prefix intentional per file note
+- `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` — only version, prefix intentional per file note
 
 ## Project State Confirmed
 
@@ -121,12 +121,12 @@ Audited all 6 remaining `draft-` prefixed handoffs:
 
 | File | Status | Verdict |
 |---|---|---|
-| `draft-2026-06-m1.1-329-matrix.md` | M1.1 COMPLETE | Intentional — "prefix retained for minimal diff" |
-| `draft-2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 COMPLETE | Intentional — "prefix retained per M1.1 precedent" |
-| `draft-2026-06-m2.1-nidatastream-descriptor-mapping.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
-| `draft-2026-06-m2.2-binding-proofs.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
-| `draft-2026-06-m2.3-role-descriptor-integration.md` | M2.3 COMPLETE ("Final — M2.3 exited") | Intentional — content finalized, prefix retained |
-| `draft-2026-06-m2.4-promotion-gate-evaluation.md` | Phase 2 (exited via M2.5) | Intentional — 0 gates cleared (expected) |
+| `2026-06-m1.1-329-matrix.md` | M1.1 COMPLETE | Intentional — "prefix retained for minimal diff" |
+| `2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 COMPLETE | Intentional — "prefix retained per M1.1 precedent" |
+| `2026-06-m2.1-nidatastream-descriptor-mapping.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
+| `2026-06-m2.2-binding-proofs.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
+| `2026-06-m2.3-role-descriptor-integration.md` | M2.3 COMPLETE ("Final — M2.3 exited") | Intentional — content finalized, prefix retained |
+| `2026-06-m2.4-promotion-gate-evaluation.md` | Phase 2 (exited via M2.5) | Intentional — 0 gates cleared (expected) |
 
 **Finding**: All 6 `draft-` prefixes are intentional conventions, not staleness. All cross-references valid. Zero fixes needed.
 

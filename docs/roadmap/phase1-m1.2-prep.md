@@ -2,7 +2,7 @@
 
 **Date**: 2026-06
 **Prepared by**: Forward-planning subagent (read-only exploration)
-**Context**: Post-M1.1 transition prep. M1.1 substantially complete (matrix + handoff mature per `docs/roadmap/phase1-m1.1-coordination.md`, `current-phase.md`, and `draft-2026-06-m1.1-329-matrix.md` in handoffs/). Per `docs/roadmap/project-roadmap.md` Phase 1 (M1.1 → M1.2: "Deep classification of the @304 extra stream on mesh#34 variants (payload analysis, vector comparison, magic patterns, role scoring refinement)").
+**Context**: Post-M1.1 transition prep. M1.1 substantially complete (matrix + handoff mature per `docs/roadmap/phase1-m1.1-coordination.md`, `current-phase.md`, and `2026-06-m1.1-329-matrix.md` in handoffs/). Per `docs/roadmap/project-roadmap.md` Phase 1 (M1.1 → M1.2: "Deep classification of the @304 extra stream on mesh#34 variants (payload analysis, vector comparison, magic patterns, role scoring refinement)").
 **Anti-drift**: Strictly meshSize=329 family only (light 305 comparison disallowed unless explicitly in later milestone). Everything **candidate-only**. No parser/export promotion. Use existing `python scripts/rift_workflow.py` commands. Every probe → JSON + MD + handoff contribution. Reference this prep + matrix + roadmap in all M1.2 work. High-reasoning lane per `docs/task-routing-safety-policy.md`.
 
 ## Exact Target List
