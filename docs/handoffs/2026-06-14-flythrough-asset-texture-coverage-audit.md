@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-14T23:51:05.148241Z
+**Generated**: 2026-06-14T23:55:19.377309Z
 
 ## Why this exists
 
@@ -31,17 +31,17 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 
 ### OBJ entries without asset IDs
 
-- `Exports/decode-264-v128/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
-- `Exports/decode-264-v128b/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128b, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
-- `Exports/decode-264-v64/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=64, faces=82, batch=batch-264-v64, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=dfa4b4fccd826b59
-- `Exports/decode-264-v80/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=80, faces=78, batch=batch-264-v80, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=0603cce7cee15eb8
-- `Exports/decode-264-v95/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=95, faces=118, batch=batch-264-v95, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=3de9c1236fe20520
-- `Exports/decode-fallback-1/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=24, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
-- `Exports/decode-fallback-2/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=30, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
-- `Exports/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
-- `Exports/discovery-plan/stage0-baseline/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
-- `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj` — mesh_block=17, verts=50, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
-- `Exports/test-fan-fallback/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=168, faces=166, batch=individual-export, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=58eaafd0fd31fcaf
+- `Exports/decode-264-v128/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128, provenance=copied, candidate_status=ambiguous-signature-match, candidate_geometry_status=ambiguous-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/decode-264-v128b/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128b, provenance=copied, candidate_status=ambiguous-signature-match, candidate_geometry_status=ambiguous-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/decode-264-v64/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=64, faces=82, batch=batch-264-v64, provenance=copied, candidate_status=single-asset-signature-match, candidate_geometry_status=single-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=dfa4b4fccd826b59
+- `Exports/decode-264-v80/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=80, faces=78, batch=batch-264-v80, provenance=copied, candidate_status=single-asset-signature-match, candidate_geometry_status=single-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=0603cce7cee15eb8
+- `Exports/decode-264-v95/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=95, faces=118, batch=batch-264-v95, provenance=copied, candidate_status=single-asset-signature-match, candidate_geometry_status=single-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=3de9c1236fe20520
+- `Exports/decode-fallback-1/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=24, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_geometry_status=no-candidate-geometry-match, candidate_texture_set_status=no-candidate-textures, candidate_asset_ids=none
+- `Exports/decode-fallback-2/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=30, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_geometry_status=no-candidate-geometry-match, candidate_texture_set_status=no-candidate-textures, candidate_asset_ids=none
+- `Exports/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_geometry_status=ambiguous-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/discovery-plan/stage0-baseline/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_geometry_status=ambiguous-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj` — mesh_block=17, verts=50, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_geometry_status=no-source-geometry, candidate_texture_set_status=no-candidate-textures, candidate_asset_ids=none
+- `Exports/test-fan-fallback/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=168, faces=166, batch=individual-export, provenance=copied, candidate_status=single-asset-signature-match, candidate_geometry_status=single-candidate-geometry-match, candidate_texture_set_status=single-candidate-texture-set, candidate_asset_ids=58eaafd0fd31fcaf
 
 ## Asset IDs without linked textures
 
@@ -91,6 +91,10 @@ Optional heuristic expansion:
 - 4 id-less OBJ entries are eligible for single-candidate texture borrowing.
 - 327 total OBJ entries become materializable with that option.
 - 23 entries remain skipped after heuristic expansion.
+- `--allow-common-candidate-materials` additionally borrows textures for ambiguous candidate groups only when all geometry-matched candidates share the same linked texture set.
+- 4 ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.
+- 331 total OBJ entries become materializable with both candidate options.
+- 19 entries remain skipped after both candidate options.
 
 ## Top 10 next best actions
 

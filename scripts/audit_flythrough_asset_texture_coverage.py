@@ -15,6 +15,7 @@ and which assets still have no linked texture references.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -134,6 +135,27 @@ def entry_geometry_signature(entry: dict[str, Any]) -> tuple[Any, ...]:
         sibling_pair.get("mesh_size") or entry.get("mesh_size"),
         entry.get("descriptor"),
     )
+
+
+def obj_geometry_fingerprint(path: Path) -> dict[str, Any] | None:
+    """Return a stable hash of OBJ geometry/material data lines, excluding comments."""
+
+    if not path.exists():
+        return None
+    digest = hashlib.sha256()
+    line_count = 0
+    try:
+        with path.open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith(("v ", "vt ", "vn ", "f ")):
+                    digest.update((" ".join(line.split()) + "\n").encode("utf-8"))
+                    line_count += 1
+    except OSError:
+        return None
+    return {
+        "geometry_hash": digest.hexdigest(),
+        "geometry_line_count": line_count,
+    }
 
 
 def _counter_to_sorted_dict(counter: Counter[Any]) -> dict[str, int]:
@@ -265,6 +287,16 @@ def build_audit(
     missing_obj_files = sorted(manifest_path_set - obj_files_on_disk)
     extra_obj_files = sorted(obj_files_on_disk - manifest_path_set)
     existing_manifest_obj_entries = sum(1 for path in manifest_paths if path in obj_files_on_disk)
+    geometry_fingerprints: dict[str, dict[str, Any]] = {}
+
+    def geometry_for_rel_path(rel_path: str) -> dict[str, Any] | None:
+        if rel_path not in obj_files_on_disk:
+            return None
+        if rel_path not in geometry_fingerprints:
+            fingerprint = obj_geometry_fingerprint(repo_path_from_relative(repo_root, rel_path))
+            if fingerprint:
+                geometry_fingerprints[rel_path] = fingerprint
+        return geometry_fingerprints.get(rel_path)
 
     entries_by_asset_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
     idless_export_entries: list[tuple[dict[str, Any], str]] = []
@@ -327,8 +359,12 @@ def build_audit(
             "asset_id": aid,
             "path": rel_path,
             "linked_texture_count": asset_texture_counts.get(aid, 0),
+            "linked_textures": linked_textures_by_asset.get(aid, []),
             "texture_link_rows": texture_link_rows_by_asset.get(aid, 0),
         }
+        fingerprint = geometry_for_rel_path(rel_path)
+        if fingerprint:
+            candidate.update(fingerprint)
         if candidate not in signature_to_candidates[entry_geometry_signature(entry)]:
             signature_to_candidates[entry_geometry_signature(entry)].append(candidate)
 
@@ -338,6 +374,39 @@ def build_audit(
     for entry, rel_path in idless_export_entries:
         candidates = signature_to_candidates.get(entry_geometry_signature(entry), [])
         candidate_asset_ids = sorted({candidate["asset_id"] for candidate in candidates})
+        fingerprint = geometry_for_rel_path(rel_path)
+        geometry_hash = fingerprint.get("geometry_hash") if fingerprint else None
+        geometry_line_count = fingerprint.get("geometry_line_count") if fingerprint else None
+        geometry_matching_candidate_asset_ids = sorted(
+            {
+                candidate["asset_id"]
+                for candidate in candidates
+                if geometry_hash and candidate.get("geometry_hash") == geometry_hash
+            }
+        )
+        if not geometry_hash:
+            candidate_geometry_status = "no-source-geometry"
+        elif not candidates:
+            candidate_geometry_status = "no-candidate-geometry-match"
+        elif not geometry_matching_candidate_asset_ids:
+            candidate_geometry_status = "signature-only-no-geometry-match"
+        elif len(geometry_matching_candidate_asset_ids) == 1:
+            candidate_geometry_status = "single-candidate-geometry-match"
+        else:
+            candidate_geometry_status = "ambiguous-candidate-geometry-match"
+
+        candidate_texture_sets = {
+            tuple(candidate.get("linked_textures", []))
+            for candidate in candidates
+            if candidate.get("linked_textures")
+            and (not geometry_hash or candidate.get("geometry_hash") == geometry_hash)
+        }
+        if not candidate_texture_sets:
+            candidate_texture_set_status = "no-candidate-textures"
+        elif len(candidate_texture_sets) == 1:
+            candidate_texture_set_status = "single-candidate-texture-set"
+        else:
+            candidate_texture_set_status = "multiple-candidate-texture-sets"
         if not candidates:
             candidate_status = "no-geometry-signature-match"
         elif len(candidate_asset_ids) == 1:
@@ -360,6 +429,11 @@ def build_audit(
             "candidate_status": candidate_status,
             "candidate_asset_ids": candidate_asset_ids,
             "candidate_entries": candidates,
+            "candidate_geometry_status": candidate_geometry_status,
+            "geometry_matching_candidate_asset_ids": geometry_matching_candidate_asset_ids,
+            "candidate_texture_set_status": candidate_texture_set_status,
+            "geometry_hash": geometry_hash,
+            "geometry_line_count": geometry_line_count,
         }
         idless_obj_entries.append(candidate_info)
         idless_candidate_info_by_path[rel_path] = candidate_info
@@ -389,6 +463,17 @@ def build_audit(
                 "candidate_status": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_status"),
                 "candidate_asset_ids": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_asset_ids", []),
                 "candidate_entries": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_entries", []),
+                "candidate_geometry_status": idless_candidate_info_by_path.get(rel_path, {}).get(
+                    "candidate_geometry_status"
+                ),
+                "geometry_matching_candidate_asset_ids": idless_candidate_info_by_path.get(rel_path, {}).get(
+                    "geometry_matching_candidate_asset_ids", []
+                ),
+                "candidate_texture_set_status": idless_candidate_info_by_path.get(rel_path, {}).get(
+                    "candidate_texture_set_status"
+                ),
+                "geometry_hash": (geometry_for_rel_path(rel_path) or {}).get("geometry_hash"),
+                "geometry_line_count": (geometry_for_rel_path(rel_path) or {}).get("geometry_line_count"),
                 "texture_status": texture_status,
                 "linked_texture_count": len(linked_textures),
                 "linked_textures": linked_textures,
@@ -508,12 +593,27 @@ def render_markdown(audit: dict[str, Any]) -> str:
     single_candidate_materializable = sum(
         1
         for entry in obj.get("entries", [])
-        if entry.get("candidate_status") == "single-asset-signature-match"
+        if entry.get("candidate_geometry_status") == "single-candidate-geometry-match"
         and entry.get("exists_on_disk")
         and any(candidate.get("linked_texture_count", 0) > 0 for candidate in entry.get("candidate_entries", []))
     )
+    common_candidate_materializable = 0
+    for entry in obj.get("entries", []):
+        if entry.get("candidate_geometry_status") != "ambiguous-candidate-geometry-match" or not entry.get(
+            "exists_on_disk"
+        ):
+            continue
+        texture_sets = {
+            tuple(candidate.get("linked_textures", []))
+            for candidate in entry.get("candidate_entries", [])
+            if candidate.get("linked_textures") and candidate.get("geometry_hash") == entry.get("geometry_hash")
+        }
+        if len(texture_sets) == 1:
+            common_candidate_materializable += 1
     heuristic_materializable = existing_texture_linked + single_candidate_materializable
+    common_heuristic_materializable = heuristic_materializable + common_candidate_materializable
     heuristic_skipped = obj["manifest_entries"] - heuristic_materializable
+    common_heuristic_skipped = obj["manifest_entries"] - common_heuristic_materializable
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -566,6 +666,8 @@ def render_markdown(audit: dict[str, Any]) -> str:
                 f"verts={entry.get('vertex_count')}, faces={entry.get('face_count')}, "
                 f"batch={entry.get('export_batch')}, provenance={entry.get('provenance')}, "
                 f"candidate_status={entry.get('candidate_status')}, "
+                f"candidate_geometry_status={entry.get('candidate_geometry_status')}, "
+                f"candidate_texture_set_status={entry.get('candidate_texture_set_status')}, "
                 f"candidate_asset_ids={', '.join(entry.get('candidate_asset_ids') or []) or 'none'}"
             )
             for entry in idless
@@ -628,6 +730,10 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {single_candidate_materializable} id-less OBJ entries are eligible for single-candidate texture borrowing.",
         f"- {heuristic_materializable} total OBJ entries become materializable with that option.",
         f"- {heuristic_skipped} entries remain skipped after heuristic expansion.",
+        "- `--allow-common-candidate-materials` additionally borrows textures for ambiguous candidate groups only when all geometry-matched candidates share the same linked texture set.",
+        f"- {common_candidate_materializable} ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.",
+        f"- {common_heuristic_materializable} total OBJ entries become materializable with both candidate options.",
+        f"- {common_heuristic_skipped} entries remain skipped after both candidate options.",
         "",
         "## Top 10 next best actions",
         "",

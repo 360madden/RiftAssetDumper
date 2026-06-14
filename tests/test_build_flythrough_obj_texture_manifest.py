@@ -12,6 +12,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     build_manifest,
     choose_material_textures,
     classify_texture_role,
+    common_candidate_texture_names,
     normalize_converted_texture_path,
     obj_with_material_text,
     verify_bundle,
@@ -167,6 +168,69 @@ def test_build_manifest_can_borrow_single_candidate_textures_without_promoting_a
     assert heuristic["entries"][1]["texture_source"] == "single-candidate-heuristic"
     assert heuristic["entries"][1]["borrowed_texture_asset_id"] == "abcdef0123456789"
     assert heuristic["entries"][1]["chosen_material_textures"]["diffuse"] == "abc_wall_c.png"
+
+
+def test_build_manifest_can_borrow_common_candidate_textures_without_promoting_asset_id(tmp_path: Path) -> None:
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"texture-linked": 2, "no-asset-id": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {"ambiguous-signature-match": 1},
+            "entries": [
+                {
+                    "manifest_index": 0,
+                    "path": "Exports/a/aaaaaaaaaaaaaaaa.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "aaaaaaaaaaaaaaaa",
+                    "candidate_asset_ids": [],
+                    "texture_status": "texture-linked",
+                    "linked_textures": ["shared_diffuse_c.png"],
+                },
+                {
+                    "manifest_index": 1,
+                    "path": "Exports/b/bbbbbbbbbbbbbbbb.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "bbbbbbbbbbbbbbbb",
+                    "candidate_asset_ids": [],
+                    "texture_status": "texture-linked",
+                    "linked_textures": ["shared_diffuse_c.png"],
+                },
+                {
+                    "manifest_index": 2,
+                    "path": "Exports/idless.obj",
+                    "exists_on_disk": True,
+                    "asset_id": None,
+                    "candidate_asset_ids": ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"],
+                    "geometry_matching_candidate_asset_ids": ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"],
+                    "candidate_status": "ambiguous-signature-match",
+                    "candidate_geometry_status": "ambiguous-candidate-geometry-match",
+                    "texture_status": "no-asset-id",
+                    "linked_textures": [],
+                },
+            ],
+        },
+    }
+    asset_textures = {
+        "aaaaaaaaaaaaaaaa": ["shared_diffuse_c.png"],
+        "bbbbbbbbbbbbbbbb": ["shared_diffuse_c.png"],
+    }
+    assert common_candidate_texture_names(audit["obj_file_level"]["entries"][2], asset_textures) == [
+        "shared_diffuse_c.png"
+    ]
+
+    manifest = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={
+            "shared_diffuse_c.png": "Assets/build/flythrough/textures/converted/shared_diffuse_c.png"
+        },
+        allow_common_candidate_materials=True,
+    )
+    assert manifest["summary"]["materializable_entries"] == 3
+    assert manifest["summary"]["common_candidate_materialized_entries"] == 1
+    assert manifest["entries"][2]["asset_id"] is None
+    assert manifest["entries"][2]["texture_source"] == "common-candidate-textures"
+    assert manifest["entries"][2]["borrowed_texture_asset_id"] == "aaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbb"
 
 
 def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> None:

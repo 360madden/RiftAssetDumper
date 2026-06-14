@@ -177,6 +177,27 @@ def asset_texture_names_by_id(audit: dict[str, Any]) -> dict[str, list[str]]:
     return out
 
 
+def candidate_ids_for_texture_borrowing(entry: dict[str, Any]) -> list[str]:
+    geometry_matches = entry.get("geometry_matching_candidate_asset_ids")
+    if isinstance(geometry_matches, list) and geometry_matches:
+        return [str(asset_id) for asset_id in geometry_matches]
+    candidate_asset_ids = entry.get("candidate_asset_ids", [])
+    if isinstance(candidate_asset_ids, list):
+        return [str(asset_id) for asset_id in candidate_asset_ids]
+    return []
+
+
+def common_candidate_texture_names(entry: dict[str, Any], asset_textures: dict[str, list[str]]) -> list[str]:
+    texture_sets = {
+        tuple(asset_textures[asset_id])
+        for asset_id in candidate_ids_for_texture_borrowing(entry)
+        if asset_textures.get(asset_id)
+    }
+    if len(texture_sets) == 1:
+        return list(next(iter(texture_sets)))
+    return []
+
+
 def build_manifest(
     *,
     repo_root: Path = REPO_ROOT,
@@ -184,6 +205,7 @@ def build_manifest(
     converted_texture_paths: dict[str, str] | None = None,
     bundle_root: Path = DEFAULT_BUNDLE_ROOT,
     allow_single_candidate_materials: bool = False,
+    allow_common_candidate_materials: bool = False,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
@@ -197,6 +219,7 @@ def build_manifest(
     missing_source = 0
     no_texture = 0
     single_candidate_materialized = 0
+    common_candidate_materialized = 0
 
     for entry in audit["obj_file_level"]["entries"]:
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
@@ -207,15 +230,21 @@ def build_manifest(
             allow_single_candidate_materials
             and not linked_texture_names
             and not entry.get("asset_id")
-            and isinstance(candidate_asset_ids, list)
-            and len(candidate_asset_ids) == 1
+            and len(candidate_ids_for_texture_borrowing(entry)) == 1
         ):
-            candidate_asset_id = str(candidate_asset_ids[0])
+            candidate_asset_id = candidate_ids_for_texture_borrowing(entry)[0]
             candidate_textures = asset_textures.get(candidate_asset_id, [])
             if candidate_textures:
                 linked_texture_names = candidate_textures
                 texture_source = "single-candidate-heuristic"
                 borrowed_texture_asset_id = candidate_asset_id
+        elif allow_common_candidate_materials and not linked_texture_names and not entry.get("asset_id"):
+            candidate_textures = common_candidate_texture_names(entry, asset_textures)
+            candidate_ids = candidate_ids_for_texture_borrowing(entry)
+            if candidate_textures and len(candidate_ids) > 1:
+                linked_texture_names = candidate_textures
+                texture_source = "common-candidate-textures"
+                borrowed_texture_asset_id = ",".join(candidate_ids)
 
         texture_rows = [
             {
@@ -235,6 +264,8 @@ def build_manifest(
             materializable += 1
             if texture_source == "single-candidate-heuristic":
                 single_candidate_materialized += 1
+            if texture_source == "common-candidate-textures":
+                common_candidate_materialized += 1
         elif not source_exists:
             missing_source += 1
         elif not has_textures:
@@ -286,7 +317,9 @@ def build_manifest(
             "entries_missing_source_obj": missing_source,
             "entries_without_textures": no_texture,
             "allow_single_candidate_materials": allow_single_candidate_materials,
+            "allow_common_candidate_materials": allow_common_candidate_materials,
             "single_candidate_materialized_entries": single_candidate_materialized,
+            "common_candidate_materialized_entries": common_candidate_materialized,
             "converted_texture_paths": len(converted_texture_paths),
             "bundle_root": bundle_rel,
             "texture_status_breakdown": audit["obj_file_level"].get("entry_texture_status_breakdown", {}),
@@ -499,6 +532,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="For id-less OBJ entries with exactly one geometry-signature asset candidate, borrow that asset's textures.",
     )
     parser.add_argument(
+        "--allow-common-candidate-materials",
+        action="store_true",
+        help="For id-less OBJ entries with multiple candidates, borrow textures only when all candidates share one texture set.",
+    )
+    parser.add_argument(
         "--verify-bundle", action="store_true", help="Verify generated OBJ/MTL outputs and texture refs."
     )
     parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT, help="Generated OBJ/MTL bundle root.")
@@ -512,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         repo_root=repo_root,
         bundle_root=args.bundle_root,
         allow_single_candidate_materials=args.allow_single_candidate_materials,
+        allow_common_candidate_materials=args.allow_common_candidate_materials,
     )
     _write_json(args.manifest_out, manifest)
     print(f"wrote {repo_relative_path(args.manifest_out, repo_root)}")
@@ -543,7 +582,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{summary['total_entries']} entries, {summary['materializable_entries']} materializable, "
         f"{summary['entries_without_textures']} without textures, "
         f"{summary['entries_missing_source_obj']} missing source, "
-        f"{summary['single_candidate_materialized_entries']} single-candidate materialized"
+        f"{summary['single_candidate_materialized_entries']} single-candidate materialized, "
+        f"{summary['common_candidate_materialized_entries']} common-candidate materialized"
     )
     return 0
 
