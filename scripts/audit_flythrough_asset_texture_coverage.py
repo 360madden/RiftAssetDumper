@@ -505,6 +505,15 @@ def render_markdown(audit: dict[str, Any]) -> str:
     skipped_default_bundle = obj["manifest_entries"] - existing_texture_linked
     missing_sources = obj["missing_obj_files_count"]
     skipped_without_textures = skipped_default_bundle - missing_sources
+    single_candidate_materializable = sum(
+        1
+        for entry in obj.get("entries", [])
+        if entry.get("candidate_status") == "single-asset-signature-match"
+        and entry.get("exists_on_disk")
+        and any(candidate.get("linked_texture_count", 0) > 0 for candidate in entry.get("candidate_entries", []))
+    )
+    heuristic_materializable = existing_texture_linked + single_candidate_materializable
+    heuristic_skipped = obj["manifest_entries"] - heuristic_materializable
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -608,6 +617,17 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {existing_texture_linked} generated OBJ files and {existing_texture_linked} generated MTL files.",
         f"- {skipped_default_bundle} skipped entries: {skipped_without_textures} without textures and {missing_sources} missing source OBJ.",
         f"- {texture['converted_manifest_entries']} converted PNG paths available to the manifest.",
+        "",
+        "Optional heuristic expansion:",
+        "",
+        (
+            "`--allow-single-candidate-materials` borrows textures for id-less OBJ rows only when the geometry "
+            "signature has exactly one asset-ID candidate. It does not promote that candidate to durable truth."
+        ),
+        "",
+        f"- {single_candidate_materializable} id-less OBJ entries are eligible for single-candidate texture borrowing.",
+        f"- {heuristic_materializable} total OBJ entries become materializable with that option.",
+        f"- {heuristic_skipped} entries remain skipped after heuristic expansion.",
         "",
         "## Top 10 next best actions",
         "",

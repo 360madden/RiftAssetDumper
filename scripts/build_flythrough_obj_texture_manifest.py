@@ -163,26 +163,60 @@ def material_name_for_entry(entry: dict[str, Any]) -> str:
     return safe_slug(f"mat_{int(entry['manifest_index']):03d}_{aid}")
 
 
+def asset_texture_names_by_id(audit: dict[str, Any]) -> dict[str, list[str]]:
+    """Return asset ID -> linked texture names from asset-backed audit rows."""
+
+    out: dict[str, list[str]] = {}
+    for entry in audit["obj_file_level"]["entries"]:
+        aid = entry.get("asset_id")
+        if not isinstance(aid, str) or not aid:
+            continue
+        names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
+        if names and aid not in out:
+            out[aid] = names
+    return out
+
+
 def build_manifest(
     *,
     repo_root: Path = REPO_ROOT,
     audit: dict[str, Any] | None = None,
     converted_texture_paths: dict[str, str] | None = None,
     bundle_root: Path = DEFAULT_BUNDLE_ROOT,
+    allow_single_candidate_materials: bool = False,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
     audit = audit or build_audit(repo_root=repo_root)
     converted_texture_paths = converted_texture_paths or load_converted_texture_paths(repo_root=repo_root)
+    asset_textures = asset_texture_names_by_id(audit)
     bundle_rel = repo_relative_path(bundle_root, repo_root)
 
     entries: list[dict[str, Any]] = []
     materializable = 0
     missing_source = 0
     no_texture = 0
+    single_candidate_materialized = 0
 
     for entry in audit["obj_file_level"]["entries"]:
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
+        texture_source = "asset-id" if linked_texture_names else "none"
+        borrowed_texture_asset_id = None
+        candidate_asset_ids = entry.get("candidate_asset_ids", [])
+        if (
+            allow_single_candidate_materials
+            and not linked_texture_names
+            and not entry.get("asset_id")
+            and isinstance(candidate_asset_ids, list)
+            and len(candidate_asset_ids) == 1
+        ):
+            candidate_asset_id = str(candidate_asset_ids[0])
+            candidate_textures = asset_textures.get(candidate_asset_id, [])
+            if candidate_textures:
+                linked_texture_names = candidate_textures
+                texture_source = "single-candidate-heuristic"
+                borrowed_texture_asset_id = candidate_asset_id
+
         texture_rows = [
             {
                 "name": name,
@@ -199,6 +233,8 @@ def build_manifest(
         can_materialize = source_exists and has_textures and bool(chosen.get("diffuse"))
         if can_materialize:
             materializable += 1
+            if texture_source == "single-candidate-heuristic":
+                single_candidate_materialized += 1
         elif not source_exists:
             missing_source += 1
         elif not has_textures:
@@ -217,8 +253,11 @@ def build_manifest(
                 "source_obj": source_obj,
                 "source_exists": source_exists,
                 "asset_id": entry.get("asset_id"),
-                "candidate_asset_ids": entry.get("candidate_asset_ids", []),
+                "candidate_asset_ids": candidate_asset_ids,
+                "candidate_status": entry.get("candidate_status"),
                 "texture_status": entry.get("texture_status"),
+                "texture_source": texture_source,
+                "borrowed_texture_asset_id": borrowed_texture_asset_id,
                 "linked_texture_count": len(linked_texture_names),
                 "linked_textures": texture_rows,
                 "chosen_material_textures": chosen,
@@ -246,6 +285,8 @@ def build_manifest(
             "materializable_entries": materializable,
             "entries_missing_source_obj": missing_source,
             "entries_without_textures": no_texture,
+            "allow_single_candidate_materials": allow_single_candidate_materials,
+            "single_candidate_materialized_entries": single_candidate_materialized,
             "converted_texture_paths": len(converted_texture_paths),
             "bundle_root": bundle_rel,
             "texture_status_breakdown": audit["obj_file_level"].get("entry_texture_status_breakdown", {}),
@@ -348,6 +389,67 @@ def write_bundle(
     }
 
 
+def verify_bundle(manifest: dict[str, Any], *, repo_root: Path = REPO_ROOT) -> dict[str, Any]:
+    """Verify generated OBJ/MTL files and MTL texture references for materializable rows."""
+
+    checked_entries = 0
+    objs_present = 0
+    mtls_present = 0
+    obj_material_refs_ok = 0
+    texture_refs_checked = 0
+    missing_outputs: list[str] = []
+    missing_texture_refs: list[str] = []
+
+    map_statements = {"map_Kd", "map_Ks", "bump", "map_d", "map_Ke"}
+
+    for entry in manifest["entries"]:
+        if not entry.get("materializable"):
+            continue
+        checked_entries += 1
+        obj_path = repo_path_from_relative(repo_root, entry["bundled_obj"])
+        mtl_path = repo_path_from_relative(repo_root, entry["bundled_mtl"])
+
+        if obj_path.exists():
+            objs_present += 1
+            obj_lines = obj_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            expected_mtllib = os.path.relpath(mtl_path, obj_path.parent).replace("\\", "/")
+            if f"mtllib {expected_mtllib}" in obj_lines[:5] and f"usemtl {entry['material_name']}" in obj_lines[:5]:
+                obj_material_refs_ok += 1
+        else:
+            missing_outputs.append(repo_relative_path(obj_path, repo_root))
+
+        if mtl_path.exists():
+            mtls_present += 1
+            for line in mtl_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                parts = line.strip().split(maxsplit=1)
+                if len(parts) != 2 or parts[0] not in map_statements:
+                    continue
+                texture_refs_checked += 1
+                texture_path = (mtl_path.parent / parts[1]).resolve()
+                if not texture_path.exists():
+                    missing_texture_refs.append(repo_relative_path(texture_path, repo_root))
+        else:
+            missing_outputs.append(repo_relative_path(mtl_path, repo_root))
+
+    return {
+        "checked_entries": checked_entries,
+        "objs_present": objs_present,
+        "mtls_present": mtls_present,
+        "obj_material_refs_ok": obj_material_refs_ok,
+        "texture_refs_checked": texture_refs_checked,
+        "missing_outputs_count": len(missing_outputs),
+        "missing_outputs": missing_outputs[:50],
+        "missing_texture_refs_count": len(missing_texture_refs),
+        "missing_texture_refs": missing_texture_refs[:50],
+        "pass": (
+            checked_entries == objs_present
+            and checked_entries == mtls_present
+            and checked_entries == obj_material_refs_ok
+            and not missing_texture_refs
+        ),
+    }
+
+
 def write_csv(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
@@ -356,7 +458,10 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         "source_exists",
         "asset_id",
         "candidate_asset_ids",
+        "candidate_status",
         "texture_status",
+        "texture_source",
+        "borrowed_texture_asset_id",
         "linked_texture_count",
         "materializable",
         "material_name",
@@ -388,6 +493,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--csv-out", type=Path, default=DEFAULT_CSV_OUT, help="Output CSV manifest path.")
     parser.add_argument("--no-csv", action="store_true", help="Skip writing the CSV triage sheet.")
     parser.add_argument("--write-bundle", action="store_true", help="Generate OBJ/MTL bundle for materializable rows.")
+    parser.add_argument(
+        "--allow-single-candidate-materials",
+        action="store_true",
+        help="For id-less OBJ entries with exactly one geometry-signature asset candidate, borrow that asset's textures.",
+    )
+    parser.add_argument(
+        "--verify-bundle", action="store_true", help="Verify generated OBJ/MTL outputs and texture refs."
+    )
     parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT, help="Generated OBJ/MTL bundle root.")
     return parser.parse_args(argv)
 
@@ -395,7 +508,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
-    manifest = build_manifest(repo_root=repo_root, bundle_root=args.bundle_root)
+    manifest = build_manifest(
+        repo_root=repo_root,
+        bundle_root=args.bundle_root,
+        allow_single_candidate_materials=args.allow_single_candidate_materials,
+    )
     _write_json(args.manifest_out, manifest)
     print(f"wrote {repo_relative_path(args.manifest_out, repo_root)}")
     if not args.no_csv:
@@ -410,11 +527,23 @@ def main(argv: list[str] | None = None) -> int:
             f"{result['written_objs']} OBJ, {result['written_mtls']} MTL, "
             f"{result['skipped_entries']} skipped under {result['bundle_root']}"
         )
+    if args.write_bundle or args.verify_bundle:
+        result = verify_bundle(manifest, repo_root=repo_root)
+        manifest["summary"]["bundle_verify"] = result
+        _write_json(args.manifest_out, manifest)
+        print(
+            "verify: "
+            f"pass={result['pass']} checked={result['checked_entries']} "
+            f"missing_outputs={result['missing_outputs_count']} "
+            f"missing_textures={result['missing_texture_refs_count']}"
+        )
     summary = manifest["summary"]
     print(
         "summary: "
         f"{summary['total_entries']} entries, {summary['materializable_entries']} materializable, "
-        f"{summary['entries_without_textures']} without textures, {summary['entries_missing_source_obj']} missing source"
+        f"{summary['entries_without_textures']} without textures, "
+        f"{summary['entries_missing_source_obj']} missing source, "
+        f"{summary['single_candidate_materialized_entries']} single-candidate materialized"
     )
     return 0
 

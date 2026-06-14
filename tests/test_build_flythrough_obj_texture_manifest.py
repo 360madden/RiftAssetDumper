@@ -14,6 +14,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     classify_texture_role,
     normalize_converted_texture_path,
     obj_with_material_text,
+    verify_bundle,
     write_bundle,
 )
 
@@ -115,6 +116,59 @@ def test_build_manifest_preserves_350_style_rows_and_material_paths(tmp_path: Pa
     assert manifest["entries"][1]["candidate_asset_ids"] == ["abcdef0123456789"]
 
 
+def test_build_manifest_can_borrow_single_candidate_textures_without_promoting_asset_id(tmp_path: Path) -> None:
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"texture-linked": 1, "no-asset-id": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {"single-asset-signature-match": 1},
+            "entries": [
+                {
+                    "manifest_index": 0,
+                    "path": "Exports/a/abcdef0123456789.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "abcdef0123456789",
+                    "candidate_asset_ids": [],
+                    "texture_status": "texture-linked",
+                    "linked_textures": ["abc_wall_c.png"],
+                },
+                {
+                    "manifest_index": 1,
+                    "path": "Exports/idless.obj",
+                    "exists_on_disk": True,
+                    "asset_id": None,
+                    "candidate_asset_ids": ["abcdef0123456789"],
+                    "candidate_status": "single-asset-signature-match",
+                    "texture_status": "no-asset-id",
+                    "linked_textures": [],
+                },
+            ],
+        },
+    }
+
+    conservative = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={"abc_wall_c.png": "Assets/build/flythrough/textures/converted/abc_wall_c.png"},
+    )
+    assert conservative["summary"]["materializable_entries"] == 1
+    assert conservative["entries"][1]["materializable"] is False
+    assert conservative["entries"][1]["asset_id"] is None
+
+    heuristic = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={"abc_wall_c.png": "Assets/build/flythrough/textures/converted/abc_wall_c.png"},
+        allow_single_candidate_materials=True,
+    )
+    assert heuristic["summary"]["materializable_entries"] == 2
+    assert heuristic["summary"]["single_candidate_materialized_entries"] == 1
+    assert heuristic["entries"][1]["asset_id"] is None
+    assert heuristic["entries"][1]["texture_source"] == "single-candidate-heuristic"
+    assert heuristic["entries"][1]["borrowed_texture_asset_id"] == "abcdef0123456789"
+    assert heuristic["entries"][1]["chosen_material_textures"]["diffuse"] == "abc_wall_c.png"
+
+
 def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> None:
     source_obj = tmp_path / "Exports" / "a" / "abcdef0123456789.obj"
     source_obj.parent.mkdir(parents=True)
@@ -143,6 +197,9 @@ def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> 
     )
     assert result["written_objs"] == 1
     assert result["written_mtls"] == 1
+    verify = verify_bundle(manifest, repo_root=tmp_path)
+    assert verify["pass"] is True
+    assert verify["texture_refs_checked"] == 1
 
     bundled_obj = tmp_path / manifest["entries"][0]["bundled_obj"]
     bundled_mtl = tmp_path / manifest["entries"][0]["bundled_mtl"]

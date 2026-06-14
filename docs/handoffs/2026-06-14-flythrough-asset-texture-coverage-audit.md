@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-14T23:47:17.163673Z
+**Generated**: 2026-06-14T23:51:05.148241Z
 
 ## Why this exists
 
@@ -83,6 +83,14 @@ Expected default bundle summary from this audit:
 - 323 generated OBJ files and 323 generated MTL files.
 - 27 skipped entries: 26 without textures and 1 missing source OBJ.
 - 13176 converted PNG paths available to the manifest.
+
+Optional heuristic expansion:
+
+`--allow-single-candidate-materials` borrows textures for id-less OBJ rows only when the geometry signature has exactly one asset-ID candidate. It does not promote that candidate to durable truth.
+
+- 4 id-less OBJ entries are eligible for single-candidate texture borrowing.
+- 327 total OBJ entries become materializable with that option.
+- 23 entries remain skipped after heuristic expansion.
 
 ## Top 10 next best actions
 
