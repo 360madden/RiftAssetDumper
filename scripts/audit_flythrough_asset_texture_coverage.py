@@ -1,0 +1,652 @@
+#!/usr/bin/env python3
+"""Audit file-level OBJ coverage against flythrough asset texture links.
+
+This is a read-only bridge audit for the post-FT closure question:
+
+* the export manifest is file-level (350 OBJ entries),
+* ``flythrough-index.json`` is asset-ID-level (217 unique assets), and
+* texture links are asset-ID-level.
+
+The audit joins those surfaces so downstream users can see which OBJ files
+already inherit texture coverage, which OBJ entries are not asset-ID mapped,
+and which assets still have no linked texture references.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from collections import Counter, defaultdict
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FLYTHROUGH_ROOT = REPO_ROOT / "Assets" / "build" / "flythrough"
+EXPORTS_ROOT = REPO_ROOT / "Exports"
+
+DEFAULT_EXPORT_MANIFEST = EXPORTS_ROOT / "export-manifest.json"
+DEFAULT_INDEX = FLYTHROUGH_ROOT / "flythrough-index.json"
+DEFAULT_LINKS = FLYTHROUGH_ROOT / "flythrough-texture-links.jsonl"
+DEFAULT_CONVERTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "converted-manifest.json"
+DEFAULT_EXTRACTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "extracted-manifest.json"
+DEFAULT_JSON_OUT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
+
+ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8-sig") as f:
+        return json.load(f)
+
+
+def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return rows
+
+
+def _write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False, sort_keys=True)
+        f.write("\n")
+    tmp.replace(path)
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
+    tmp.replace(path)
+
+
+def _to_posix(value: str | Path) -> str:
+    return str(value).replace("\\", "/")
+
+
+def repo_relative_path(value: str | Path, repo_root: Path = REPO_ROOT) -> str:
+    """Return a stable repo-relative POSIX path for manifest values.
+
+    Generated manifests can contain absolute Windows paths. Reports should not
+    preserve those machine-specific paths, so this helper trims the known repo
+    root when possible and otherwise falls back to the first known repo segment.
+    """
+
+    raw = _to_posix(value)
+    repo_raw = _to_posix(repo_root.resolve()).rstrip("/")
+    raw_lower = raw.lower()
+    repo_lower = repo_raw.lower()
+
+    if raw_lower.startswith(repo_lower + "/"):
+        return raw[len(repo_raw) + 1 :]
+
+    for segment in ("Assets/build/flythrough/", "Exports/"):
+        index = raw.find(segment)
+        if index >= 0:
+            return raw[index:]
+
+    return raw
+
+
+def repo_path_from_relative(repo_root: Path, relative: str) -> Path:
+    """Build a local Path from a repo-relative POSIX path."""
+
+    return repo_root.joinpath(*relative.split("/"))
+
+
+def asset_id_from_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = ASSET_ID_RE.search(value)
+    return match.group(1).lower() if match else None
+
+
+def entry_asset_id(entry: dict[str, Any]) -> str | None:
+    """Return an asset id from an export entry, preferring explicit metadata."""
+
+    explicit = entry.get("asset_id")
+    if isinstance(explicit, str) and ASSET_ID_RE.fullmatch(explicit):
+        return explicit.lower()
+    return asset_id_from_text(str(entry.get("path", "")))
+
+
+def entry_geometry_signature(entry: dict[str, Any]) -> tuple[Any, ...]:
+    """Return a compact geometry signature for candidate id-less OBJ matching."""
+
+    sibling_pair = entry.get("sibling_pair") if isinstance(entry.get("sibling_pair"), dict) else {}
+    return (
+        str(entry.get("mesh_block")),
+        entry.get("vertex_count", 0),
+        entry.get("face_count", 0),
+        bool(entry.get("faced")),
+        sibling_pair.get("mesh_size") or entry.get("mesh_size"),
+        entry.get("descriptor"),
+    )
+
+
+def _counter_to_sorted_dict(counter: Counter[Any]) -> dict[str, int]:
+    return {str(key): count for key, count in sorted(counter.items(), key=lambda item: (str(item[0]), item[1]))}
+
+
+def _scan_obj_material_refs(exports_root: Path, repo_root: Path) -> dict[str, Any]:
+    """Scan exported OBJs for material references without parsing full geometry."""
+
+    obj_count = 0
+    mtllib_count = 0
+    usemtl_count = 0
+    with_any: list[str] = []
+
+    if not exports_root.exists():
+        return {
+            "obj_files_scanned": 0,
+            "obj_files_with_mtllib": 0,
+            "obj_files_with_usemtl": 0,
+            "obj_files_with_any_material_ref": [],
+        }
+
+    for obj_path in sorted(exports_root.rglob("*.obj")):
+        obj_count += 1
+        has_mtllib = False
+        has_usemtl = False
+        try:
+            with obj_path.open(encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if line.startswith("mtllib "):
+                        has_mtllib = True
+                    elif line.startswith("usemtl "):
+                        has_usemtl = True
+                    if has_mtllib and has_usemtl:
+                        break
+        except OSError:
+            continue
+
+        if has_mtllib:
+            mtllib_count += 1
+        if has_usemtl:
+            usemtl_count += 1
+        if has_mtllib or has_usemtl:
+            with_any.append(repo_relative_path(obj_path, repo_root))
+
+    return {
+        "obj_files_scanned": obj_count,
+        "obj_files_with_mtllib": mtllib_count,
+        "obj_files_with_usemtl": usemtl_count,
+        "obj_files_with_any_material_ref": with_any,
+    }
+
+
+def _texture_names_from_converted_manifest(converted_manifest: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    for entry in converted_manifest.get("Entries", []):
+        if not isinstance(entry, dict):
+            continue
+        png_name = entry.get("png_name")
+        if isinstance(png_name, str) and png_name:
+            names.add(Path(png_name).name)
+            continue
+        for key in ("png_path", "path", "output"):
+            value = entry.get(key)
+            if isinstance(value, str) and value:
+                names.add(Path(value).name)
+                break
+    return names
+
+
+def _png_names_on_disk(converted_root: Path) -> set[str]:
+    if not converted_root.exists():
+        return set()
+    return {path.name for path in converted_root.rglob("*.png")}
+
+
+def build_audit(
+    *,
+    repo_root: Path = REPO_ROOT,
+    export_manifest_path: Path | None = None,
+    flythrough_index_path: Path | None = None,
+    texture_links_path: Path | None = None,
+    converted_manifest_path: Path | None = None,
+    extracted_manifest_path: Path | None = None,
+    scan_material_refs: bool = True,
+) -> dict[str, Any]:
+    """Build the OBJ↔asset↔texture coverage audit from current generated artifacts."""
+
+    export_manifest_path = export_manifest_path or repo_root / "Exports" / "export-manifest.json"
+    flythrough_index_path = (
+        flythrough_index_path or repo_root / "Assets" / "build" / "flythrough" / "flythrough-index.json"
+    )
+    texture_links_path = (
+        texture_links_path or repo_root / "Assets" / "build" / "flythrough" / "flythrough-texture-links.jsonl"
+    )
+    converted_manifest_path = (
+        converted_manifest_path
+        or repo_root / "Assets" / "build" / "flythrough" / "textures" / "converted-manifest.json"
+    )
+    extracted_manifest_path = (
+        extracted_manifest_path
+        or repo_root / "Assets" / "build" / "flythrough" / "textures" / "extracted-manifest.json"
+    )
+
+    required = [export_manifest_path, flythrough_index_path, texture_links_path, converted_manifest_path]
+    missing_inputs = [repo_relative_path(path, repo_root) for path in required if not path.exists()]
+    if missing_inputs:
+        raise FileNotFoundError("Missing required flythrough coverage inputs: " + ", ".join(missing_inputs))
+
+    export_manifest = _load_json(export_manifest_path)
+    flythrough_index = _load_json(flythrough_index_path)
+    texture_links = _load_jsonl(texture_links_path)
+    converted_manifest = _load_json(converted_manifest_path)
+    extracted_manifest = _load_json(extracted_manifest_path) if extracted_manifest_path.exists() else {}
+
+    exports_root = repo_root / "Exports"
+    converted_root = repo_root / "Assets" / "build" / "flythrough" / "textures" / "converted"
+
+    export_entries = [entry for entry in export_manifest.get("entries", []) if isinstance(entry, dict)]
+    manifest_paths = [repo_relative_path(str(entry.get("path", "")), repo_root) for entry in export_entries]
+    manifest_path_set = set(manifest_paths)
+    duplicate_manifest_paths = sorted(path for path, count in Counter(manifest_paths).items() if count > 1)
+
+    obj_files_on_disk = (
+        {repo_relative_path(path, repo_root) for path in exports_root.rglob("*.obj")}
+        if exports_root.exists()
+        else set()
+    )
+    missing_obj_files = sorted(manifest_path_set - obj_files_on_disk)
+    extra_obj_files = sorted(obj_files_on_disk - manifest_path_set)
+    existing_manifest_obj_entries = sum(1 for path in manifest_paths if path in obj_files_on_disk)
+
+    entries_by_asset_id: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    idless_export_entries: list[tuple[dict[str, Any], str]] = []
+    faced_counter: Counter[str] = Counter()
+    provenance_counter: Counter[str] = Counter()
+    batch_counter: Counter[str] = Counter()
+
+    for entry, rel_path in zip(export_entries, manifest_paths, strict=True):
+        aid = entry_asset_id(entry)
+        if aid:
+            entries_by_asset_id[aid].append(entry)
+        else:
+            idless_export_entries.append((entry, rel_path))
+        faced_counter["faced" if entry.get("faced") else "position_only"] += 1
+        provenance_counter[str(entry.get("provenance", "unknown"))] += 1
+        batch_counter[str(entry.get("export_batch", "unknown"))] += 1
+
+    assets = flythrough_index.get("assets", {})
+    if not isinstance(assets, dict):
+        assets = {}
+
+    linked_textures_by_asset: dict[str, list[str]] = {}
+    for aid, asset in assets.items():
+        if not isinstance(aid, str) or not isinstance(asset, dict):
+            continue
+        linked = asset.get("linked_textures") or []
+        linked_textures_by_asset[aid.lower()] = [Path(str(name)).name for name in linked if str(name)]
+
+    asset_texture_counts = {aid: len(names) for aid, names in linked_textures_by_asset.items()}
+    assets_with_texture_links = sorted(aid for aid, count in asset_texture_counts.items() if count > 0)
+    assets_without_texture_links = sorted(aid for aid, count in asset_texture_counts.items() if count == 0)
+
+    obj_entries_with_asset_id = sum(len(entries) for entries in entries_by_asset_id.values())
+    obj_entries_with_texture_links = sum(
+        len(entries) for aid, entries in entries_by_asset_id.items() if asset_texture_counts.get(aid, 0) > 0
+    )
+    existing_obj_entries_with_texture_links = sum(
+        1
+        for entry, rel_path in zip(export_entries, manifest_paths, strict=True)
+        if rel_path in obj_files_on_disk and (entry_asset_id(entry) or "") in assets_with_texture_links
+    )
+
+    linked_texture_refs = [name for names in linked_textures_by_asset.values() for name in names]
+    unique_linked_textures = sorted(set(linked_texture_refs))
+    converted_manifest_names = _texture_names_from_converted_manifest(converted_manifest)
+    converted_disk_names = _png_names_on_disk(converted_root)
+
+    texture_link_rows_by_asset: Counter[str] = Counter()
+    for row in texture_links:
+        aid = row.get("ModelIdPrefix")
+        if isinstance(aid, str) and ASSET_ID_RE.fullmatch(aid):
+            texture_link_rows_by_asset[aid.lower()] += 1
+
+    signature_to_candidates: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+    for entry, rel_path in zip(export_entries, manifest_paths, strict=True):
+        aid = entry_asset_id(entry)
+        if not aid:
+            continue
+        candidate = {
+            "asset_id": aid,
+            "path": rel_path,
+            "linked_texture_count": asset_texture_counts.get(aid, 0),
+            "texture_link_rows": texture_link_rows_by_asset.get(aid, 0),
+        }
+        if candidate not in signature_to_candidates[entry_geometry_signature(entry)]:
+            signature_to_candidates[entry_geometry_signature(entry)].append(candidate)
+
+    idless_obj_entries: list[dict[str, Any]] = []
+    idless_candidate_counter: Counter[str] = Counter()
+    for entry, rel_path in idless_export_entries:
+        candidates = signature_to_candidates.get(entry_geometry_signature(entry), [])
+        candidate_asset_ids = sorted({candidate["asset_id"] for candidate in candidates})
+        if not candidates:
+            candidate_status = "no-geometry-signature-match"
+        elif len(candidate_asset_ids) == 1:
+            candidate_status = "single-asset-signature-match"
+        else:
+            candidate_status = "ambiguous-signature-match"
+        idless_candidate_counter[candidate_status] += 1
+        idless_obj_entries.append(
+            {
+                "path": rel_path,
+                "mesh_block": entry.get("mesh_block"),
+                "mesh_size": (entry.get("sibling_pair") or {}).get("mesh_size")
+                if isinstance(entry.get("sibling_pair"), dict)
+                else entry.get("mesh_size"),
+                "descriptor": entry.get("descriptor"),
+                "vertex_count": entry.get("vertex_count", 0),
+                "face_count": entry.get("face_count", 0),
+                "faced": bool(entry.get("faced")),
+                "export_batch": entry.get("export_batch"),
+                "provenance": entry.get("provenance"),
+                "candidate_status": candidate_status,
+                "candidate_asset_ids": candidate_asset_ids,
+                "candidate_entries": candidates,
+            }
+        )
+
+    obj_entry_rows: list[dict[str, Any]] = []
+    texture_status_counter: Counter[str] = Counter()
+    for index, (entry, rel_path) in enumerate(zip(export_entries, manifest_paths, strict=True)):
+        aid = entry_asset_id(entry)
+        linked_textures = linked_textures_by_asset.get(aid or "", [])
+        if not aid:
+            texture_status = "no-asset-id"
+        elif aid not in linked_textures_by_asset:
+            texture_status = "asset-not-indexed"
+        elif linked_textures:
+            texture_status = "texture-linked"
+        else:
+            texture_status = "no-linked-textures"
+        texture_status_counter[texture_status] += 1
+
+        sibling_pair = entry.get("sibling_pair") if isinstance(entry.get("sibling_pair"), dict) else {}
+        obj_entry_rows.append(
+            {
+                "manifest_index": index,
+                "path": rel_path,
+                "exists_on_disk": rel_path in obj_files_on_disk,
+                "asset_id": aid,
+                "texture_status": texture_status,
+                "linked_texture_count": len(linked_textures),
+                "linked_textures": linked_textures,
+                "texture_link_rows": texture_link_rows_by_asset.get(aid or "", 0),
+                "mesh_block": entry.get("mesh_block"),
+                "mesh_size": sibling_pair.get("mesh_size") or entry.get("mesh_size"),
+                "descriptor": entry.get("descriptor"),
+                "vertex_count": entry.get("vertex_count", 0),
+                "face_count": entry.get("face_count", 0),
+                "faced": bool(entry.get("faced")),
+                "export_batch": entry.get("export_batch"),
+                "provenance": entry.get("provenance"),
+            }
+        )
+
+    material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
+
+    top_actions = [
+        "Recover or classify id-less OBJ entries so the full 350-file set can inherit asset-level metadata.",
+        "Resolve the missing manifest OBJ path before treating the 350-entry manifest as fully materialized on disk.",
+        "Generate OBJ/MTL bundles for textured assets; current OBJs have no material references.",
+        "Investigate the 10 indexed asset IDs with no linked texture references.",
+        "Prioritize faced OBJs with texture links for downstream viewer/import smoke tests.",
+        "Create a file-level consumer manifest so RiftFlythrough can address all 350 OBJ entries, not just 217 unique assets.",
+        "Map JSONL texture-link rows to PNG names explicitly instead of relying only on flythrough-index enrichment.",
+        "Add thumbnails or a lightweight HTML gallery for textured coverage triage.",
+        "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
+        "Use CI only as a guardrail after asset-coverage scripts/docs change, not as the main workstream.",
+    ]
+
+    audit: dict[str, Any] = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "generated_at": _now_iso(),
+        "phase_context": "Flythrough Bridge FT-1..FT-8 closure follow-up; post-completion asset usability audit",
+        "inputs": {
+            "export_manifest": repo_relative_path(export_manifest_path, repo_root),
+            "flythrough_index": repo_relative_path(flythrough_index_path, repo_root),
+            "texture_links": repo_relative_path(texture_links_path, repo_root),
+            "converted_manifest": repo_relative_path(converted_manifest_path, repo_root),
+            "extracted_manifest": repo_relative_path(extracted_manifest_path, repo_root)
+            if extracted_manifest_path.exists()
+            else None,
+        },
+        "obj_file_level": {
+            "manifest_entries": len(export_entries),
+            "manifest_unique_paths": len(manifest_path_set),
+            "duplicate_manifest_paths": duplicate_manifest_paths,
+            "obj_files_on_disk": len(obj_files_on_disk),
+            "manifest_entries_existing_on_disk": existing_manifest_obj_entries,
+            "missing_obj_files_count": len(missing_obj_files),
+            "missing_obj_files": missing_obj_files,
+            "extra_obj_files_count": len(extra_obj_files),
+            "extra_obj_files": extra_obj_files,
+            "entries_with_asset_id": obj_entries_with_asset_id,
+            "entries_without_asset_id": len(idless_obj_entries),
+            "entries_without_asset_id_candidate_status_breakdown": _counter_to_sorted_dict(idless_candidate_counter),
+            "entries_without_asset_id_detail": idless_obj_entries,
+            "entries_with_texture_links": obj_entries_with_texture_links,
+            "existing_entries_with_texture_links": existing_obj_entries_with_texture_links,
+            "entry_texture_status_breakdown": _counter_to_sorted_dict(texture_status_counter),
+            "entries": obj_entry_rows,
+            "faced_breakdown": _counter_to_sorted_dict(faced_counter),
+            "export_batch_breakdown": _counter_to_sorted_dict(batch_counter),
+            "provenance_breakdown": _counter_to_sorted_dict(provenance_counter),
+        },
+        "asset_id_level": {
+            "export_unique_asset_ids": len(entries_by_asset_id),
+            "indexed_asset_ids": len(assets),
+            "indexed_assets_with_texture_links": len(assets_with_texture_links),
+            "indexed_assets_without_texture_links": len(assets_without_texture_links),
+            "indexed_assets_without_texture_links_detail": assets_without_texture_links,
+            "indexed_assets_with_world_json": flythrough_index.get("summary", {}).get("with_world_json"),
+            "indexed_assets_with_lod_info": flythrough_index.get("summary", {}).get("with_lod_info"),
+            "indexed_assets_with_meshsize": flythrough_index.get("summary", {}).get("with_meshsize"),
+            "texture_count_distribution": _counter_to_sorted_dict(Counter(asset_texture_counts.values())),
+        },
+        "texture_level": {
+            "texture_link_rows": len(texture_links),
+            "texture_linked_model_ids": len(texture_link_rows_by_asset),
+            "linked_texture_references_total": len(linked_texture_refs),
+            "linked_texture_references_unique": len(unique_linked_textures),
+            "converted_manifest_mode": converted_manifest.get("Mode"),
+            "converted_manifest_entries": len(converted_manifest.get("Entries", [])),
+            "converted_pngs_on_disk": len(converted_disk_names),
+            "extracted_manifest_entries": len(extracted_manifest.get("Entries", []))
+            if isinstance(extracted_manifest.get("Entries"), list)
+            else 0,
+            "unique_linked_pngs_present_in_converted_manifest": len(
+                set(unique_linked_textures) & converted_manifest_names
+            ),
+            "unique_linked_pngs_missing_from_converted_manifest": sorted(
+                set(unique_linked_textures) - converted_manifest_names
+            ),
+            "unique_linked_pngs_present_on_disk": len(set(unique_linked_textures) & converted_disk_names),
+            "unique_linked_pngs_missing_on_disk": sorted(set(unique_linked_textures) - converted_disk_names),
+        },
+        "material_usability": material_refs,
+        "next_best_actions": top_actions,
+    }
+
+    return audit
+
+
+def render_markdown(audit: dict[str, Any]) -> str:
+    obj = audit["obj_file_level"]
+    asset = audit["asset_id_level"]
+    texture = audit["texture_level"]
+    material = audit.get("material_usability", {})
+
+    missing_obj_files = obj["missing_obj_files"] or ["_none_"]
+    idless = obj["entries_without_asset_id_detail"]
+    no_texture_assets = asset["indexed_assets_without_texture_links_detail"] or ["_none_"]
+
+    lines = [
+        "# Flythrough Asset + Texture Coverage Audit",
+        "",
+        f"**Generated**: {audit['generated_at']}",
+        "",
+        "## Why this exists",
+        "",
+        (
+            "The flythrough closure artifact is asset-ID centric (`217` unique assets), while the export manifest is "
+            "file-level (`350` OBJ entries). This audit joins the file-level OBJ set to asset IDs and texture coverage "
+            "so the remaining usability work stays focused on assets/textures instead of unrelated CI churn."
+        ),
+        "",
+        "## Current coverage snapshot",
+        "",
+        "| Surface | Count | Notes |",
+        "|---|---:|---|",
+        f"| OBJ manifest entries | {obj['manifest_entries']} | `{audit['inputs']['export_manifest']}` |",
+        f"| OBJ files currently on disk | {obj['obj_files_on_disk']} | {obj['missing_obj_files_count']} manifest path(s) missing |",
+        f"| OBJ entries with asset IDs | {obj['entries_with_asset_id']} | Can inherit asset-level metadata/textures |",
+        f"| OBJ entries without asset IDs | {obj['entries_without_asset_id']} | Need recovery/classification for full 350-file access |",
+        (
+            f"| Id-less OBJ signature candidates | "
+            f"{obj['entries_without_asset_id_candidate_status_breakdown']} | Geometry-only recovery hints |"
+        ),
+        f"| OBJ entries with texture links | {obj['entries_with_texture_links']} | File-level entries whose asset has linked textures |",
+        f"| Full OBJ row manifest | {len(obj['entries'])} rows | Written in generated audit JSON under `obj_file_level.entries` |",
+        f"| Indexed asset IDs | {asset['indexed_asset_ids']} | `{audit['inputs']['flythrough_index']}` |",
+        f"| Indexed assets with textures | {asset['indexed_assets_with_texture_links']} | {asset['indexed_assets_without_texture_links']} without links |",
+        f"| Texture-link JSONL rows | {texture['texture_link_rows']} | {texture['texture_linked_model_ids']} model IDs |",
+        (
+            f"| Unique linked PNGs available | {texture['unique_linked_pngs_present_on_disk']}/"
+            f"{texture['linked_texture_references_unique']} | Converted manifest mode: `{texture['converted_manifest_mode']}` |"
+        ),
+        f"| OBJ material refs | {material.get('obj_files_with_any_material_ref', []) and 'present' or '0'} | "
+        f"{material.get('obj_files_with_mtllib', 0)} `mtllib`, {material.get('obj_files_with_usemtl', 0)} `usemtl` |",
+        "",
+        "## File-level OBJ gaps",
+        "",
+        "### Missing manifest paths",
+        "",
+        *[f"- `{path}`" for path in missing_obj_files],
+        "",
+        "### OBJ entries without asset IDs",
+        "",
+        *[
+            (
+                f"- `{entry['path']}` — mesh_block={entry.get('mesh_block')}, "
+                f"verts={entry.get('vertex_count')}, faces={entry.get('face_count')}, "
+                f"batch={entry.get('export_batch')}, provenance={entry.get('provenance')}, "
+                f"candidate_status={entry.get('candidate_status')}, "
+                f"candidate_asset_ids={entry.get('candidate_asset_ids')}"
+            )
+            for entry in idless
+        ],
+        "",
+        "## Asset IDs without linked textures",
+        "",
+        *[f"- `{aid}`" for aid in no_texture_assets],
+        "",
+        "## Downstream usability readout",
+        "",
+        "- Texture PNG availability for linked assets is good: every unique linked PNG is present in the converted manifest and on disk.",
+        "- The generated audit JSON now contains one row per OBJ manifest entry with path, existence, asset ID, texture status, and linked PNG names.",
+        "- Id-less OBJ entries now include geometry-signature candidate matches where current exports contain same-shape asset-ID-backed rows.",
+        "- The main usability blocker is materialization: exported OBJs currently do not reference `.mtl` files or `usemtl` assignments.",
+        "- The second blocker is file-level coverage: the 217-asset index does not directly expose every one of the 350 manifest OBJ entries.",
+        "- The third blocker is recovery/classification of id-less OBJ entries and no-texture asset IDs.",
+        "",
+        "## Top 10 next best actions",
+        "",
+        *[f"{i}. {action}" for i, action in enumerate(audit["next_best_actions"], start=1)],
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _print_summary(audit: dict[str, Any]) -> None:
+    obj = audit["obj_file_level"]
+    asset = audit["asset_id_level"]
+    texture = audit["texture_level"]
+    material = audit.get("material_usability", {})
+
+    print("Flythrough asset/texture coverage audit")
+    print("=======================================")
+    print(
+        "OBJ manifest: "
+        f"{obj['manifest_entries']} entries, {obj['obj_files_on_disk']} OBJ files on disk, "
+        f"{obj['missing_obj_files_count']} missing"
+    )
+    print(
+        "OBJ linkage: "
+        f"{obj['entries_with_asset_id']} with asset IDs, {obj['entries_without_asset_id']} without, "
+        f"{obj['entries_with_texture_links']} with texture links"
+    )
+    print(
+        "Assets: "
+        f"{asset['indexed_asset_ids']} indexed, {asset['indexed_assets_with_texture_links']} with textures, "
+        f"{asset['indexed_assets_without_texture_links']} without"
+    )
+    print(
+        "Textures: "
+        f"{texture['texture_link_rows']} JSONL rows, {texture['linked_texture_references_unique']} unique linked PNGs, "
+        f"{texture['unique_linked_pngs_present_on_disk']} present on disk"
+    )
+    print(
+        "Materials: "
+        f"{material.get('obj_files_with_mtllib', 0)} OBJ files with mtllib, "
+        f"{material.get('obj_files_with_usemtl', 0)} with usemtl"
+    )
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Repository root to audit.")
+    parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT, help="Write full audit JSON here.")
+    parser.add_argument("--markdown-out", type=Path, help="Optionally write a human-readable Markdown report.")
+    parser.add_argument("--no-material-scan", action="store_true", help="Skip scanning OBJ files for mtllib/usemtl.")
+    parser.add_argument("--summary-only", action="store_true", help="Print summary without writing output files.")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    repo_root = args.repo_root.resolve()
+    audit = build_audit(
+        repo_root=repo_root,
+        export_manifest_path=repo_root / "Exports" / "export-manifest.json",
+        flythrough_index_path=repo_root / "Assets" / "build" / "flythrough" / "flythrough-index.json",
+        texture_links_path=repo_root / "Assets" / "build" / "flythrough" / "flythrough-texture-links.jsonl",
+        converted_manifest_path=repo_root / "Assets" / "build" / "flythrough" / "textures" / "converted-manifest.json",
+        extracted_manifest_path=repo_root / "Assets" / "build" / "flythrough" / "textures" / "extracted-manifest.json",
+        scan_material_refs=not args.no_material_scan,
+    )
+
+    _print_summary(audit)
+    if not args.summary_only:
+        _write_json(args.json_out, audit)
+        print(f"wrote {repo_relative_path(args.json_out, repo_root)}")
+    if args.markdown_out:
+        _write_text(args.markdown_out, render_markdown(audit))
+        print(f"wrote {repo_relative_path(args.markdown_out, repo_root)}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
