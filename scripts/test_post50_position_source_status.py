@@ -15,6 +15,7 @@ import jsonschema
 sys.path.insert(0, ".")
 
 from scripts import rift_workflow
+from scripts.post50_test_fixtures import minimal_mesh329_attribute_role_matrix_report
 
 failed = 0
 
@@ -233,30 +234,7 @@ with tempfile.TemporaryDirectory() as tmp:
         encoding="utf-8",
     )
     (out_dir / "mesh329-family-attribute-role-matrix.json").write_text(
-        json.dumps(
-            {
-                "Schema": "329-family-attribute-role-matrix/v1",
-                "CandidateOnly": True,
-                "MeshSize": 329,
-                "TargetMeshBlocks": [7, 34],
-                "IDsCovered": [],
-                "ProbeCount": 0,
-                "MatrixRows": [],
-                "PairComparisons": [],
-                "PatternQuantification": {
-                    "IDsWithBothProbes": 0,
-                    "IDsWithMesh7Attr1": 0,
-                    "IDsWithMesh34Attr0": 0,
-                    "IDsWithMesh34_304ScoredAsPosition": 0,
-                    "IDsWithMesh7UVPresent": 0,
-                    "IDsWithMesh34UVAbsent": 0,
-                    "ConsistentPatterns": [],
-                    "QuantifiedNotes": {},
-                },
-                "Interpretation": "minimal test fixture",
-                "ParserExportPromotionAllowed": False,
-            }
-        ),
+        json.dumps(minimal_mesh329_attribute_role_matrix_report()),
         encoding="utf-8",
     )
     matrix_schema = json.loads(
