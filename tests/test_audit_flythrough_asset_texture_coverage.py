@@ -118,6 +118,8 @@ def test_build_audit_joins_obj_asset_and_texture_surfaces(tmp_path: Path) -> Non
     assert audit["obj_file_level"]["entries"][0]["asset_id"] == "abcdef0123456789"
     assert audit["obj_file_level"]["entries"][0]["texture_status"] == "texture-linked"
     assert audit["obj_file_level"]["entries"][0]["linked_textures"] == ["abc12345_diffuse.png", "missing_normal.png"]
+    assert audit["obj_file_level"]["entries"][1]["candidate_status"] == "no-geometry-signature-match"
+    assert audit["obj_file_level"]["entries"][1]["candidate_asset_ids"] == []
     assert audit["asset_id_level"]["indexed_assets_with_texture_links"] == 1
     assert audit["asset_id_level"]["indexed_assets_without_texture_links_detail"] == ["fedcba9876543210"]
     assert audit["texture_level"]["linked_texture_references_unique"] == 2

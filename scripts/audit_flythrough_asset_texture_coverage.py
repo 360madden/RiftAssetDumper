@@ -333,6 +333,7 @@ def build_audit(
             signature_to_candidates[entry_geometry_signature(entry)].append(candidate)
 
     idless_obj_entries: list[dict[str, Any]] = []
+    idless_candidate_info_by_path: dict[str, dict[str, Any]] = {}
     idless_candidate_counter: Counter[str] = Counter()
     for entry, rel_path in idless_export_entries:
         candidates = signature_to_candidates.get(entry_geometry_signature(entry), [])
@@ -344,24 +345,24 @@ def build_audit(
         else:
             candidate_status = "ambiguous-signature-match"
         idless_candidate_counter[candidate_status] += 1
-        idless_obj_entries.append(
-            {
-                "path": rel_path,
-                "mesh_block": entry.get("mesh_block"),
-                "mesh_size": (entry.get("sibling_pair") or {}).get("mesh_size")
-                if isinstance(entry.get("sibling_pair"), dict)
-                else entry.get("mesh_size"),
-                "descriptor": entry.get("descriptor"),
-                "vertex_count": entry.get("vertex_count", 0),
-                "face_count": entry.get("face_count", 0),
-                "faced": bool(entry.get("faced")),
-                "export_batch": entry.get("export_batch"),
-                "provenance": entry.get("provenance"),
-                "candidate_status": candidate_status,
-                "candidate_asset_ids": candidate_asset_ids,
-                "candidate_entries": candidates,
-            }
-        )
+        candidate_info = {
+            "path": rel_path,
+            "mesh_block": entry.get("mesh_block"),
+            "mesh_size": (entry.get("sibling_pair") or {}).get("mesh_size")
+            if isinstance(entry.get("sibling_pair"), dict)
+            else entry.get("mesh_size"),
+            "descriptor": entry.get("descriptor"),
+            "vertex_count": entry.get("vertex_count", 0),
+            "face_count": entry.get("face_count", 0),
+            "faced": bool(entry.get("faced")),
+            "export_batch": entry.get("export_batch"),
+            "provenance": entry.get("provenance"),
+            "candidate_status": candidate_status,
+            "candidate_asset_ids": candidate_asset_ids,
+            "candidate_entries": candidates,
+        }
+        idless_obj_entries.append(candidate_info)
+        idless_candidate_info_by_path[rel_path] = candidate_info
 
     obj_entry_rows: list[dict[str, Any]] = []
     texture_status_counter: Counter[str] = Counter()
@@ -385,6 +386,9 @@ def build_audit(
                 "path": rel_path,
                 "exists_on_disk": rel_path in obj_files_on_disk,
                 "asset_id": aid,
+                "candidate_status": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_status"),
+                "candidate_asset_ids": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_asset_ids", []),
+                "candidate_entries": idless_candidate_info_by_path.get(rel_path, {}).get("candidate_entries", []),
                 "texture_status": texture_status,
                 "linked_texture_count": len(linked_textures),
                 "linked_textures": linked_textures,
@@ -403,14 +407,14 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
-        "Recover or classify id-less OBJ entries so the full 350-file set can inherit asset-level metadata.",
-        "Resolve the missing manifest OBJ path before treating the 350-entry manifest as fully materialized on disk.",
-        "Generate OBJ/MTL bundles for textured assets; current OBJs have no material references.",
-        "Investigate the 10 indexed asset IDs with no linked texture references.",
-        "Prioritize faced OBJs with texture links for downstream viewer/import smoke tests.",
-        "Create a file-level consumer manifest so RiftFlythrough can address all 350 OBJ entries, not just 217 unique assets.",
-        "Map JSONL texture-link rows to PNG names explicitly instead of relying only on flythrough-index enrichment.",
-        "Add thumbnails or a lightweight HTML gallery for textured coverage triage.",
+        "Smoke-import the generated OBJ/MTL bundle in RiftFlythrough or Blender.",
+        "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
+        "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
+        "Investigate the 3 no-match id-less OBJ entries separately.",
+        "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
+        "Investigate the 10 indexed asset IDs with no linked textures.",
+        "Improve material role inference for special maps such as glow, masks, and alpha.",
+        "Add thumbnails or a lightweight HTML gallery for textured bundle triage.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
         "Use CI only as a guardrail after asset-coverage scripts/docs change, not as the main workstream.",
     ]
@@ -497,6 +501,10 @@ def render_markdown(audit: dict[str, Any]) -> str:
     missing_obj_files = obj["missing_obj_files"] or ["_none_"]
     idless = obj["entries_without_asset_id_detail"]
     no_texture_assets = asset["indexed_assets_without_texture_links_detail"] or ["_none_"]
+    existing_texture_linked = obj["existing_entries_with_texture_links"]
+    skipped_default_bundle = obj["manifest_entries"] - existing_texture_linked
+    missing_sources = obj["missing_obj_files_count"]
+    skipped_without_textures = skipped_default_bundle - missing_sources
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -549,7 +557,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
                 f"verts={entry.get('vertex_count')}, faces={entry.get('face_count')}, "
                 f"batch={entry.get('export_batch')}, provenance={entry.get('provenance')}, "
                 f"candidate_status={entry.get('candidate_status')}, "
-                f"candidate_asset_ids={entry.get('candidate_asset_ids')}"
+                f"candidate_asset_ids={', '.join(entry.get('candidate_asset_ids') or []) or 'none'}"
             )
             for entry in idless
         ],
@@ -566,6 +574,40 @@ def render_markdown(audit: dict[str, Any]) -> str:
         "- The main usability blocker is materialization: exported OBJs currently do not reference `.mtl` files or `usemtl` assignments.",
         "- The second blocker is file-level coverage: the 217-asset index does not directly expose every one of the 350 manifest OBJ entries.",
         "- The third blocker is recovery/classification of id-less OBJ entries and no-texture asset IDs.",
+        "",
+        "## Downstream consumer artifact builder",
+        "",
+        (
+            "`scripts/build_flythrough_obj_texture_manifest.py --write-bundle` turns this audit into generated, "
+            "gitignored consumer artifacts:"
+        ),
+        "",
+        "| Artifact | Expected result from current audit | Purpose |",
+        "|---|---:|---|",
+        (
+            f"| `Assets/build/flythrough/flythrough-obj-texture-manifest.json` | {obj['manifest_entries']} rows | "
+            "File-level OBJ manifest with texture roles, materialization status, candidate asset IDs, and bundle paths |"
+        ),
+        (
+            f"| `Assets/build/flythrough/flythrough-obj-texture-manifest.csv` | {obj['manifest_entries']} rows | "
+            "Spreadsheet-friendly triage view |"
+        ),
+        (
+            f"| `Assets/build/flythrough/obj-texture-bundle/objs/` | {existing_texture_linked} OBJ files | "
+            "Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |"
+        ),
+        (
+            f"| `Assets/build/flythrough/obj-texture-bundle/materials/` | {existing_texture_linked} MTL files | "
+            "Simple material sidecars pointing at converted PNGs |"
+        ),
+        "",
+        "Expected default bundle summary from this audit:",
+        "",
+        f"- {obj['manifest_entries']} total manifest entries.",
+        f"- {existing_texture_linked} materializable OBJ entries.",
+        f"- {existing_texture_linked} generated OBJ files and {existing_texture_linked} generated MTL files.",
+        f"- {skipped_default_bundle} skipped entries: {skipped_without_textures} without textures and {missing_sources} missing source OBJ.",
+        f"- {texture['converted_manifest_entries']} converted PNG paths available to the manifest.",
         "",
         "## Top 10 next best actions",
         "",

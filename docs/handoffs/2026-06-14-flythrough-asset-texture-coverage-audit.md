@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-14T23:37:55.410801Z
+**Generated**: 2026-06-14T23:47:17.163673Z
 
 ## Why this exists
 
@@ -31,17 +31,17 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 
 ### OBJ entries without asset IDs
 
-- `Exports/decode-264-v128/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=['6fc01704d4a509d5', 'caa9a88e94ec8db0']
-- `Exports/decode-264-v128b/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128b, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=['6fc01704d4a509d5', 'caa9a88e94ec8db0']
-- `Exports/decode-264-v64/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=64, faces=82, batch=batch-264-v64, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=['dfa4b4fccd826b59']
-- `Exports/decode-264-v80/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=80, faces=78, batch=batch-264-v80, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=['0603cce7cee15eb8']
-- `Exports/decode-264-v95/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=95, faces=118, batch=batch-264-v95, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=['3de9c1236fe20520']
-- `Exports/decode-fallback-1/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=24, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=[]
-- `Exports/decode-fallback-2/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=30, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=[]
-- `Exports/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=['6fc01704d4a509d5', 'caa9a88e94ec8db0']
-- `Exports/discovery-plan/stage0-baseline/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=['6fc01704d4a509d5', 'caa9a88e94ec8db0']
-- `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj` — mesh_block=17, verts=50, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=[]
-- `Exports/test-fan-fallback/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=168, faces=166, batch=individual-export, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=['58eaafd0fd31fcaf']
+- `Exports/decode-264-v128/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/decode-264-v128b/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=batch-264-v128b, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/decode-264-v64/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=64, faces=82, batch=batch-264-v64, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=dfa4b4fccd826b59
+- `Exports/decode-264-v80/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=80, faces=78, batch=batch-264-v80, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=0603cce7cee15eb8
+- `Exports/decode-264-v95/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=95, faces=118, batch=batch-264-v95, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=3de9c1236fe20520
+- `Exports/decode-fallback-1/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=24, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
+- `Exports/decode-fallback-2/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=30, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
+- `Exports/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/discovery-plan/stage0-baseline/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=128, faces=318, batch=individual-export, provenance=copied, candidate_status=ambiguous-signature-match, candidate_asset_ids=6fc01704d4a509d5, caa9a88e94ec8db0
+- `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj` — mesh_block=17, verts=50, faces=0, batch=individual-export, provenance=copied, candidate_status=no-geometry-signature-match, candidate_asset_ids=none
+- `Exports/test-fan-fallback/decode-nif-geometry/decode-nif-geometry-mesh6.obj` — mesh_block=6, verts=168, faces=166, batch=individual-export, provenance=copied, candidate_status=single-asset-signature-match, candidate_asset_ids=58eaafd0fd31fcaf
 
 ## Asset IDs without linked textures
 
@@ -65,24 +65,24 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 - The second blocker is file-level coverage: the 217-asset index does not directly expose every one of the 350 manifest OBJ entries.
 - The third blocker is recovery/classification of id-less OBJ entries and no-texture asset IDs.
 
-## Downstream consumer artifacts generated locally
+## Downstream consumer artifact builder
 
-`scripts/build_flythrough_obj_texture_manifest.py --write-bundle` now turns the audit into generated, gitignored consumer artifacts:
+`scripts/build_flythrough_obj_texture_manifest.py --write-bundle` turns this audit into generated, gitignored consumer artifacts:
 
-| Artifact | Result | Purpose |
+| Artifact | Expected result from current audit | Purpose |
 |---|---:|---|
 | `Assets/build/flythrough/flythrough-obj-texture-manifest.json` | 350 rows | File-level OBJ manifest with texture roles, materialization status, candidate asset IDs, and bundle paths |
 | `Assets/build/flythrough/flythrough-obj-texture-manifest.csv` | 350 rows | Spreadsheet-friendly triage view |
 | `Assets/build/flythrough/obj-texture-bundle/objs/` | 323 OBJ files | Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |
 | `Assets/build/flythrough/obj-texture-bundle/materials/` | 323 MTL files | Simple material sidecars pointing at converted PNGs |
 
-Latest local generation summary:
+Expected default bundle summary from this audit:
 
 - 350 total manifest entries.
 - 323 materializable OBJ entries.
 - 323 generated OBJ files and 323 generated MTL files.
 - 27 skipped entries: 26 without textures and 1 missing source OBJ.
-- 13,176 converted PNG paths available to the manifest.
+- 13176 converted PNG paths available to the manifest.
 
 ## Top 10 next best actions
 
