@@ -148,7 +148,7 @@ python -m pytest scripts/ -v --tb=short
 
 ## Deliverables
 
-- [ ] `docs/roadmap/phase2-m2.2-prep.md` (this file)
+- [x] `docs/roadmap/phase2-m2.2-prep.md` (this file)
 - [x] `docs/handoffs/2026-06-m2.2-binding-proofs.md` (M2.2 handoff)
 - [ ] Binding proof table: 329 family (12 IDs × per-mesh attribute → stream block)
 - [ ] Cross-family binding comparison (329 vs 305)
@@ -164,7 +164,7 @@ python -m pytest scripts/ -v --tb=short
 - [ ] Candidate-only language; no promotion claims
 - [ ] Drift check: strictly M2.2 scope — no parser changes, no new families
 - [ ] All refs to Phase 2 M2.2 + roadmap + M2.1 handoff + Phase 1 exit handoff
-- [ ] CI green: ruff 0, mypy 0, Python tests passing
+- [x] CI green: ruff 0, mypy 0, Python tests passing
 - [ ] No `Exports/` committed
 
 ## Blockers (M2.2 context)

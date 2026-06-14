@@ -126,10 +126,10 @@ python -m pytest scripts/ -v --tb=short
 
 ## Deliverables
 
-- [ ] `docs/roadmap/phase1-m1.4-prep.md` (this file)
+- [x] `docs/roadmap/phase1-m1.4-prep.md` (this file)
 - [x] `docs/handoffs/2026-06-m1.4-305-family-comparison.md` (M1.4 handoff)
 - [ ] `docs/roadmap/phase1-m1.4-coordination.md` (coordination log)
-- [ ] Updated `docs/roadmap/current-phase.md` (M1.4 COMPLETE → M1.5 ACTIVE)
+- [x] Updated `docs/roadmap/current-phase.md` (M1.4 COMPLETE → M1.5 ACTIVE)
 
 ## Validation Gates
 
@@ -137,9 +137,9 @@ python -m pytest scripts/ -v --tb=short
 - [ ] Drift check: strictly meshSize=305 comparison only; no new families
 - [ ] Candidate-only language throughout
 - [ ] All refs to Phase 1 M1.4 + roadmap + M1.3 handoff + matrix
-- [ ] Python-only; no new .ps1/.cmd
-- [ ] CI green: ruff 0, mypy 0, Python tests passing
-- [ ] No `Exports/` committed
+- [x] Python-only; no new .ps1/.cmd
+- [x] CI green: ruff 0, mypy 0, Python tests passing
+- [x] No `Exports/` committed
 
 ## Blockers (inherited; not addressed by M1.4)
 

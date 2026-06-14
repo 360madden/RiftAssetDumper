@@ -156,7 +156,7 @@ python -m pytest scripts/ -v --tb=short
 
 ## Deliverables
 
-- [ ] `docs/roadmap/phase2-m2.1-prep.md` (this file)
+- [x] `docs/roadmap/phase2-m2.1-prep.md` (this file)
 - [x] `docs/handoffs/2026-06-m2.1-nidatastream-descriptor-mapping.md` (M2.1 handoff)
 - [ ] Refreshed `Exports/ghidra-reports/nidatastream_descriptor_reference_classify.*` (with Phase 1 anchor context)
 - [ ] Refreshed `Exports/ghidra-reports/nidatastream_descriptor_base_model_review.*`
@@ -171,9 +171,9 @@ python -m pytest scripts/ -v --tb=short
 - [ ] Candidate-only language throughout; no promotion claims
 - [ ] Drift check: strictly M2.1 scope (descriptor field mapping) — no parser changes, no new families
 - [ ] All refs to Phase 2 M2.1 + roadmap + Phase 1 exit handoff + matrix
-- [ ] Python + Java only; no new .ps1/.cmd
-- [ ] CI green: ruff 0, mypy 0, Python tests passing
-- [ ] No `Exports/` committed
+- [x] Python + Java only; no new .ps1/.cmd
+- [x] CI green: ruff 0, mypy 0, Python tests passing
+- [x] No `Exports/` committed
 - [ ] `FieldOrderPromoted` remains `false`; `ParserExportPromotionAllowed` remains `false`
 
 ## Blockers (inherited from NiDataStream lane)

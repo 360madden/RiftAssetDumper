@@ -35,10 +35,10 @@
 
 ### Step 1 — Build & test baseline
 
-- [ ] `dotnet build RiftAssetDumper.slnx --nologo`
-- [ ] `python scripts/test_rift_workflow_utils.py`
+- [x] `dotnet build RiftAssetDumper.slnx --nologo`
+- [x] `python scripts/test_rift_workflow_utils.py`
 - [ ] Verify all Python imports
-- [ ] `git status --short`
+- [x] `git status --short`
 - **Exit:** 0 build errors, 46/46 tests pass, imports OK
 
 ### Step 2 — Refresh proof guard suite

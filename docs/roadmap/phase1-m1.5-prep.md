@@ -121,13 +121,13 @@ python -m pytest scripts/ -v --tb=short
 
 ## Deliverables
 
-- [ ] `docs/roadmap/phase1-m1.5-prep.md` (this file)
+- [x] `docs/roadmap/phase1-m1.5-prep.md` (this file)
 - [x] `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md` (comprehensive Phase 1 exit handoff)
 - [ ] Updated `docs/post50-mesh34-negative-binding-proof-checklist.md` (cross-family blocker append)
 - [ ] Updated `docs/post50-parser-export-promotion-readiness-checklist.md` (Phase 1 evidence)
 - [ ] Refreshed `Exports/post50-validation-suite.*` (9/9 PASS expected)
 - [ ] Refreshed `Exports/post50-mesh329-family-proof.*`
-- [ ] Updated `docs/roadmap/current-phase.md` (Phase 1 COMPLETE → Phase 2 ACTIVE)
+- [x] Updated `docs/roadmap/current-phase.md` (Phase 1 COMPLETE → Phase 2 ACTIVE)
 
 ## Validation Gates
 
@@ -138,9 +138,9 @@ python -m pytest scripts/ -v --tb=short
 - [ ] Drift check: strictly consolidation — no new discovery, no new probes, no new families
 - [ ] Candidate-only language throughout; no promotion claims
 - [ ] All refs to Phase 1 M1.5 + roadmap + M1.1-M1.4 handoffs
-- [ ] Python-only; no new .ps1/.cmd
-- [ ] CI green: ruff 0, mypy 0, Python tests passing
-- [ ] No `Exports/` committed
+- [x] Python-only; no new .ps1/.cmd
+- [x] CI green: ruff 0, mypy 0, Python tests passing
+- [x] No `Exports/` committed
 - [ ] Phase 2 entry criteria clearly stated and assessed
 
 ## Phase 1 Exit Assessment (to be finalized in handoff)
