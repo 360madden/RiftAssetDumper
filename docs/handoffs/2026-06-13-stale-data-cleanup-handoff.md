@@ -48,8 +48,8 @@ Multiple documentation inconsistencies were found:
 
 ### Kept unchanged
 
-- `docs/handoffs/2026-06-m1.1-329-matrix.md` — only version, prefix intentional per file note
-- `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` — only version, prefix intentional per file note
+- `docs/handoffs/2026-06-m1.1-329-matrix.md` — only version, renamed from `draft-` (Cycle 13)
+- `docs/handoffs/2026-06-m1.2-@304-extra-stream-classification.md` — only version, renamed from `draft-` (Cycle 13)
 
 ## Project State Confirmed
 
@@ -106,7 +106,7 @@ Cross-referenced all 104 unique handoff file references in docs against the 182 
 ### Notes
 
 - `discovery-plan-50.md` is a historical planning document; the 4 broken references were aspirational `[ ] Write` checklist items. All 4 stages completed with evolved handoff filenames.
-- 6 `draft-` files remain (M1.1, M1.2, M2.1-M2.4) — all are draft-only with no finalized counterpart.
+- 6 `draft-` files remain (M1.1, M1.2, M2.1-M2.4) — all are draft-only with no finalized counterpart (subsequently renamed in Cycle 13).
 - Markdownlint: 233 files, 0 errors.
 
 ---
@@ -121,12 +121,12 @@ Audited all 6 remaining `draft-` prefixed handoffs:
 
 | File | Status | Verdict |
 |---|---|---|
-| `2026-06-m1.1-329-matrix.md` | M1.1 COMPLETE | Intentional — "prefix retained for minimal diff" |
-| `2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 COMPLETE | Intentional — "prefix retained per M1.1 precedent" |
-| `2026-06-m2.1-nidatastream-descriptor-mapping.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
-| `2026-06-m2.2-binding-proofs.md` | Phase 2 (exited via M2.5) | Intentional — working doc within phase |
-| `2026-06-m2.3-role-descriptor-integration.md` | M2.3 COMPLETE ("Final — M2.3 exited") | Intentional — content finalized, prefix retained |
-| `2026-06-m2.4-promotion-gate-evaluation.md` | Phase 2 (exited via M2.5) | Intentional — 0 gates cleared (expected) |
+| `2026-06-m1.1-329-matrix.md` | M1.1 COMPLETE | Renamed from `draft-` (Cycle 13) |
+| `2026-06-m1.2-@304-extra-stream-classification.md` | M1.2 COMPLETE | Renamed from `draft-` (Cycle 13) |
+| `2026-06-m2.1-nidatastream-descriptor-mapping.md` | Phase 2 (exited via M2.5) | Renamed from `draft-` (Cycle 13) |
+| `2026-06-m2.2-binding-proofs.md` | Phase 2 (exited via M2.5) | Renamed from `draft-` (Cycle 13) |
+| `2026-06-m2.3-role-descriptor-integration.md` | M2.3 COMPLETE ("Final — M2.3 exited") | Renamed from `draft-` (Cycle 13) |
+| `2026-06-m2.4-promotion-gate-evaluation.md` | Phase 2 (exited via M2.5) | Renamed from `draft-` (Cycle 13) |
 
 **Finding**: All 6 `draft-` prefixes are intentional conventions, not staleness. All cross-references valid. Zero fixes needed.
 
