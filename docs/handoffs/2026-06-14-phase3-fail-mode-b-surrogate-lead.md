@@ -113,6 +113,7 @@ The two commits land consecutively in `git log` so the FAIL verdict and the lead
 - Step 49 schema: `docs/schemas/live-memory-step49-status-v1.schema.json`
 - Parser UX follow-up (still unblocked — ships after the two-commit sequence lands): `docs/handoffs/2026-06-14-parser-ux-region-pin-hint.md`
 - Follow-up batch cross-ref: `docs/handoffs/2026-06-13-m3-safe-followup-batch.md` §"Deferred items"
+- §8.4 decision pre-draft (consolidated commit templates + status-update payloads + schema-widening + proof-guard gate): `docs/handoffs/2026-06-14-phase3-decision-pre-draft.md`
 
 ## Decision log
 

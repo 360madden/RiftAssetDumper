@@ -104,6 +104,7 @@ Step 49 status: `closed-negative-current-live-state` (UNCHANGED)
 - Follow-up batch cross-ref: `docs/handoffs/2026-06-13-m3-safe-followup-batch.md` §"Deferred items"
 - Sibling PASS template: `docs/handoffs/2026-06-14-phase3-pass-step49-status-update.md`
 - Mode B Phase 4 lead handoff template (to be created on demand): `docs/handoffs/2026-06-14-phase3-fail-mode-b-surrogate-lead.md`
+- §8.4 decision pre-draft (consolidated commit templates + status-update payloads + schema-widening + proof-guard gate): `docs/handoffs/2026-06-14-phase3-decision-pre-draft.md`
 
 ## Decision log
 

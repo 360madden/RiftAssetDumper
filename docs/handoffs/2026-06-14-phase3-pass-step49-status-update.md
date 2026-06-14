@@ -92,6 +92,7 @@ Step 49 status: `closed-negative-current-live-state` → `open-positive-live-con
 - Parser UX follow-up (unblocked by this commit): `docs/handoffs/2026-06-14-parser-ux-region-pin-hint.md`
 - Follow-up batch cross-ref: `docs/handoffs/2026-06-13-m3-safe-followup-batch.md` §"Deferred items"
 - Sibling FAIL template: `docs/handoffs/2026-06-14-phase3-fail-step49-stays-closed.md`
+- §8.4 decision pre-draft (consolidated commit templates + status-update payloads + schema-widening + proof-guard gate): `docs/handoffs/2026-06-14-phase3-decision-pre-draft.md`
 
 ## Decision log
 
