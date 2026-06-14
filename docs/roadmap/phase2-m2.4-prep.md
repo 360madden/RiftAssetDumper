@@ -162,8 +162,8 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 
 - [ ] All 6 promotion gates evaluated against M2.1-M2.3 evidence
 - [ ] No gate advanced to "pass" without clear evidence
-- [ ] `FieldOrderPromoted` explicitly confirmed still false
-- [ ] `ParserExportPromotionAllowed` explicitly confirmed still false
+- [x] `FieldOrderPromoted` explicitly confirmed still false
+- [x] `ParserExportPromotionAllowed` explicitly confirmed still false
 - [ ] Per-block-embedded finding correctly reflected in gate reclassification
 - [ ] Gaps documented for each blocked/partially-advanced gate
 - [ ] Candidate-only language throughout

@@ -125,8 +125,8 @@ Per `docs/nidatastream-parser-export-promotion-decision-template.md`, before ANY
 - [ ] All pre-work completed or explicitly deferred
 - [ ] Decision record completed and reviewed
 - [ ] Parser patch is minimal (descriptor read + classification only, no behavioral change)
-- [ ] `FieldOrderPromoted` still false
-- [ ] `ParserExportPromotionAllowed` still false
+- [x] `FieldOrderPromoted` still false
+- [x] `ParserExportPromotionAllowed` still false
 - [ ] Existing tests still pass (all xUnit tests)
 - [ ] New targeted tests pass
 - [x] `dotnet format --verify-no-changes` clean

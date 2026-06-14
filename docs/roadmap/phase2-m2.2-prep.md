@@ -165,7 +165,7 @@ python -m pytest scripts/ -v --tb=short
 - [ ] Drift check: strictly M2.2 scope — no parser changes, no new families
 - [ ] All refs to Phase 2 M2.2 + roadmap + M2.1 handoff + Phase 1 exit handoff
 - [x] CI green: ruff 0, mypy 0, Python tests passing
-- [ ] No `Exports/` committed
+- [x] No `Exports/` committed
 
 ## Blockers (M2.2 context)
 

@@ -69,9 +69,9 @@ dotnet format RiftAssetDumper.slnx --verify-no-changes
 - [x] Build: 0 errors
 - [x] Tests: 49/49 pass
 - [x] `dotnet format --verify-no-changes` clean
-- [ ] `FieldOrderPromoted` still false
-- [ ] `ParserExportPromotionAllowed` still false
-- [ ] Generated-output guard clean
+- [x] `FieldOrderPromoted` still false
+- [x] `ParserExportPromotionAllowed` still false
+- [x] Generated-output guard clean
 
 ---
 

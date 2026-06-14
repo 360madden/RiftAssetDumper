@@ -174,7 +174,7 @@ python -m pytest scripts/ -v --tb=short
 - [x] Python + Java only; no new .ps1/.cmd
 - [x] CI green: ruff 0, mypy 0, Python tests passing
 - [x] No `Exports/` committed
-- [ ] `FieldOrderPromoted` remains `false`; `ParserExportPromotionAllowed` remains `false`
+- [x] `FieldOrderPromoted` remains `false`; `ParserExportPromotionAllowed` remains `false`
 
 ## Blockers (inherited from NiDataStream lane)
 
