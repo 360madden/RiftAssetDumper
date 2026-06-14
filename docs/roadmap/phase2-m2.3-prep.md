@@ -85,7 +85,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 
 ## Deliverables
 
-- [ ] `docs/roadmap/phase2-m2.3-prep.md` (this file)
+- [x] `docs/roadmap/phase2-m2.3-prep.md` (this file)
 - [x] `docs/handoffs/2026-06-m2.3-role-descriptor-integration.md`
 - [ ] Unified role↔descriptor↔block table
 - [ ] Gap analysis
@@ -97,7 +97,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 - [ ] All 12/12 matrix bindings cross-referenced with descriptor patterns
 - [ ] Gaps explicitly documented (blocks #55, #57; index streams; `3c 01 04 00`)
 - [ ] Candidate-only throughout; no promotion claims
-- [ ] CI green
+- [x] CI green
 
 ---
 

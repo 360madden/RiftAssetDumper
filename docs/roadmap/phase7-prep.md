@@ -78,9 +78,9 @@ dotnet format RiftAssetDumper.slnx --verify-no-changes
 
 ## Validation Gates (apply to M7.3+ code-running milestones)
 
-- [ ] Build: 0 errors
-- [ ] Tests: 49/49 pass
-- [ ] `dotnet format --verify-no-changes` clean
+- [x] Build: 0 errors
+- [x] Tests: 49/49 pass
+- [x] `dotnet format --verify-no-changes` clean
 - [ ] `FieldOrderPromoted` still false (gate 6 blocks)
 - [ ] `ParserExportPromotionAllowed` still false (gate 6 blocks)
 - [x] At least 1 gate formally retired or cleared (3 cleared + 1 retired in M7.1-M7.4)

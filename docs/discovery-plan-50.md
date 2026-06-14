@@ -133,7 +133,7 @@
 
 ### Step 13 — Build and test
 
-- [ ] `dotnet build` — 0 errors
+- [x] `dotnet build` — 0 errors
 - [ ] `python scripts/test_rift_workflow_utils.py` — 46/46
 - [ ] Run smoke tests on new commands
 - **Exit:** Clean build, passing tests
@@ -211,7 +211,7 @@
 
 ### Step 23 — Build and test
 
-- [ ] `dotnet build` — 0 errors
+- [x] `dotnet build` — 0 errors
 - [ ] Unit tests pass
 - [ ] Smoke test on `meshSize=325` with discovered positions
 - **Exit:** Clean build, command works
@@ -238,7 +238,7 @@
 
 ### Step 26 — Inventory remaining guards
 
-- [ ] Catalog all unported guard functions in `Invoke-RiftAssetWorkflow.ps1`
+- [x] Catalog all unported guard functions in `Invoke-RiftAssetWorkflow.ps1`
 - [ ] Prioritize by: regression risk, complexity, dependency on other ports
 - **Exit:** Guard migration priority list
 
@@ -296,7 +296,7 @@
 
 ### Step 34 — Build and test everything
 
-- [ ] `dotnet build` — 0 errors
+- [x] `dotnet build` — 0 errors
 - [ ] Full Python test suite — all pass
 - [ ] Run all guards with known-good data — all pass
 - [ ] Deliberately break a guard — verify it fails
@@ -370,7 +370,7 @@
 
 ### Step 43 — Build and test full suite
 
-- [ ] `dotnet build` — 0 errors
+- [x] `dotnet build` — 0 errors
 - [ ] Run full discovery suite — all stages complete
 - [ ] Run quick mode — completes in < 2 min
 - [ ] Run CI script — exits 0

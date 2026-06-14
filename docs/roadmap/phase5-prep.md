@@ -84,7 +84,7 @@ ruff check scripts/ && mypy scripts/ --no-error-summary
 - [x] Build: 0 errors
 - [x] Tests: 29/29 pass
 - [x] `dotnet format --verify-no-changes` clean
-- [ ] ruff 0, mypy 0
+- [x] ruff 0, mypy 0
 - [x] `FieldOrderPromoted` still false
 - [x] `ParserExportPromotionAllowed` still false
 - [ ] Generated-output guard clean

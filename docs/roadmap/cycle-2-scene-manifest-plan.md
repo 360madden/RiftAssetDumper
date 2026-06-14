@@ -253,7 +253,7 @@ When any agent (or human) opens this repo to make progress on cycle 2, in this o
 - [ ] Cohort file exists and validates
 - [ ] Charter handoff written
 - [ ] All 8 proof guards PASS
-- [ ] `dotnet build/test/pytest/ruff/mypy` all green
+- [x] `dotnet build/test/pytest/ruff/mypy` all green
 - [ ] No V4 Pro session used yet
 
 ---

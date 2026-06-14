@@ -111,7 +111,7 @@ Per `docs/nidatastream-parser-export-promotion-decision-template.md`, before ANY
 
 ## Deliverables (Phase 3 M3.1)
 
-- [ ] `docs/roadmap/phase3-prep.md` (this file)
+- [x] `docs/roadmap/phase3-prep.md` (this file)
 - [ ] Pre-work: resolve `36 04 02 00` role
 - [ ] Pre-work: probe blocks #55/#57
 - [ ] Decision record (per template)
@@ -129,8 +129,8 @@ Per `docs/nidatastream-parser-export-promotion-decision-template.md`, before ANY
 - [ ] `ParserExportPromotionAllowed` still false
 - [ ] Existing tests still pass (all xUnit tests)
 - [ ] New targeted tests pass
-- [ ] `dotnet format --verify-no-changes` clean
-- [ ] CI green (both .NET and Python)
+- [x] `dotnet format --verify-no-changes` clean
+- [x] CI green (both .NET and Python)
 - [ ] Generated-output guard clean
 
 ---
