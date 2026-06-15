@@ -16,6 +16,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     common_candidate_texture_names,
     load_source_substitutions,
     load_texture_fallbacks,
+    mtl_lines,
     normalize_converted_texture_path,
     normalize_face_token_for_available_attributes,
     obj_with_material_text,
@@ -338,8 +339,32 @@ def test_build_manifest_can_materialize_untextured_existing_obj_as_neutral(tmp_p
     assert neutral["summary"]["entries_without_textures"] == 0
     assert neutral["summary"]["entries_lacking_texture_links"] == 1
     assert neutral["summary"]["untextured_materialized_entries"] == 1
+    assert neutral["summary"]["review_material_entries"] == 1
     assert neutral["entries"][0]["texture_source"] == "untextured-neutral"
     assert neutral["entries"][0]["chosen_material_textures"] == {}
+    assert neutral["entries"][0]["review_material"]["kind"] == "asset-id-no-linked-textures"
+    assert neutral["entries"][0]["review_material"]["durable_texture_truth"] is False
+
+
+def test_mtl_lines_colors_neutral_review_material_without_texture_claim(tmp_path: Path) -> None:
+    lines = mtl_lines(
+        "neutral_mat",
+        {},
+        mtl_path=tmp_path / "neutral_mat.mtl",
+        repo_root=tmp_path,
+        review_material={
+            "kind": "idless-no-texture-candidate",
+            "label": "id-less row without texture candidate",
+            "diffuse_color": [1.0, 0.65, 0.25],
+            "durable_texture_truth": False,
+            "reason": "No durable asset ID or texture candidate is available.",
+        },
+    )
+
+    assert lines[0] == "newmtl neutral_mat"
+    assert "# Durable texture truth: false" in lines
+    assert "Kd 1.000000 0.650000 0.250000" in lines
+    assert not any(line.startswith("map_Kd ") for line in lines)
 
 
 def test_build_manifest_can_use_textureless_triage_converted_refs(tmp_path: Path) -> None:

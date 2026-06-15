@@ -170,6 +170,7 @@ def neutral_gap_row(
             str(ref) for ref in (probe_target or {}).get("asset_dds_refs", []) if isinstance(ref, str)
         ),
         "source_substitution": entry.get("source_substitution"),
+        "review_material": entry.get("review_material"),
     }
 
 
@@ -231,6 +232,11 @@ def build_texture_gap_report(
 
     texture_source_counts = Counter(str(entry.get("texture_source") or "none") for entry in entries)
     texture_status_counts = Counter(str(entry.get("texture_status") or "none") for entry in entries)
+    review_material_counts = Counter(
+        str(entry.get("review_material", {}).get("kind"))
+        for entry in entries
+        if isinstance(entry.get("review_material"), dict)
+    )
     neutral_rows = [
         neutral_gap_row(
             entry,
@@ -283,12 +289,14 @@ def build_texture_gap_report(
             "neutral_entries_without_asset_id": len([row for row in neutral_rows if not row.get("asset_id")]),
             "texture_fallback_entries": len(practical_fallback_rows),
             "texture_fallback_refs": sum(int(row.get("fallback_count") or 0) for row in practical_fallback_rows),
+            "review_material_entries": sum(review_material_counts.values()),
             "source_substituted_entries": len(practical_source_substitution_rows),
             "unmatched_exact_dds_refs": len(unmatched_target_refs),
             "fallback_target_dds_refs": len(fallback_target_refs),
         },
         "texture_source_counts": _counter_to_sorted_dict(texture_source_counts),
         "texture_status_counts": _counter_to_sorted_dict(texture_status_counts),
+        "review_material_counts": _counter_to_sorted_dict(review_material_counts),
         "neutral_bucket_counts": _counter_to_sorted_dict(neutral_bucket_counts),
         "unmatched_exact_dds_refs": unmatched_target_refs,
         "fallback_target_dds_refs": fallback_target_refs,
@@ -325,6 +333,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral material rows still lacking texture evidence | {summary['neutral_material_entries']} |",
         f"| Neutral rows with asset IDs | {summary['neutral_entries_with_asset_id']} |",
         f"| Neutral rows without asset IDs | {summary['neutral_entries_without_asset_id']} |",
+        f"| Neutral review-color materials | {summary.get('review_material_entries', 0)} |",
         f"| Practical texture-fallback rows | {summary['texture_fallback_entries']} |",
         f"| Practical texture-fallback refs | {summary['texture_fallback_refs']} |",
         f"| Practical source-substituted rows | {summary['source_substituted_entries']} |",
@@ -381,14 +390,16 @@ def render_markdown(report: dict[str, Any]) -> str:
     if neutral_rows_list:
         lines.extend(
             [
-                "| Row | Bucket | Asset ID | Mesh | Verts/Faces | Probe/DDS evidence | Source |",
-                "|---:|---|---|---|---:|---|---|",
+                "| Row | Bucket | Review material | Asset ID | Mesh | Verts/Faces | Probe/DDS evidence | Source |",
+                "|---:|---|---|---|---|---:|---|---|",
             ]
         )
         for row in neutral_rows_list:
             probe_note = _format_refs(row.get("row_dds_refs", []) or row.get("mesh_dds_refs", []))
+            review_material = row.get("review_material") or {}
             lines.append(
-                f"| {row.get('manifest_index')} | `{row.get('bucket')}` | `{row.get('asset_id') or 'n/a'}` | "
+                f"| {row.get('manifest_index')} | `{row.get('bucket')}` | "
+                f"`{review_material.get('kind') or 'n/a'}` | `{row.get('asset_id') or 'n/a'}` | "
                 f"{row.get('mesh_block')} / {row.get('mesh_size')} | "
                 f"{row.get('vertex_count')}/{row.get('face_count')} | {probe_note} | "
                 f"`{row.get('source_obj')}` |"

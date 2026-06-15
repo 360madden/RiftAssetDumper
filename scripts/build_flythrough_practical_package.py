@@ -331,6 +331,7 @@ def build_practical_package(
             "materializable_entries": manifest["summary"]["materializable_entries"],
             "non_neutral_texture_entries": texture_gap_report["summary"]["entries_with_non_neutral_textures"],
             "neutral_material_entries": texture_gap_report["summary"]["neutral_material_entries"],
+            "review_material_entries": manifest["summary"]["review_material_entries"],
             "source_substituted_entries": manifest["summary"]["source_substituted_entries"],
             "texture_fallback_refs": manifest["summary"]["texture_fallback_refs"],
             "unmatched_exact_dds_refs": texture_gap_report["summary"]["unmatched_exact_dds_refs"],
@@ -401,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
         f"source_substitutions={summary['source_substituted_entries']} "
         f"texture_fallback_refs={summary['texture_fallback_refs']} "
         f"neutral={summary['neutral_material_entries']} "
+        f"review_materials={summary['review_material_entries']} "
         f"unmatched_dds={summary['unmatched_exact_dds_refs']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "

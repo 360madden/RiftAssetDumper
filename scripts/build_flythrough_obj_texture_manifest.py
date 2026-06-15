@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -207,6 +208,59 @@ def choose_material_textures(linked_textures: list[str]) -> dict[str, str]:
     return chosen
 
 
+NEUTRAL_REVIEW_MATERIALS = {
+    "asset-id-no-linked-textures": {
+        "label": "asset-id row without linked texture refs",
+        "diffuse_color": [0.350000, 0.550000, 1.000000],
+        "reason": "Asset ID is known, but current texture-link evidence has no row textures.",
+    },
+    "idless-no-texture-candidate": {
+        "label": "id-less row without texture candidate",
+        "diffuse_color": [1.000000, 0.650000, 0.250000],
+        "reason": "No durable asset ID or texture candidate is available for this OBJ row.",
+    },
+    "source-substitution-no-textures": {
+        "label": "source-substituted row without texture refs",
+        "diffuse_color": [0.650000, 0.450000, 0.950000],
+        "reason": "Source OBJ is a practical substitute and still has no texture evidence.",
+    },
+    "untextured-neutral": {
+        "label": "untextured neutral review material",
+        "diffuse_color": [0.700000, 0.700000, 0.700000],
+        "reason": "No linked texture evidence is available; material is a visible review aid only.",
+    },
+}
+
+
+def review_material_for_entry(
+    entry: dict[str, Any],
+    *,
+    texture_source: str,
+    source_substitution: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return explicit non-truth review material metadata for neutral rows."""
+
+    if texture_source != "untextured-neutral":
+        return None
+    if source_substitution:
+        kind = "source-substitution-no-textures"
+    elif not entry.get("asset_id"):
+        kind = "idless-no-texture-candidate"
+    elif entry.get("texture_status") == "no-linked-textures":
+        kind = "asset-id-no-linked-textures"
+    else:
+        kind = "untextured-neutral"
+
+    material = NEUTRAL_REVIEW_MATERIALS[kind]
+    return {
+        "kind": kind,
+        "label": material["label"],
+        "diffuse_color": material["diffuse_color"],
+        "durable_texture_truth": False,
+        "reason": material["reason"],
+    }
+
+
 def material_name_for_entry(entry: dict[str, Any]) -> str:
     aid = entry.get("asset_id") or "idless"
     return safe_slug(f"mat_{int(entry['manifest_index']):03d}_{aid}")
@@ -345,6 +399,7 @@ def build_manifest(
     texture_fallback_materialized = 0
     texture_fallback_refs = 0
     texture_fallback_replacement_missing = 0
+    review_material_counter: Counter[str] = Counter()
     textureless_triage_textures = (
         textureless_triage_row_textures(
             textureless_triage_report_path,
@@ -486,6 +541,17 @@ def build_manifest(
             missing_source += 1
         elif not has_textures:
             no_texture += 1
+        review_material = (
+            review_material_for_entry(
+                entry,
+                texture_source=texture_source,
+                source_substitution=source_substitution,
+            )
+            if can_materialize
+            else None
+        )
+        if review_material:
+            review_material_counter[str(review_material["kind"])] += 1
 
         obj_slug = safe_slug(f"{manifest_index:03d}_{entry.get('asset_id') or 'idless'}_{Path(source_obj).stem}")
         bundled_obj = f"{bundle_rel}/objs/{obj_slug}.obj"
@@ -510,6 +576,7 @@ def build_manifest(
                 "texture_fallbacks": active_texture_fallbacks,
                 "texture_fallback_count": len(active_texture_fallbacks),
                 "chosen_material_textures": chosen,
+                "review_material": review_material,
                 "materializable": can_materialize,
                 "material_name": material_name if can_materialize else None,
                 "bundled_obj": bundled_obj if can_materialize else None,
@@ -550,6 +617,8 @@ def build_manifest(
             "common_candidate_materialized_entries": common_candidate_materialized,
             "textureless_triage_materialized_entries": textureless_triage_materialized,
             "untextured_materialized_entries": untextured_materialized,
+            "review_material_entries": sum(review_material_counter.values()),
+            "review_material_breakdown": dict(sorted(review_material_counter.items())),
             "converted_texture_paths": len(converted_texture_paths),
             "bundle_root": bundle_rel,
             "texture_status_breakdown": audit["obj_file_level"].get("entry_texture_status_breakdown", {}),
@@ -561,16 +630,48 @@ def build_manifest(
     }
 
 
-def mtl_lines(material_name: str, chosen_textures: dict[str, str], *, mtl_path: Path, repo_root: Path) -> list[str]:
-    lines = [
-        f"newmtl {material_name}",
-        "Ka 1.000000 1.000000 1.000000",
-        "Kd 1.000000 1.000000 1.000000",
-        "Ks 0.100000 0.100000 0.100000",
-        "Ns 10.000000",
-        "d 1.000000",
-        "illum 2",
-    ]
+def _material_rgb(review_material: dict[str, Any] | None) -> tuple[float, float, float]:
+    if not review_material:
+        return (1.0, 1.0, 1.0)
+    color = review_material.get("diffuse_color")
+    if not isinstance(color, (list, tuple)) or len(color) != 3:
+        return (1.0, 1.0, 1.0)
+    try:
+        red, green, blue = (max(0.0, min(1.0, float(component))) for component in color)
+    except TypeError, ValueError:
+        return (1.0, 1.0, 1.0)
+    return (red, green, blue)
+
+
+def mtl_lines(
+    material_name: str,
+    chosen_textures: dict[str, str],
+    *,
+    mtl_path: Path,
+    repo_root: Path,
+    review_material: dict[str, Any] | None = None,
+) -> list[str]:
+    rgb = _material_rgb(review_material)
+    lines = [f"newmtl {material_name}"]
+    if review_material:
+        lines.extend(
+            [
+                f"# Review material: {review_material.get('label')}",
+                f"# Review material kind: {review_material.get('kind')}",
+                "# Durable texture truth: false",
+                f"# Reason: {review_material.get('reason')}",
+            ]
+        )
+    lines.extend(
+        [
+            f"Ka {rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}",
+            f"Kd {rgb[0]:.6f} {rgb[1]:.6f} {rgb[2]:.6f}",
+            "Ks 0.100000 0.100000 0.100000",
+            "Ns 10.000000",
+            "d 1.000000",
+            "illum 2",
+        ]
+    )
 
     role_to_statement = {
         "diffuse": "map_Kd",
@@ -701,6 +802,7 @@ def write_bundle(
                 entry["chosen_material_textures"],
                 mtl_path=out_mtl,
                 repo_root=repo_root,
+                review_material=entry.get("review_material"),
             )
         )
         out_mtl.write_text(mtl_text + "\n", encoding="utf-8", newline="\n")
@@ -799,6 +901,9 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         "texture_source",
         "borrowed_texture_asset_id",
         "texture_fallback_count",
+        "review_material_kind",
+        "review_material_label",
+        "review_material_durable_texture_truth",
         "linked_texture_count",
         "materializable",
         "material_name",
@@ -821,6 +926,10 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
             row["candidate_asset_ids"] = ";".join(entry.get("candidate_asset_ids") or [])
             substitution = entry.get("source_substitution") or {}
             row["source_substitution_status"] = substitution.get("status")
+            review_material = entry.get("review_material") or {}
+            row["review_material_kind"] = review_material.get("kind")
+            row["review_material_label"] = review_material.get("label")
+            row["review_material_durable_texture_truth"] = review_material.get("durable_texture_truth")
             writer.writerow(row)
     tmp.replace(path)
 
