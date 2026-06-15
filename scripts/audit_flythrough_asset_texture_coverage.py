@@ -36,6 +36,9 @@ DEFAULT_EXTRACTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "extracted-manifest.
 DEFAULT_JSON_OUT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
 DEFAULT_MISSING_OBJ_REPAIR_REPORT = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "repair-report.json"
 DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
+DEFAULT_TEXTURELESS_PROBE_REFRESH_REPORT = (
+    FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
+)
 DEFAULT_TEXTURELESS_RECOVERY_REPORT = (
     FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "textureless-dds-recovery-report.json"
 )
@@ -507,12 +510,12 @@ def build_audit(
         "Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
         "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
-        "Investigate the 16 remaining neutral-material rows that still lack row-scoped DDS refs.",
+        "Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.",
+        "Investigate the remaining textureless-scope rows that still lack row-scoped DDS refs.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
         "Investigate the 2 existing no-match fallback OBJ rows separately.",
         "Review the 2 textureless-triage materialized rows for visual/material-role quality.",
-        "Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
     ]
 
@@ -646,6 +649,19 @@ def render_markdown(audit: dict[str, Any]) -> str:
     textureless_triage_lines = [
         "- `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`."
     ]
+    textureless_probe_refresh = _load_optional_json(DEFAULT_TEXTURELESS_PROBE_REFRESH_REPORT)
+    textureless_probe_refresh_lines = [
+        "- `scripts/probe_flythrough_textureless_meshes.py` refreshes focused live-root `probe-nif-mesh` JSON for textureless-scope asset/mesh rows, so triage can find row-scoped DDS refs instead of guessing."
+    ]
+    if textureless_probe_refresh:
+        probe_summary = textureless_probe_refresh.get("summary", {})
+        textureless_probe_refresh_lines.append(
+            "- Latest textureless probe refresh report: "
+            f"{probe_summary.get('unique_probe_targets', 'n/a')} asset/mesh targets, "
+            f"{probe_summary.get('commands_run', 'n/a')} commands run, "
+            f"{probe_summary.get('targets_with_mesh_dds_refs', 'n/a')} targets with mesh-level DDS refs, "
+            f"{probe_summary.get('unique_mesh_dds_refs', 'n/a')} unique mesh-level DDS refs."
+        )
     textureless_triage_materializable = 0
     if textureless_triage:
         triage_summary = textureless_triage.get("summary", {})
@@ -840,6 +856,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {full_available_skipped} entry remains skipped: the missing source OBJ path.",
         "- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.",
         *missing_obj_repair_lines,
+        *textureless_probe_refresh_lines,
         *textureless_triage_lines,
         *textureless_recovery_lines,
         *bundle_smoke_lines,

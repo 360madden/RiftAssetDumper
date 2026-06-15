@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T00:46:58.489576Z
+**Generated**: 2026-06-15T01:05:49.502503Z
 
 ## Why this exists
 
@@ -106,10 +106,13 @@ Optional heuristic expansion:
 - `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
 - `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`.
 - Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 repaired.
+- `scripts/probe_flythrough_textureless_meshes.py` refreshes focused live-root `probe-nif-mesh` JSON for textureless-scope asset/mesh rows, so triage can find row-scoped DDS refs instead of guessing.
+- Latest textureless probe refresh report: 11 asset/mesh targets, 11 commands run, 3 targets with mesh-level DDS refs, 5 unique mesh-level DDS refs.
 - `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`.
-- Latest textureless-asset triage report: 18 neutral rows, 2 rows with mesh-level DDS refs, 2 neutral asset IDs with refs, 6 unique DDS refs, 6 already converted, 0 missing converted PNGs, 0 of the missing refs catalog-backed.
+- Latest textureless-asset triage report: 18 neutral rows, 3 rows with mesh-level DDS refs, 3 neutral asset IDs with refs, 8 unique DDS refs, 6 already converted, 2 missing converted PNGs, 0 of the missing refs catalog-backed.
+- Missing converted DDS targets found in probe evidence: `n_ds_eternal_assault_flowers_01_c.dds`, `n_ds_eternal_assault_flowers_01_s.dds`.
 - `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report.
-- Latest textureless DDS recovery report: 6 refs, 0 currently missing conversion targets, 0 name matches, 0 newly converted PNGs, 0 failed conversions.
+- Latest textureless DDS recovery report: 8 refs, 2 currently missing conversion targets, 0 name matches, 0 newly converted PNGs, 0 failed conversions.
 - `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
 
@@ -118,10 +121,10 @@ Optional heuristic expansion:
 1. Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.
 2. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
 3. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
-4. Investigate the 16 remaining neutral-material rows that still lack row-scoped DDS refs.
-5. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
-6. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
-7. Investigate the 2 existing no-match fallback OBJ rows separately.
-8. Review the 2 textureless-triage materialized rows for visual/material-role quality.
-9. Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.
+4. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
+5. Investigate the remaining textureless-scope rows that still lack row-scoped DDS refs.
+6. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
+7. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
+8. Investigate the 2 existing no-match fallback OBJ rows separately.
+9. Review the 2 textureless-triage materialized rows for visual/material-role quality.
 10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.
