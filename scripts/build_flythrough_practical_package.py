@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from audit_flythrough_neutral_row_provenance import build_neutral_row_provenance_report
+from audit_flythrough_neutral_row_provenance import render_markdown as render_neutral_provenance_markdown
 from audit_flythrough_unresolved_texture_evidence import build_unresolved_texture_evidence_report
 from audit_flythrough_unresolved_texture_evidence import render_markdown as render_unresolved_texture_markdown
 from build_flythrough_combined_obj_package import build_combined_obj_package
@@ -70,7 +72,14 @@ DEFAULT_UNRESOLVED_TEXTURE_JSON = (
 DEFAULT_UNRESOLVED_TEXTURE_MD = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "UNRESOLVED_TEXTURE_EVIDENCE.md"
 )
+DEFAULT_NEUTRAL_PROVENANCE_JSON = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "neutral-row-provenance-report.json"
+)
+DEFAULT_NEUTRAL_PROVENANCE_MD = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "NEUTRAL_ROW_PROVENANCE.md"
+)
 DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
+DEFAULT_ASSETS64_ENTRIES = REPO_ROOT / "Exports" / "assets64.entries.jsonl"
 
 DEFAULT_MISSING_MANIFEST_INDEX = 121
 DEFAULT_MISSING_ORIGINAL_SOURCE_OBJ = "Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj"
@@ -247,7 +256,10 @@ def build_practical_package(
     texture_gap_markdown_out: Path = DEFAULT_TEXTURE_GAP_MD,
     unresolved_texture_json_out: Path = DEFAULT_UNRESOLVED_TEXTURE_JSON,
     unresolved_texture_markdown_out: Path = DEFAULT_UNRESOLVED_TEXTURE_MD,
+    neutral_provenance_json_out: Path = DEFAULT_NEUTRAL_PROVENANCE_JSON,
+    neutral_provenance_markdown_out: Path = DEFAULT_NEUTRAL_PROVENANCE_MD,
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
+    assets64_entries_path: Path = DEFAULT_ASSETS64_ENTRIES,
     build_report_out: Path = DEFAULT_BUILD_REPORT,
     max_gallery_cards: int = 400,
 ) -> dict[str, Any]:
@@ -317,6 +329,18 @@ def build_practical_package(
     _write_json(unresolved_texture_json_out, unresolved_texture_report)
     _write_text(unresolved_texture_markdown_out, render_unresolved_texture_markdown(unresolved_texture_report))
 
+    neutral_provenance_report = build_neutral_row_provenance_report(
+        repo_root=repo_root,
+        manifest=manifest,
+        manifest_path=manifest_out,
+        texture_gap_report_path=texture_gap_json_out,
+        unresolved_texture_report_path=unresolved_texture_json_out,
+        assets64_entries_path=assets64_entries_path,
+        probe_refresh_report_path=probe_refresh_report_path,
+    )
+    _write_json(neutral_provenance_json_out, neutral_provenance_report)
+    _write_text(neutral_provenance_markdown_out, render_neutral_provenance_markdown(neutral_provenance_report))
+
     report = {
         "schema": "flythrough-practical-package-build-report-v1",
         "generated_at": _now_iso(),
@@ -326,6 +350,7 @@ def build_practical_package(
             "textureless_triage": repo_relative_path(textureless_triage_path, repo_root=repo_root),
             "texture_recovery_report": repo_relative_path(texture_recovery_report_path, repo_root=repo_root),
             "probe_refresh_report": repo_relative_path(probe_refresh_report_path, repo_root=repo_root),
+            "assets64_entries": repo_relative_path(assets64_entries_path, repo_root=repo_root),
         },
         "outputs": {
             "source_substitutions": repo_relative_path(source_substitutions_out, repo_root=repo_root),
@@ -344,6 +369,8 @@ def build_practical_package(
             "texture_gap_markdown": repo_relative_path(texture_gap_markdown_out, repo_root=repo_root),
             "unresolved_texture_json": repo_relative_path(unresolved_texture_json_out, repo_root=repo_root),
             "unresolved_texture_markdown": repo_relative_path(unresolved_texture_markdown_out, repo_root=repo_root),
+            "neutral_provenance_json": repo_relative_path(neutral_provenance_json_out, repo_root=repo_root),
+            "neutral_provenance_markdown": repo_relative_path(neutral_provenance_markdown_out, repo_root=repo_root),
         },
         "summary": {
             "manifest_entries": manifest["summary"]["total_entries"],
@@ -359,6 +386,15 @@ def build_practical_package(
             ],
             "neutral_asset_ids_with_texture_link_rows": unresolved_texture_report["summary"][
                 "neutral_asset_ids_with_texture_link_rows"
+            ],
+            "neutral_provenance_rows": neutral_provenance_report["summary"]["neutral_rows"],
+            "neutral_provenance_asset_ids": neutral_provenance_report["summary"]["unique_neutral_asset_ids"],
+            "neutral_provenance_idless_rows": neutral_provenance_report["summary"]["idless_neutral_rows"],
+            "neutral_provenance_source_substituted_rows": neutral_provenance_report["summary"][
+                "source_substituted_neutral_rows"
+            ],
+            "neutral_provenance_asset_backed_no_mesh_or_link_textures": neutral_provenance_report["summary"][
+                "asset_backed_rows_with_no_mesh_or_link_textures"
             ],
             "bundle_verify_pass": bundle_verify["pass"],
             "smoke_pass": smoke_report["summary"]["pass"],
@@ -392,7 +428,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--texture-gap-markdown-out", type=Path, default=DEFAULT_TEXTURE_GAP_MD)
     parser.add_argument("--unresolved-texture-json-out", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_JSON)
     parser.add_argument("--unresolved-texture-markdown-out", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_MD)
+    parser.add_argument("--neutral-provenance-json-out", type=Path, default=DEFAULT_NEUTRAL_PROVENANCE_JSON)
+    parser.add_argument("--neutral-provenance-markdown-out", type=Path, default=DEFAULT_NEUTRAL_PROVENANCE_MD)
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
+    parser.add_argument("--assets64-entries", type=Path, default=DEFAULT_ASSETS64_ENTRIES)
     parser.add_argument("--build-report-out", type=Path, default=DEFAULT_BUILD_REPORT)
     parser.add_argument("--max-gallery-cards", type=int, default=400)
     return parser.parse_args(argv)
@@ -420,7 +459,10 @@ def main(argv: list[str] | None = None) -> int:
         texture_gap_markdown_out=args.texture_gap_markdown_out,
         unresolved_texture_json_out=args.unresolved_texture_json_out,
         unresolved_texture_markdown_out=args.unresolved_texture_markdown_out,
+        neutral_provenance_json_out=args.neutral_provenance_json_out,
+        neutral_provenance_markdown_out=args.neutral_provenance_markdown_out,
         probe_refresh_report_path=args.probe_refresh_report,
+        assets64_entries_path=args.assets64_entries,
         build_report_out=args.build_report_out,
         max_gallery_cards=args.max_gallery_cards,
     )
@@ -434,6 +476,8 @@ def main(argv: list[str] | None = None) -> int:
         f"review_materials={summary['review_material_entries']} "
         f"unmatched_dds={summary['unmatched_exact_dds_refs']} "
         f"exact_matches={summary['unmatched_exact_dds_refs_with_any_exact_match']} "
+        f"neutral_provenance_assets={summary['neutral_provenance_asset_ids']} "
+        f"asset_no_mesh_link={summary['neutral_provenance_asset_backed_no_mesh_or_link_textures']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']}"
