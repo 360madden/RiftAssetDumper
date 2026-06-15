@@ -206,6 +206,7 @@ def build_manifest(
     bundle_root: Path = DEFAULT_BUNDLE_ROOT,
     allow_single_candidate_materials: bool = False,
     allow_common_candidate_materials: bool = False,
+    materialize_untextured: bool = False,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
@@ -220,6 +221,8 @@ def build_manifest(
     no_texture = 0
     single_candidate_materialized = 0
     common_candidate_materialized = 0
+    untextured_materialized = 0
+    entries_lacking_texture_links = 0
 
     for entry in audit["obj_file_level"]["entries"]:
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
@@ -259,13 +262,21 @@ def build_manifest(
         material_name = material_name_for_entry(entry)
         source_exists = bool(entry.get("exists_on_disk"))
         has_textures = bool(linked_texture_names)
-        can_materialize = source_exists and has_textures and bool(chosen.get("diffuse"))
+        if not has_textures:
+            entries_lacking_texture_links += 1
+        can_materialize = source_exists and (
+            (has_textures and bool(chosen.get("diffuse"))) or (materialize_untextured and not has_textures)
+        )
+        if can_materialize and not has_textures:
+            texture_source = "untextured-neutral"
         if can_materialize:
             materializable += 1
             if texture_source == "single-candidate-heuristic":
                 single_candidate_materialized += 1
             if texture_source == "common-candidate-textures":
                 common_candidate_materialized += 1
+            if texture_source == "untextured-neutral":
+                untextured_materialized += 1
         elif not source_exists:
             missing_source += 1
         elif not has_textures:
@@ -316,10 +327,13 @@ def build_manifest(
             "materializable_entries": materializable,
             "entries_missing_source_obj": missing_source,
             "entries_without_textures": no_texture,
+            "entries_lacking_texture_links": entries_lacking_texture_links,
             "allow_single_candidate_materials": allow_single_candidate_materials,
             "allow_common_candidate_materials": allow_common_candidate_materials,
+            "materialize_untextured": materialize_untextured,
             "single_candidate_materialized_entries": single_candidate_materialized,
             "common_candidate_materialized_entries": common_candidate_materialized,
+            "untextured_materialized_entries": untextured_materialized,
             "converted_texture_paths": len(converted_texture_paths),
             "bundle_root": bundle_rel,
             "texture_status_breakdown": audit["obj_file_level"].get("entry_texture_status_breakdown", {}),
@@ -537,6 +551,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="For id-less OBJ entries with multiple candidates, borrow textures only when all candidates share one texture set.",
     )
     parser.add_argument(
+        "--materialize-untextured",
+        action="store_true",
+        help="Generate neutral MTL/OBJ bundle rows for existing OBJs that still have no texture links.",
+    )
+    parser.add_argument(
         "--verify-bundle", action="store_true", help="Verify generated OBJ/MTL outputs and texture refs."
     )
     parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT, help="Generated OBJ/MTL bundle root.")
@@ -551,6 +570,7 @@ def main(argv: list[str] | None = None) -> int:
         bundle_root=args.bundle_root,
         allow_single_candidate_materials=args.allow_single_candidate_materials,
         allow_common_candidate_materials=args.allow_common_candidate_materials,
+        materialize_untextured=args.materialize_untextured,
     )
     _write_json(args.manifest_out, manifest)
     print(f"wrote {repo_relative_path(args.manifest_out, repo_root)}")
@@ -583,7 +603,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{summary['entries_without_textures']} without textures, "
         f"{summary['entries_missing_source_obj']} missing source, "
         f"{summary['single_candidate_materialized_entries']} single-candidate materialized, "
-        f"{summary['common_candidate_materialized_entries']} common-candidate materialized"
+        f"{summary['common_candidate_materialized_entries']} common-candidate materialized, "
+        f"{summary['untextured_materialized_entries']} untextured-neutral materialized"
     )
     return 0
 

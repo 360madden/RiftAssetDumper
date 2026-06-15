@@ -233,6 +233,44 @@ def test_build_manifest_can_borrow_common_candidate_textures_without_promoting_a
     assert manifest["entries"][2]["borrowed_texture_asset_id"] == "aaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbb"
 
 
+def test_build_manifest_can_materialize_untextured_existing_obj_as_neutral(tmp_path: Path) -> None:
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"no-linked-textures": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {},
+            "entries": [
+                {
+                    "manifest_index": 0,
+                    "path": "Exports/textureless.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "abcdef0123456789",
+                    "candidate_asset_ids": [],
+                    "texture_status": "no-linked-textures",
+                    "linked_textures": [],
+                }
+            ],
+        },
+    }
+
+    conservative = build_manifest(repo_root=tmp_path, audit=audit, converted_texture_paths={})
+    assert conservative["summary"]["materializable_entries"] == 0
+    assert conservative["summary"]["entries_without_textures"] == 1
+
+    neutral = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={},
+        materialize_untextured=True,
+    )
+    assert neutral["summary"]["materializable_entries"] == 1
+    assert neutral["summary"]["entries_without_textures"] == 0
+    assert neutral["summary"]["entries_lacking_texture_links"] == 1
+    assert neutral["summary"]["untextured_materialized_entries"] == 1
+    assert neutral["entries"][0]["texture_source"] == "untextured-neutral"
+    assert neutral["entries"][0]["chosen_material_textures"] == {}
+
+
 def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> None:
     source_obj = tmp_path / "Exports" / "a" / "abcdef0123456789.obj"
     source_obj.parent.mkdir(parents=True)

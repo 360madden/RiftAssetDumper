@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-14T23:59:44.980794Z
+**Generated**: 2026-06-15T00:03:50.074311Z
 
 ## Why this exists
 
@@ -61,7 +61,7 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 - Texture PNG availability for linked assets is good: every unique linked PNG is present in the converted manifest and on disk.
 - The generated audit JSON now contains one row per OBJ manifest entry with path, existence, asset ID, texture status, and linked PNG names.
 - Id-less OBJ entries now include geometry-signature candidate matches where current exports contain same-shape asset-ID-backed rows.
-- The main usability blocker is materialization: exported OBJs currently do not reference `.mtl` files or `usemtl` assignments.
+- The original exported OBJs still do not reference `.mtl` files or `usemtl` assignments; generated bundles below materialize that downstream without modifying generated source exports.
 - The second blocker is file-level coverage: the 217-asset index does not directly expose every one of the 350 manifest OBJ entries.
 - The third blocker is recovery/classification of id-less OBJ entries and no-texture asset IDs.
 
@@ -76,6 +76,7 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 | `Assets/build/flythrough/obj-texture-bundle/objs/` | 323 OBJ files | Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |
 | `Assets/build/flythrough/obj-texture-bundle/materials/` | 323 MTL files | Simple material sidecars pointing at converted PNGs |
 | `Assets/build/flythrough/texture-triage-gallery/index.html` | 331 preview cards + 19 gap rows | Local HTML triage surface for materialized OBJ/MTL rows and remaining gaps |
+| `Assets/build/flythrough/texture-triage-gallery-full-available/index.html` | 349 preview cards + 1 gap row | Full-available local HTML triage surface, including neutral materials for textureless existing OBJs |
 
 Expected default bundle summary from this audit:
 
@@ -96,17 +97,21 @@ Optional heuristic expansion:
 - 4 ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.
 - 331 total OBJ entries become materializable with both candidate options.
 - 19 entries remain skipped after both candidate options.
-- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-candidate-textures.json` renders the local HTML triage gallery.
+- `--materialize-untextured` adds neutral MTLs for existing OBJ rows that still lack texture evidence; it does not claim texture coverage.
+- 18 existing textureless OBJ rows become neutral-materialized with that option.
+- 349 total OBJ entries become materializable with candidate borrowing plus neutral materials.
+- 1 entry remains skipped: the missing source OBJ path.
+- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
 
 ## Top 10 next best actions
 
-1. Open the generated texture triage gallery and review the 331 preview cards plus 19 gap rows.
-2. Smoke-import the generated OBJ/MTL bundle in RiftFlythrough or Blender.
+1. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
+2. Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.
 3. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
 4. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
 5. Investigate the 2 existing no-match fallback OBJ rows separately.
 6. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
 7. Investigate the 10 indexed asset IDs with no linked textures.
 8. Improve material role inference for special maps such as glow, masks, and alpha.
-9. Generate contact-sheet thumbnails if the HTML gallery is not enough for fast visual triage.
+9. Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.
 10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.

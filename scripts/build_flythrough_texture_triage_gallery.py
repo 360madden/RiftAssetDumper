@@ -23,8 +23,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLYTHROUGH_ROOT = REPO_ROOT / "Assets" / "build" / "flythrough"
-DEFAULT_MANIFEST = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest-candidate-textures.json"
-FALLBACK_MANIFEST = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.json"
+DEFAULT_MANIFEST = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest-full-available.json"
+FALLBACK_MANIFESTS = [
+    FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest-candidate-textures.json",
+    FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.json",
+]
 DEFAULT_OUT = FLYTHROUGH_ROOT / "texture-triage-gallery" / "index.html"
 
 
@@ -255,7 +258,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
-    manifest_path = args.manifest or (DEFAULT_MANIFEST if DEFAULT_MANIFEST.exists() else FALLBACK_MANIFEST)
+    manifest_path = args.manifest
+    if manifest_path is None:
+        manifest_path = next(
+            (path for path in [DEFAULT_MANIFEST, *FALLBACK_MANIFESTS] if path.exists()), DEFAULT_MANIFEST
+        )
     manifest = _load_json(manifest_path)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
