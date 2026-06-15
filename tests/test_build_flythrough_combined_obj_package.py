@@ -146,8 +146,11 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
     assert report["summary"]["skipped_entries"] == 1
     assert report["summary"]["faces"] == 1
     assert report["summary"]["point_directive_entries"] == 1
+    assert report["summary"]["copied_texture_files"] == 1
+    assert report["summary"]["missing_source_textures"] == 0
     assert report["summary"]["verify_pass"] is True
     assert report["verify"]["texture_refs"] == 2
+    assert report["outputs"]["textures"] == "Assets/build/flythrough/combined/textures"
 
     obj_text = (package_root / "combined.obj").read_text(encoding="utf-8")
     assert "mtllib combined.mtl" in obj_text
@@ -156,5 +159,24 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
 
     mtl_text = (package_root / "combined.mtl").read_text(encoding="utf-8")
     assert "newmtl mat_face" in mtl_text
-    assert "map_Kd ../textures/converted/tex.png" in mtl_text
-    assert "bump ../textures/converted/tex.png" in mtl_text
+    assert "map_Kd textures/converted/tex.png" in mtl_text
+    assert "bump textures/converted/tex.png" in mtl_text
+    copied_texture = package_root / "textures" / "converted" / "tex.png"
+    assert copied_texture.read_text(encoding="utf-8") == "fake png"
+
+    shared_root = tmp_path / "Assets" / "build" / "flythrough" / "combined-shared-textures"
+    shared_report = build_combined_obj_package(
+        repo_root=tmp_path,
+        manifest_path=manifest,
+        obj_out=shared_root / "combined.obj",
+        mtl_out=shared_root / "combined.mtl",
+        report_out=shared_root / "report.json",
+        markdown_out=shared_root / "README.md",
+        copy_textures=False,
+    )
+
+    assert shared_report["summary"]["copied_texture_files"] == 0
+    assert shared_report["outputs"]["textures"] is None
+    shared_mtl_text = (shared_root / "combined.mtl").read_text(encoding="utf-8")
+    assert "map_Kd ../textures/converted/tex.png" in shared_mtl_text
+    assert "bump ../textures/converted/tex.png" in shared_mtl_text

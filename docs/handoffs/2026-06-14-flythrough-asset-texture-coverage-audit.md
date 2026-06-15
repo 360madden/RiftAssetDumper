@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T01:21:32.072084Z
+**Generated**: 2026-06-15T01:31:27.015113Z
 
 ## Why this exists
 
@@ -15,10 +15,10 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 | OBJ entries with asset IDs | 339 | Can inherit asset-level metadata/textures |
 | OBJ entries without asset IDs | 11 | Need recovery/classification for full 350-file access |
 | Id-less OBJ signature candidates | {'ambiguous-signature-match': 4, 'no-geometry-signature-match': 3, 'single-asset-signature-match': 4} | Geometry-only recovery hints |
-| OBJ entries with texture links | 328 | File-level entries whose asset has linked textures |
+| OBJ entries with texture links | 329 | File-level entries whose asset has linked textures |
 | Full OBJ row manifest | 350 rows | Written in generated audit JSON under `obj_file_level.entries` |
 | Indexed asset IDs | 217 | `Assets/build/flythrough/flythrough-index.json` |
-| Indexed assets with textures | 211 | 6 without links |
+| Indexed assets with textures | 212 | 5 without links |
 | Texture-link JSONL rows | 713 | 211 model IDs |
 | Unique linked PNGs available | 278/278 | Converted manifest mode: `smoke` |
 | OBJ material refs | 0 | 0 `mtllib`, 0 `usemtl` |
@@ -50,7 +50,6 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 - `1e8d2bcc6546b548`
 - `35ca1d9dbad6d245`
 - `b5dc665faa848f85`
-- `fa78ee2d8c3abca7`
 
 ## Downstream usability readout
 
@@ -69,17 +68,17 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 |---|---:|---|
 | `Assets/build/flythrough/flythrough-obj-texture-manifest.json` | 350 rows | File-level OBJ manifest with texture roles, materialization status, candidate asset IDs, and bundle paths |
 | `Assets/build/flythrough/flythrough-obj-texture-manifest.csv` | 350 rows | Spreadsheet-friendly triage view |
-| `Assets/build/flythrough/obj-texture-bundle/objs/` | 328 OBJ files | Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |
-| `Assets/build/flythrough/obj-texture-bundle/materials/` | 328 MTL files | Simple material sidecars pointing at converted PNGs |
-| `Assets/build/flythrough/texture-triage-gallery/index.html` | 336 preview cards + 14 gap rows | Local HTML triage surface for materialized OBJ/MTL rows and remaining gaps |
+| `Assets/build/flythrough/obj-texture-bundle/objs/` | 329 OBJ files | Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |
+| `Assets/build/flythrough/obj-texture-bundle/materials/` | 329 MTL files | Simple material sidecars pointing at converted PNGs |
+| `Assets/build/flythrough/texture-triage-gallery/index.html` | 337 preview cards + 13 gap rows | Local HTML triage surface for materialized OBJ/MTL rows and remaining gaps |
 | `Assets/build/flythrough/texture-triage-gallery-full-available/index.html` | 349 preview cards + 1 gap row | Full-available local HTML triage surface, including neutral materials for textureless existing OBJs |
 
 Expected default bundle summary from this audit:
 
 - 350 total manifest entries.
-- 328 materializable OBJ entries.
-- 328 generated OBJ files and 328 generated MTL files.
-- 22 skipped entries: 21 without textures and 1 missing source OBJ.
+- 329 materializable OBJ entries.
+- 329 generated OBJ files and 329 generated MTL files.
+- 21 skipped entries: 20 without textures and 1 missing source OBJ.
 - 13232 converted PNG paths available to the manifest.
 
 Optional heuristic expansion:
@@ -87,16 +86,16 @@ Optional heuristic expansion:
 `--allow-single-candidate-materials` borrows textures for id-less OBJ rows only when the geometry signature has exactly one asset-ID candidate. It does not promote that candidate to durable truth.
 
 - 4 id-less OBJ entries are eligible for single-candidate texture borrowing.
-- 332 total OBJ entries become materializable with that option.
-- 18 entries remain skipped after heuristic expansion.
+- 333 total OBJ entries become materializable with that option.
+- 17 entries remain skipped after heuristic expansion.
 - `--allow-common-candidate-materials` additionally borrows textures for ambiguous candidate groups only when all geometry-matched candidates share the same linked texture set.
 - 4 ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.
-- 336 total OBJ entries become materializable with both candidate options.
-- 14 entries remain skipped after both candidate options.
+- 337 total OBJ entries become materializable with both candidate options.
+- 13 entries remain skipped after both candidate options.
 - `--allow-textureless-triage-materials` can use row-scoped converted DDS refs discovered by the textureless triage report.
 - 0 neutral OBJ row(s) currently have converted textureless-triage DDS evidence.
 - `--materialize-untextured` adds neutral MTLs for existing OBJ rows that still lack texture evidence; it does not claim texture coverage.
-- 13 existing textureless OBJ rows still become neutral-materialized when triage textures plus neutral materials are enabled.
+- 12 existing textureless OBJ rows still become neutral-materialized when triage textures plus neutral materials are enabled.
 - 349 total OBJ entries become materializable with candidate borrowing plus neutral materials.
 - 1 entry remains skipped: the missing source OBJ path.
 - `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
@@ -112,18 +111,18 @@ Optional heuristic expansion:
 - Latest textureless DDS recovery report: 2 refs, 2 currently missing conversion targets, 0 name matches, 2 unmatched target refs, 0 newly converted PNGs, 0 failed conversions.
 - `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
-- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one importable OBJ plus one MTL, with `p` point directives for zero-face meshes.
-- Latest combined OBJ package report: 349 combined entries, 1 skipped, 23371 vertices, 30864 faces, 79 point-cloud entries, verify_pass=True.
+- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one portable import package: one OBJ, one MTL, copied MTL-referenced textures, and `p` point directives for zero-face meshes.
+- Latest combined OBJ package report: 349 combined entries, 1 skipped, 23371 vertices, 30864 faces, 79 point-cloud entries, 158 copied texture files, 0 missing source textures, verify_pass=True.
 
 ## Top 10 next best actions
 
-1. Smoke-import the combined full-available OBJ/MTL package in Blender or an MTL-aware viewer.
+1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
 2. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
-3. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
-4. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
-5. Investigate the remaining textureless-scope rows that still lack row-scoped DDS refs.
+3. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
+4. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
+5. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
 6. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
 7. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
 8. Investigate the 2 existing no-match fallback OBJ rows separately.
-9. Review the 2 textureless-triage materialized rows for visual/material-role quality.
+9. Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.
 10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.

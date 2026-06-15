@@ -510,15 +510,15 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
-        "Smoke-import the combined full-available OBJ/MTL package in Blender or an MTL-aware viewer.",
+        "Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
-        "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.",
-        "Investigate the remaining textureless-scope rows that still lack row-scoped DDS refs.",
+        "Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.",
+        "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
         "Investigate the 2 existing no-match fallback OBJ rows separately.",
-        "Review the 2 textureless-triage materialized rows for visual/material-role quality.",
+        "Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
     ]
 
@@ -743,7 +743,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         )
     combined_package = _load_optional_json(DEFAULT_COMBINED_PACKAGE_REPORT)
     combined_package_lines = [
-        "- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one importable OBJ plus one MTL, with `p` point directives for zero-face meshes."
+        "- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one portable import package: one OBJ, one MTL, copied MTL-referenced textures, and `p` point directives for zero-face meshes."
     ]
     if combined_package:
         combined_summary = combined_package.get("summary", {})
@@ -754,6 +754,8 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{combined_summary.get('vertices', 'n/a')} vertices, "
             f"{combined_summary.get('faces', 'n/a')} faces, "
             f"{combined_summary.get('point_directive_entries', 'n/a')} point-cloud entries, "
+            f"{combined_summary.get('copied_texture_files', 'n/a')} copied texture files, "
+            f"{combined_summary.get('missing_source_textures', 'n/a')} missing source textures, "
             f"verify_pass={combined_summary.get('verify_pass', 'n/a')}."
         )
 
