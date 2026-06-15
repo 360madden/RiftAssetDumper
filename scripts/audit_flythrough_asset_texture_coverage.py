@@ -36,6 +36,9 @@ DEFAULT_EXTRACTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "extracted-manifest.
 DEFAULT_JSON_OUT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
 DEFAULT_MISSING_OBJ_REPAIR_REPORT = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "repair-report.json"
 DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
+DEFAULT_TEXTURELESS_RECOVERY_REPORT = (
+    FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "textureless-dds-recovery-report.json"
+)
 
 ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
 
@@ -671,6 +674,20 @@ def render_markdown(audit: dict[str, Any]) -> str:
                 + ", ".join(f"`{ref}`" for ref in missing_refs)
                 + "."
             )
+    textureless_recovery = _load_optional_json(DEFAULT_TEXTURELESS_RECOVERY_REPORT)
+    textureless_recovery_lines = [
+        "- `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report."
+    ]
+    if textureless_recovery:
+        recovery_summary = textureless_recovery.get("summary", {})
+        textureless_recovery_lines.append(
+            "- Latest textureless DDS recovery report: "
+            f"{recovery_summary.get('triage_dds_refs', 'n/a')} refs, "
+            f"{recovery_summary.get('target_refs', 'n/a')} currently missing conversion targets, "
+            f"{recovery_summary.get('name_matches', 'n/a')} name matches, "
+            f"{recovery_summary.get('converted_pngs', 'n/a')} newly converted PNGs, "
+            f"{recovery_summary.get('failed_conversions', 'n/a')} failed conversions."
+        )
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -808,6 +825,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         "- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.",
         *missing_obj_repair_lines,
         *textureless_triage_lines,
+        *textureless_recovery_lines,
         "",
         "## Top 10 next best actions",
         "",

@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T00:32:46.062252Z
+**Generated**: 2026-06-15T00:39:35.419419Z
 
 ## Why this exists
 
@@ -108,6 +108,8 @@ Optional heuristic expansion:
 - Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 repaired.
 - `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`.
 - Latest textureless-asset triage report: 18 neutral rows, 2 rows with mesh-level DDS refs, 2 neutral asset IDs with refs, 6 unique DDS refs, 6 already converted, 0 missing converted PNGs, 0 of the missing refs catalog-backed.
+- `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report.
+- Latest textureless DDS recovery report: 6 refs, 0 currently missing conversion targets, 0 name matches, 0 newly converted PNGs, 0 failed conversions.
 
 ## Top 10 next best actions
 
