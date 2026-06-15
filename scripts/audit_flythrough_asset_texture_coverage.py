@@ -43,6 +43,9 @@ DEFAULT_TEXTURELESS_RECOVERY_REPORT = (
     FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "textureless-dds-recovery-report.json"
 )
 DEFAULT_BUNDLE_SMOKE_REPORT = FLYTHROUGH_ROOT / "evidence" / "obj-texture-bundle-smoke" / "smoke-report.json"
+DEFAULT_COMBINED_PACKAGE_REPORT = (
+    FLYTHROUGH_ROOT / "combined-obj-package-full-available" / "combined-obj-package-report.json"
+)
 
 ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
 
@@ -507,7 +510,7 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
-        "Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.",
+        "Smoke-import the combined full-available OBJ/MTL package in Blender or an MTL-aware viewer.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
         "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.",
@@ -721,6 +724,21 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{smoke_summary.get('missing_texture_refs', 'n/a')} missing texture refs, "
             f"{smoke_summary.get('zero_face_entries', 'n/a')} zero-face entries."
         )
+    combined_package = _load_optional_json(DEFAULT_COMBINED_PACKAGE_REPORT)
+    combined_package_lines = [
+        "- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one importable OBJ plus one MTL, with `p` point directives for zero-face meshes."
+    ]
+    if combined_package:
+        combined_summary = combined_package.get("summary", {})
+        combined_package_lines.append(
+            "- Latest combined OBJ package report: "
+            f"{combined_summary.get('combined_entries', 'n/a')} combined entries, "
+            f"{combined_summary.get('skipped_entries', 'n/a')} skipped, "
+            f"{combined_summary.get('vertices', 'n/a')} vertices, "
+            f"{combined_summary.get('faces', 'n/a')} faces, "
+            f"{combined_summary.get('point_directive_entries', 'n/a')} point-cloud entries, "
+            f"verify_pass={combined_summary.get('verify_pass', 'n/a')}."
+        )
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -861,6 +879,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         *textureless_triage_lines,
         *textureless_recovery_lines,
         *bundle_smoke_lines,
+        *combined_package_lines,
         "",
         "## Top 10 next best actions",
         "",

@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T01:09:18.109260Z
+**Generated**: 2026-06-15T01:17:00.306593Z
 
 ## Why this exists
 
@@ -115,10 +115,12 @@ Optional heuristic expansion:
 - Latest textureless DDS recovery report: 8 refs, 2 currently missing conversion targets, 0 name matches, 2 unmatched target refs, 0 newly converted PNGs, 0 failed conversions.
 - `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
+- `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one importable OBJ plus one MTL, with `p` point directives for zero-face meshes.
+- Latest combined OBJ package report: 349 combined entries, 1 skipped, 23371 vertices, 30864 faces, 79 point-cloud entries, verify_pass=True.
 
 ## Top 10 next best actions
 
-1. Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.
+1. Smoke-import the combined full-available OBJ/MTL package in Blender or an MTL-aware viewer.
 2. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
 3. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
 4. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
