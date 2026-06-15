@@ -14,6 +14,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     choose_material_textures,
     classify_texture_role,
     common_candidate_texture_names,
+    load_source_substitutions,
     normalize_converted_texture_path,
     normalize_face_token_for_available_attributes,
     obj_with_material_text,
@@ -117,6 +118,73 @@ def test_build_manifest_preserves_350_style_rows_and_material_paths(tmp_path: Pa
     assert manifest["entries"][0]["chosen_material_textures"]["diffuse"] == "abc_wall_c.png"
     assert manifest["entries"][0]["bundled_obj"].endswith(".obj")
     assert manifest["entries"][1]["candidate_asset_ids"] == ["abcdef0123456789"]
+
+
+def test_build_manifest_can_use_explicit_source_substitution_for_practical_access(tmp_path: Path) -> None:
+    replacement = tmp_path / "Assets" / "build" / "flythrough" / "evidence" / "candidate.obj"
+    replacement.parent.mkdir(parents=True)
+    replacement.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n", encoding="utf-8")
+    substitutions_path = tmp_path / "source-substitutions.json"
+    substitutions_path.write_text(
+        json.dumps(
+            {
+                "schema": "flythrough-source-substitutions-v1",
+                "entries": [
+                    {
+                        "manifest_index": 1,
+                        "replacement_source_obj": str(replacement),
+                        "candidate_asset_id": "07f37c99a80da009",
+                        "review_status": "candidate-practical-access",
+                        "durable_truth": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"no-asset-id": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {},
+            "entries": [
+                {
+                    "manifest_index": 1,
+                    "path": "Exports/missing/decode-nif-geometry-mesh17.obj",
+                    "exists_on_disk": False,
+                    "asset_id": None,
+                    "candidate_asset_ids": [],
+                    "texture_status": "no-asset-id",
+                    "linked_textures": [],
+                    "mesh_block": "17",
+                    "mesh_size": 197,
+                    "vertex_count": 50,
+                    "face_count": 0,
+                    "faced": False,
+                }
+            ],
+        },
+    }
+
+    substitutions = load_source_substitutions(substitutions_path, repo_root=tmp_path)
+    manifest = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={},
+        materialize_untextured=True,
+        source_substitutions=substitutions,
+    )
+
+    assert manifest["summary"]["materializable_entries"] == 1
+    assert manifest["summary"]["entries_missing_source_obj"] == 0
+    assert manifest["summary"]["entries_missing_original_source_obj"] == 1
+    assert manifest["summary"]["source_substituted_entries"] == 1
+    row = manifest["entries"][0]
+    assert row["source_obj"] == "Assets/build/flythrough/evidence/candidate.obj"
+    assert row["original_source_obj"] == "Exports/missing/decode-nif-geometry-mesh17.obj"
+    assert row["source_substitution"]["status"] == "active"
+    assert row["source_substitution"]["durable_truth"] is False
+    assert row["texture_source"] == "untextured-neutral"
 
 
 def test_build_manifest_can_borrow_single_candidate_textures_without_promoting_asset_id(tmp_path: Path) -> None:

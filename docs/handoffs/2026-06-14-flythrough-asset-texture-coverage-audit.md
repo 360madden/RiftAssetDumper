@@ -118,14 +118,18 @@ Optional heuristic expansion:
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
 - `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one portable import package: one OBJ, one MTL, copied MTL-referenced textures, and `p` point directives for zero-face meshes.
 - Latest combined OBJ package report: 349 combined entries, 1 skipped, 23371 vertices, 30864 faces, 79 point-cloud entries, 158 copied texture files, 0 missing source textures, verify_pass=True.
+- `scripts/build_flythrough_obj_texture_manifest.py --source-substitutions ...` can now build a separate practical-access manifest that substitutes explicit generated review OBJs without claiming durable source truth.
+- Practical 350 manifest: `Assets/build/flythrough/flythrough-obj-texture-manifest-practical-350.json` currently has 350/350 materializable entries, 0 effective missing source OBJs, 1 original source still missing, 1 source-substituted entry, and bundle_verify pass=True. The substitution row is manifest index 121, original `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`, replacement `07f37c99a80da009` mesh17 linked-stream redrive, `durable_truth=false`.
+- Practical 350 smoke: `Assets/build/flythrough/evidence/practical-350/obj-texture-bundle-smoke.json` reports pass=True, 350 checked entries, 0 OBJ issues, 0 MTL issues, 0 missing textures, 79 zero-face entries.
+- Practical 350 combined package: `Assets/build/flythrough/combined-obj-package-practical-350/combined.obj` reports 350 combined entries, 0 skipped, 23421 vertices, 30935 faces, 79 point-cloud entries, 158 copied texture files, verify_pass=True.
 
 ## Top 10 next best actions
 
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
-2. Prove, promote, or reject the redriven `07f37c99a80da009` mesh17 candidate as the practical substitute for the missing no-ID OBJ path.
+2. Smoke-import the practical 350 combined package in Blender or an MTL-aware viewer and inspect the source-substituted mesh17 row.
 3. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
 4. Review visual fallback candidates for the 2 unmatched DDS refs as manual surrogate options only, not durable texture truth.
-5. Decide whether the 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
+5. Decide whether any of the other 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
 6. Investigate the two redrive failures with no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
 7. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
 8. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.

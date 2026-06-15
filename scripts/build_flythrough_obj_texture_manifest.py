@@ -41,6 +41,7 @@ DEFAULT_MANIFEST_OUT = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.json"
 DEFAULT_CSV_OUT = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.csv"
 DEFAULT_BUNDLE_ROOT = FLYTHROUGH_ROOT / "obj-texture-bundle"
 DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
+DEFAULT_SOURCE_SUBSTITUTIONS = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "source-substitutions.json"
 
 SLUG_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
@@ -245,6 +246,33 @@ def common_candidate_texture_names(entry: dict[str, Any], asset_textures: dict[s
     return []
 
 
+def load_source_substitutions(path: Path, *, repo_root: Path = REPO_ROOT) -> dict[int, dict[str, Any]]:
+    """Return manifest index -> replacement source OBJ metadata.
+
+    Source substitutions are intentionally explicit and opt-in. They are for
+    practical downstream access to a generated review bundle when exact source
+    recovery is not proven; callers should keep ``durable_truth`` false unless
+    an exact source repair has been independently proven.
+    """
+
+    if not path.exists():
+        return {}
+    data = _load_json(path)
+    out: dict[int, dict[str, Any]] = {}
+    for row in data.get("entries", []):
+        if not isinstance(row, dict):
+            continue
+        manifest_index = row.get("manifest_index")
+        replacement = row.get("replacement_source_obj")
+        if not isinstance(manifest_index, int) or not isinstance(replacement, str) or not replacement:
+            continue
+        normalized = dict(row)
+        normalized["replacement_source_obj"] = repo_relative_path(replacement, repo_root)
+        normalized.setdefault("durable_truth", False)
+        out[manifest_index] = normalized
+    return out
+
+
 def build_manifest(
     *,
     repo_root: Path = REPO_ROOT,
@@ -257,6 +285,7 @@ def build_manifest(
     textureless_triage_report_path: Path = DEFAULT_TEXTURELESS_TRIAGE_REPORT,
     converted_manifest_path: Path = DEFAULT_CONVERTED_MANIFEST,
     materialize_untextured: bool = False,
+    source_substitutions: dict[int, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
@@ -274,6 +303,9 @@ def build_manifest(
     textureless_triage_materialized = 0
     untextured_materialized = 0
     entries_lacking_texture_links = 0
+    original_missing_source = 0
+    source_substituted_entries = 0
+    source_substitution_replacement_missing = 0
     textureless_triage_textures = (
         textureless_triage_row_textures(
             textureless_triage_report_path,
@@ -284,6 +316,36 @@ def build_manifest(
     )
 
     for entry in audit["obj_file_level"]["entries"]:
+        manifest_index = int(entry["manifest_index"])
+        original_source_obj = entry["path"]
+        original_source_exists = bool(entry.get("exists_on_disk"))
+        if not original_source_exists:
+            original_missing_source += 1
+
+        source_obj = original_source_obj
+        source_exists = original_source_exists
+        source_substitution = None
+        requested_substitution = (source_substitutions or {}).get(manifest_index)
+        if requested_substitution:
+            replacement_source_obj = repo_relative_path(
+                requested_substitution["replacement_source_obj"],
+                repo_root,
+            )
+            replacement_exists = repo_path_from_relative(repo_root, replacement_source_obj).exists()
+            source_substitution = {
+                **requested_substitution,
+                "replacement_source_obj": replacement_source_obj,
+                "replacement_source_exists": replacement_exists,
+                "replaces_source_obj": original_source_obj,
+                "status": "active" if replacement_exists else "replacement-missing",
+            }
+            if replacement_exists:
+                source_obj = replacement_source_obj
+                source_exists = True
+                source_substituted_entries += 1
+            else:
+                source_substitution_replacement_missing += 1
+
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
         texture_source = "asset-id" if linked_texture_names else "none"
         borrowed_texture_asset_id = None
@@ -324,7 +386,6 @@ def build_manifest(
         ]
         chosen = choose_material_textures(linked_texture_names)
         material_name = material_name_for_entry(entry)
-        source_exists = bool(entry.get("exists_on_disk"))
         has_textures = bool(linked_texture_names)
         if not has_textures:
             entries_lacking_texture_links += 1
@@ -348,18 +409,18 @@ def build_manifest(
         elif not has_textures:
             no_texture += 1
 
-        source_obj = entry["path"]
-        obj_slug = safe_slug(
-            f"{int(entry['manifest_index']):03d}_{entry.get('asset_id') or 'idless'}_{Path(source_obj).stem}"
-        )
+        obj_slug = safe_slug(f"{manifest_index:03d}_{entry.get('asset_id') or 'idless'}_{Path(source_obj).stem}")
         bundled_obj = f"{bundle_rel}/objs/{obj_slug}.obj"
         bundled_mtl = f"{bundle_rel}/materials/{material_name}.mtl"
 
         entries.append(
             {
-                "manifest_index": entry["manifest_index"],
+                "manifest_index": manifest_index,
                 "source_obj": source_obj,
                 "source_exists": source_exists,
+                "original_source_obj": original_source_obj if source_obj != original_source_obj else None,
+                "original_source_exists": original_source_exists,
+                "source_substitution": source_substitution,
                 "asset_id": entry.get("asset_id"),
                 "candidate_asset_ids": candidate_asset_ids,
                 "candidate_status": entry.get("candidate_status"),
@@ -392,6 +453,9 @@ def build_manifest(
             "total_entries": len(entries),
             "materializable_entries": materializable,
             "entries_missing_source_obj": missing_source,
+            "entries_missing_original_source_obj": original_missing_source,
+            "source_substituted_entries": source_substituted_entries,
+            "source_substitution_replacement_missing": source_substitution_replacement_missing,
             "entries_without_textures": no_texture,
             "entries_lacking_texture_links": entries_lacking_texture_links,
             "allow_single_candidate_materials": allow_single_candidate_materials,
@@ -641,6 +705,9 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         "manifest_index",
         "source_obj",
         "source_exists",
+        "original_source_obj",
+        "original_source_exists",
+        "source_substitution_status",
         "asset_id",
         "candidate_asset_ids",
         "candidate_status",
@@ -667,6 +734,8 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         for entry in manifest["entries"]:
             row = {key: entry.get(key) for key in fieldnames}
             row["candidate_asset_ids"] = ";".join(entry.get("candidate_asset_ids") or [])
+            substitution = entry.get("source_substitution") or {}
+            row["source_substitution_status"] = substitution.get("status")
             writer.writerow(row)
     tmp.replace(path)
 
@@ -711,6 +780,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Generate neutral MTL/OBJ bundle rows for existing OBJs that still have no texture links.",
     )
     parser.add_argument(
+        "--source-substitutions",
+        type=Path,
+        default=None,
+        help=(
+            "Optional flythrough-source-substitutions-v1 JSON. Replaces missing source OBJs with explicit "
+            "generated candidate OBJs for practical review without promoting durable source truth."
+        ),
+    )
+    parser.add_argument(
         "--verify-bundle", action="store_true", help="Verify generated OBJ/MTL outputs and texture refs."
     )
     parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT, help="Generated OBJ/MTL bundle root.")
@@ -729,6 +807,9 @@ def main(argv: list[str] | None = None) -> int:
         textureless_triage_report_path=args.textureless_triage_report,
         converted_manifest_path=args.converted_manifest,
         materialize_untextured=args.materialize_untextured,
+        source_substitutions=load_source_substitutions(args.source_substitutions, repo_root=repo_root)
+        if args.source_substitutions
+        else None,
     )
     _write_json(args.manifest_out, manifest)
     print(f"wrote {repo_relative_path(args.manifest_out, repo_root)}")
@@ -760,6 +841,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{summary['total_entries']} entries, {summary['materializable_entries']} materializable, "
         f"{summary['entries_without_textures']} without textures, "
         f"{summary['entries_missing_source_obj']} missing source, "
+        f"{summary['source_substituted_entries']} source-substituted, "
         f"{summary['single_candidate_materialized_entries']} single-candidate materialized, "
         f"{summary['common_candidate_materialized_entries']} common-candidate materialized, "
         f"{summary['textureless_triage_materialized_entries']} textureless-triage materialized, "
