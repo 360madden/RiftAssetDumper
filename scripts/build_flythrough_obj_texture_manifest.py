@@ -552,6 +552,13 @@ def build_manifest(
         )
         if review_material:
             review_material_counter[str(review_material["kind"])] += 1
+        review_material_kind = review_material.get("kind") if review_material else None
+        review_material_label = review_material.get("label") if review_material else None
+        review_material_diffuse_color = review_material.get("diffuse_color") if review_material else None
+        review_material_durable_texture_truth = (
+            review_material.get("durable_texture_truth") if review_material else None
+        )
+        review_material_reason = review_material.get("reason") if review_material else None
 
         obj_slug = safe_slug(f"{manifest_index:03d}_{entry.get('asset_id') or 'idless'}_{Path(source_obj).stem}")
         bundled_obj = f"{bundle_rel}/objs/{obj_slug}.obj"
@@ -577,6 +584,11 @@ def build_manifest(
                 "texture_fallback_count": len(active_texture_fallbacks),
                 "chosen_material_textures": chosen,
                 "review_material": review_material,
+                "review_material_kind": review_material_kind,
+                "review_material_label": review_material_label,
+                "review_material_diffuse_color": review_material_diffuse_color,
+                "review_material_durable_texture_truth": review_material_durable_texture_truth,
+                "review_material_reason": review_material_reason,
                 "materializable": can_materialize,
                 "material_name": material_name if can_materialize else None,
                 "bundled_obj": bundled_obj if can_materialize else None,
@@ -903,7 +915,9 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         "texture_fallback_count",
         "review_material_kind",
         "review_material_label",
+        "review_material_diffuse_color",
         "review_material_durable_texture_truth",
+        "review_material_reason",
         "linked_texture_count",
         "materializable",
         "material_name",
@@ -929,7 +943,12 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
             review_material = entry.get("review_material") or {}
             row["review_material_kind"] = review_material.get("kind")
             row["review_material_label"] = review_material.get("label")
+            color = review_material.get("diffuse_color")
+            row["review_material_diffuse_color"] = (
+                " ".join(f"{float(component):.6f}" for component in color) if isinstance(color, list) else None
+            )
             row["review_material_durable_texture_truth"] = review_material.get("durable_texture_truth")
+            row["review_material_reason"] = review_material.get("reason")
             writer.writerow(row)
     tmp.replace(path)
 

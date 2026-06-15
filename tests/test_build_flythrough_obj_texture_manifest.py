@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     obj_with_material_text,
     verify_bundle,
     write_bundle,
+    write_csv,
 )
 
 
@@ -344,6 +346,19 @@ def test_build_manifest_can_materialize_untextured_existing_obj_as_neutral(tmp_p
     assert neutral["entries"][0]["chosen_material_textures"] == {}
     assert neutral["entries"][0]["review_material"]["kind"] == "asset-id-no-linked-textures"
     assert neutral["entries"][0]["review_material"]["durable_texture_truth"] is False
+    assert neutral["entries"][0]["review_material_kind"] == "asset-id-no-linked-textures"
+    assert neutral["entries"][0]["review_material_label"] == "asset-id row without linked texture refs"
+    assert neutral["entries"][0]["review_material_diffuse_color"] == [0.35, 0.55, 1.0]
+    assert neutral["entries"][0]["review_material_durable_texture_truth"] is False
+    assert "no row textures" in neutral["entries"][0]["review_material_reason"]
+
+    csv_path = tmp_path / "manifest.csv"
+    write_csv(csv_path, neutral)
+    with csv_path.open(encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["review_material_kind"] == "asset-id-no-linked-textures"
+    assert rows[0]["review_material_diffuse_color"] == "0.350000 0.550000 1.000000"
+    assert "no row textures" in rows[0]["review_material_reason"]
 
 
 def test_mtl_lines_colors_neutral_review_material_without_texture_claim(tmp_path: Path) -> None:
