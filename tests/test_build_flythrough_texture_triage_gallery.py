@@ -124,6 +124,12 @@ def test_build_gallery_model_counts_sources_roles_and_remaining() -> None:
     assert model["texture_roles"] == {"diffuse": 2, "normal": 1}
     assert len(model["texture_fallback_refs"]) == 1
     assert model["review_materials"] == {}
+    assert model["filter_counts"]["all"] == 2
+    assert model["filter_counts"]["textured"] == 2
+    assert model["filter_counts"]["texture-fallback"] == 1
+    assert model["filter_counts"]["id-less"] == 1
+    assert model["filter_counts"]["asset-backed"] == 1
+    assert model["filter_counts"]["non-durable"] == 1
 
 
 def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> None:
@@ -133,6 +139,9 @@ def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> Non
     assert "missing-source-obj" in text
     assert "wall_c.png" in text
     assert "Practical texture fallbacks" in text
+    assert "Preview filters" in text
+    assert 'data-filter="texture-fallback"' in text
+    assert "data-filter-tags=" in text
     assert "missing_flowers_c.dds" in text
     assert "durable=false" in text
     assert "../textures/converted/wall_c.png" in text
@@ -152,6 +161,8 @@ def test_render_gallery_lists_source_substitutions(tmp_path: Path) -> None:
     assert "Exports/original-missing.obj" in text
     assert "07f37c99a80da009" in text
     assert "Neutral review materials" in text
+    assert 'data-filter="source-substitution"' in text
+    assert 'data-filter="neutral"' in text
     assert "source-substitution-no-textures" in text
     assert "durable_texture_truth=False" in text
     assert "rgb(166, 115, 242)" in text

@@ -122,6 +122,9 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
         for entry in materialized
         if isinstance(entry.get("review_material"), dict)
     )
+    filter_counts: Counter[str] = Counter()
+    for entry in materialized:
+        filter_counts.update(_card_filter_tags(entry))
     return {
         "summary": manifest.get("summary", {}),
         "entries": entries,
@@ -134,11 +137,71 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
         "texture_fallback_entries": texture_fallback_entries,
         "texture_fallback_refs": texture_fallback_refs,
         "review_materials": dict(sorted(review_materials.items())),
+        "filter_counts": dict(sorted(filter_counts.items())),
     }
 
 
 def _pill(label: str, value: Any) -> str:
     return f'<span class="pill"><strong>{_esc(label)}</strong> {_esc(value)}</span>'
+
+
+def _card_filter_tags(entry: dict[str, Any]) -> set[str]:
+    tags = {"all"}
+    texture_source = str(entry.get("texture_source") or "none")
+    tags.add(f"source:{texture_source}")
+    if entry.get("asset_id"):
+        tags.add("asset-backed")
+    else:
+        tags.add("id-less")
+    if texture_source == "untextured-neutral" or isinstance(entry.get("review_material"), dict):
+        tags.add("neutral")
+    else:
+        tags.add("textured")
+    if isinstance(entry.get("source_substitution"), dict):
+        tags.add("source-substitution")
+        tags.add("non-durable")
+    if [fallback for fallback in entry.get("texture_fallbacks", []) if isinstance(fallback, dict)]:
+        tags.add("texture-fallback")
+        tags.add("non-durable")
+    review_material = entry.get("review_material")
+    if isinstance(review_material, dict):
+        tags.add("review-material")
+        kind = review_material.get("kind")
+        if kind:
+            tags.add(f"review:{kind}")
+        if review_material.get("durable_texture_truth") is not True:
+            tags.add("non-durable")
+    return tags
+
+
+def _filter_controls(model: dict[str, Any]) -> str:
+    counts = model.get("filter_counts", {})
+    controls = [
+        ("all", "All"),
+        ("textured", "Textured"),
+        ("neutral", "Neutral review"),
+        ("texture-fallback", "Texture fallbacks"),
+        ("source-substitution", "Source substitutions"),
+        ("id-less", "Id-less"),
+        ("asset-backed", "Asset-backed"),
+        ("non-durable", "Non-durable truth"),
+    ]
+    buttons = "\n".join(
+        (
+            f'<button type="button" class="filter-button{" active" if tag == "all" else ""}" '
+            f'data-filter="{_esc(tag)}">{_esc(label)} '
+            f"<span>{_esc(counts.get(tag, 0))}</span></button>"
+        )
+        for tag, label in controls
+    )
+    return f"""
+<section class="filter-panel" aria-label="Preview filters">
+  <h2>Preview filters</h2>
+  <p class="small">Filter the 350-row review gallery to jump directly to texture fallbacks, neutral review materials, source substitutions, or id-less provenance gaps.</p>
+  <div class="filter-controls">{buttons}</div>
+  <p class="small"><span id="filter-count">{_esc(len(model["materialized"]))}</span> visible cards.</p>
+</section>
+"""
 
 
 def _summary_html(model: dict[str, Any]) -> str:
@@ -221,9 +284,10 @@ def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path
         card_classes.append("has-texture-fallback")
     if review_material:
         card_classes.append(f"review-{review_material.get('kind')}")
+    filter_tags = " ".join(sorted(_card_filter_tags(entry)))
 
     return f"""
-<article class="{_esc(" ".join(card_classes))}">
+<article class="{_esc(" ".join(card_classes))}" data-filter-tags="{_esc(filter_tags)}">
   <div class="thumb">{image_html}</div>
   <div class="meta">
     <h3>#{_esc(entry.get("manifest_index"))} {_esc(entry.get("asset_id") or "id-less")}</h3>
@@ -354,6 +418,11 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     th {{ color: #bfdbfe; }}
     .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
     .pill {{ display: inline-block; margin: 4px 6px 4px 0; padding: 4px 8px; border-radius: 999px; background: #1f2937; }}
+    .filter-panel {{ margin: 0 0 24px; padding: 16px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; }}
+    .filter-controls {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }}
+    .filter-button {{ cursor: pointer; border: 1px solid #475569; border-radius: 999px; background: #1f2937; color: #e5e7eb; padding: 8px 12px; }}
+    .filter-button span {{ color: #bfdbfe; margin-left: 4px; }}
+    .filter-button.active {{ background: #1d4ed8; border-color: #93c5fd; color: white; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }}
     .card {{ display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 12px; }}
     .card.has-source-substitution, .card.has-texture-fallback {{ border-color: #f59e0b; box-shadow: 0 0 0 1px rgba(245, 158, 11, .25); }}
@@ -381,6 +450,7 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     {_review_material_table(model["review_materials"])}
     {_source_substitution_table(model["source_substitutions"])}
     {_texture_fallback_table(model["texture_fallback_entries"])}
+    {_filter_controls(model)}
 
     <section>
       <h2>Remaining non-materialized rows ({len(model["remaining"])})</h2>
@@ -396,6 +466,27 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
       <div class="grid">{cards}</div>
     </section>
   </main>
+  <script>
+    const buttons = Array.from(document.querySelectorAll("[data-filter]"));
+    const cards = Array.from(document.querySelectorAll("[data-filter-tags]"));
+    const counter = document.getElementById("filter-count");
+    function applyFilter(filter) {{
+      let visible = 0;
+      for (const card of cards) {{
+        const tags = new Set((card.dataset.filterTags || "").split(/\\s+/).filter(Boolean));
+        const show = filter === "all" || tags.has(filter);
+        card.hidden = !show;
+        if (show) visible += 1;
+      }}
+      if (counter) counter.textContent = String(visible);
+      for (const button of buttons) {{
+        button.classList.toggle("active", button.dataset.filter === filter);
+      }}
+    }}
+    for (const button of buttons) {{
+      button.addEventListener("click", () => applyFilter(button.dataset.filter || "all"));
+    }}
+  </script>
 </body>
 </html>
 """
