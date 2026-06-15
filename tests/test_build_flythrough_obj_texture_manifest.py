@@ -15,6 +15,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     classify_texture_role,
     common_candidate_texture_names,
     load_source_substitutions,
+    load_texture_fallbacks,
     normalize_converted_texture_path,
     normalize_face_token_for_available_attributes,
     obj_with_material_text,
@@ -404,6 +405,122 @@ def test_build_manifest_can_use_textureless_triage_converted_refs(tmp_path: Path
     assert manifest["summary"]["entries_lacking_texture_links"] == 0
     assert manifest["entries"][0]["texture_source"] == "textureless-triage-probe"
     assert manifest["entries"][0]["chosen_material_textures"]["diffuse"] == "12345678_recovered_wall_c.png"
+
+
+def test_build_manifest_can_use_explicit_visual_texture_fallbacks_without_promoting_truth(tmp_path: Path) -> None:
+    texture = tmp_path / "Assets" / "build" / "flythrough" / "textures" / "converted" / "fallback_wall_c.png"
+    texture.parent.mkdir(parents=True)
+    texture.write_text("png", encoding="utf-8")
+    fallbacks_path = tmp_path / "texture-fallbacks.json"
+    fallbacks_path.write_text(
+        json.dumps(
+            {
+                "schema": "flythrough-texture-fallbacks-v1",
+                "entries": [
+                    {
+                        "manifest_index": 5,
+                        "target_dds_ref": "missing_wall_c.dds",
+                        "replacement_dds_ref": "similar_wall_c.dds",
+                        "replacement_png_name": "fallback_wall_c.png",
+                        "replacement_png_path": str(texture),
+                        "review_status": "visual-fallback",
+                        "durable_truth": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"no-linked-textures": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {},
+            "entries": [
+                {
+                    "manifest_index": 5,
+                    "path": "Exports/textureless.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "abcdef0123456789",
+                    "candidate_asset_ids": [],
+                    "texture_status": "no-linked-textures",
+                    "linked_textures": [],
+                }
+            ],
+        },
+    }
+
+    manifest = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={
+            "fallback_wall_c.png": "Assets/build/flythrough/textures/converted/fallback_wall_c.png"
+        },
+        texture_fallbacks=load_texture_fallbacks(fallbacks_path, repo_root=tmp_path),
+        materialize_untextured=True,
+    )
+
+    assert manifest["summary"]["materializable_entries"] == 1
+    assert manifest["summary"]["entries_lacking_original_texture_links"] == 1
+    assert manifest["summary"]["entries_lacking_texture_links"] == 0
+    assert manifest["summary"]["texture_fallback_materialized_entries"] == 1
+    assert manifest["summary"]["texture_fallback_refs"] == 1
+    row = manifest["entries"][0]
+    assert row["texture_source"] == "visual-fallback-textures"
+    assert row["texture_fallbacks"][0]["durable_truth"] is False
+    assert row["texture_fallbacks"][0]["status"] == "active"
+    assert row["chosen_material_textures"]["diffuse"] == "fallback_wall_c.png"
+
+
+def test_texture_fallbacks_override_same_role_asset_textures_for_review(tmp_path: Path) -> None:
+    fallbacks_path = tmp_path / "texture-fallbacks.json"
+    fallbacks_path.write_text(
+        json.dumps(
+            {
+                "entries": [
+                    {
+                        "manifest_index": 8,
+                        "target_dds_ref": "missing_wall_c.dds",
+                        "replacement_png_name": "fallback_wall_c.png",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"texture-linked": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {},
+            "entries": [
+                {
+                    "manifest_index": 8,
+                    "path": "Exports/textured.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "abcdef0123456789",
+                    "candidate_asset_ids": [],
+                    "texture_status": "texture-linked",
+                    "linked_textures": ["original_wall_c.png"],
+                }
+            ],
+        },
+    }
+
+    manifest = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={
+            "fallback_wall_c.png": "Assets/build/flythrough/textures/converted/fallback_wall_c.png",
+            "original_wall_c.png": "Assets/build/flythrough/textures/converted/original_wall_c.png",
+        },
+        texture_fallbacks=load_texture_fallbacks(fallbacks_path, repo_root=tmp_path),
+    )
+
+    row = manifest["entries"][0]
+    assert row["texture_source"] == "asset-id+visual-fallback-textures"
+    assert row["chosen_material_textures"]["diffuse"] == "fallback_wall_c.png"
+    assert [texture["name"] for texture in row["linked_textures"]] == ["fallback_wall_c.png", "original_wall_c.png"]
 
 
 def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> None:

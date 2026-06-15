@@ -42,6 +42,7 @@ DEFAULT_CSV_OUT = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.csv"
 DEFAULT_BUNDLE_ROOT = FLYTHROUGH_ROOT / "obj-texture-bundle"
 DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
 DEFAULT_SOURCE_SUBSTITUTIONS = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "source-substitutions.json"
+DEFAULT_TEXTURE_FALLBACKS = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "texture-fallbacks.json"
 
 SLUG_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
@@ -273,6 +274,39 @@ def load_source_substitutions(path: Path, *, repo_root: Path = REPO_ROOT) -> dic
     return out
 
 
+def load_texture_fallbacks(path: Path, *, repo_root: Path = REPO_ROOT) -> dict[int, list[dict[str, Any]]]:
+    """Return manifest index -> explicit visual fallback texture metadata.
+
+    Texture fallbacks are practical review aids for missing exact DDS refs. They
+    must not be treated as recovered texture truth unless a separate exact
+    archive/name proof exists; callers should keep ``durable_truth`` false for
+    visual substitutes.
+    """
+
+    if not path.exists():
+        return {}
+    data = _load_json(path)
+    out: dict[int, list[dict[str, Any]]] = {}
+    for row in data.get("entries", []):
+        if not isinstance(row, dict):
+            continue
+        manifest_index = row.get("manifest_index")
+        png_name = row.get("replacement_png_name") or row.get("png_name")
+        if not isinstance(manifest_index, int) or not isinstance(png_name, str) or not png_name:
+            continue
+        normalized = dict(row)
+        normalized["replacement_png_name"] = texture_name_from_path_or_name(png_name)
+        replacement_png_path = normalized.get("replacement_png_path") or normalized.get("png_path")
+        if isinstance(replacement_png_path, str) and replacement_png_path:
+            normalized["replacement_png_path"] = normalize_converted_texture_path(
+                replacement_png_path,
+                repo_root=repo_root,
+            )
+        normalized.setdefault("durable_truth", False)
+        out.setdefault(manifest_index, []).append(normalized)
+    return out
+
+
 def build_manifest(
     *,
     repo_root: Path = REPO_ROOT,
@@ -286,6 +320,7 @@ def build_manifest(
     converted_manifest_path: Path = DEFAULT_CONVERTED_MANIFEST,
     materialize_untextured: bool = False,
     source_substitutions: dict[int, dict[str, Any]] | None = None,
+    texture_fallbacks: dict[int, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
@@ -306,6 +341,10 @@ def build_manifest(
     original_missing_source = 0
     source_substituted_entries = 0
     source_substitution_replacement_missing = 0
+    original_lacking_texture_links = 0
+    texture_fallback_materialized = 0
+    texture_fallback_refs = 0
+    texture_fallback_replacement_missing = 0
     textureless_triage_textures = (
         textureless_triage_row_textures(
             textureless_triage_report_path,
@@ -347,8 +386,11 @@ def build_manifest(
                 source_substitution_replacement_missing += 1
 
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
+        if not linked_texture_names:
+            original_lacking_texture_links += 1
         texture_source = "asset-id" if linked_texture_names else "none"
         borrowed_texture_asset_id = None
+        active_texture_fallbacks: list[dict[str, Any]] = []
         candidate_asset_ids = entry.get("candidate_asset_ids", [])
         if (
             allow_single_candidate_materials
@@ -374,6 +416,40 @@ def build_manifest(
             if triage_textures:
                 linked_texture_names = triage_textures
                 texture_source = "textureless-triage-probe"
+        fallback_texture_names: list[str] = []
+        for fallback in (texture_fallbacks or {}).get(manifest_index, []):
+            replacement_png_name = texture_name_from_path_or_name(str(fallback["replacement_png_name"]))
+            replacement_path = fallback.get("replacement_png_path") or converted_texture_paths.get(replacement_png_name)
+            replacement_available = replacement_png_name in converted_texture_paths
+            if isinstance(replacement_path, str) and replacement_path:
+                replacement_available = (
+                    replacement_available
+                    or repo_path_from_relative(
+                        repo_root,
+                        normalize_converted_texture_path(replacement_path, repo_root=repo_root),
+                    ).exists()
+                )
+            enriched_fallback = {
+                **fallback,
+                "replacement_png_name": replacement_png_name,
+                "replacement_png_path": replacement_path,
+                "replacement_available": replacement_available,
+                "status": "active" if replacement_available else "replacement-missing",
+            }
+            active_texture_fallbacks.append(enriched_fallback)
+            if replacement_available:
+                fallback_texture_names.append(replacement_png_name)
+                texture_fallback_refs += 1
+            else:
+                texture_fallback_replacement_missing += 1
+        if fallback_texture_names:
+            fallback_texture_name_set = set(fallback_texture_names)
+            linked_texture_names = fallback_texture_names + [
+                name for name in linked_texture_names if name not in fallback_texture_name_set
+            ]
+            texture_source = (
+                "visual-fallback-textures" if texture_source == "none" else f"{texture_source}+visual-fallback-textures"
+            )
 
         texture_rows = [
             {
@@ -404,6 +480,8 @@ def build_manifest(
                 textureless_triage_materialized += 1
             if texture_source == "untextured-neutral":
                 untextured_materialized += 1
+            if any(fallback.get("status") == "active" for fallback in active_texture_fallbacks):
+                texture_fallback_materialized += 1
         elif not source_exists:
             missing_source += 1
         elif not has_textures:
@@ -429,6 +507,8 @@ def build_manifest(
                 "borrowed_texture_asset_id": borrowed_texture_asset_id,
                 "linked_texture_count": len(linked_texture_names),
                 "linked_textures": texture_rows,
+                "texture_fallbacks": active_texture_fallbacks,
+                "texture_fallback_count": len(active_texture_fallbacks),
                 "chosen_material_textures": chosen,
                 "materializable": can_materialize,
                 "material_name": material_name if can_materialize else None,
@@ -458,6 +538,10 @@ def build_manifest(
             "source_substitution_replacement_missing": source_substitution_replacement_missing,
             "entries_without_textures": no_texture,
             "entries_lacking_texture_links": entries_lacking_texture_links,
+            "entries_lacking_original_texture_links": original_lacking_texture_links,
+            "texture_fallback_materialized_entries": texture_fallback_materialized,
+            "texture_fallback_refs": texture_fallback_refs,
+            "texture_fallback_replacement_missing": texture_fallback_replacement_missing,
             "allow_single_candidate_materials": allow_single_candidate_materials,
             "allow_common_candidate_materials": allow_common_candidate_materials,
             "allow_textureless_triage_materials": allow_textureless_triage_materials,
@@ -714,6 +798,7 @@ def write_csv(path: Path, manifest: dict[str, Any]) -> None:
         "texture_status",
         "texture_source",
         "borrowed_texture_asset_id",
+        "texture_fallback_count",
         "linked_texture_count",
         "materializable",
         "material_name",
@@ -789,6 +874,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--texture-fallbacks",
+        type=Path,
+        default=None,
+        help=(
+            "Optional flythrough-texture-fallbacks-v1 JSON. Adds explicit visual fallback PNGs for missing DDS "
+            "refs without promoting exact texture truth."
+        ),
+    )
+    parser.add_argument(
         "--verify-bundle", action="store_true", help="Verify generated OBJ/MTL outputs and texture refs."
     )
     parser.add_argument("--bundle-root", type=Path, default=DEFAULT_BUNDLE_ROOT, help="Generated OBJ/MTL bundle root.")
@@ -809,6 +903,9 @@ def main(argv: list[str] | None = None) -> int:
         materialize_untextured=args.materialize_untextured,
         source_substitutions=load_source_substitutions(args.source_substitutions, repo_root=repo_root)
         if args.source_substitutions
+        else None,
+        texture_fallbacks=load_texture_fallbacks(args.texture_fallbacks, repo_root=repo_root)
+        if args.texture_fallbacks
         else None,
     )
     _write_json(args.manifest_out, manifest)
@@ -842,6 +939,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{summary['entries_without_textures']} without textures, "
         f"{summary['entries_missing_source_obj']} missing source, "
         f"{summary['source_substituted_entries']} source-substituted, "
+        f"{summary['texture_fallback_materialized_entries']} texture-fallback materialized, "
         f"{summary['single_candidate_materialized_entries']} single-candidate materialized, "
         f"{summary['common_candidate_materialized_entries']} common-candidate materialized, "
         f"{summary['textureless_triage_materialized_entries']} textureless-triage materialized, "

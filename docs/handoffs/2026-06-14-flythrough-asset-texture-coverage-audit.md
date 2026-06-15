@@ -122,13 +122,17 @@ Optional heuristic expansion:
 - Practical 350 manifest: `Assets/build/flythrough/flythrough-obj-texture-manifest-practical-350.json` currently has 350/350 materializable entries, 0 effective missing source OBJs, 1 original source still missing, 1 source-substituted entry, and bundle_verify pass=True. The substitution row is manifest index 121, original `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`, replacement `07f37c99a80da009` mesh17 linked-stream redrive, `durable_truth=false`.
 - Practical 350 smoke: `Assets/build/flythrough/evidence/practical-350/obj-texture-bundle-smoke.json` reports pass=True, 350 checked entries, 0 OBJ issues, 0 MTL issues, 0 missing textures, 79 zero-face entries.
 - Practical 350 combined package: `Assets/build/flythrough/combined-obj-package-practical-350/combined.obj` reports 350 combined entries, 0 skipped, 23421 vertices, 30935 faces, 79 point-cloud entries, 158 copied texture files, verify_pass=True.
+- `scripts/build_flythrough_obj_texture_manifest.py --texture-fallbacks ...` can now build a separate practical texture-fallback manifest that uses explicit visual fallback PNGs for missing DDS refs without claiming exact DDS recovery.
+- Practical 350 + texture fallbacks manifest: `Assets/build/flythrough/flythrough-obj-texture-manifest-practical-350-texture-fallbacks.json` currently has 350/350 materializable entries, 1 source-substituted row, 1 texture-fallback materialized row, 2 active fallback refs, and bundle_verify pass=True.
+- The texture fallback row is manifest index 118 (`fa78ee2d8c3abca7`): exact missing refs remain `n_ds_eternal_assault_flowers_01_c.dds` and `n_ds_eternal_assault_flowers_01_s.dds`; practical visual substitutes are `b3024468_n_ds_ruinouspassage_flowers_01_c.png` and `378ceef5_n_ds_ruinouspassage_flowers_01_s.png`, both `durable_truth=false`.
+- Practical 350 + texture fallbacks smoke/package: `Assets/build/flythrough/evidence/practical-350-texture-fallbacks/obj-texture-bundle-smoke.json` reports pass=True, 350 checked entries, 0 OBJ issues, 0 MTL issues, 0 missing textures; `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/combined.obj` reports 350 combined entries, 0 skipped, 23421 vertices, 30935 faces, 158 copied texture files, verify_pass=True.
 
 ## Top 10 next best actions
 
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
 2. Smoke-import the practical 350 combined package in Blender or an MTL-aware viewer and inspect the source-substituted mesh17 row.
-3. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
-4. Review visual fallback candidates for the 2 unmatched DDS refs as manual surrogate options only, not durable texture truth.
+3. Smoke-import the practical 350 + texture-fallback combined package and compare row 118 with and without the visual flower substitutes.
+4. Continue exact recovery/proof for the 2 `n_ds_eternal_assault_flowers_01_*` DDS refs; the practical fallbacks are not durable truth.
 5. Decide whether any of the other 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
 6. Investigate the two redrive failures with no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
 7. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
