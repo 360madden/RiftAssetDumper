@@ -25,6 +25,7 @@ from typing import Any
 
 from audit_flythrough_neutral_row_provenance import build_neutral_row_provenance_report
 from audit_flythrough_neutral_row_provenance import render_markdown as render_neutral_provenance_markdown
+from audit_flythrough_texture_fallback_provenance import DEFAULT_NIF_INVENTORY as DEFAULT_FALLBACK_NIF_INVENTORY
 from audit_flythrough_texture_fallback_provenance import build_texture_fallback_provenance_report
 from audit_flythrough_texture_fallback_provenance import render_markdown as render_texture_fallback_provenance_markdown
 from audit_flythrough_unresolved_texture_evidence import build_unresolved_texture_evidence_report
@@ -280,6 +281,7 @@ def build_practical_package(
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
     assets64_entries_path: Path = DEFAULT_ASSETS64_ENTRIES,
     flythrough_index_path: Path = DEFAULT_FLYTHROUGH_INDEX,
+    fallback_nif_inventory_path: Path = DEFAULT_FALLBACK_NIF_INVENTORY,
     build_report_out: Path = DEFAULT_BUILD_REPORT,
     max_gallery_cards: int = 400,
 ) -> dict[str, Any]:
@@ -366,6 +368,7 @@ def build_practical_package(
         manifest=manifest,
         manifest_path=manifest_out,
         flythrough_index_path=flythrough_index_path,
+        inventory_path=fallback_nif_inventory_path,
     )
     _write_json(texture_fallback_provenance_json_out, texture_fallback_provenance_report)
     _write_text(
@@ -409,6 +412,9 @@ def build_practical_package(
                 "texture_fallback_refs_with_same_mesh_source_assets": texture_fallback_provenance_report["summary"][
                     "fallback_refs_with_same_mesh_source_assets"
                 ],
+                "texture_fallback_refs_with_same_geometry_hash": texture_fallback_provenance_report["summary"][
+                    "fallback_refs_with_same_geometry_hash"
+                ],
             },
         },
         texture_gap_report=texture_gap_report,
@@ -425,6 +431,7 @@ def build_practical_package(
         "texture_fallback_provenance_report": repo_relative_path(
             texture_fallback_provenance_json_out, repo_root=repo_root
         ),
+        "fallback_nif_inventory": repo_relative_path(fallback_nif_inventory_path, repo_root=repo_root),
     }
     access_report["outputs"] = {
         "json": repo_relative_path(access_report_json_out, repo_root=repo_root),
@@ -524,6 +531,9 @@ def build_practical_package(
             "texture_fallback_refs_with_same_mesh_source_assets": texture_fallback_provenance_report["summary"][
                 "fallback_refs_with_same_mesh_source_assets"
             ],
+            "texture_fallback_refs_with_same_geometry_hash": texture_fallback_provenance_report["summary"][
+                "fallback_refs_with_same_geometry_hash"
+            ],
         },
     }
     _write_json(build_report_out, report)
@@ -563,6 +573,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
     parser.add_argument("--assets64-entries", type=Path, default=DEFAULT_ASSETS64_ENTRIES)
     parser.add_argument("--flythrough-index", type=Path, default=DEFAULT_FLYTHROUGH_INDEX)
+    parser.add_argument("--fallback-nif-inventory", type=Path, default=DEFAULT_FALLBACK_NIF_INVENTORY)
     parser.add_argument("--build-report-out", type=Path, default=DEFAULT_BUILD_REPORT)
     parser.add_argument("--max-gallery-cards", type=int, default=400)
     return parser.parse_args(argv)
@@ -599,6 +610,7 @@ def main(argv: list[str] | None = None) -> int:
         probe_refresh_report_path=args.probe_refresh_report,
         assets64_entries_path=args.assets64_entries,
         flythrough_index_path=args.flythrough_index,
+        fallback_nif_inventory_path=args.fallback_nif_inventory,
         build_report_out=args.build_report_out,
         max_gallery_cards=args.max_gallery_cards,
     )
@@ -620,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']} access_report={summary['access_report_exists']} "
-        f"fallback_same_mesh={summary['texture_fallback_refs_with_same_mesh_source_assets']}"
+        f"fallback_same_mesh={summary['texture_fallback_refs_with_same_mesh_source_assets']} "
+        f"fallback_same_geometry={summary['texture_fallback_refs_with_same_geometry_hash']}"
     )
     return (
         0
