@@ -132,6 +132,19 @@ def test_build_gallery_model_counts_sources_roles_and_remaining() -> None:
     assert model["filter_counts"]["non-durable"] == 1
 
 
+def test_build_gallery_model_groups_review_material_details() -> None:
+    manifest = _manifest()
+    manifest["entries"][2]["materializable"] = True
+    model = build_gallery_model(manifest)
+
+    assert model["review_materials"] == {"source-substitution-no-textures": 1}
+    detail = model["review_material_details"]["source-substitution-no-textures"]
+    assert detail["manifest_indices"] == [2]
+    assert detail["diffuse_color"] == [0.65, 0.45, 0.95]
+    assert detail["durable_texture_truth"] is False
+    assert "practical substitute" in detail["reason"]
+
+
 def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> None:
     html_out = tmp_path / "Assets" / "build" / "flythrough" / "texture-triage-gallery" / "index.html"
     text = render_gallery(_manifest(), html_out=html_out, repo_root=tmp_path, max_cards=10)
@@ -165,6 +178,9 @@ def test_render_gallery_lists_source_substitutions(tmp_path: Path) -> None:
     assert "Neutral review materials" in text
     assert 'data-filter="source-substitution"' in text
     assert 'data-filter="neutral"' in text
+    assert 'data-filter="review:source-substitution-no-textures"' in text
     assert "source-substitution-no-textures" in text
     assert "durable_texture_truth=False" in text
+    assert "Source OBJ is a practical substitute and still has no texture evidence." in text
+    assert '<a href="#row-2">2</a>' in text
     assert "rgb(166, 115, 242)" in text

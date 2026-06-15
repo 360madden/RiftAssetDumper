@@ -88,6 +88,22 @@ def _review_material_color(review_material: dict[str, Any] | None) -> str | None
     return f"rgb({red}, {green}, {blue})"
 
 
+def _entry_review_material(entry: dict[str, Any]) -> dict[str, Any] | None:
+    review_material = entry.get("review_material")
+    if isinstance(review_material, dict):
+        return review_material
+    kind = entry.get("review_material_kind")
+    if not kind:
+        return None
+    return {
+        "kind": kind,
+        "label": entry.get("review_material_label"),
+        "diffuse_color": entry.get("review_material_diffuse_color"),
+        "durable_texture_truth": entry.get("review_material_durable_texture_truth"),
+        "reason": entry.get("review_material_reason"),
+    }
+
+
 def non_materialized_reason(entry: dict[str, Any]) -> str:
     if not entry.get("source_exists"):
         return "missing-source-obj"
@@ -117,11 +133,26 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
         for fallback in entry.get("texture_fallbacks", [])
         if isinstance(fallback, dict)
     ]
-    review_materials = Counter(
-        entry.get("review_material", {}).get("kind")
-        for entry in materialized
-        if isinstance(entry.get("review_material"), dict)
-    )
+    review_materials: Counter[str] = Counter()
+    review_material_details: dict[str, dict[str, Any]] = {}
+    for entry in materialized:
+        review_material = _entry_review_material(entry)
+        if not review_material:
+            continue
+        kind = str(review_material.get("kind") or "unknown-review-material")
+        review_materials[kind] += 1
+        detail = review_material_details.setdefault(
+            kind,
+            {
+                "kind": kind,
+                "label": review_material.get("label"),
+                "diffuse_color": review_material.get("diffuse_color"),
+                "durable_texture_truth": review_material.get("durable_texture_truth"),
+                "reason": review_material.get("reason"),
+                "manifest_indices": [],
+            },
+        )
+        detail["manifest_indices"].append(entry.get("manifest_index"))
     filter_counts: Counter[str] = Counter()
     for entry in materialized:
         filter_counts.update(_card_filter_tags(entry))
@@ -137,6 +168,7 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
         "texture_fallback_entries": texture_fallback_entries,
         "texture_fallback_refs": texture_fallback_refs,
         "review_materials": dict(sorted(review_materials.items())),
+        "review_material_details": dict(sorted(review_material_details.items())),
         "filter_counts": dict(sorted(filter_counts.items())),
     }
 
@@ -153,7 +185,7 @@ def _card_filter_tags(entry: dict[str, Any]) -> set[str]:
         tags.add("asset-backed")
     else:
         tags.add("id-less")
-    if texture_source == "untextured-neutral" or isinstance(entry.get("review_material"), dict):
+    if texture_source == "untextured-neutral" or _entry_review_material(entry):
         tags.add("neutral")
     else:
         tags.add("textured")
@@ -163,8 +195,8 @@ def _card_filter_tags(entry: dict[str, Any]) -> set[str]:
     if [fallback for fallback in entry.get("texture_fallbacks", []) if isinstance(fallback, dict)]:
         tags.add("texture-fallback")
         tags.add("non-durable")
-    review_material = entry.get("review_material")
-    if isinstance(review_material, dict):
+    review_material = _entry_review_material(entry)
+    if review_material:
         tags.add("review-material")
         kind = review_material.get("kind")
         if kind:
@@ -186,6 +218,7 @@ def _filter_controls(model: dict[str, Any]) -> str:
         ("asset-backed", "Asset-backed"),
         ("non-durable", "Non-durable truth"),
     ]
+    controls.extend((f"review:{kind}", f"Review: {kind}") for kind in model.get("review_materials", {}))
     buttons = "\n".join(
         (
             f'<button type="button" class="filter-button{" active" if tag == "all" else ""}" '
@@ -239,7 +272,7 @@ def _counter_table(title: str, values: dict[str, int]) -> str:
 
 def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path) -> str:
     preview = choose_preview_texture(entry)
-    review_material = entry.get("review_material") if isinstance(entry.get("review_material"), dict) else None
+    review_material = _entry_review_material(entry)
     image_html = '<div class="no-preview">no preview</div>'
     if preview and preview.get("path"):
         href = relative_link(preview["path"], html_out=html_out, repo_root=repo_root)
@@ -276,6 +309,9 @@ def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path
                 f"{review_material.get('kind')}; durable_texture_truth={review_material.get('durable_texture_truth')}",
             )
         )
+    review_reason = ""
+    if review_material and review_material.get("reason"):
+        review_reason = f'<p class="small review-reason">{_esc(review_material.get("reason"))}</p>'
     badges_html = f'<p class="badges">{" ".join(badges)}</p>' if badges else ""
     card_classes = ["card", f"source-{entry.get('texture_source') or 'none'}"]
     if source_substitution:
@@ -293,6 +329,7 @@ def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path
     <h3>#{_esc(entry.get("manifest_index"))} {_esc(entry.get("asset_id") or "id-less")}</h3>
     <p>{_pill("source", entry.get("texture_source"))} {_pill("textures", entry.get("linked_texture_count"))}</p>
     {badges_html}
+    {review_reason}
     <p class="small">{_esc(textures)}</p>
     <p><a href="{_esc(obj_href)}">OBJ</a> · <a href="{_esc(mtl_href)}">MTL</a></p>
   </div>
@@ -375,19 +412,38 @@ def _texture_fallback_table(entries: list[dict[str, Any]]) -> str:
 """
 
 
-def _review_material_table(values: dict[str, int]) -> str:
-    if not values:
+def _review_material_table(model: dict[str, Any]) -> str:
+    details = model.get("review_material_details", {})
+    if not details:
         return ""
-    rows = "\n".join(
-        f'<tr><td>{_esc(key)}</td><td class="num">{_esc(value)}</td></tr>' for key, value in values.items()
-    )
+    rows = []
+    for kind, detail in details.items():
+        color = _review_material_color(detail)
+        swatch = f'<span class="inline-swatch" style="background:{_esc(color or "#6b7280")}"></span>'
+        row_links = " ".join(
+            f'<a href="#row-{_esc(index)}">{_esc(index)}</a>'
+            for index in detail.get("manifest_indices", [])
+            if index not in (None, "")
+        )
+        rows.append(
+            f"""
+<tr>
+  <td>{swatch}<code>{_esc(kind)}</code></td>
+  <td class="num">{_esc(len(detail.get("manifest_indices", [])))}</td>
+  <td>{_esc(detail.get("label") or "")}</td>
+  <td>{_esc(detail.get("durable_texture_truth"))}</td>
+  <td>{_esc(detail.get("reason") or "")}</td>
+  <td>{row_links}</td>
+</tr>
+"""
+        )
     return f"""
-<section>
-  <h2>Neutral review materials ({sum(values.values())})</h2>
+<section id="review-materials">
+  <h2>Neutral review materials ({sum(model.get("review_materials", {}).values())})</h2>
   <p class="small">These colored materials make texture gaps visible in the gallery and OBJ/MTL imports; they are review aids, not recovered texture truth.</p>
   <table>
-    <thead><tr><th>Review material kind</th><th>Count</th></tr></thead>
-    <tbody>{rows}</tbody>
+    <thead><tr><th>Review material kind</th><th>Count</th><th>Label</th><th>Durable texture truth</th><th>Reason</th><th>Rows</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
   </table>
 </section>
 """
@@ -433,6 +489,7 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     .no-preview {{ color: #94a3b8; font-size: 12px; text-align: center; }}
     .review-swatch {{ width: 100%; height: 100%; display: grid; place-items: center; color: #020617; font-size: 10px; font-weight: 700; text-align: center; padding: 4px; box-sizing: border-box; }}
     .review-swatch span {{ background: rgba(255,255,255,.72); border-radius: 6px; padding: 3px 4px; }}
+    .inline-swatch {{ display: inline-block; width: 14px; height: 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.6); margin-right: 8px; vertical-align: -2px; }}
     .small {{ color: #cbd5e1; font-size: 12px; overflow-wrap: anywhere; }}
     .badges .pill {{ background: #78350f; color: #fde68a; }}
   </style>
@@ -447,7 +504,7 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     {_counter_table("Texture sources", model["texture_sources"])}
     {_counter_table("Remaining gap reasons", model["remaining_reasons"])}
     {_counter_table("Texture roles in materialized rows", model["texture_roles"])}
-    {_review_material_table(model["review_materials"])}
+    {_review_material_table(model)}
     {_source_substitution_table(model["source_substitutions"])}
     {_texture_fallback_table(model["texture_fallback_entries"])}
     {_filter_controls(model)}
