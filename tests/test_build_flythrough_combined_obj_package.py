@@ -142,6 +142,12 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
                     "material_name": "mat_points",
                     "materializable": True,
                     "texture_source": "untextured-neutral",
+                    "review_material": {
+                        "kind": "asset-id-no-linked-textures",
+                        "label": "asset-id row without linked texture refs",
+                        "diffuse_color": [0.35, 0.55, 1.0],
+                        "durable_texture_truth": False,
+                    },
                 },
                 {"manifest_index": 3, "source_obj": "Exports/missing.obj", "materializable": False},
             ]
@@ -170,10 +176,13 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
     assert report["summary"]["texture_fallback_refs"] == 1
     assert report["summary"]["non_durable_source_substitutions"] == 1
     assert report["summary"]["non_durable_texture_fallback_refs"] == 1
+    assert report["summary"]["review_material_entries"] == 1
+    assert report["summary"]["review_material_breakdown"] == {"asset-id-no-linked-textures": 1}
     assert report["verify"]["texture_refs"] == 2
     assert report["outputs"]["textures"] == "Assets/build/flythrough/combined/textures"
     assert report["practical_truth_boundaries"]["source_substitutions"][0]["durable_truth"] is False
     assert report["practical_truth_boundaries"]["texture_fallbacks"][0]["durable_truth"] is False
+    assert report["practical_truth_boundaries"]["review_materials"][0]["durable_texture_truth"] is False
 
     obj_text = (package_root / "combined.obj").read_text(encoding="utf-8")
     assert "mtllib combined.mtl" in obj_text
@@ -189,6 +198,9 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
     markdown = (package_root / "README.md").read_text(encoding="utf-8")
     assert "## Practical source substitutions" in markdown
     assert "## Practical texture fallbacks" in markdown
+    assert "## Neutral review materials" in markdown
+    assert "## Import review checklist" in markdown
+    assert "asset-id-no-linked-textures" in markdown
     assert "`False`" in markdown
 
     shared_root = tmp_path / "Assets" / "build" / "flythrough" / "combined-shared-textures"

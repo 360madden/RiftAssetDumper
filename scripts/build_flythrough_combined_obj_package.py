@@ -292,6 +292,7 @@ def collect_practical_truth_boundaries(entries: list[dict[str, Any]]) -> dict[st
 
     source_substitutions: list[dict[str, Any]] = []
     texture_fallbacks: list[dict[str, Any]] = []
+    review_materials: list[dict[str, Any]] = []
 
     for entry in entries:
         manifest_index = entry.get("manifest_index")
@@ -328,15 +329,34 @@ def collect_practical_truth_boundaries(entries: list[dict[str, Any]]) -> dict[st
                 }
             )
 
+        review_material = entry.get("review_material")
+        if isinstance(review_material, dict):
+            review_materials.append(
+                {
+                    "manifest_index": manifest_index,
+                    "asset_id": entry.get("asset_id"),
+                    "texture_source": entry.get("texture_source"),
+                    "material_name": entry.get("material_name"),
+                    "kind": review_material.get("kind"),
+                    "label": review_material.get("label"),
+                    "diffuse_color": review_material.get("diffuse_color"),
+                    "durable_texture_truth": bool(review_material.get("durable_texture_truth")),
+                }
+            )
+
+    review_material_breakdown = Counter(str(row.get("kind")) for row in review_materials)
     return {
         "source_substitutions": source_substitutions,
         "texture_fallbacks": texture_fallbacks,
+        "review_materials": review_materials,
         "summary": {
             "source_substituted_entries": len(source_substitutions),
             "texture_fallback_entries": len({row.get("manifest_index") for row in texture_fallbacks}),
             "texture_fallback_refs": len(texture_fallbacks),
             "non_durable_source_substitutions": sum(1 for row in source_substitutions if not row.get("durable_truth")),
             "non_durable_texture_fallback_refs": sum(1 for row in texture_fallbacks if not row.get("durable_truth")),
+            "review_material_entries": len(review_materials),
+            "review_material_breakdown": dict(sorted(review_material_breakdown.items())),
         },
     }
 
@@ -633,6 +653,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Source-substituted entries | {summary.get('source_substituted_entries', 0)} |",
         f"| Texture fallback entries | {summary.get('texture_fallback_entries', 0)} |",
         f"| Texture fallback refs | {summary.get('texture_fallback_refs', 0)} |",
+        f"| Neutral review materials | {summary.get('review_material_entries', 0)} |",
         f"| Verify pass | {summary['verify_pass']} |",
         "",
         "## Outputs",
@@ -667,6 +688,27 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"| {row.get('manifest_index')} | `{row.get('original_source_obj')}` | "
                 f"`{row.get('replacement_source_obj') or row.get('source_obj')}` | "
                 f"`{row.get('candidate_asset_id') or ''}` | `{row.get('durable_truth')}` |"
+            )
+
+    if practical.get("review_materials"):
+        lines.extend(
+            [
+                "",
+                "## Neutral review materials",
+                "",
+                "These are color-coded review aids for rows without durable texture evidence. They are not recovered texture truth.",
+                "",
+                "| Row | Kind | Asset ID | Material | RGB | Durable texture truth |",
+                "|---:|---|---|---|---|---|",
+            ]
+        )
+        for row in practical["review_materials"]:
+            rgb = row.get("diffuse_color") or []
+            rgb_text = ", ".join(str(value) for value in rgb) if isinstance(rgb, list) else ""
+            lines.append(
+                f"| {row.get('manifest_index')} | `{row.get('kind')}` | "
+                f"`{row.get('asset_id') or ''}` | `{row.get('material_name') or ''}` | "
+                f"`{rgb_text}` | `{row.get('durable_texture_truth')}` |"
             )
 
     if practical.get("texture_fallbacks"):
@@ -707,6 +749,15 @@ def render_markdown(report: dict[str, Any]) -> str:
             "- Texture files referenced by the combined MTL are copied into the package by default for portable imports.",
             "- Practical source substitutions and texture fallbacks are explicitly listed above when present.",
             "- The package is intended for generic OBJ/MTL importers; current RiftFlythrough viewer integration may still need an MTL-aware load path.",
+            "",
+            "## Import review checklist",
+            "",
+            "1. Import the OBJ with MTL/material loading enabled.",
+            "2. Confirm the importer found the copied `textures/converted/` folder.",
+            "3. Inspect row 118's fallback flower material and keep it non-durable unless exact DDS proof appears.",
+            "4. Inspect row 121's source-substituted point-cloud/mesh and keep it non-durable unless exact source proof appears.",
+            "5. Sweep the blue/orange/purple neutral review materials and decide whether each needs texture recovery, provenance work, or no action.",
+            "6. Confirm point-cloud rows are visible or acceptable in the target importer.",
             "",
         ]
     )
