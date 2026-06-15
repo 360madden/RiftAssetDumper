@@ -27,6 +27,7 @@ DEFAULT_NAME_MATCHES = REPO_ROOT / "Exports" / "nif-reference-name-matches.jsonl
 DEFAULT_TEXTURE_LINKS = REPO_ROOT / "Exports" / "nif-texture-links.jsonl"
 
 DDS_RE = re.compile(r"[\w./\\:-]+\.dds", re.IGNORECASE)
+TEXTURELESS_TRIAGE_TEXTURE_SOURCES = {"untextured-neutral", "textureless-triage-probe"}
 
 
 def _now_iso() -> str:
@@ -236,7 +237,9 @@ def build_textureless_triage(
     exports_root = repo_root / "Exports"
 
     neutral_rows = [
-        entry for entry in manifest.get("entries", []) if entry.get("texture_source") == "untextured-neutral"
+        entry
+        for entry in manifest.get("entries", [])
+        if entry.get("texture_source") in TEXTURELESS_TRIAGE_TEXTURE_SOURCES
     ]
     asset_refs: dict[str, set[str]] = defaultdict(set)
     row_reports: list[dict[str, Any]] = []
@@ -268,6 +271,7 @@ def build_textureless_triage(
                 "source_obj": entry.get("source_obj"),
                 "asset_id": asset_id,
                 "mesh_block": mesh_block,
+                "texture_source": entry.get("texture_source"),
                 "vertex_count": entry.get("vertex_count", 0),
                 "face_count": entry.get("face_count", 0),
                 "asset_probe_files": sorted(set(asset_probe_files)),
@@ -346,7 +350,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "| Metric | Count |",
         "|---|---:|",
-        f"| Neutral-materialized rows | {summary['neutral_rows']} |",
+        f"| Textureless-scope rows | {summary['neutral_rows']} |",
         f"| Rows with mesh-level DDS refs | {summary['neutral_rows_with_mesh_dds_refs']} |",
         f"| Neutral asset IDs | {summary['neutral_asset_ids']} |",
         f"| Neutral asset IDs with any DDS refs | {summary['neutral_asset_ids_with_any_dds_refs']} |",
@@ -390,12 +394,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     if not report.get("dds_reference_status"):
         lines.append("| _none_ | n/a | 0 | n/a | n/a |")
 
-    lines.extend(["", "## Neutral rows", ""])
+    lines.extend(["", "## Textureless-scope rows", ""])
     for row in report["rows"]:
         refs = row["row_dds_refs"]
         lines.append(
             f"- #{row['manifest_index']} `{row['source_obj']}` asset=`{row.get('asset_id')}` "
-            f"mesh={row.get('mesh_block')} refs={', '.join(f'`{ref}`' for ref in refs) if refs else 'none'}"
+            f"mesh={row.get('mesh_block')} source={row.get('texture_source')} "
+            f"refs={', '.join(f'`{ref}`' for ref in refs) if refs else 'none'}"
         )
     lines.append("")
     return "\n".join(lines)

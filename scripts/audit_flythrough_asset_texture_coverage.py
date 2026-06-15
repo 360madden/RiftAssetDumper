@@ -500,14 +500,14 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
-        "Name-recover/extract the remaining probe-only DDS refs from the textureless-asset triage report.",
-        "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
+        "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
+        "Investigate the 16 remaining neutral-material rows that still lack row-scoped DDS refs.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
         "Investigate the 2 existing no-match fallback OBJ rows separately.",
-        "Keep investigating indexed asset IDs that still lack linked textures after DDS-ref triage.",
+        "Review the 2 textureless-triage materialized rows for visual/material-role quality.",
         "Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
     ]
@@ -800,7 +800,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {common_heuristic_materializable} total OBJ entries become materializable with both candidate options.",
         f"- {common_heuristic_skipped} entries remain skipped after both candidate options.",
         "- `--allow-textureless-triage-materials` can use row-scoped converted DDS refs discovered by the textureless triage report.",
-        f"- {textureless_triage_materializable} neutral OBJ row currently has converted textureless-triage DDS evidence.",
+        f"- {textureless_triage_materializable} neutral OBJ row(s) currently have converted textureless-triage DDS evidence.",
         "- `--materialize-untextured` adds neutral MTLs for existing OBJ rows that still lack texture evidence; it does not claim texture coverage.",
         f"- {max(neutral_materialized - textureless_triage_materializable, 0)} existing textureless OBJ rows still become neutral-materialized when triage textures plus neutral materials are enabled.",
         f"- {full_available_materializable} total OBJ entries become materializable with candidate borrowing plus neutral materials.",
