@@ -38,6 +38,8 @@ DEFAULT_LIVE_ROOT_CANDIDATES = (
     Path(r"C:\Program Files\Glyph\Games\RIFT\Live"),
 )
 ID_SUFFIX_RE = re.compile(r"_(?P<id>[0-9a-f]{16})\.dds$", re.IGNORECASE)
+PNG_HASH_PREFIX_RE = re.compile(r"^[0-9a-f]{8}_", re.IGNORECASE)
+TEXTURE_ROLE_TOKENS = {"c", "d", "g", "n", "s"}
 
 
 def _now_iso() -> str:
@@ -114,6 +116,112 @@ def canonical_dds_ref(value: str) -> str:
 
     name = texture_basename(value)
     return ID_SUFFIX_RE.sub(".dds", name)
+
+
+def canonical_texture_stem(value: str) -> str:
+    """Normalize a DDS/PNG texture basename for token comparison."""
+
+    name = texture_basename(value)
+    for suffix in (".dds", ".png"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    return PNG_HASH_PREFIX_RE.sub("", name)
+
+
+def texture_tokens(value: str) -> list[str]:
+    return [token for token in re.split(r"[^a-z0-9]+", canonical_texture_stem(value)) if token]
+
+
+def converted_texture_candidates(converted_manifest: dict[str, Any]) -> list[dict[str, str]]:
+    candidates: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for entry in converted_manifest.get("Entries", []):
+        if not isinstance(entry, dict):
+            continue
+        original_basename = entry.get("original_basename")
+        png_name = entry.get("png_name")
+        png_path = entry.get("png_path") or entry.get("path") or entry.get("output")
+        if isinstance(original_basename, str) and original_basename:
+            dds_ref = canonical_dds_ref(original_basename + ".dds")
+        elif isinstance(png_name, str) and png_name:
+            dds_ref = canonical_texture_stem(png_name) + ".dds"
+        else:
+            continue
+        if dds_ref in seen:
+            continue
+        seen.add(dds_ref)
+        candidates.append(
+            {
+                "dds_ref": dds_ref,
+                "png_name": str(png_name or ""),
+                "png_path": str(png_path or ""),
+            }
+        )
+    return candidates
+
+
+def texture_role(tokens: list[str]) -> str | None:
+    if tokens and tokens[-1] in TEXTURE_ROLE_TOKENS:
+        return tokens[-1]
+    return None
+
+
+def score_texture_fallback(target_ref: str, candidate_ref: str) -> tuple[int, list[str]]:
+    target_tokens = texture_tokens(target_ref)
+    candidate_tokens = texture_tokens(candidate_ref)
+    if not target_tokens or not candidate_tokens:
+        return 0, []
+
+    target_set = set(target_tokens)
+    candidate_set = set(candidate_tokens)
+    overlap = target_set & candidate_set
+    if not overlap:
+        return 0, []
+
+    union = target_set | candidate_set
+    target_role = texture_role(target_tokens)
+    candidate_role = texture_role(candidate_tokens)
+    score = int((len(overlap) / len(union)) * 100) + len(overlap) * 10
+    reasons = [f"shared tokens: {', '.join(sorted(overlap))}"]
+    if target_role and target_role == candidate_role:
+        score += 25
+        reasons.append(f"same texture role: {target_role}")
+    if target_tokens[:2] == candidate_tokens[:2]:
+        score += 20
+        reasons.append("same leading namespace tokens")
+    return score, reasons
+
+
+def suggest_visual_fallback_textures(
+    target_refs: list[str],
+    converted_manifest: dict[str, Any],
+    *,
+    limit: int = 5,
+) -> dict[str, list[dict[str, Any]]]:
+    """Suggest converted PNGs for manual visual fallback review; never exact-truth promotion."""
+
+    candidates = converted_texture_candidates(converted_manifest)
+    suggestions: dict[str, list[dict[str, Any]]] = {}
+    for target_ref in target_refs:
+        ranked: list[dict[str, Any]] = []
+        for candidate in candidates:
+            candidate_ref = candidate["dds_ref"]
+            if candidate_ref == target_ref:
+                continue
+            score, reasons = score_texture_fallback(target_ref, candidate_ref)
+            if score <= 0:
+                continue
+            ranked.append(
+                {
+                    **candidate,
+                    "score": score,
+                    "reasons": reasons,
+                }
+            )
+        ranked.sort(key=lambda item: (-int(item["score"]), item["dds_ref"]))
+        suggestions[target_ref] = ranked[:limit]
+    return suggestions
 
 
 def dds_refs_from_triage(report: dict[str, Any]) -> list[str]:
@@ -387,6 +495,7 @@ def recover_textureless_dds(
             "already_converted_refs": len([ref for ref in all_refs if ref in converted_refs]),
             "target_refs": len(target_refs),
             "unmatched_target_refs": 0,
+            "visual_fallback_candidate_refs": 0,
             "name_matches": 0,
             "extracted_dds": 0,
             "recovered_dds_files_present": 0,
@@ -408,6 +517,11 @@ def recover_textureless_dds(
         },
         "commands": [],
     }
+    visual_fallback_candidates = suggest_visual_fallback_textures(target_refs, converted_manifest)
+    report["visual_fallback_candidates"] = visual_fallback_candidates
+    report["summary"]["visual_fallback_candidate_refs"] = sum(
+        1 for suggestions in visual_fallback_candidates.values() if suggestions
+    )
 
     build_names_file(target_refs, names_file)
     if not target_refs:
@@ -516,6 +630,7 @@ def main(argv: list[str] | None = None) -> int:
         "textureless DDS recovery: "
         f"refs={summary['triage_dds_refs']} targets={summary['target_refs']} "
         f"matches={summary['name_matches']} unmatched={summary.get('unmatched_target_refs', 0)} "
+        f"fallback_refs={summary.get('visual_fallback_candidate_refs', 0)} "
         f"extracted={summary['extracted_dds']} "
         f"converted={summary['converted_pngs']} skipped={summary['skipped_existing_pngs']} "
         f"failed={summary['failed_conversions']}"

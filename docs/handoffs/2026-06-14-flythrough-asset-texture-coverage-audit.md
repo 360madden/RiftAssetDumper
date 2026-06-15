@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T01:31:27.015113Z
+**Generated**: 2026-06-15T01:36:32.405585Z
 
 ## Why this exists
 
@@ -108,7 +108,7 @@ Optional heuristic expansion:
 - Latest textureless-asset triage report: 13 neutral rows, 1 rows with mesh-level DDS refs, 1 neutral asset IDs with refs, 2 unique DDS refs, 0 already converted, 2 missing converted PNGs, 0 of the missing refs catalog-backed.
 - Missing converted DDS targets found in probe evidence: `n_ds_eternal_assault_flowers_01_c.dds`, `n_ds_eternal_assault_flowers_01_s.dds`.
 - `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report.
-- Latest textureless DDS recovery report: 2 refs, 2 currently missing conversion targets, 0 name matches, 2 unmatched target refs, 0 newly converted PNGs, 0 failed conversions.
+- Latest textureless DDS recovery report: 2 refs, 2 currently missing conversion targets, 0 name matches, 2 unmatched target refs, 2 refs with visual fallback candidates, 0 newly converted PNGs, 0 failed conversions.
 - `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
 - `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one portable import package: one OBJ, one MTL, copied MTL-referenced textures, and `p` point directives for zero-face meshes.
@@ -119,10 +119,10 @@ Optional heuristic expansion:
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
 2. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
 3. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
-4. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
-5. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
-6. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
-7. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
-8. Investigate the 2 existing no-match fallback OBJ rows separately.
-9. Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.
-10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.
+4. Review visual fallback candidates for the 2 unmatched DDS refs as manual surrogate options only, not durable texture truth.
+5. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
+6. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
+7. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
+8. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
+9. Investigate the 2 existing no-match fallback OBJ rows separately.
+10. Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.

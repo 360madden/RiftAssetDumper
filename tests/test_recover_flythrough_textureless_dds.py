@@ -62,6 +62,39 @@ def test_texture_link_from_name_match_builds_extractable_record() -> None:
     assert link["TextureManifestEntryIndex"] == 7
 
 
+def test_visual_fallback_suggestions_prefer_shared_namespace_and_role() -> None:
+    manifest = {
+        "Entries": [
+            {
+                "original_basename": "n_ds_ruinouspassage_flowers_01_c",
+                "png_name": "b3024468_n_ds_ruinouspassage_flowers_01_c.png",
+                "png_path": "textures/converted/b3024468_n_ds_ruinouspassage_flowers_01_c.png",
+            },
+            {
+                "original_basename": "n_ds_ruinouspassage_flowers_01_s",
+                "png_name": "378ceef5_n_ds_ruinouspassage_flowers_01_s.png",
+                "png_path": "textures/converted/378ceef5_n_ds_ruinouspassage_flowers_01_s.png",
+            },
+            {
+                "original_basename": "n_p_freemarch_foliage_flowers_01_c",
+                "png_name": "e6cc732e_n_p_freemarch_foliage_flowers_01_c.png",
+                "png_path": "textures/converted/e6cc732e_n_p_freemarch_foliage_flowers_01_c.png",
+            },
+        ]
+    }
+
+    suggestions = recovery.suggest_visual_fallback_textures(
+        ["n_ds_eternal_assault_flowers_01_c.dds"],
+        manifest,
+        limit=2,
+    )
+
+    top = suggestions["n_ds_eternal_assault_flowers_01_c.dds"][0]
+    assert top["dds_ref"] == "n_ds_ruinouspassage_flowers_01_c.dds"
+    assert "same texture role: c" in top["reasons"]
+    assert "same leading namespace tokens" in top["reasons"]
+
+
 def test_recover_textureless_dds_noops_when_all_refs_converted(tmp_path: Path) -> None:
     triage = tmp_path / "triage.json"
     converted_manifest = tmp_path / "converted-manifest.json"
@@ -120,6 +153,7 @@ def test_recover_textureless_dds_reports_unmatched_targets(monkeypatch, tmp_path
     assert report["summary"]["name_matches"] == 0
     assert report["summary"]["unmatched_target_refs"] == 1
     assert report["refs"]["unmatched_target"] == ["missing_c.dds"]
+    assert report["summary"]["visual_fallback_candidate_refs"] == 0
     assert report["summary"]["converted_pngs"] == 0
     assert len(report["commands"]) == 1
 

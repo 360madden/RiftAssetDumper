@@ -513,13 +513,13 @@ def build_audit(
         "Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
         "Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.",
+        "Review visual fallback candidates for the 2 unmatched DDS refs as manual surrogate options only, not durable texture truth.",
         "Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.",
         "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
         "Investigate the 2 existing no-match fallback OBJ rows separately.",
         "Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.",
-        "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
     ]
 
     audit: dict[str, Any] = {
@@ -723,6 +723,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{recovery_summary.get('target_refs', 'n/a')} currently missing conversion targets, "
             f"{recovery_summary.get('name_matches', 'n/a')} name matches, "
             f"{recovery_summary.get('unmatched_target_refs', 'n/a')} unmatched target refs, "
+            f"{recovery_summary.get('visual_fallback_candidate_refs', 'n/a')} refs with visual fallback candidates, "
             f"{recovery_summary.get('converted_pngs', 'n/a')} newly converted PNGs, "
             f"{recovery_summary.get('failed_conversions', 'n/a')} failed conversions."
         )
