@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T01:36:32.405585Z
+**Generated**: 2026-06-15T01:43:40.579868Z
 
 ## Why this exists
 
@@ -109,6 +109,7 @@ Optional heuristic expansion:
 - Missing converted DDS targets found in probe evidence: `n_ds_eternal_assault_flowers_01_c.dds`, `n_ds_eternal_assault_flowers_01_s.dds`.
 - `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report.
 - Latest textureless DDS recovery report: 2 refs, 2 currently missing conversion targets, 0 name matches, 2 unmatched target refs, 2 refs with visual fallback candidates, 0 newly converted PNGs, 0 failed conversions.
+- Textureless DDS visual fallback review: `Assets/build/flythrough/evidence/textureless-assets/recovery/TEXTURELESS_DDS_RECOVERY.md`.
 - `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
 - Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
 - `scripts/build_flythrough_combined_obj_package.py` turns the 349 materialized per-row OBJ/MTL files into one portable import package: one OBJ, one MTL, copied MTL-referenced textures, and `p` point directives for zero-face meshes.

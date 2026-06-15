@@ -118,6 +118,7 @@ def test_recover_textureless_dds_noops_when_all_refs_converted(tmp_path: Path) -
     assert report["summary"]["target_refs"] == 0
     assert report["commands"] == []
     assert (tmp_path / "recovery" / "textureless-dds-recovery-report.json").exists()
+    assert (tmp_path / "recovery" / "TEXTURELESS_DDS_RECOVERY.md").exists()
 
 
 def test_recover_textureless_dds_reports_unmatched_targets(monkeypatch, tmp_path: Path) -> None:
@@ -156,6 +157,9 @@ def test_recover_textureless_dds_reports_unmatched_targets(monkeypatch, tmp_path
     assert report["summary"]["visual_fallback_candidate_refs"] == 0
     assert report["summary"]["converted_pngs"] == 0
     assert len(report["commands"]) == 1
+    markdown = (tmp_path / "recovery" / "TEXTURELESS_DDS_RECOVERY.md").read_text(encoding="utf-8")
+    assert "Missing_C.dds".lower() in markdown
+    assert "Exact manifest name matching is the truth gate" in markdown
 
 
 def test_convert_recovered_dds_updates_manifest_with_png(monkeypatch, tmp_path: Path) -> None:

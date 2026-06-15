@@ -32,6 +32,7 @@ DEFAULT_RECOVERY_ROOT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "r
 DEFAULT_CONVERTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "converted-manifest.json"
 DEFAULT_CONVERTED_DIR = FLYTHROUGH_ROOT / "textures" / "converted"
 DEFAULT_DDS_OUT = FLYTHROUGH_ROOT / "textures" / "linked-dds" / "textureless-triage"
+DEFAULT_MARKDOWN_OUT = DEFAULT_RECOVERY_ROOT / "TEXTURELESS_DDS_RECOVERY.md"
 DEFAULT_PROJECT = REPO_ROOT / "src" / "RiftAssetDumper" / "RiftAssetDumper.csproj"
 DEFAULT_LIVE_ROOT_CANDIDATES = (
     Path(r"C:\Program Files (x86)\Glyph\Games\RIFT\Live"),
@@ -222,6 +223,88 @@ def suggest_visual_fallback_textures(
         ranked.sort(key=lambda item: (-int(item["score"]), item["dds_ref"]))
         suggestions[target_ref] = ranked[:limit]
     return suggestions
+
+
+def markdown_texture_path(png_path: str) -> str:
+    """Return a path usable from DEFAULT_RECOVERY_ROOT markdown to preview a generated PNG."""
+
+    normalized = _to_posix(png_path).lstrip("/")
+    flythrough_prefix = "Assets/build/flythrough/"
+    if normalized.startswith(flythrough_prefix):
+        normalized = normalized[len(flythrough_prefix) :]
+    return "../../../" + normalized
+
+
+def render_markdown(report: dict[str, Any]) -> str:
+    summary = report["summary"]
+    fallback_candidates = report.get("visual_fallback_candidates", {})
+    lines = [
+        "# Textureless DDS Recovery",
+        "",
+        f"**Generated**: {report['generated_at']}",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Count |",
+        "|---|---:|",
+        f"| Triage DDS refs | {summary['triage_dds_refs']} |",
+        f"| Current missing targets | {summary['target_refs']} |",
+        f"| Exact name matches | {summary['name_matches']} |",
+        f"| Unmatched targets | {summary.get('unmatched_target_refs', 0)} |",
+        f"| Refs with visual fallback candidates | {summary.get('visual_fallback_candidate_refs', 0)} |",
+        f"| Newly converted PNGs | {summary['converted_pngs']} |",
+        f"| Failed conversions | {summary['failed_conversions']} |",
+        "",
+        "## Exact recovery status",
+        "",
+        (
+            "Exact manifest name matching is the truth gate. Visual fallback candidates below are review aids only; "
+            "they are not promoted as recovered DDS truth."
+        ),
+        "",
+    ]
+    unmatched = report.get("refs", {}).get("unmatched_target", report.get("refs", {}).get("target", []))
+    if unmatched:
+        lines.extend(["### Unmatched target refs", ""])
+        lines.extend(f"- `{ref}`" for ref in unmatched)
+        lines.append("")
+
+    if fallback_candidates:
+        lines.extend(["## Visual fallback candidates", ""])
+        for target_ref, candidates in fallback_candidates.items():
+            lines.extend([f"### `{target_ref}`", ""])
+            if not candidates:
+                lines.extend(["_No fallback candidates found._", ""])
+                continue
+            lines.extend(["| Preview | Candidate | Score | Why |", "|---|---|---:|---|"])
+            for candidate in candidates:
+                png_path = str(candidate.get("png_path") or "")
+                preview = f"![preview]({markdown_texture_path(png_path)})" if png_path else ""
+                reasons = "; ".join(str(reason) for reason in candidate.get("reasons", []))
+                lines.append(
+                    f"| {preview} | `{candidate.get('dds_ref')}`<br>`{candidate.get('png_name')}` | "
+                    f"{candidate.get('score')} | {reasons} |"
+                )
+            lines.append("")
+
+    lines.extend(
+        [
+            "## Outputs",
+            "",
+            f"- JSON report: `{report['outputs']['report']}`",
+            f"- Name matches JSONL: `{report['outputs']['matches']}`",
+            f"- Links JSONL: `{report['outputs']['links']}`",
+            f"- DDS output root: `{report['outputs']['dds_out']}`",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_report_outputs(report: dict[str, Any], *, report_out: Path, markdown_out: Path, repo_root: Path) -> None:
+    report["outputs"]["markdown"] = repo_relative_path(markdown_out, repo_root=repo_root)
+    _write_json(report_out, report)
+    _write_text(markdown_out, render_markdown(report))
 
 
 def dds_refs_from_triage(report: dict[str, Any]) -> list[str]:
@@ -467,6 +550,7 @@ def recover_textureless_dds(
     converted_dir: Path = DEFAULT_CONVERTED_DIR,
     recovery_root: Path = DEFAULT_RECOVERY_ROOT,
     dds_out: Path = DEFAULT_DDS_OUT,
+    markdown_out: Path | None = None,
     project: Path = DEFAULT_PROJECT,
     live_root: Path | None = None,
     force: bool = False,
@@ -480,6 +564,7 @@ def recover_textureless_dds(
     matches_out = recovery_root / "textureless-dds-name-matches.jsonl"
     links_out = recovery_root / "textureless-dds-links.jsonl"
     report_out = recovery_root / "textureless-dds-recovery-report.json"
+    markdown_out = markdown_out or (recovery_root / DEFAULT_MARKDOWN_OUT.name)
     resolved_live_root = choose_live_root(live_root)
 
     report: dict[str, Any] = {
@@ -514,6 +599,7 @@ def recover_textureless_dds(
             "links": repo_relative_path(links_out, repo_root=repo_root),
             "dds_out": repo_relative_path(dds_out, repo_root=repo_root),
             "report": repo_relative_path(report_out, repo_root=repo_root),
+            "markdown": repo_relative_path(markdown_out, repo_root=repo_root),
         },
         "commands": [],
     }
@@ -525,11 +611,11 @@ def recover_textureless_dds(
 
     build_names_file(target_refs, names_file)
     if not target_refs:
-        _write_json(report_out, report)
+        write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
         return report
     if resolved_live_root is None:
         report["error"] = "No live root was provided and no default live root exists."
-        _write_json(report_out, report)
+        write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
         return report
 
     match_result = match_names(
@@ -542,7 +628,7 @@ def recover_textureless_dds(
     report["commands"].append(match_result)
     if match_result["returncode"] != 0:
         report["error"] = "match-names failed"
-        _write_json(report_out, report)
+        write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
         return report
 
     matches = _read_jsonl(matches_out)
@@ -565,7 +651,7 @@ def recover_textureless_dds(
     ]
 
     if not links:
-        _write_json(report_out, report)
+        write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
         return report
 
     extract_result = extract_linked_textures(
@@ -578,7 +664,7 @@ def recover_textureless_dds(
     report["commands"].append(extract_result)
     if extract_result["returncode"] != 0:
         report["error"] = "extract-linked-textures failed"
-        _write_json(report_out, report)
+        write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
         return report
 
     conversion = convert_recovered_dds(
@@ -593,7 +679,7 @@ def recover_textureless_dds(
     report["summary"]["converted_pngs"] = conversion["converted"]
     report["summary"]["skipped_existing_pngs"] = conversion["skipped_existing"]
     report["summary"]["failed_conversions"] = conversion["failed"]
-    _write_json(report_out, report)
+    write_report_outputs(report, report_out=report_out, markdown_out=markdown_out, repo_root=repo_root)
     return report
 
 
@@ -605,6 +691,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--converted-dir", type=Path, default=DEFAULT_CONVERTED_DIR)
     parser.add_argument("--recovery-root", type=Path, default=DEFAULT_RECOVERY_ROOT)
     parser.add_argument("--dds-out", type=Path, default=DEFAULT_DDS_OUT)
+    parser.add_argument("--markdown-out", type=Path)
     parser.add_argument("--project", type=Path, default=DEFAULT_PROJECT)
     parser.add_argument("--live-root", type=Path)
     parser.add_argument("--force", action="store_true", help="Recover all triage DDS refs, including converted refs.")
@@ -621,6 +708,7 @@ def main(argv: list[str] | None = None) -> int:
         converted_dir=args.converted_dir,
         recovery_root=args.recovery_root,
         dds_out=args.dds_out,
+        markdown_out=args.markdown_out,
         project=args.project,
         live_root=args.live_root,
         force=args.force,

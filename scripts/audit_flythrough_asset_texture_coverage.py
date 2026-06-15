@@ -727,6 +727,11 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{recovery_summary.get('converted_pngs', 'n/a')} newly converted PNGs, "
             f"{recovery_summary.get('failed_conversions', 'n/a')} failed conversions."
         )
+        recovery_outputs = textureless_recovery.get("outputs", {})
+        if recovery_outputs.get("markdown"):
+            textureless_recovery_lines.append(
+                f"- Textureless DDS visual fallback review: `{recovery_outputs['markdown']}`."
+            )
     bundle_smoke = _load_optional_json(DEFAULT_BUNDLE_SMOKE_REPORT)
     bundle_smoke_lines = [
         "- `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import."
