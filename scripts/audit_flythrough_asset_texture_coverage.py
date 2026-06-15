@@ -492,16 +492,16 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
+        "Open the generated texture triage gallery and review the 331 preview cards plus 19 gap rows.",
         "Smoke-import the generated OBJ/MTL bundle in RiftFlythrough or Blender.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
-        "Investigate the 3 no-match id-less OBJ entries separately.",
+        "Investigate the 2 existing no-match fallback OBJ rows separately.",
         "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
         "Investigate the 10 indexed asset IDs with no linked textures.",
         "Improve material role inference for special maps such as glow, masks, and alpha.",
-        "Add thumbnails or a lightweight HTML gallery for textured bundle triage.",
+        "Generate contact-sheet thumbnails if the HTML gallery is not enough for fast visual triage.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
-        "Use CI only as a guardrail after asset-coverage scripts/docs change, not as the main workstream.",
     ]
 
     audit: dict[str, Any] = {
@@ -711,6 +711,10 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"| `Assets/build/flythrough/obj-texture-bundle/materials/` | {existing_texture_linked} MTL files | "
             "Simple material sidecars pointing at converted PNGs |"
         ),
+        (
+            f"| `Assets/build/flythrough/texture-triage-gallery/index.html` | {common_heuristic_materializable} preview cards + {common_heuristic_skipped} gap rows | "
+            "Local HTML triage surface for materialized OBJ/MTL rows and remaining gaps |"
+        ),
         "",
         "Expected default bundle summary from this audit:",
         "",
@@ -734,6 +738,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {common_candidate_materializable} ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.",
         f"- {common_heuristic_materializable} total OBJ entries become materializable with both candidate options.",
         f"- {common_heuristic_skipped} entries remain skipped after both candidate options.",
+        "- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-candidate-textures.json` renders the local HTML triage gallery.",
         "",
         "## Top 10 next best actions",
         "",

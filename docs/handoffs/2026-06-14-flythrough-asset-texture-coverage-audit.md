@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-14T23:55:19.377309Z
+**Generated**: 2026-06-14T23:59:44.980794Z
 
 ## Why this exists
 
@@ -75,6 +75,7 @@ The flythrough closure artifact is asset-ID centric (`217` unique assets), while
 | `Assets/build/flythrough/flythrough-obj-texture-manifest.csv` | 350 rows | Spreadsheet-friendly triage view |
 | `Assets/build/flythrough/obj-texture-bundle/objs/` | 323 OBJ files | Texture-linked OBJ copies with injected `mtllib`/`usemtl` lines |
 | `Assets/build/flythrough/obj-texture-bundle/materials/` | 323 MTL files | Simple material sidecars pointing at converted PNGs |
+| `Assets/build/flythrough/texture-triage-gallery/index.html` | 331 preview cards + 19 gap rows | Local HTML triage surface for materialized OBJ/MTL rows and remaining gaps |
 
 Expected default bundle summary from this audit:
 
@@ -95,16 +96,17 @@ Optional heuristic expansion:
 - 4 ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.
 - 331 total OBJ entries become materializable with both candidate options.
 - 19 entries remain skipped after both candidate options.
+- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-candidate-textures.json` renders the local HTML triage gallery.
 
 ## Top 10 next best actions
 
-1. Smoke-import the generated OBJ/MTL bundle in RiftFlythrough or Blender.
-2. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
-3. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
-4. Investigate the 3 no-match id-less OBJ entries separately.
-5. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
-6. Investigate the 10 indexed asset IDs with no linked textures.
-7. Improve material role inference for special maps such as glow, masks, and alpha.
-8. Add thumbnails or a lightweight HTML gallery for textured bundle triage.
-9. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.
-10. Use CI only as a guardrail after asset-coverage scripts/docs change, not as the main workstream.
+1. Open the generated texture triage gallery and review the 331 preview cards plus 19 gap rows.
+2. Smoke-import the generated OBJ/MTL bundle in RiftFlythrough or Blender.
+3. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
+4. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
+5. Investigate the 2 existing no-match fallback OBJ rows separately.
+6. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
+7. Investigate the 10 indexed asset IDs with no linked textures.
+8. Improve material role inference for special maps such as glow, masks, and alpha.
+9. Generate contact-sheet thumbnails if the HTML gallery is not enough for fast visual triage.
+10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.
