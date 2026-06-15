@@ -351,6 +351,7 @@ def build_practical_package(
     unresolved_texture_report = build_unresolved_texture_evidence_report(
         repo_root=repo_root,
         texture_gap_report_path=texture_gap_json_out,
+        texture_recovery_report_path=texture_recovery_report_path,
     )
     _write_json(unresolved_texture_json_out, unresolved_texture_report)
     _write_text(unresolved_texture_markdown_out, render_unresolved_texture_markdown(unresolved_texture_report))
@@ -407,6 +408,10 @@ def build_practical_package(
                 "unmatched_exact_dds_refs": texture_gap_report["summary"]["unmatched_exact_dds_refs"],
                 "unmatched_exact_dds_refs_with_any_exact_match": unresolved_texture_report["summary"][
                     "unmatched_exact_dds_refs_with_any_exact_match"
+                ],
+                "texture_recovery_name_matches": unresolved_texture_report["summary"]["texture_recovery_name_matches"],
+                "texture_recovery_unmatched_refs": unresolved_texture_report["summary"][
+                    "texture_recovery_unmatched_refs"
                 ],
                 "bundle_verify_pass": bundle_verify["pass"],
                 "smoke_pass": smoke_report["summary"]["pass"],
@@ -499,6 +504,8 @@ def build_practical_package(
             "unmatched_exact_dds_refs_with_any_exact_match": unresolved_texture_report["summary"][
                 "unmatched_exact_dds_refs_with_any_exact_match"
             ],
+            "texture_recovery_name_matches": unresolved_texture_report["summary"]["texture_recovery_name_matches"],
+            "texture_recovery_unmatched_refs": unresolved_texture_report["summary"]["texture_recovery_unmatched_refs"],
             "neutral_asset_ids_with_texture_link_rows": unresolved_texture_report["summary"][
                 "neutral_asset_ids_with_texture_link_rows"
             ],
@@ -635,6 +642,8 @@ def main(argv: list[str] | None = None) -> int:
         f"review_materials={summary['review_material_entries']} "
         f"unmatched_dds={summary['unmatched_exact_dds_refs']} "
         f"exact_matches={summary['unmatched_exact_dds_refs_with_any_exact_match']} "
+        f"recovery_matches={summary['texture_recovery_name_matches']} "
+        f"recovery_unmatched={summary['texture_recovery_unmatched_refs']} "
         f"neutral_provenance_assets={summary['neutral_provenance_asset_ids']} "
         f"asset_no_mesh_link={summary['neutral_provenance_asset_backed_no_mesh_or_link_textures']} "
         f"world_context={summary['neutral_provenance_world_context_rows']} "

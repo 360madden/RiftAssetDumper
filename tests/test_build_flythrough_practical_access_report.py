@@ -61,6 +61,8 @@ def _build_report() -> dict:
             "texture_fallback_refs": 2,
             "unmatched_exact_dds_refs": 2,
             "unmatched_exact_dds_refs_with_any_exact_match": 0,
+            "texture_recovery_name_matches": 0,
+            "texture_recovery_unmatched_refs": 2,
             "bundle_verify_pass": True,
             "smoke_pass": True,
             "combined_entries": 350,
@@ -87,11 +89,17 @@ def _unresolved_texture_report() -> dict:
             {
                 "dds_ref": "n_ds_eternal_assault_flowers_01_c.dds",
                 "exact_match_count": 0,
+                "recovery_name_match_count": 0,
+                "recovery_unmatched": True,
+                "visual_fallback_candidate_count": 1,
             }
         ],
         "summary": {
             "unmatched_exact_dds_refs": 1,
             "unmatched_exact_dds_refs_with_any_exact_match": 0,
+            "texture_recovery_name_matches": 0,
+            "texture_recovery_unmatched_refs": 1,
+            "texture_recovery_visual_fallback_candidate_refs": 1,
         },
     }
 
@@ -160,6 +168,8 @@ def test_build_access_report_summarizes_access_and_review_queues() -> None:
     assert report["summary"]["rows_with_non_neutral_textures_or_fallbacks"] == 337
     assert report["summary"]["neutral_review_rows"] == 13
     assert report["summary"]["exact_dds_gaps"] == 2
+    assert report["summary"]["texture_recovery_name_matches"] == 0
+    assert report["summary"]["texture_recovery_unmatched_refs"] == 2
     assert report["summary"]["point_cloud_entries"] == 79
     assert report["summary"]["verification_pass"] is True
     assert report["review_queues"]["exact_dds_recovery"][0]["fallbacks"][0]["manifest_index"] == 118
@@ -184,6 +194,8 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
     assert "Assets/build/flythrough/gallery/index.html" in markdown
     assert "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.csv" in markdown
     assert "n_ds_eternal_assault_flowers_01_c.dds" in markdown
+    assert "Recovery name matches for exact DDS gaps" in markdown
+    assert "zero exact archive/name matches" in markdown
     assert "b5dc665faa848f85" in markdown
     assert "NiMaterialProperty" in markdown
     assert "Visual texture fallbacks are usability aids" in markdown
@@ -207,6 +219,8 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert exact_row["manifest_indices"] == "118"
     assert exact_row["gallery_links"] == "Assets/build/flythrough/gallery/index.html#row-118"
     assert exact_row["durable_truth"] is False
+    assert "recovery_name_matches=0" in exact_row["evidence"]
+    assert "recovery_unmatched=True" in exact_row["evidence"]
     assert "replacement=n_ds_ruinouspassage_flowers_01_c.dds" in exact_row["evidence"]
 
     neutral_row = next(row for row in rows if row["queue"] == "neutral-asset-provenance")

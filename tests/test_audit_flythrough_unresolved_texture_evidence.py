@@ -30,6 +30,7 @@ def test_build_unresolved_texture_evidence_report_counts_exact_and_asset_matches
     name_matches = tmp_path / "Exports" / "name-matches.jsonl"
     texture_links = tmp_path / "Exports" / "texture-links.jsonl"
     live_links = tmp_path / "Exports" / "live-links.jsonl"
+    recovery_report = tmp_path / "Assets" / "build" / "flythrough" / "evidence" / "recovery.json"
     _write_json(
         gap_report,
         {
@@ -61,10 +62,36 @@ def test_build_unresolved_texture_evidence_report_counts_exact_and_asset_matches
         ],
     )
     _write_jsonl(live_links, [{"ModelIdPrefix": "bbbbbbbbbbbbbbbb", "Candidate": "live_texture.dds"}])
+    _write_json(
+        recovery_report,
+        {
+            "summary": {
+                "target_refs": 2,
+                "name_matches": 0,
+                "unmatched_target_refs": 2,
+                "visual_fallback_candidate_refs": 1,
+            },
+            "refs": {
+                "target": ["missing_wall_c.dds", "still_missing_s.dds"],
+                "unmatched_target": ["missing_wall_c.dds", "still_missing_s.dds"],
+            },
+            "visual_fallback_candidates": {
+                "still_missing_s.dds": [
+                    {
+                        "dds_ref": "similar_wall_s.dds",
+                        "png_name": "abcd_similar_wall_s.png",
+                        "score": 157,
+                        "reasons": ["same texture role: s"],
+                    }
+                ]
+            },
+        },
+    )
 
     report = build_unresolved_texture_evidence_report(
         repo_root=tmp_path,
         texture_gap_report_path=gap_report,
+        texture_recovery_report_path=recovery_report,
         name_matches_path=name_matches,
         texture_links_path=texture_links,
         live_texture_links_all4_path=live_links,
@@ -74,9 +101,14 @@ def test_build_unresolved_texture_evidence_report_counts_exact_and_asset_matches
     assert report["summary"]["unmatched_exact_dds_refs_with_any_exact_match"] == 1
     assert report["summary"]["neutral_asset_ids"] == 2
     assert report["summary"]["neutral_asset_ids_with_texture_link_rows"] == 2
+    assert report["summary"]["texture_recovery_name_matches"] == 0
+    assert report["summary"]["texture_recovery_unmatched_refs"] == 2
     exact = {row["dds_ref"]: row for row in report["exact_dds_refs"]}
     assert exact["missing_wall_c.dds"]["exact_match_count"] == 1
     assert exact["still_missing_s.dds"]["exact_match_count"] == 0
+    assert exact["still_missing_s.dds"]["recovery_unmatched"] is True
+    assert exact["still_missing_s.dds"]["visual_fallback_candidate_count"] == 1
+    assert exact["still_missing_s.dds"]["top_visual_fallback"]["dds_ref"] == "similar_wall_s.dds"
     assets = {row["asset_id"]: row for row in report["neutral_assets"]}
     assert assets["aaaaaaaaaaaaaaaa"]["manifest_indices"] == [10, 11]
     assert assets["aaaaaaaaaaaaaaaa"]["texture_link_row_count"] == 1
@@ -95,6 +127,10 @@ def test_render_markdown_includes_negative_interpretation() -> None:
                 "neutral_rows": 2,
                 "neutral_rows_with_asset_id": 1,
                 "neutral_rows_without_asset_id": 1,
+                "texture_recovery_target_refs": 1,
+                "texture_recovery_name_matches": 0,
+                "texture_recovery_unmatched_refs": 1,
+                "texture_recovery_visual_fallback_candidate_refs": 1,
             },
             "source_stats": [
                 {
@@ -110,6 +146,14 @@ def test_render_markdown_includes_negative_interpretation() -> None:
                     "dds_ref": "still_missing_s.dds",
                     "exact_match_count": 0,
                     "counts_by_source": {},
+                    "recovery_name_match_count": 0,
+                    "recovery_unmatched": True,
+                    "visual_fallback_candidate_count": 1,
+                    "top_visual_fallback": {
+                        "dds_ref": "similar_wall_s.dds",
+                        "png_name": "abcd_similar_wall_s.png",
+                        "score": 157,
+                    },
                 }
             ],
             "neutral_assets": [
@@ -124,5 +168,7 @@ def test_render_markdown_includes_negative_interpretation() -> None:
     )
 
     assert "still_missing_s.dds" in markdown
+    assert "Recovery name matches" in markdown
+    assert "similar_wall_s.dds" in markdown
     assert "zero exact matches remain unresolved" in markdown
     assert "aaaaaaaaaaaaaaaa" in markdown

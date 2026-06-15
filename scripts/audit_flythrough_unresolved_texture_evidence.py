@@ -26,6 +26,9 @@ FLYTHROUGH_ROOT = REPO_ROOT / "Assets" / "build" / "flythrough"
 DEFAULT_TEXTURE_GAP_REPORT = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "texture-gap-report.json"
 )
+DEFAULT_TEXTURE_RECOVERY_REPORT = (
+    FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "textureless-dds-recovery-report.json"
+)
 DEFAULT_JSON_OUT = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "unresolved-texture-evidence-report.json"
 )
@@ -132,6 +135,45 @@ def _compact_match(source: str, line_number: int, row: dict[str, Any]) -> dict[s
     return compact
 
 
+def _load_optional_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return _load_json(path)
+
+
+def _recovery_ref_lookup(recovery_report: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    refs = recovery_report.get("refs", {}) if isinstance(recovery_report.get("refs"), dict) else {}
+    targets = {canonical_dds_ref(ref) for ref in refs.get("target", []) if isinstance(ref, str)}
+    unmatched = {canonical_dds_ref(ref) for ref in refs.get("unmatched_target", []) if isinstance(ref, str)}
+    match_counts: dict[str, int] = Counter(
+        canonical_dds_ref(str(match.get("name") or ""))
+        for match in recovery_report.get("matches", [])
+        if isinstance(match, dict) and str(match.get("name") or "").lower().endswith(".dds")
+    )
+    fallback_candidates = recovery_report.get("visual_fallback_candidates", {})
+    lookup: dict[str, dict[str, Any]] = {}
+    for ref in sorted(targets | unmatched | set(match_counts)):
+        candidates = fallback_candidates.get(ref, []) if isinstance(fallback_candidates, dict) else []
+        candidates = [candidate for candidate in candidates if isinstance(candidate, dict)]
+        top_fallback: dict[str, Any] | None = None
+        if candidates:
+            candidate = candidates[0]
+            top_fallback = {
+                "dds_ref": candidate.get("dds_ref"),
+                "png_name": candidate.get("png_name"),
+                "score": candidate.get("score"),
+                "reasons": candidate.get("reasons", []),
+            }
+        lookup[ref] = {
+            "targeted": ref in targets,
+            "name_match_count": match_counts.get(ref, 0),
+            "unmatched": ref in unmatched,
+            "visual_fallback_candidate_count": len(candidates),
+            "top_visual_fallback": top_fallback,
+        }
+    return lookup
+
+
 def _append_limited(bucket: dict[str, list[dict[str, Any]]], key: str, value: dict[str, Any], *, limit: int) -> None:
     values = bucket.setdefault(key, [])
     if len(values) < limit:
@@ -229,6 +271,7 @@ def build_unresolved_texture_evidence_report(
     *,
     repo_root: Path = REPO_ROOT,
     texture_gap_report_path: Path = DEFAULT_TEXTURE_GAP_REPORT,
+    texture_recovery_report_path: Path = DEFAULT_TEXTURE_RECOVERY_REPORT,
     name_matches_path: Path = DEFAULT_NAME_MATCHES,
     texture_links_path: Path = DEFAULT_TEXTURE_LINKS,
     live_texture_links_all4_path: Path = DEFAULT_LIVE_TEXTURE_LINKS_ALL4,
@@ -236,10 +279,12 @@ def build_unresolved_texture_evidence_report(
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     texture_gap = _load_json(texture_gap_report_path)
+    recovery_report = _load_optional_json(texture_recovery_report_path)
     neutral_rows = [row for row in texture_gap.get("neutral_rows", []) if isinstance(row, dict)]
     exact_refs = [canonical_dds_ref(ref) for ref in texture_gap.get("unmatched_exact_dds_refs", [])]
     neutral_asset_rows = _neutral_asset_rows(neutral_rows)
     asset_ids = sorted(neutral_asset_rows)
+    recovery_lookup = _recovery_ref_lookup(recovery_report)
     sources = [
         ("nif-reference-name-matches", name_matches_path),
         ("nif-texture-links", texture_links_path),
@@ -257,12 +302,18 @@ def build_unresolved_texture_evidence_report(
     exact_ref_reports = []
     for ref in exact_refs:
         counts = scan["exact_counts"].get(ref, {})
+        recovery = recovery_lookup.get(ref, {})
         exact_ref_reports.append(
             {
                 "dds_ref": ref,
                 "exact_match_count": sum(counts.values()),
                 "counts_by_source": counts,
                 "sample_matches": scan["exact_matches"].get(ref, []),
+                "recovery_targeted": bool(recovery.get("targeted")),
+                "recovery_name_match_count": int(recovery.get("name_match_count", 0) or 0),
+                "recovery_unmatched": bool(recovery.get("unmatched")),
+                "visual_fallback_candidate_count": int(recovery.get("visual_fallback_candidate_count", 0) or 0),
+                "top_visual_fallback": recovery.get("top_visual_fallback"),
             }
         )
 
@@ -286,6 +337,7 @@ def build_unresolved_texture_evidence_report(
         "generated_at": _now_iso(),
         "inputs": {
             "texture_gap_report": repo_relative_path(texture_gap_report_path, repo_root=repo_root),
+            "texture_recovery_report": repo_relative_path(texture_recovery_report_path, repo_root=repo_root),
             "name_matches": repo_relative_path(name_matches_path, repo_root=repo_root),
             "texture_links": repo_relative_path(texture_links_path, repo_root=repo_root),
             "live_texture_links_all4": repo_relative_path(live_texture_links_all4_path, repo_root=repo_root)
@@ -301,6 +353,26 @@ def build_unresolved_texture_evidence_report(
             "neutral_rows_with_asset_id": sum(len(rows) for rows in neutral_asset_rows.values()),
             "neutral_rows_without_asset_id": len([row for row in neutral_rows if not row.get("asset_id")]),
             "sources_scanned": len([source for source in scan["source_stats"] if source.get("exists")]),
+            "texture_recovery_target_refs": int(
+                recovery_report.get("summary", {}).get("target_refs", 0)
+                if isinstance(recovery_report.get("summary"), dict)
+                else 0
+            ),
+            "texture_recovery_name_matches": int(
+                recovery_report.get("summary", {}).get("name_matches", 0)
+                if isinstance(recovery_report.get("summary"), dict)
+                else 0
+            ),
+            "texture_recovery_unmatched_refs": int(
+                recovery_report.get("summary", {}).get("unmatched_target_refs", 0)
+                if isinstance(recovery_report.get("summary"), dict)
+                else 0
+            ),
+            "texture_recovery_visual_fallback_candidate_refs": int(
+                recovery_report.get("summary", {}).get("visual_fallback_candidate_refs", 0)
+                if isinstance(recovery_report.get("summary"), dict)
+                else 0
+            ),
         },
         "source_stats": scan["source_stats"],
         "exact_dds_refs": exact_ref_reports,
@@ -327,6 +399,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral rows | {summary['neutral_rows']} |",
         f"| Neutral rows with asset IDs | {summary['neutral_rows_with_asset_id']} |",
         f"| Neutral rows without asset IDs | {summary['neutral_rows_without_asset_id']} |",
+        f"| Recovery target DDS refs | {summary['texture_recovery_target_refs']} |",
+        f"| Recovery name matches | {summary['texture_recovery_name_matches']} |",
+        f"| Recovery unmatched refs | {summary['texture_recovery_unmatched_refs']} |",
+        f"| Recovery refs with visual fallback candidates | {summary['texture_recovery_visual_fallback_candidate_refs']} |",
         "",
         "## Source scan stats",
         "",
@@ -344,13 +420,23 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "## Exact DDS refs",
             "",
-            "| DDS ref | Exact matches | Counts by source |",
-            "|---|---:|---|",
+            "| DDS ref | Exact matches | Recovery name matches | Recovery unmatched | Fallback candidates | Top fallback | Counts by source |",
+            "|---|---:|---:|---:|---:|---|---|",
         ]
     )
     for row in report.get("exact_dds_refs", []):
         counts = ", ".join(f"{source}={count}" for source, count in row.get("counts_by_source", {}).items()) or "none"
-        lines.append(f"| `{row.get('dds_ref')}` | {row.get('exact_match_count')} | {counts} |")
+        fallback = row.get("top_visual_fallback") if isinstance(row.get("top_visual_fallback"), dict) else {}
+        fallback_text = (
+            f"`{fallback.get('dds_ref')}` / `{fallback.get('png_name')}` score={fallback.get('score')}"
+            if fallback
+            else "none"
+        )
+        lines.append(
+            f"| `{row.get('dds_ref')}` | {row.get('exact_match_count')} | "
+            f"{row.get('recovery_name_match_count')} | {row.get('recovery_unmatched')} | "
+            f"{row.get('visual_fallback_candidate_count')} | {fallback_text} | {counts} |"
+        )
 
     lines.extend(
         [
@@ -372,6 +458,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             "## Interpretation",
             "",
             "- Exact DDS refs with zero exact matches remain unresolved durable texture truth.",
+            "- Recovery name-match counts are the archive/name proof gate for the current textureless DDS targets.",
             "- Neutral asset IDs with zero texture-link rows should be investigated through non-mesh or parent/provenance evidence rather than normal asset texture links.",
             "- Any practical visual fallback remains non-durable until an exact DDS/name/archive proof appears.",
             "",
@@ -389,6 +476,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--texture-gap-report", type=Path, default=DEFAULT_TEXTURE_GAP_REPORT)
+    parser.add_argument("--texture-recovery-report", type=Path, default=DEFAULT_TEXTURE_RECOVERY_REPORT)
     parser.add_argument("--name-matches", type=Path, default=DEFAULT_NAME_MATCHES)
     parser.add_argument("--texture-links", type=Path, default=DEFAULT_TEXTURE_LINKS)
     parser.add_argument("--live-texture-links-all4", type=Path, default=DEFAULT_LIVE_TEXTURE_LINKS_ALL4)
@@ -403,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
     report = build_unresolved_texture_evidence_report(
         repo_root=args.repo_root,
         texture_gap_report_path=args.texture_gap_report,
+        texture_recovery_report_path=args.texture_recovery_report,
         name_matches_path=args.name_matches,
         texture_links_path=args.texture_links,
         live_texture_links_all4_path=args.live_texture_links_all4,
@@ -414,6 +503,8 @@ def main(argv: list[str] | None = None) -> int:
         "unresolved texture evidence: "
         f"exact_refs={summary['unmatched_exact_dds_refs']} "
         f"exact_matches={summary['unmatched_exact_dds_refs_with_any_exact_match']} "
+        f"recovery_matches={summary['texture_recovery_name_matches']} "
+        f"recovery_unmatched={summary['texture_recovery_unmatched_refs']} "
         f"neutral_assets={summary['neutral_asset_ids']} "
         f"neutral_assets_with_links={summary['neutral_asset_ids_with_texture_link_rows']}"
     )

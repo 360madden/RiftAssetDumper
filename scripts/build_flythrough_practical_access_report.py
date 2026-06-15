@@ -181,6 +181,9 @@ def _exact_dds_queue(
             {
                 "dds_ref": dds_ref,
                 "exact_match_count": row.get("exact_match_count", 0),
+                "recovery_name_match_count": row.get("recovery_name_match_count", 0),
+                "recovery_unmatched": row.get("recovery_unmatched"),
+                "visual_fallback_candidate_count": row.get("visual_fallback_candidate_count", 0),
                 "fallbacks": fallback_lookup.get(dds_ref, []),
                 "next_action": "Continue exact DDS/path/hash recovery; keep any visual fallback marked non-durable.",
             }
@@ -249,6 +252,10 @@ def _truth_boundaries(summary: dict[str, Any]) -> list[str]:
     ]
     if summary.get("exact_dds_gaps", 0) == 0:
         boundaries.append("No exact DDS gaps are currently reported by the package evidence.")
+    elif summary.get("texture_recovery_name_matches", 0) == 0:
+        boundaries.append(
+            "The current textureless DDS recovery gate found zero exact archive/name matches for the exact DDS gaps."
+        )
     return boundaries
 
 
@@ -306,7 +313,11 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                     "manifest_indices": "",
                     "asset_id": "",
                     "subject": item.get("dds_ref"),
-                    "evidence": f"exact_matches={item.get('exact_match_count')}; fallback=none",
+                    "evidence": (
+                        f"local_exact_matches={item.get('exact_match_count')}; "
+                        f"recovery_name_matches={item.get('recovery_name_match_count')}; "
+                        f"recovery_unmatched={item.get('recovery_unmatched')}; fallback=none"
+                    ),
                     "durable_truth": False,
                     "gallery_links": "",
                     "filter_tag": "texture-fallback",
@@ -324,7 +335,10 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                     "asset_id": fallback.get("asset_id") or "",
                     "subject": item.get("dds_ref"),
                     "evidence": (
-                        f"exact_matches={item.get('exact_match_count')}; "
+                        f"local_exact_matches={item.get('exact_match_count')}; "
+                        f"recovery_name_matches={item.get('recovery_name_match_count')}; "
+                        f"recovery_unmatched={item.get('recovery_unmatched')}; "
+                        f"fallback_candidates={item.get('visual_fallback_candidate_count')}; "
                         f"replacement={fallback.get('replacement_dds_ref')} / {fallback.get('replacement_png_name')}; "
                         f"score={fallback.get('score')}"
                     ),
@@ -414,6 +428,7 @@ def build_access_report(
 ) -> dict[str, Any]:
     package_summary = build_report.get("summary", {})
     texture_summary = texture_gap_report.get("summary", {})
+    unresolved_summary = unresolved_texture_report.get("summary", {})
     neutral_summary = neutral_provenance_report.get("summary", {})
     combined_summary = combined_report.get("summary", {})
     manifest_summary = manifest.get("summary", {})
@@ -452,7 +467,25 @@ def build_access_report(
         "texture_fallback_refs": int(package_summary.get("texture_fallback_refs", 0) or 0),
         "exact_dds_gaps": int(package_summary.get("unmatched_exact_dds_refs", 0) or 0),
         "exact_dds_gaps_with_any_exact_match": int(
-            package_summary.get("unmatched_exact_dds_refs_with_any_exact_match", 0) or 0
+            package_summary.get(
+                "unmatched_exact_dds_refs_with_any_exact_match",
+                unresolved_summary.get("unmatched_exact_dds_refs_with_any_exact_match", 0),
+            )
+            or 0
+        ),
+        "texture_recovery_name_matches": int(
+            package_summary.get(
+                "texture_recovery_name_matches",
+                unresolved_summary.get("texture_recovery_name_matches", 0),
+            )
+            or 0
+        ),
+        "texture_recovery_unmatched_refs": int(
+            package_summary.get(
+                "texture_recovery_unmatched_refs",
+                unresolved_summary.get("texture_recovery_unmatched_refs", 0),
+            )
+            or 0
         ),
         "combined_entries": int(
             package_summary.get("combined_entries", combined_summary.get("combined_entries", 0)) or 0
@@ -526,6 +559,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Id-less/source-substituted neutral rows | {summary['idless_neutral_rows']} |",
         f"| Texture fallback refs | {summary['texture_fallback_refs']} |",
         f"| Exact DDS gaps | {summary['exact_dds_gaps']} |",
+        f"| Recovery name matches for exact DDS gaps | {summary['texture_recovery_name_matches']} |",
+        f"| Recovery unmatched exact DDS refs | {summary['texture_recovery_unmatched_refs']} |",
         f"| Source-substituted entries | {summary['source_substituted_entries']} |",
         f"| Combined entries | {summary['combined_entries']} |",
         f"| Combined skipped entries | {summary['combined_skipped_entries']} |",
@@ -539,7 +574,12 @@ def render_markdown(report: dict[str, Any]) -> str:
     exact_dds_queue = queues.get("exact_dds_recovery", [])
     lines.extend(["## Review queue: exact DDS recovery", ""])
     if exact_dds_queue:
-        lines.extend(["| DDS ref | Exact matches | Active fallback(s) | Next action |", "|---|---:|---|---|"])
+        lines.extend(
+            [
+                "| DDS ref | Local exact matches | Recovery name matches | Recovery unmatched | Fallback candidates | Active fallback(s) | Next action |",
+                "|---|---:|---:|---:|---:|---|---|",
+            ]
+        )
         for item in exact_dds_queue:
             fallbacks = item.get("fallbacks", [])
             fallback_text = "<br>".join(
@@ -552,7 +592,9 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
             lines.append(
                 f"| `{item.get('dds_ref')}` | {item.get('exact_match_count')} | "
-                f"{fallback_text or '_none_'} | {item.get('next_action')} |"
+                f"{item.get('recovery_name_match_count')} | {item.get('recovery_unmatched')} | "
+                f"{item.get('visual_fallback_candidate_count')} | {fallback_text or '_none_'} | "
+                f"{item.get('next_action')} |"
             )
     else:
         lines.append("_No exact DDS recovery queue items._")
