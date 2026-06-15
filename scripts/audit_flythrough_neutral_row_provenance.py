@@ -355,7 +355,7 @@ def _summarize_world_context(
         return {"path": rel_path, "exists": False}
     try:
         world = _load_json(path)
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {"path": rel_path, "exists": True, "parse_error": True}
 
     nodes = [node for node in world.get("Nodes", []) if isinstance(node, dict)]
@@ -481,7 +481,7 @@ def _summarize_probe_file(repo_root: Path, output: str | Path | None, mesh_block
         return {"path": rel_path, "exists": False}
     try:
         probe = _load_json(path)
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {"path": rel_path, "exists": True, "parse_error": True}
 
     meshes = [mesh for mesh in probe.get("Meshes", []) if isinstance(mesh, dict)]
