@@ -64,6 +64,14 @@ def _manifest() -> dict:
                     }
                 ],
                 "chosen_material_textures": {"diffuse": "fallback_c.png"},
+                "texture_fallbacks": [
+                    {
+                        "target_dds_ref": "missing_flowers_c.dds",
+                        "replacement_dds_ref": "similar_flowers_c.dds",
+                        "replacement_png_name": "fallback_c.png",
+                        "durable_truth": False,
+                    }
+                ],
                 "bundled_obj": "Assets/build/flythrough/obj-texture-bundle-candidate-textures/objs/001.obj",
                 "bundled_mtl": "Assets/build/flythrough/obj-texture-bundle-candidate-textures/materials/001.mtl",
             },
@@ -72,6 +80,13 @@ def _manifest() -> dict:
                 "materializable": False,
                 "source_obj": "Exports/missing.obj",
                 "source_exists": False,
+                "original_source_obj": "Exports/original-missing.obj",
+                "source_substitution": {
+                    "replacement_source_obj": "Assets/build/flythrough/evidence/candidate.obj",
+                    "candidate_asset_id": "07f37c99a80da009",
+                    "durable_truth": False,
+                    "status": "active",
+                },
                 "asset_id": None,
                 "candidate_asset_ids": [],
                 "candidate_status": "no-geometry-signature-match",
@@ -99,6 +114,7 @@ def test_build_gallery_model_counts_sources_roles_and_remaining() -> None:
     assert model["texture_sources"] == {"asset-id": 1, "single-candidate-heuristic": 1}
     assert model["remaining_reasons"] == {"missing-source-obj": 1}
     assert model["texture_roles"] == {"diffuse": 2, "normal": 1}
+    assert len(model["texture_fallback_refs"]) == 1
 
 
 def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> None:
@@ -107,5 +123,22 @@ def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> Non
     assert "Flythrough OBJ Texture Triage" in text
     assert "missing-source-obj" in text
     assert "wall_c.png" in text
+    assert "Practical texture fallbacks" in text
+    assert "missing_flowers_c.dds" in text
+    assert "durable=false" in text
     assert "../textures/converted/wall_c.png" in text
     assert "../obj-texture-bundle-candidate-textures/objs/000.obj" in text
+
+
+def test_render_gallery_lists_source_substitutions(tmp_path: Path) -> None:
+    manifest = _manifest()
+    manifest["entries"][2]["materializable"] = True
+    manifest["entries"][2]["bundled_obj"] = "Assets/build/flythrough/obj-texture-bundle-candidate-textures/objs/002.obj"
+    manifest["entries"][2]["bundled_mtl"] = (
+        "Assets/build/flythrough/obj-texture-bundle-candidate-textures/materials/002.mtl"
+    )
+    html_out = tmp_path / "Assets" / "build" / "flythrough" / "texture-triage-gallery" / "index.html"
+    text = render_gallery(manifest, html_out=html_out, repo_root=tmp_path, max_cards=10)
+    assert "Practical source substitutions" in text
+    assert "Exports/original-missing.obj" in text
+    assert "07f37c99a80da009" in text

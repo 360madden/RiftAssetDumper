@@ -96,6 +96,14 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
     roles = Counter(
         texture.get("role") or "unknown" for entry in materialized for texture in entry.get("linked_textures", [])
     )
+    source_substitutions = [entry for entry in materialized if isinstance(entry.get("source_substitution"), dict)]
+    texture_fallback_entries = [entry for entry in materialized if entry.get("texture_fallbacks")]
+    texture_fallback_refs = [
+        fallback
+        for entry in texture_fallback_entries
+        for fallback in entry.get("texture_fallbacks", [])
+        if isinstance(fallback, dict)
+    ]
     return {
         "summary": manifest.get("summary", {}),
         "entries": entries,
@@ -104,6 +112,9 @@ def build_gallery_model(manifest: dict[str, Any]) -> dict[str, Any]:
         "texture_sources": dict(sorted(texture_sources.items())),
         "remaining_reasons": dict(sorted(remaining_reasons.items())),
         "texture_roles": dict(sorted(roles.items())),
+        "source_substitutions": source_substitutions,
+        "texture_fallback_entries": texture_fallback_entries,
+        "texture_fallback_refs": texture_fallback_refs,
     }
 
 
@@ -120,6 +131,8 @@ def _summary_html(model: dict[str, Any]) -> str:
         _pill("remaining", len(model["remaining"])),
         _pill("single-candidate", summary.get("single_candidate_materialized_entries", 0)),
         _pill("common-candidate", summary.get("common_candidate_materialized_entries", 0)),
+        _pill("source substitutions", summary.get("source_substituted_entries", 0)),
+        _pill("texture fallback refs", summary.get("texture_fallback_refs", 0)),
         _pill("verify", "pass" if verify.get("pass") else "not-run"),
         _pill("missing textures", verify.get("missing_texture_refs_count", "n/a")),
     ]
@@ -153,13 +166,33 @@ def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path
     textures = ", ".join(texture.get("name", "") for texture in entry.get("linked_textures", [])[:4])
     if entry.get("linked_texture_count", 0) > 4:
         textures += f", +{entry['linked_texture_count'] - 4} more"
+    badges = []
+    source_substitution = entry.get("source_substitution")
+    if isinstance(source_substitution, dict):
+        badges.append(
+            _pill(
+                "source substitute",
+                f"{source_substitution.get('review_status') or source_substitution.get('status')}; "
+                f"durable={source_substitution.get('durable_truth')}",
+            )
+        )
+    texture_fallbacks = [fallback for fallback in entry.get("texture_fallbacks", []) if isinstance(fallback, dict)]
+    if texture_fallbacks:
+        badges.append(_pill("texture fallbacks", f"{len(texture_fallbacks)}; durable=false"))
+    badges_html = f'<p class="badges">{" ".join(badges)}</p>' if badges else ""
+    card_classes = ["card", f"source-{entry.get('texture_source') or 'none'}"]
+    if source_substitution:
+        card_classes.append("has-source-substitution")
+    if texture_fallbacks:
+        card_classes.append("has-texture-fallback")
 
     return f"""
-<article class="card source-{_esc(entry.get("texture_source") or "none")}">
+<article class="{_esc(" ".join(card_classes))}">
   <div class="thumb">{image_html}</div>
   <div class="meta">
     <h3>#{_esc(entry.get("manifest_index"))} {_esc(entry.get("asset_id") or "id-less")}</h3>
     <p>{_pill("source", entry.get("texture_source"))} {_pill("textures", entry.get("linked_texture_count"))}</p>
+    {badges_html}
     <p class="small">{_esc(textures)}</p>
     <p><a href="{_esc(obj_href)}">OBJ</a> · <a href="{_esc(mtl_href)}">MTL</a></p>
   </div>
@@ -178,6 +211,67 @@ def _remaining_row(entry: dict[str, Any]) -> str:
   <td>{_esc(candidates)}</td>
   <td>{_esc(entry.get("candidate_status") or "")}</td>
 </tr>
+"""
+
+
+def _source_substitution_table(entries: list[dict[str, Any]]) -> str:
+    if not entries:
+        return ""
+    rows = []
+    for entry in entries:
+        substitution = entry.get("source_substitution") or {}
+        rows.append(
+            f"""
+<tr>
+  <td class="num">{_esc(entry.get("manifest_index"))}</td>
+  <td><code>{_esc(entry.get("original_source_obj") or substitution.get("replaces_source_obj"))}</code></td>
+  <td><code>{_esc(substitution.get("replacement_source_obj") or entry.get("source_obj"))}</code></td>
+  <td>{_esc(substitution.get("candidate_asset_id") or "")}</td>
+  <td>{_esc(substitution.get("durable_truth"))}</td>
+</tr>
+"""
+        )
+    return f"""
+<section>
+  <h2>Practical source substitutions ({len(entries)})</h2>
+  <p class="small">These rows improve access but do not claim exact source recovery unless durable truth is true.</p>
+  <table>
+    <thead><tr><th>#</th><th>Original source</th><th>Replacement source</th><th>Candidate asset</th><th>Durable truth</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table>
+</section>
+"""
+
+
+def _texture_fallback_table(entries: list[dict[str, Any]]) -> str:
+    rows = []
+    for entry in entries:
+        for fallback in entry.get("texture_fallbacks", []):
+            if not isinstance(fallback, dict):
+                continue
+            rows.append(
+                f"""
+<tr>
+  <td class="num">{_esc(entry.get("manifest_index"))}</td>
+  <td>{_esc(entry.get("asset_id") or "")}</td>
+  <td><code>{_esc(fallback.get("target_dds_ref"))}</code></td>
+  <td><code>{_esc(fallback.get("replacement_dds_ref") or "")}</code></td>
+  <td>{_esc(fallback.get("replacement_png_name") or "")}</td>
+  <td>{_esc(fallback.get("durable_truth"))}</td>
+</tr>
+"""
+            )
+    if not rows:
+        return ""
+    return f"""
+<section>
+  <h2>Practical texture fallbacks ({len(rows)})</h2>
+  <p class="small">These PNGs are visual substitutes for review/import usability; exact DDS recovery remains separate unless durable truth is true.</p>
+  <table>
+    <thead><tr><th>#</th><th>Asset ID</th><th>Missing DDS ref</th><th>Replacement DDS ref</th><th>Replacement PNG</th><th>Durable truth</th></tr></thead>
+    <tbody>{"".join(rows)}</tbody>
+  </table>
+</section>
 """
 
 
@@ -208,12 +302,14 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     .pill {{ display: inline-block; margin: 4px 6px 4px 0; padding: 4px 8px; border-radius: 999px; background: #1f2937; }}
     .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }}
     .card {{ display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 12px; }}
+    .card.has-source-substitution, .card.has-texture-fallback {{ border-color: #f59e0b; box-shadow: 0 0 0 1px rgba(245, 158, 11, .25); }}
     .card h3 {{ margin: 0 0 8px; font-size: 15px; }}
     .card p {{ margin: 6px 0; }}
     .thumb {{ width: 92px; height: 92px; background: #0f172a; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }}
     .thumb img {{ max-width: 92px; max-height: 92px; image-rendering: auto; }}
     .no-preview {{ color: #94a3b8; font-size: 12px; text-align: center; }}
     .small {{ color: #cbd5e1; font-size: 12px; overflow-wrap: anywhere; }}
+    .badges .pill {{ background: #78350f; color: #fde68a; }}
   </style>
 </head>
 <body>
@@ -226,6 +322,8 @@ def render_gallery(manifest: dict[str, Any], *, html_out: Path, repo_root: Path,
     {_counter_table("Texture sources", model["texture_sources"])}
     {_counter_table("Remaining gap reasons", model["remaining_reasons"])}
     {_counter_table("Texture roles in materialized rows", model["texture_roles"])}
+    {_source_substitution_table(model["source_substitutions"])}
+    {_texture_fallback_table(model["texture_fallback_entries"])}
 
     <section>
       <h2>Remaining non-materialized rows ({len(model["remaining"])})</h2>

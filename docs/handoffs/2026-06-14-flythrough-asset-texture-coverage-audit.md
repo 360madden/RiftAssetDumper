@@ -127,12 +127,13 @@ Optional heuristic expansion:
 - The texture fallback row is manifest index 118 (`fa78ee2d8c3abca7`): exact missing refs remain `n_ds_eternal_assault_flowers_01_c.dds` and `n_ds_eternal_assault_flowers_01_s.dds`; practical visual substitutes are `b3024468_n_ds_ruinouspassage_flowers_01_c.png` and `378ceef5_n_ds_ruinouspassage_flowers_01_s.png`, both `durable_truth=false`.
 - Practical 350 + texture fallbacks smoke/package: `Assets/build/flythrough/evidence/practical-350-texture-fallbacks/obj-texture-bundle-smoke.json` reports pass=True, 350 checked entries, 0 OBJ issues, 0 MTL issues, 0 missing textures; `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/combined.obj` reports 350 combined entries, 0 skipped, 23421 vertices, 30935 faces, 158 copied texture files, verify_pass=True.
 - The practical 350 + texture fallbacks combined-package report/Markdown now explicitly lists practical source substitutions and texture fallbacks: 1 non-durable source substitution, 1 texture-fallback entry, 2 non-durable texture fallback refs, all marked `durable_truth=false` in `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/COMBINED_OBJ_PACKAGE.md`.
+- Practical 350 + texture fallbacks gallery: `Assets/build/flythrough/texture-triage-gallery-practical-350-texture-fallbacks/index.html` renders 350 materialized cards, 0 remaining rows, and explicit practical source substitution / texture fallback tables containing row 121, row 118, and `durable=false` labels.
 
 ## Top 10 next best actions
 
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
 2. Smoke-import the practical 350 combined package in Blender or an MTL-aware viewer and inspect the source-substituted mesh17 row.
-3. Review `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/COMBINED_OBJ_PACKAGE.md`, then smoke-import the package and compare row 118 with and without the visual flower substitutes.
+3. Open `Assets/build/flythrough/texture-triage-gallery-practical-350-texture-fallbacks/index.html`, review row 118 and row 121 boundary labels, then smoke-import the package.
 4. Continue exact recovery/proof for the 2 `n_ds_eternal_assault_flowers_01_*` DDS refs; the practical fallbacks are not durable truth.
 5. Decide whether any of the other 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
 6. Investigate the two redrive failures with no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
