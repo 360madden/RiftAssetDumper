@@ -91,6 +91,14 @@ def _manifest() -> dict:
                 "candidate_asset_ids": [],
                 "candidate_status": "no-geometry-signature-match",
                 "linked_texture_count": 0,
+                "texture_source": "untextured-neutral",
+                "review_material": {
+                    "kind": "source-substitution-no-textures",
+                    "label": "source-substituted row without texture refs",
+                    "diffuse_color": [0.65, 0.45, 0.95],
+                    "durable_texture_truth": False,
+                    "reason": "Source OBJ is a practical substitute and still has no texture evidence.",
+                },
             },
         ],
     }
@@ -115,6 +123,7 @@ def test_build_gallery_model_counts_sources_roles_and_remaining() -> None:
     assert model["remaining_reasons"] == {"missing-source-obj": 1}
     assert model["texture_roles"] == {"diffuse": 2, "normal": 1}
     assert len(model["texture_fallback_refs"]) == 1
+    assert model["review_materials"] == {}
 
 
 def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> None:
@@ -142,3 +151,7 @@ def test_render_gallery_lists_source_substitutions(tmp_path: Path) -> None:
     assert "Practical source substitutions" in text
     assert "Exports/original-missing.obj" in text
     assert "07f37c99a80da009" in text
+    assert "Neutral review materials" in text
+    assert "source-substitution-no-textures" in text
+    assert "durable_texture_truth=False" in text
+    assert "rgb(166, 115, 242)" in text
