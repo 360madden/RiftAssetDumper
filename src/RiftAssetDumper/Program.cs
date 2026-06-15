@@ -14959,8 +14959,8 @@ internal static class Program
           experimental,
           experimentalPositionSource,
           exportObj,
-          ghidraBodyOffset,
-          writeObj);
+          writeObj,
+          ghidraBodyOffset);
     }
 
     public int MaxTotalOrUnlimited() => MaxTotal > 0 ? MaxTotal : int.MaxValue;

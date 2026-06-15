@@ -102,6 +102,10 @@ Optional heuristic expansion:
 - `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`.
 - Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 same-size file candidates, 0 repaired.
 - Latest missing OBJ classifier: 8 similar existing candidate(s), 0 derived no-face variant(s) matching the expected SHA-256.
+- 2026-06-15 source-access redrive: `decode-nif-geometry --write-obj` was blocked by an option-parse swap that assigned `--write-obj` to `GhidraBodyOffset`; this is fixed so linked-stream fallback exports can actually write OBJ files again.
+- Isolated live redrive of high-similarity candidate `07f37c99a80da009` mesh block 17 succeeded through `--experimental-position-source --write-obj`: 50 vertices, 71 faces, 50 texcoords. This is a practical materialized candidate for review, not an exact SHA repair of the missing no-ID source path.
+- Bulk redrive of the 14 prior FT-2 failed assets now exports 12/14 through linked-stream fallback into generated evidence (`Assets/build/flythrough/evidence/missing-obj-repair/bulk-redrive-failed-manifest.json`), and `bulk_export_for_flythrough.py verify` reports 12/12 exported entries OK; the 2 remaining failures have no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
+- `scripts/bulk_export_for_flythrough.py` now records nested generated OBJ paths relative to the output root and records the real experimental fallback command, so redriven OBJ artifacts are discoverable by status/verify tooling instead of being orphaned under subdirectories.
 - `scripts/probe_flythrough_textureless_meshes.py` refreshes focused live-root `probe-nif-mesh` JSON for textureless-scope asset/mesh rows, so triage can find row-scoped DDS refs instead of guessing.
 - Latest textureless probe refresh report: 6 asset/mesh targets, 0 commands run, 1 targets with mesh-level DDS refs, 2 unique mesh-level DDS refs.
 - `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`.
@@ -118,12 +122,12 @@ Optional heuristic expansion:
 ## Top 10 next best actions
 
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
-2. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
+2. Prove, promote, or reject the redriven `07f37c99a80da009` mesh17 candidate as the practical substitute for the missing no-ID OBJ path.
 3. Recover or prove unavailable the 2 newly found `n_ds_eternal_assault_flowers_01_*` DDS refs.
 4. Review visual fallback candidates for the 2 unmatched DDS refs as manual surrogate options only, not durable texture truth.
-5. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
-6. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
-7. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
-8. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
-9. Investigate the 2 existing no-match fallback OBJ rows separately.
+5. Decide whether the 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
+6. Investigate the two redrive failures with no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
+7. Investigate the remaining neutral-material rows that still lack row-scoped DDS refs.
+8. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
+9. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
 10. Verify the portable package in the target downstream importer once a Blender or MTL-aware viewer path is available.

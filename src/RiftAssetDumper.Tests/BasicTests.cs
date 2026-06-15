@@ -241,6 +241,25 @@ public class BasicTests
   }
 
   [Fact]
+  public void AppOptionsParse_KeepsWriteObjAndGhidraBodyOffsetSeparate()
+  {
+    var appOptionsType = typeof(Program).GetNestedType("AppOptions", BindingFlags.NonPublic);
+    Assert.NotNull(appOptionsType);
+    var parse = appOptionsType!.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static);
+    Assert.NotNull(parse);
+
+    var writeOnly = parse!.Invoke(null, [new[] { "decode-nif-geometry", "--write-obj" }]);
+    Assert.NotNull(writeOnly);
+    Assert.True((bool)appOptionsType.GetProperty("WriteObj")!.GetValue(writeOnly)!);
+    Assert.False((bool)appOptionsType.GetProperty("GhidraBodyOffset")!.GetValue(writeOnly)!);
+
+    var ghidraOnly = parse.Invoke(null, [new[] { "decode-nif-geometry", "--ghidra-body-offset" }]);
+    Assert.NotNull(ghidraOnly);
+    Assert.False((bool)appOptionsType.GetProperty("WriteObj")!.GetValue(ghidraOnly)!);
+    Assert.True((bool)appOptionsType.GetProperty("GhidraBodyOffset")!.GetValue(ghidraOnly)!);
+  }
+
+  [Fact]
   public void TwadArchiveHeader_MatchesClientGhidraProof()
   {
     var bytes = new byte[20 + 44];

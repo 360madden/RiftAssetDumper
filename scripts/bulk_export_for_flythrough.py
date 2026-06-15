@@ -418,6 +418,17 @@ def _write_manifest(manifest_path: Path, manifest: dict[str, Any]) -> None:
     _atomic_write_json(manifest_path, manifest)
 
 
+def _relative_path_text(path: Path, root: Path) -> str:
+    """Return a stable POSIX path for a file under a generated artifact root."""
+
+    return str(path.relative_to(root)).replace("\\", "/")
+
+
+def _decode_command_text(asset_id: str, mesh_block: int, mode: str) -> str:
+    mode_flags = "--experimental-position-source --write-obj" if mode == "experimental" else "--export-obj"
+    return f"decode-nif-geometry --id {asset_id} --mesh-block {mesh_block} {mode_flags}"
+
+
 def _enrich_sidecar_with_scene_graph(
     sidecar_path: Path,
     sg_data: dict[str, Any],
@@ -693,7 +704,7 @@ def bulk_export_for_flythrough(
                 "status": "failed",
                 "error_message": stderr_tail or "no obj produced",
                 "export_duration_sec": round(elapsed, 1),
-                "command": f"decode-nif-geometry --id {asset_id} --mesh-block {best_mb} --export-obj",
+                "command": _decode_command_text(asset_id, best_mb, export_mode),
             }
             manifest["Entries"].append(fail_entry)
             manifest["Stats"] = stats
@@ -758,12 +769,12 @@ def bulk_export_for_flythrough(
             "mesh_size": None,
             "status": status,
             "export_mode": export_mode,
-            "obj_path": obj_path.name,
+            "obj_path": _relative_path_text(obj_path, output_dir),
             "obj_sha1": obj_sha1,
             "obj_bytes": obj_bytes,
             "export_duration_sec": round(elapsed, 1),
             "exported_at": _now_iso(),
-            "command": f"decode-nif-geometry --id {asset_id} --mesh-block {best_mb} --export-obj",
+            "command": _decode_command_text(asset_id, best_mb, export_mode),
             "stdout_tail": stdout_tail,
             "stderr_tail": stderr_tail,
         }

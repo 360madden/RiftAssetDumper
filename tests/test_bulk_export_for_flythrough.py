@@ -181,6 +181,7 @@ def test_single_mesh_export_writes_one_entry(tmp_path, monkeypatch) -> None:
     assert len(data["Entries"]) == 1
     assert data["Entries"][0]["nif_hash"] == "abcdef0123456789"
     assert data["Entries"][0]["status"] == "exported"
+    assert data["Entries"][0]["obj_path"] == "decode-nif-geometry-abcdef0123456789/mesh.obj"
 
 
 def test_error_on_one_mesh_with_skip_on_error_continues(tmp_path, monkeypatch) -> None:
@@ -211,6 +212,40 @@ def test_error_on_one_mesh_with_skip_on_error_continues(tmp_path, monkeypatch) -
     assert result.stats["failed"] == 1
     assert len(result.errors) == 1
     assert result.errors[0]["id"] == "1111111111111111"
+
+
+def test_no_attribute_sets_retries_experimental_and_records_real_command(tmp_path, monkeypatch) -> None:
+    """No-attribute-set meshes should be redriven through linked-stream fallback."""
+    out = tmp_path / "objs"
+    manifest = tmp_path / "m.json"
+    calls: list[str] = []
+
+    def fake_decode(asset_id, *, project, root, timeout_sec, mesh_block=0, mode="export-obj", out_dir=None):
+        calls.append(mode)
+        if mode == "export-obj":
+            return False, "", "ERROR: no attribute sets found for this mesh.", 0.1
+        asset_subdir = out_dir or (out / f"decode-nif-geometry-{asset_id}")
+        asset_subdir.mkdir(parents=True, exist_ok=True)
+        obj_file = asset_subdir / "mesh.obj"
+        _write_obj(obj_file, b"# experimental OBJ\nv 0 0 0\n")
+        return True, "OBJ written", "", 0.1
+
+    monkeypatch.setattr("bulk_export_for_flythrough.run_decode_geometry", fake_decode)
+    result = bulk_export_for_flythrough(
+        asset_ids=["abcdef0123456789"],
+        output_dir=out,
+        manifest_path=manifest,
+        project=Path("."),
+        root=Path("."),
+    )
+
+    assert calls == ["export-obj", "experimental"]
+    assert result.stats["exported"] == 1
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    entry = data["Entries"][0]
+    assert entry["export_mode"] == "experimental"
+    assert entry["command"].endswith("--experimental-position-source --write-obj")
+    assert entry["obj_path"] == "decode-nif-geometry-abcdef0123456789/mesh.obj"
 
 
 def test_resume_after_error_skips_already_exported(tmp_path, monkeypatch) -> None:
