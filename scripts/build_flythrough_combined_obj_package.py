@@ -287,6 +287,60 @@ def collect_mtl_lines(
     return lines, missing, copied_textures, missing_textures
 
 
+def collect_practical_truth_boundaries(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Collect non-durable practical substitute metadata from manifest rows."""
+
+    source_substitutions: list[dict[str, Any]] = []
+    texture_fallbacks: list[dict[str, Any]] = []
+
+    for entry in entries:
+        manifest_index = entry.get("manifest_index")
+        source_substitution = entry.get("source_substitution")
+        if isinstance(source_substitution, dict):
+            source_substitutions.append(
+                {
+                    "manifest_index": manifest_index,
+                    "source_obj": entry.get("source_obj"),
+                    "original_source_obj": entry.get("original_source_obj")
+                    or source_substitution.get("replaces_source_obj"),
+                    "replacement_source_obj": source_substitution.get("replacement_source_obj"),
+                    "candidate_asset_id": source_substitution.get("candidate_asset_id"),
+                    "review_status": source_substitution.get("review_status"),
+                    "status": source_substitution.get("status"),
+                    "durable_truth": bool(source_substitution.get("durable_truth")),
+                }
+            )
+
+        for fallback in entry.get("texture_fallbacks") or []:
+            if not isinstance(fallback, dict):
+                continue
+            texture_fallbacks.append(
+                {
+                    "manifest_index": manifest_index,
+                    "asset_id": entry.get("asset_id"),
+                    "texture_source": entry.get("texture_source"),
+                    "target_dds_ref": fallback.get("target_dds_ref"),
+                    "replacement_dds_ref": fallback.get("replacement_dds_ref"),
+                    "replacement_png_name": fallback.get("replacement_png_name"),
+                    "review_status": fallback.get("review_status"),
+                    "status": fallback.get("status"),
+                    "durable_truth": bool(fallback.get("durable_truth")),
+                }
+            )
+
+    return {
+        "source_substitutions": source_substitutions,
+        "texture_fallbacks": texture_fallbacks,
+        "summary": {
+            "source_substituted_entries": len(source_substitutions),
+            "texture_fallback_entries": len({row.get("manifest_index") for row in texture_fallbacks}),
+            "texture_fallback_refs": len(texture_fallbacks),
+            "non_durable_source_substitutions": sum(1 for row in source_substitutions if not row.get("durable_truth")),
+            "non_durable_texture_fallback_refs": sum(1 for row in texture_fallbacks if not row.get("durable_truth")),
+        },
+    }
+
+
 def build_combined_obj_package(
     *,
     repo_root: Path = REPO_ROOT,
@@ -402,6 +456,7 @@ def build_combined_obj_package(
         if not bundled_obj.exists():
             missing_objs.append(repo_relative_path(bundled_obj, repo_root=repo_root))
 
+    practical_truth_boundaries = collect_practical_truth_boundaries([entry for entry, _, _ in selected])
     _write_text(mtl_out, "\n".join(mtl_lines).rstrip() + "\n")
     _write_text(obj_out, "\n".join(obj_lines).rstrip() + "\n")
 
@@ -440,7 +495,9 @@ def build_combined_obj_package(
             "copied_texture_files": len(copied_textures),
             "missing_source_textures": len(missing_textures),
             "verify_pass": verify["pass"],
+            **practical_truth_boundaries["summary"],
         },
+        "practical_truth_boundaries": practical_truth_boundaries,
         "skipped": skipped,
         "missing_source_textures": sorted(set(missing_textures)),
         "verify": verify,
@@ -553,6 +610,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     verify = report["verify"]
     outputs = report["outputs"]
+    practical = report.get("practical_truth_boundaries", {})
     texture_output = outputs.get("textures")
     lines = [
         "# Flythrough Combined OBJ Package",
@@ -572,6 +630,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Entries emitted as point clouds | {summary['point_directive_entries']} |",
         f"| Copied texture files | {summary['copied_texture_files']} |",
         f"| Missing source textures | {summary['missing_source_textures']} |",
+        f"| Source-substituted entries | {summary.get('source_substituted_entries', 0)} |",
+        f"| Texture fallback entries | {summary.get('texture_fallback_entries', 0)} |",
+        f"| Texture fallback refs | {summary.get('texture_fallback_refs', 0)} |",
         f"| Verify pass | {summary['verify_pass']} |",
         "",
         "## Outputs",
@@ -588,6 +649,44 @@ def render_markdown(report: dict[str, Any]) -> str:
     ]
     for source, count in summary["texture_source_breakdown"].items():
         lines.append(f"| `{source}` | {count} |")
+
+    if practical.get("source_substitutions"):
+        lines.extend(
+            [
+                "",
+                "## Practical source substitutions",
+                "",
+                "These rows improve downstream access but do not claim exact recovered source truth unless `durable_truth` is true.",
+                "",
+                "| Row | Original source | Replacement source | Candidate asset | Durable truth |",
+                "|---:|---|---|---|---|",
+            ]
+        )
+        for row in practical["source_substitutions"]:
+            lines.append(
+                f"| {row.get('manifest_index')} | `{row.get('original_source_obj')}` | "
+                f"`{row.get('replacement_source_obj') or row.get('source_obj')}` | "
+                f"`{row.get('candidate_asset_id') or ''}` | `{row.get('durable_truth')}` |"
+            )
+
+    if practical.get("texture_fallbacks"):
+        lines.extend(
+            [
+                "",
+                "## Practical texture fallbacks",
+                "",
+                "These rows use visual fallback PNGs for review/import usability; exact DDS recovery remains separate unless `durable_truth` is true.",
+                "",
+                "| Row | Missing DDS ref | Replacement DDS ref | Replacement PNG | Durable truth |",
+                "|---:|---|---|---|---|",
+            ]
+        )
+        for row in practical["texture_fallbacks"]:
+            lines.append(
+                f"| {row.get('manifest_index')} | `{row.get('target_dds_ref')}` | "
+                f"`{row.get('replacement_dds_ref') or ''}` | `{row.get('replacement_png_name') or ''}` | "
+                f"`{row.get('durable_truth')}` |"
+            )
 
     lines.extend(
         [
@@ -606,6 +705,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             "- This package is generated and should stay out of git.",
             "- Point directives are emitted for zero-face rows to preserve access to position-only geometry.",
             "- Texture files referenced by the combined MTL are copied into the package by default for portable imports.",
+            "- Practical source substitutions and texture fallbacks are explicitly listed above when present.",
             "- The package is intended for generic OBJ/MTL importers; current RiftFlythrough viewer integration may still need an MTL-aware load path.",
             "",
         ]

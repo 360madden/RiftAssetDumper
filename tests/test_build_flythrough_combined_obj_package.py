@@ -111,6 +111,22 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
                     "manifest_index": 1,
                     "asset_id": "abcdef0123456789",
                     "source_obj": "Exports/a.obj",
+                    "original_source_obj": "Exports/missing-original.obj",
+                    "source_substitution": {
+                        "replacement_source_obj": "Assets/build/flythrough/evidence/candidate.obj",
+                        "candidate_asset_id": "abcdef0123456789",
+                        "durable_truth": False,
+                        "status": "active",
+                    },
+                    "texture_fallbacks": [
+                        {
+                            "target_dds_ref": "missing_wall_c.dds",
+                            "replacement_dds_ref": "similar_wall_c.dds",
+                            "replacement_png_name": "tex.png",
+                            "durable_truth": False,
+                            "status": "active",
+                        }
+                    ],
                     "bundled_obj": "Assets/build/flythrough/obj-texture-bundle-full-available/objs/001_face.obj",
                     "bundled_mtl": "Assets/build/flythrough/obj-texture-bundle-full-available/materials/mat_face.mtl",
                     "material_name": "mat_face",
@@ -149,8 +165,15 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
     assert report["summary"]["copied_texture_files"] == 1
     assert report["summary"]["missing_source_textures"] == 0
     assert report["summary"]["verify_pass"] is True
+    assert report["summary"]["source_substituted_entries"] == 1
+    assert report["summary"]["texture_fallback_entries"] == 1
+    assert report["summary"]["texture_fallback_refs"] == 1
+    assert report["summary"]["non_durable_source_substitutions"] == 1
+    assert report["summary"]["non_durable_texture_fallback_refs"] == 1
     assert report["verify"]["texture_refs"] == 2
     assert report["outputs"]["textures"] == "Assets/build/flythrough/combined/textures"
+    assert report["practical_truth_boundaries"]["source_substitutions"][0]["durable_truth"] is False
+    assert report["practical_truth_boundaries"]["texture_fallbacks"][0]["durable_truth"] is False
 
     obj_text = (package_root / "combined.obj").read_text(encoding="utf-8")
     assert "mtllib combined.mtl" in obj_text
@@ -163,6 +186,10 @@ def test_build_combined_obj_package_rewrites_mtl_and_emits_point_clouds(tmp_path
     assert "bump textures/converted/tex.png" in mtl_text
     copied_texture = package_root / "textures" / "converted" / "tex.png"
     assert copied_texture.read_text(encoding="utf-8") == "fake png"
+    markdown = (package_root / "README.md").read_text(encoding="utf-8")
+    assert "## Practical source substitutions" in markdown
+    assert "## Practical texture fallbacks" in markdown
+    assert "`False`" in markdown
 
     shared_root = tmp_path / "Assets" / "build" / "flythrough" / "combined-shared-textures"
     shared_report = build_combined_obj_package(
