@@ -36,6 +36,8 @@ from build_flythrough_obj_texture_manifest import (
     write_bundle,
     write_csv,
 )
+from build_flythrough_practical_access_report import build_access_report
+from build_flythrough_practical_access_report import render_markdown as render_access_markdown
 from build_flythrough_texture_gap_report import build_texture_gap_report
 from build_flythrough_texture_gap_report import render_markdown as render_texture_gap_markdown
 from build_flythrough_texture_triage_gallery import render_gallery
@@ -78,6 +80,10 @@ DEFAULT_NEUTRAL_PROVENANCE_JSON = (
 DEFAULT_NEUTRAL_PROVENANCE_MD = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "NEUTRAL_ROW_PROVENANCE.md"
 )
+DEFAULT_ACCESS_REPORT_JSON = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "practical-access-report.json"
+)
+DEFAULT_ACCESS_REPORT_MD = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "PRACTICAL_350_ACCESS.md"
 DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
 DEFAULT_ASSETS64_ENTRIES = REPO_ROOT / "Exports" / "assets64.entries.jsonl"
 
@@ -258,6 +264,8 @@ def build_practical_package(
     unresolved_texture_markdown_out: Path = DEFAULT_UNRESOLVED_TEXTURE_MD,
     neutral_provenance_json_out: Path = DEFAULT_NEUTRAL_PROVENANCE_JSON,
     neutral_provenance_markdown_out: Path = DEFAULT_NEUTRAL_PROVENANCE_MD,
+    access_report_json_out: Path = DEFAULT_ACCESS_REPORT_JSON,
+    access_report_markdown_out: Path = DEFAULT_ACCESS_REPORT_MD,
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
     assets64_entries_path: Path = DEFAULT_ASSETS64_ENTRIES,
     build_report_out: Path = DEFAULT_BUILD_REPORT,
@@ -341,6 +349,57 @@ def build_practical_package(
     _write_json(neutral_provenance_json_out, neutral_provenance_report)
     _write_text(neutral_provenance_markdown_out, render_neutral_provenance_markdown(neutral_provenance_report))
 
+    access_report = build_access_report(
+        manifest=manifest,
+        build_report={
+            "outputs": {
+                "manifest": repo_relative_path(manifest_out, repo_root=repo_root),
+                "csv": repo_relative_path(csv_out, repo_root=repo_root),
+                "bundle_root": repo_relative_path(bundle_root, repo_root=repo_root),
+                "combined_markdown": repo_relative_path(combined_root / "COMBINED_OBJ_PACKAGE.md", repo_root=repo_root),
+                "gallery": repo_relative_path(gallery_out, repo_root=repo_root),
+                "texture_gap_markdown": repo_relative_path(texture_gap_markdown_out, repo_root=repo_root),
+                "unresolved_texture_markdown": repo_relative_path(unresolved_texture_markdown_out, repo_root=repo_root),
+                "neutral_provenance_markdown": repo_relative_path(neutral_provenance_markdown_out, repo_root=repo_root),
+            },
+            "summary": {
+                "manifest_entries": manifest["summary"]["total_entries"],
+                "materializable_entries": manifest["summary"]["materializable_entries"],
+                "non_neutral_texture_entries": texture_gap_report["summary"]["entries_with_non_neutral_textures"],
+                "neutral_material_entries": texture_gap_report["summary"]["neutral_material_entries"],
+                "source_substituted_entries": manifest["summary"]["source_substituted_entries"],
+                "texture_fallback_refs": manifest["summary"]["texture_fallback_refs"],
+                "unmatched_exact_dds_refs": texture_gap_report["summary"]["unmatched_exact_dds_refs"],
+                "unmatched_exact_dds_refs_with_any_exact_match": unresolved_texture_report["summary"][
+                    "unmatched_exact_dds_refs_with_any_exact_match"
+                ],
+                "bundle_verify_pass": bundle_verify["pass"],
+                "smoke_pass": smoke_report["summary"]["pass"],
+                "combined_entries": combined_report["summary"]["combined_entries"],
+                "combined_skipped_entries": combined_report["summary"]["skipped_entries"],
+                "combined_verify_pass": combined_report["summary"]["verify_pass"],
+                "gallery_exists": gallery_out.exists(),
+            },
+        },
+        texture_gap_report=texture_gap_report,
+        unresolved_texture_report=unresolved_texture_report,
+        neutral_provenance_report=neutral_provenance_report,
+        combined_report=combined_report,
+    )
+    access_report["inputs"] = {
+        "manifest": repo_relative_path(manifest_out, repo_root=repo_root),
+        "texture_gap_report": repo_relative_path(texture_gap_json_out, repo_root=repo_root),
+        "unresolved_texture_report": repo_relative_path(unresolved_texture_json_out, repo_root=repo_root),
+        "neutral_provenance_report": repo_relative_path(neutral_provenance_json_out, repo_root=repo_root),
+        "combined_report": repo_relative_path(combined_root / "combined-obj-package-report.json", repo_root=repo_root),
+    }
+    access_report["outputs"] = {
+        "json": repo_relative_path(access_report_json_out, repo_root=repo_root),
+        "markdown": repo_relative_path(access_report_markdown_out, repo_root=repo_root),
+    }
+    _write_json(access_report_json_out, access_report)
+    _write_text(access_report_markdown_out, render_access_markdown(access_report))
+
     report = {
         "schema": "flythrough-practical-package-build-report-v1",
         "generated_at": _now_iso(),
@@ -371,6 +430,8 @@ def build_practical_package(
             "unresolved_texture_markdown": repo_relative_path(unresolved_texture_markdown_out, repo_root=repo_root),
             "neutral_provenance_json": repo_relative_path(neutral_provenance_json_out, repo_root=repo_root),
             "neutral_provenance_markdown": repo_relative_path(neutral_provenance_markdown_out, repo_root=repo_root),
+            "access_report_json": repo_relative_path(access_report_json_out, repo_root=repo_root),
+            "access_report_markdown": repo_relative_path(access_report_markdown_out, repo_root=repo_root),
         },
         "summary": {
             "manifest_entries": manifest["summary"]["total_entries"],
@@ -417,6 +478,7 @@ def build_practical_package(
             "combined_skipped_entries": combined_report["summary"]["skipped_entries"],
             "combined_verify_pass": combined_report["summary"]["verify_pass"],
             "gallery_exists": gallery_out.exists(),
+            "access_report_exists": access_report_markdown_out.exists(),
         },
     }
     _write_json(build_report_out, report)
@@ -445,6 +507,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--unresolved-texture-markdown-out", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_MD)
     parser.add_argument("--neutral-provenance-json-out", type=Path, default=DEFAULT_NEUTRAL_PROVENANCE_JSON)
     parser.add_argument("--neutral-provenance-markdown-out", type=Path, default=DEFAULT_NEUTRAL_PROVENANCE_MD)
+    parser.add_argument("--access-report-json-out", type=Path, default=DEFAULT_ACCESS_REPORT_JSON)
+    parser.add_argument("--access-report-markdown-out", type=Path, default=DEFAULT_ACCESS_REPORT_MD)
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
     parser.add_argument("--assets64-entries", type=Path, default=DEFAULT_ASSETS64_ENTRIES)
     parser.add_argument("--build-report-out", type=Path, default=DEFAULT_BUILD_REPORT)
@@ -476,6 +540,8 @@ def main(argv: list[str] | None = None) -> int:
         unresolved_texture_markdown_out=args.unresolved_texture_markdown_out,
         neutral_provenance_json_out=args.neutral_provenance_json_out,
         neutral_provenance_markdown_out=args.neutral_provenance_markdown_out,
+        access_report_json_out=args.access_report_json_out,
+        access_report_markdown_out=args.access_report_markdown_out,
         probe_refresh_report_path=args.probe_refresh_report,
         assets64_entries_path=args.assets64_entries,
         build_report_out=args.build_report_out,
@@ -498,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
         f"idless_no_geom_candidate={summary['neutral_provenance_idless_without_candidate_geometry']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
-        f"gallery={summary['gallery_exists']}"
+        f"gallery={summary['gallery_exists']} access_report={summary['access_report_exists']}"
     )
     return (
         0
@@ -510,6 +576,7 @@ def main(argv: list[str] | None = None) -> int:
                 summary["combined_verify_pass"],
                 summary["combined_skipped_entries"] == 0,
                 summary["gallery_exists"],
+                summary["access_report_exists"],
             ]
         )
         else 1
