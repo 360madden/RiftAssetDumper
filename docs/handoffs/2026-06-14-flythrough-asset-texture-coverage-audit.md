@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T00:03:50.074311Z
+**Generated**: 2026-06-15T00:10:41.193372Z
 
 ## Why this exists
 
@@ -102,6 +102,8 @@ Optional heuristic expansion:
 - 349 total OBJ entries become materializable with candidate borrowing plus neutral materials.
 - 1 entry remains skipped: the missing source OBJ path.
 - `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
+- `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`.
+- Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 repaired.
 
 ## Top 10 next best actions
 

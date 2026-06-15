@@ -34,6 +34,7 @@ DEFAULT_LINKS = FLYTHROUGH_ROOT / "flythrough-texture-links.jsonl"
 DEFAULT_CONVERTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "converted-manifest.json"
 DEFAULT_EXTRACTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "extracted-manifest.json"
 DEFAULT_JSON_OUT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
+DEFAULT_MISSING_OBJ_REPAIR_REPORT = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "repair-report.json"
 
 ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
 
@@ -45,6 +46,12 @@ def _now_iso() -> str:
 def _load_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def _load_optional_json(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    return _load_json(path)
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -618,6 +625,18 @@ def render_markdown(audit: dict[str, Any]) -> str:
     full_available_materializable = existing_obj_entries
     full_available_skipped = obj["manifest_entries"] - full_available_materializable
     neutral_materialized = full_available_materializable - common_heuristic_materializable
+    missing_obj_repair = _load_optional_json(DEFAULT_MISSING_OBJ_REPAIR_REPORT)
+    missing_obj_repair_lines = [
+        "- `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`."
+    ]
+    if missing_obj_repair:
+        repair_summary = missing_obj_repair.get("summary", {})
+        missing_obj_repair_lines.append(
+            "- Latest exact-hash repair report: "
+            f"{repair_summary.get('missing_entries', 'n/a')} missing, "
+            f"{repair_summary.get('repairable_exact_sha', 'n/a')} exact SHA-256 duplicate matches, "
+            f"{repair_summary.get('repaired', 'n/a')} repaired."
+        )
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -751,6 +770,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {full_available_materializable} total OBJ entries become materializable with candidate borrowing plus neutral materials.",
         f"- {full_available_skipped} entry remains skipped: the missing source OBJ path.",
         "- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.",
+        *missing_obj_repair_lines,
         "",
         "## Top 10 next best actions",
         "",
