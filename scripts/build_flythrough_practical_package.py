@@ -23,6 +23,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from audit_flythrough_unresolved_texture_evidence import build_unresolved_texture_evidence_report
+from audit_flythrough_unresolved_texture_evidence import render_markdown as render_unresolved_texture_markdown
 from build_flythrough_combined_obj_package import build_combined_obj_package
 from build_flythrough_obj_texture_manifest import (
     build_manifest,
@@ -62,6 +64,12 @@ DEFAULT_BUILD_REPORT = (
 )
 DEFAULT_TEXTURE_GAP_JSON = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "texture-gap-report.json"
 DEFAULT_TEXTURE_GAP_MD = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "TEXTURE_GAP_REPORT.md"
+DEFAULT_UNRESOLVED_TEXTURE_JSON = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "unresolved-texture-evidence-report.json"
+)
+DEFAULT_UNRESOLVED_TEXTURE_MD = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "UNRESOLVED_TEXTURE_EVIDENCE.md"
+)
 DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
 
 DEFAULT_MISSING_MANIFEST_INDEX = 121
@@ -237,6 +245,8 @@ def build_practical_package(
     gallery_out: Path = DEFAULT_GALLERY_OUT,
     texture_gap_json_out: Path = DEFAULT_TEXTURE_GAP_JSON,
     texture_gap_markdown_out: Path = DEFAULT_TEXTURE_GAP_MD,
+    unresolved_texture_json_out: Path = DEFAULT_UNRESOLVED_TEXTURE_JSON,
+    unresolved_texture_markdown_out: Path = DEFAULT_UNRESOLVED_TEXTURE_MD,
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
     build_report_out: Path = DEFAULT_BUILD_REPORT,
     max_gallery_cards: int = 400,
@@ -300,6 +310,13 @@ def build_practical_package(
     _write_json(texture_gap_json_out, texture_gap_report)
     _write_text(texture_gap_markdown_out, render_texture_gap_markdown(texture_gap_report))
 
+    unresolved_texture_report = build_unresolved_texture_evidence_report(
+        repo_root=repo_root,
+        texture_gap_report_path=texture_gap_json_out,
+    )
+    _write_json(unresolved_texture_json_out, unresolved_texture_report)
+    _write_text(unresolved_texture_markdown_out, render_unresolved_texture_markdown(unresolved_texture_report))
+
     report = {
         "schema": "flythrough-practical-package-build-report-v1",
         "generated_at": _now_iso(),
@@ -325,6 +342,8 @@ def build_practical_package(
             "gallery": repo_relative_path(gallery_out, repo_root=repo_root),
             "texture_gap_json": repo_relative_path(texture_gap_json_out, repo_root=repo_root),
             "texture_gap_markdown": repo_relative_path(texture_gap_markdown_out, repo_root=repo_root),
+            "unresolved_texture_json": repo_relative_path(unresolved_texture_json_out, repo_root=repo_root),
+            "unresolved_texture_markdown": repo_relative_path(unresolved_texture_markdown_out, repo_root=repo_root),
         },
         "summary": {
             "manifest_entries": manifest["summary"]["total_entries"],
@@ -335,6 +354,12 @@ def build_practical_package(
             "source_substituted_entries": manifest["summary"]["source_substituted_entries"],
             "texture_fallback_refs": manifest["summary"]["texture_fallback_refs"],
             "unmatched_exact_dds_refs": texture_gap_report["summary"]["unmatched_exact_dds_refs"],
+            "unmatched_exact_dds_refs_with_any_exact_match": unresolved_texture_report["summary"][
+                "unmatched_exact_dds_refs_with_any_exact_match"
+            ],
+            "neutral_asset_ids_with_texture_link_rows": unresolved_texture_report["summary"][
+                "neutral_asset_ids_with_texture_link_rows"
+            ],
             "bundle_verify_pass": bundle_verify["pass"],
             "smoke_pass": smoke_report["summary"]["pass"],
             "combined_entries": combined_report["summary"]["combined_entries"],
@@ -365,6 +390,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--gallery-out", type=Path, default=DEFAULT_GALLERY_OUT)
     parser.add_argument("--texture-gap-json-out", type=Path, default=DEFAULT_TEXTURE_GAP_JSON)
     parser.add_argument("--texture-gap-markdown-out", type=Path, default=DEFAULT_TEXTURE_GAP_MD)
+    parser.add_argument("--unresolved-texture-json-out", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_JSON)
+    parser.add_argument("--unresolved-texture-markdown-out", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_MD)
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
     parser.add_argument("--build-report-out", type=Path, default=DEFAULT_BUILD_REPORT)
     parser.add_argument("--max-gallery-cards", type=int, default=400)
@@ -391,6 +418,8 @@ def main(argv: list[str] | None = None) -> int:
         gallery_out=args.gallery_out,
         texture_gap_json_out=args.texture_gap_json_out,
         texture_gap_markdown_out=args.texture_gap_markdown_out,
+        unresolved_texture_json_out=args.unresolved_texture_json_out,
+        unresolved_texture_markdown_out=args.unresolved_texture_markdown_out,
         probe_refresh_report_path=args.probe_refresh_report,
         build_report_out=args.build_report_out,
         max_gallery_cards=args.max_gallery_cards,
@@ -404,6 +433,7 @@ def main(argv: list[str] | None = None) -> int:
         f"neutral={summary['neutral_material_entries']} "
         f"review_materials={summary['review_material_entries']} "
         f"unmatched_dds={summary['unmatched_exact_dds_refs']} "
+        f"exact_matches={summary['unmatched_exact_dds_refs_with_any_exact_match']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']}"
