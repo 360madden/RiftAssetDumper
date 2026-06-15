@@ -109,6 +109,11 @@ def _entrypoints(build_report: dict[str, Any]) -> list[dict[str, str]]:
             "path": str(outputs.get("unresolved_texture_markdown", "")),
             "purpose": "Exact DDS and neutral asset evidence audit.",
         },
+        {
+            "kind": "texture_fallback_provenance",
+            "path": str(outputs.get("texture_fallback_provenance_markdown", "")),
+            "purpose": "Evidence for practical visual fallbacks, including same-mesh source assets when present.",
+        },
     ]
 
 
