@@ -140,6 +140,8 @@ def test_render_gallery_includes_remaining_rows_and_links(tmp_path: Path) -> Non
     assert "wall_c.png" in text
     assert "Practical texture fallbacks" in text
     assert "Preview filters" in text
+    assert 'id="row-0"' in text
+    assert 'id="row-1"' in text
     assert 'data-filter="texture-fallback"' in text
     assert "data-filter-tags=" in text
     assert "missing_flowers_c.dds" in text

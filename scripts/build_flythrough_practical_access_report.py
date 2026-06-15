@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,19 @@ DEFAULT_COMBINED_REPORT = (
 )
 DEFAULT_REPORT_OUT = PRACTICAL_EVIDENCE_ROOT / "practical-access-report.json"
 DEFAULT_MARKDOWN_OUT = PRACTICAL_EVIDENCE_ROOT / "PRACTICAL_350_ACCESS.md"
+DEFAULT_REVIEW_QUEUE_CSV_OUT = PRACTICAL_EVIDENCE_ROOT / "PRACTICAL_350_REVIEW_QUEUE.csv"
+REVIEW_QUEUE_FIELDS = [
+    "priority",
+    "queue",
+    "manifest_indices",
+    "asset_id",
+    "subject",
+    "evidence",
+    "durable_truth",
+    "gallery_links",
+    "filter_tag",
+    "next_action",
+]
 
 
 def _now_iso() -> str:
@@ -113,6 +127,11 @@ def _entrypoints(build_report: dict[str, Any]) -> list[dict[str, str]]:
             "kind": "texture_fallback_provenance",
             "path": str(outputs.get("texture_fallback_provenance_markdown", "")),
             "purpose": "Evidence for practical visual fallbacks, including same-mesh source assets when present.",
+        },
+        {
+            "kind": "review_queue_csv",
+            "path": str(outputs.get("review_queue_csv") or outputs.get("access_review_queue_csv") or ""),
+            "purpose": "Spreadsheet-friendly queue for exact DDS, neutral provenance, and id-less/source-substitution review.",
         },
     ]
 
@@ -246,6 +265,142 @@ def _next_best_actions(summary: dict[str, Any]) -> list[str]:
         "Smoke-import the combined OBJ/MTL package in the target viewer with point-cloud rows enabled or explicitly accepted.",
         f"Keep quick local validation on the package gates only; current verification pass is {summary.get('verification_pass')}.",
     ]
+
+
+def _entrypoint_path(report: dict[str, Any], kind: str) -> str:
+    for entrypoint in report.get("entrypoints", []):
+        if entrypoint.get("kind") == kind:
+            return str(entrypoint.get("path") or "")
+    return ""
+
+
+def _gallery_links(gallery_path: str, manifest_indices: list[Any]) -> str:
+    links = []
+    for index in manifest_indices:
+        if index in (None, ""):
+            continue
+        links.append(f"{gallery_path}#row-{index}" if gallery_path else f"#row-{index}")
+    return "; ".join(links)
+
+
+def _format_counts(values: dict[str, Any]) -> str:
+    if not values:
+        return "none"
+    return ", ".join(f"{key}={values[key]}" for key in sorted(values))
+
+
+def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flatten access report queues into a spreadsheet-friendly review queue."""
+
+    gallery_path = _entrypoint_path(report, "gallery")
+    queues = report.get("review_queues", {})
+    rows: list[dict[str, Any]] = []
+
+    for item in queues.get("exact_dds_recovery", []):
+        fallbacks = [fallback for fallback in item.get("fallbacks", []) if isinstance(fallback, dict)]
+        if not fallbacks:
+            rows.append(
+                {
+                    "priority": 1,
+                    "queue": "exact-dds-recovery",
+                    "manifest_indices": "",
+                    "asset_id": "",
+                    "subject": item.get("dds_ref"),
+                    "evidence": f"exact_matches={item.get('exact_match_count')}; fallback=none",
+                    "durable_truth": False,
+                    "gallery_links": "",
+                    "filter_tag": "texture-fallback",
+                    "next_action": item.get("next_action"),
+                }
+            )
+            continue
+        for fallback in fallbacks:
+            manifest_index = fallback.get("manifest_index")
+            rows.append(
+                {
+                    "priority": 1,
+                    "queue": "exact-dds-recovery",
+                    "manifest_indices": str(manifest_index),
+                    "asset_id": fallback.get("asset_id") or "",
+                    "subject": item.get("dds_ref"),
+                    "evidence": (
+                        f"exact_matches={item.get('exact_match_count')}; "
+                        f"replacement={fallback.get('replacement_dds_ref')} / {fallback.get('replacement_png_name')}; "
+                        f"score={fallback.get('score')}"
+                    ),
+                    "durable_truth": fallback.get("durable_truth"),
+                    "gallery_links": _gallery_links(gallery_path, [manifest_index]),
+                    "filter_tag": "texture-fallback",
+                    "next_action": item.get("next_action"),
+                }
+            )
+
+    for item in queues.get("neutral_asset_provenance", []):
+        manifest_indices = item.get("manifest_indices", [])
+        scene_parts = []
+        if item.get("world_parent_node_names"):
+            scene_parts.append("parents=" + ",".join(str(value) for value in item["world_parent_node_names"]))
+        if item.get("world_named_nodes"):
+            scene_parts.append("named=" + ",".join(str(value) for value in item["world_named_nodes"]))
+        if item.get("world_mesh_size_mismatch_rows"):
+            scene_parts.append(
+                "mismatch_rows=" + ",".join(str(value) for value in item["world_mesh_size_mismatch_rows"])
+            )
+        if item.get("world_non_texture_property_type_counts"):
+            scene_parts.append("non_texture_props=" + _format_counts(item["world_non_texture_property_type_counts"]))
+        rows.append(
+            {
+                "priority": 2,
+                "queue": "neutral-asset-provenance",
+                "manifest_indices": ";".join(str(index) for index in manifest_indices),
+                "asset_id": item.get("asset_id") or "",
+                "subject": "asset-backed neutral material",
+                "evidence": (
+                    f"mesh_dds_refs={len(item.get('mesh_dds_refs', []))}; "
+                    f"texture_link_rows={item.get('texture_link_row_count', 0)}; "
+                    f"{'; '.join(scene_parts) or 'world_context'}"
+                ),
+                "durable_truth": False,
+                "gallery_links": _gallery_links(gallery_path, manifest_indices),
+                "filter_tag": "neutral",
+                "next_action": item.get("next_action"),
+            }
+        )
+
+    for item in queues.get("idless_or_source_substituted_rows", []):
+        manifest_index = item.get("manifest_index")
+        classification = str(item.get("classification") or "")
+        rows.append(
+            {
+                "priority": 3,
+                "queue": "idless-or-source-substituted",
+                "manifest_indices": str(manifest_index),
+                "asset_id": item.get("candidate_asset_id") or "",
+                "subject": classification,
+                "evidence": (
+                    f"original_source_exists={item.get('original_source_exists')}; "
+                    f"geometry={item.get('geometry_status')}; lines={item.get('geometry_line_count')}; "
+                    f"source={item.get('source_obj')}"
+                ),
+                "durable_truth": False,
+                "gallery_links": _gallery_links(gallery_path, [manifest_index]),
+                "filter_tag": "source-substitution" if "source-substitution" in classification else "id-less",
+                "next_action": item.get("next_action"),
+            }
+        )
+
+    return rows
+
+
+def write_review_queue_csv(path: Path, report: dict[str, Any]) -> None:
+    rows = review_queue_rows(report)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=REVIEW_QUEUE_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    tmp.replace(path)
 
 
 def build_access_report(
@@ -479,6 +634,7 @@ def build_practical_access_report(
     combined_report_path: Path = DEFAULT_COMBINED_REPORT,
     report_out: Path = DEFAULT_REPORT_OUT,
     markdown_out: Path = DEFAULT_MARKDOWN_OUT,
+    review_queue_csv_out: Path = DEFAULT_REVIEW_QUEUE_CSV_OUT,
 ) -> dict[str, Any]:
     report = build_access_report(
         manifest=_load_json(manifest_path),
@@ -499,9 +655,14 @@ def build_practical_access_report(
     report["outputs"] = {
         "json": repo_relative_path(report_out, repo_root=repo_root),
         "markdown": repo_relative_path(markdown_out, repo_root=repo_root),
+        "review_queue_csv": repo_relative_path(review_queue_csv_out, repo_root=repo_root),
     }
+    for entrypoint in report.get("entrypoints", []):
+        if entrypoint.get("kind") == "review_queue_csv":
+            entrypoint["path"] = report["outputs"]["review_queue_csv"]
     _write_json(report_out, report)
     _write_text(markdown_out, render_markdown(report))
+    write_review_queue_csv(review_queue_csv_out, report)
     return report
 
 
@@ -516,6 +677,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--combined-report", type=Path, default=DEFAULT_COMBINED_REPORT)
     parser.add_argument("--report-out", type=Path, default=DEFAULT_REPORT_OUT)
     parser.add_argument("--markdown-out", type=Path, default=DEFAULT_MARKDOWN_OUT)
+    parser.add_argument("--review-queue-csv-out", type=Path, default=DEFAULT_REVIEW_QUEUE_CSV_OUT)
     return parser.parse_args(argv)
 
 
@@ -531,6 +693,7 @@ def main(argv: list[str] | None = None) -> int:
         combined_report_path=args.combined_report,
         report_out=args.report_out,
         markdown_out=args.markdown_out,
+        review_queue_csv_out=args.review_queue_csv_out,
     )
     summary = report["summary"]
     print(

@@ -39,7 +39,7 @@ from build_flythrough_obj_texture_manifest import (
     write_bundle,
     write_csv,
 )
-from build_flythrough_practical_access_report import build_access_report
+from build_flythrough_practical_access_report import build_access_report, write_review_queue_csv
 from build_flythrough_practical_access_report import render_markdown as render_access_markdown
 from build_flythrough_texture_gap_report import build_texture_gap_report
 from build_flythrough_texture_gap_report import render_markdown as render_texture_gap_markdown
@@ -87,6 +87,9 @@ DEFAULT_ACCESS_REPORT_JSON = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "practical-access-report.json"
 )
 DEFAULT_ACCESS_REPORT_MD = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "PRACTICAL_350_ACCESS.md"
+DEFAULT_ACCESS_REVIEW_QUEUE_CSV = (
+    FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "PRACTICAL_350_REVIEW_QUEUE.csv"
+)
 DEFAULT_TEXTURE_FALLBACK_PROVENANCE_JSON = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "texture-fallback-provenance-report.json"
 )
@@ -276,6 +279,7 @@ def build_practical_package(
     neutral_provenance_markdown_out: Path = DEFAULT_NEUTRAL_PROVENANCE_MD,
     access_report_json_out: Path = DEFAULT_ACCESS_REPORT_JSON,
     access_report_markdown_out: Path = DEFAULT_ACCESS_REPORT_MD,
+    access_review_queue_csv_out: Path = DEFAULT_ACCESS_REVIEW_QUEUE_CSV,
     texture_fallback_provenance_json_out: Path = DEFAULT_TEXTURE_FALLBACK_PROVENANCE_JSON,
     texture_fallback_provenance_markdown_out: Path = DEFAULT_TEXTURE_FALLBACK_PROVENANCE_MD,
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
@@ -391,6 +395,7 @@ def build_practical_package(
                 "texture_fallback_provenance_markdown": repo_relative_path(
                     texture_fallback_provenance_markdown_out, repo_root=repo_root
                 ),
+                "review_queue_csv": repo_relative_path(access_review_queue_csv_out, repo_root=repo_root),
             },
             "summary": {
                 "manifest_entries": manifest["summary"]["total_entries"],
@@ -436,9 +441,11 @@ def build_practical_package(
     access_report["outputs"] = {
         "json": repo_relative_path(access_report_json_out, repo_root=repo_root),
         "markdown": repo_relative_path(access_report_markdown_out, repo_root=repo_root),
+        "review_queue_csv": repo_relative_path(access_review_queue_csv_out, repo_root=repo_root),
     }
     _write_json(access_report_json_out, access_report)
     _write_text(access_report_markdown_out, render_access_markdown(access_report))
+    write_review_queue_csv(access_review_queue_csv_out, access_report)
 
     report = {
         "schema": "flythrough-practical-package-build-report-v1",
@@ -472,6 +479,7 @@ def build_practical_package(
             "neutral_provenance_markdown": repo_relative_path(neutral_provenance_markdown_out, repo_root=repo_root),
             "access_report_json": repo_relative_path(access_report_json_out, repo_root=repo_root),
             "access_report_markdown": repo_relative_path(access_report_markdown_out, repo_root=repo_root),
+            "access_review_queue_csv": repo_relative_path(access_review_queue_csv_out, repo_root=repo_root),
             "texture_fallback_provenance_json": repo_relative_path(
                 texture_fallback_provenance_json_out, repo_root=repo_root
             ),
@@ -525,6 +533,7 @@ def build_practical_package(
             "combined_verify_pass": combined_report["summary"]["verify_pass"],
             "gallery_exists": gallery_out.exists(),
             "access_report_exists": access_report_markdown_out.exists(),
+            "access_review_queue_csv_exists": access_review_queue_csv_out.exists(),
             "texture_fallback_refs_with_source_assets": texture_fallback_provenance_report["summary"][
                 "fallback_refs_with_source_assets"
             ],
@@ -564,6 +573,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--neutral-provenance-markdown-out", type=Path, default=DEFAULT_NEUTRAL_PROVENANCE_MD)
     parser.add_argument("--access-report-json-out", type=Path, default=DEFAULT_ACCESS_REPORT_JSON)
     parser.add_argument("--access-report-markdown-out", type=Path, default=DEFAULT_ACCESS_REPORT_MD)
+    parser.add_argument("--access-review-queue-csv-out", type=Path, default=DEFAULT_ACCESS_REVIEW_QUEUE_CSV)
     parser.add_argument(
         "--texture-fallback-provenance-json-out", type=Path, default=DEFAULT_TEXTURE_FALLBACK_PROVENANCE_JSON
     )
@@ -605,6 +615,7 @@ def main(argv: list[str] | None = None) -> int:
         neutral_provenance_markdown_out=args.neutral_provenance_markdown_out,
         access_report_json_out=args.access_report_json_out,
         access_report_markdown_out=args.access_report_markdown_out,
+        access_review_queue_csv_out=args.access_review_queue_csv_out,
         texture_fallback_provenance_json_out=args.texture_fallback_provenance_json_out,
         texture_fallback_provenance_markdown_out=args.texture_fallback_provenance_markdown_out,
         probe_refresh_report_path=args.probe_refresh_report,
@@ -632,6 +643,7 @@ def main(argv: list[str] | None = None) -> int:
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']} access_report={summary['access_report_exists']} "
+        f"review_queue_csv={summary['access_review_queue_csv_exists']} "
         f"fallback_same_mesh={summary['texture_fallback_refs_with_same_mesh_source_assets']} "
         f"fallback_same_geometry={summary['texture_fallback_refs_with_same_geometry_hash']}"
     )
@@ -646,6 +658,7 @@ def main(argv: list[str] | None = None) -> int:
                 summary["combined_skipped_entries"] == 0,
                 summary["gallery_exists"],
                 summary["access_report_exists"],
+                summary["access_review_queue_csv_exists"],
             ]
         )
         else 1

@@ -287,7 +287,7 @@ def _materialized_card(entry: dict[str, Any], *, html_out: Path, repo_root: Path
     filter_tags = " ".join(sorted(_card_filter_tags(entry)))
 
     return f"""
-<article class="{_esc(" ".join(card_classes))}" data-filter-tags="{_esc(filter_tags)}">
+<article id="row-{_esc(entry.get("manifest_index"))}" class="{_esc(" ".join(card_classes))}" data-filter-tags="{_esc(filter_tags)}">
   <div class="thumb">{image_html}</div>
   <div class="meta">
     <h3>#{_esc(entry.get("manifest_index"))} {_esc(entry.get("asset_id") or "id-less")}</h3>

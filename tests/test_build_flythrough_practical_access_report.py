@@ -8,7 +8,11 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from build_flythrough_practical_access_report import build_access_report, render_markdown  # noqa: E402
+from build_flythrough_practical_access_report import (  # noqa: E402
+    build_access_report,
+    render_markdown,
+    review_queue_rows,
+)
 
 
 def _manifest() -> dict:
@@ -46,6 +50,7 @@ def _build_report() -> dict:
             "texture_gap_markdown": "Assets/build/flythrough/evidence/TEXTURE_GAP_REPORT.md",
             "neutral_provenance_markdown": "Assets/build/flythrough/evidence/NEUTRAL_ROW_PROVENANCE.md",
             "unresolved_texture_markdown": "Assets/build/flythrough/evidence/UNRESOLVED_TEXTURE_EVIDENCE.md",
+            "review_queue_csv": "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.csv",
         },
         "summary": {
             "manifest_entries": 350,
@@ -177,8 +182,43 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
 
     assert "# Practical 350 OBJ Access Report" in markdown
     assert "Assets/build/flythrough/gallery/index.html" in markdown
+    assert "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.csv" in markdown
     assert "n_ds_eternal_assault_flowers_01_c.dds" in markdown
     assert "b5dc665faa848f85" in markdown
     assert "NiMaterialProperty" in markdown
     assert "Visual texture fallbacks are usability aids" in markdown
     assert "## Top 10 next asset-focused actions" in markdown
+
+
+def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> None:
+    report = build_access_report(
+        manifest=_manifest(),
+        build_report=_build_report(),
+        texture_gap_report=_texture_gap_report(),
+        unresolved_texture_report=_unresolved_texture_report(),
+        neutral_provenance_report=_neutral_provenance_report(),
+        combined_report=_combined_report(),
+    )
+
+    rows = review_queue_rows(report)
+
+    exact_row = next(row for row in rows if row["queue"] == "exact-dds-recovery")
+    assert exact_row["priority"] == 1
+    assert exact_row["manifest_indices"] == "118"
+    assert exact_row["gallery_links"] == "Assets/build/flythrough/gallery/index.html#row-118"
+    assert exact_row["durable_truth"] is False
+    assert "replacement=n_ds_ruinouspassage_flowers_01_c.dds" in exact_row["evidence"]
+
+    neutral_row = next(row for row in rows if row["queue"] == "neutral-asset-provenance")
+    assert neutral_row["priority"] == 2
+    assert neutral_row["asset_id"] == "b5dc665faa848f85"
+    assert neutral_row["gallery_links"] == (
+        "Assets/build/flythrough/gallery/index.html#row-89; Assets/build/flythrough/gallery/index.html#row-324"
+    )
+    assert "non_texture_props=NiMaterialProperty=1" in neutral_row["evidence"]
+
+    idless_row = next(row for row in rows if row["queue"] == "idless-or-source-substituted")
+    assert idless_row["priority"] == 3
+    assert idless_row["manifest_indices"] == "5"
+    assert idless_row["gallery_links"] == "Assets/build/flythrough/gallery/index.html#row-5"
+    assert idless_row["filter_tag"] == "id-less"
