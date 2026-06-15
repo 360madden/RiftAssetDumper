@@ -87,6 +87,43 @@ def test_recover_textureless_dds_noops_when_all_refs_converted(tmp_path: Path) -
     assert (tmp_path / "recovery" / "textureless-dds-recovery-report.json").exists()
 
 
+def test_recover_textureless_dds_reports_unmatched_targets(monkeypatch, tmp_path: Path) -> None:
+    triage = tmp_path / "triage.json"
+    converted_manifest = tmp_path / "converted-manifest.json"
+    matches_out = tmp_path / "recovery" / "textureless-dds-name-matches.jsonl"
+    _write_json(triage, {"rows": [{"row_dds_refs": ["Missing_C.dds"]}]})
+    _write_json(converted_manifest, {"Entries": []})
+
+    def fake_match_names(**kwargs: object) -> dict:
+        matches_out.parent.mkdir(parents=True, exist_ok=True)
+        matches_out.write_text("", encoding="utf-8")
+        return {"args": ["fake"], "returncode": 0, "stdout": "Matches: 0", "stderr": ""}
+
+    def fail_convert_recovered_dds(**kwargs: object) -> dict:
+        raise AssertionError("conversion should not run without texture links")
+
+    monkeypatch.setattr(recovery, "match_names", fake_match_names)
+    monkeypatch.setattr(recovery, "convert_recovered_dds", fail_convert_recovered_dds)
+
+    report = recovery.recover_textureless_dds(
+        repo_root=tmp_path,
+        triage_report_path=triage,
+        converted_manifest_path=converted_manifest,
+        converted_dir=tmp_path / "converted",
+        recovery_root=tmp_path / "recovery",
+        dds_out=tmp_path / "dds",
+        project=tmp_path / "missing.csproj",
+        live_root=tmp_path,
+    )
+
+    assert report["summary"]["target_refs"] == 1
+    assert report["summary"]["name_matches"] == 0
+    assert report["summary"]["unmatched_target_refs"] == 1
+    assert report["refs"]["unmatched_target"] == ["missing_c.dds"]
+    assert report["summary"]["converted_pngs"] == 0
+    assert len(report["commands"]) == 1
+
+
 def test_convert_recovered_dds_updates_manifest_with_png(monkeypatch, tmp_path: Path) -> None:
     dds_dir = tmp_path / "dds" / "recovered"
     dds_dir.mkdir(parents=True)

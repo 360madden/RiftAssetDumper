@@ -386,8 +386,10 @@ def recover_textureless_dds(
             "triage_dds_refs": len(all_refs),
             "already_converted_refs": len([ref for ref in all_refs if ref in converted_refs]),
             "target_refs": len(target_refs),
+            "unmatched_target_refs": 0,
             "name_matches": 0,
             "extracted_dds": 0,
+            "recovered_dds_files_present": 0,
             "converted_pngs": 0,
             "skipped_existing_pngs": 0,
             "failed_conversions": 0,
@@ -432,7 +434,11 @@ def recover_textureless_dds(
     matches = _read_jsonl(matches_out)
     links = [texture_link_from_name_match(match) for match in matches]
     _write_jsonl(links_out, links)
+    matched_refs = {canonical_dds_ref(str(match.get("Name", ""))) for match in matches}
+    unmatched_target_refs = sorted(set(target_refs) - matched_refs)
     report["summary"]["name_matches"] = len(matches)
+    report["summary"]["unmatched_target_refs"] = len(unmatched_target_refs)
+    report["refs"]["unmatched_target"] = unmatched_target_refs
     report["matches"] = [
         {
             "name": match.get("Name"),
@@ -444,19 +450,22 @@ def recover_textureless_dds(
         for match in matches
     ]
 
-    if links:
-        extract_result = extract_linked_textures(
-            repo_root=repo_root,
-            live_root=resolved_live_root,
-            project=project,
-            links_path=links_out,
-            dds_out=dds_out,
-        )
-        report["commands"].append(extract_result)
-        if extract_result["returncode"] != 0:
-            report["error"] = "extract-linked-textures failed"
-            _write_json(report_out, report)
-            return report
+    if not links:
+        _write_json(report_out, report)
+        return report
+
+    extract_result = extract_linked_textures(
+        repo_root=repo_root,
+        live_root=resolved_live_root,
+        project=project,
+        links_path=links_out,
+        dds_out=dds_out,
+    )
+    report["commands"].append(extract_result)
+    if extract_result["returncode"] != 0:
+        report["error"] = "extract-linked-textures failed"
+        _write_json(report_out, report)
+        return report
 
     conversion = convert_recovered_dds(
         dds_out=dds_out,
@@ -464,7 +473,9 @@ def recover_textureless_dds(
         converted_manifest_path=converted_manifest_path,
     )
     report["conversion"] = conversion
-    report["summary"]["extracted_dds"] = len(list((dds_out / "recovered").glob("*.dds")))
+    recovered_dds_files_present = len(list((dds_out / "recovered").glob("*.dds")))
+    report["summary"]["extracted_dds"] = recovered_dds_files_present
+    report["summary"]["recovered_dds_files_present"] = recovered_dds_files_present
     report["summary"]["converted_pngs"] = conversion["converted"]
     report["summary"]["skipped_existing_pngs"] = conversion["skipped_existing"]
     report["summary"]["failed_conversions"] = conversion["failed"]
@@ -504,7 +515,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "textureless DDS recovery: "
         f"refs={summary['triage_dds_refs']} targets={summary['target_refs']} "
-        f"matches={summary['name_matches']} extracted={summary['extracted_dds']} "
+        f"matches={summary['name_matches']} unmatched={summary.get('unmatched_target_refs', 0)} "
+        f"extracted={summary['extracted_dds']} "
         f"converted={summary['converted_pngs']} skipped={summary['skipped_existing_pngs']} "
         f"failed={summary['failed_conversions']}"
     )

@@ -702,6 +702,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{recovery_summary.get('triage_dds_refs', 'n/a')} refs, "
             f"{recovery_summary.get('target_refs', 'n/a')} currently missing conversion targets, "
             f"{recovery_summary.get('name_matches', 'n/a')} name matches, "
+            f"{recovery_summary.get('unmatched_target_refs', 'n/a')} unmatched target refs, "
             f"{recovery_summary.get('converted_pngs', 'n/a')} newly converted PNGs, "
             f"{recovery_summary.get('failed_conversions', 'n/a')} failed conversions."
         )
