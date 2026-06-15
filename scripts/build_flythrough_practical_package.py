@@ -32,6 +32,8 @@ from build_flythrough_obj_texture_manifest import (
     write_bundle,
     write_csv,
 )
+from build_flythrough_texture_gap_report import build_texture_gap_report
+from build_flythrough_texture_gap_report import render_markdown as render_texture_gap_markdown
 from build_flythrough_texture_triage_gallery import render_gallery
 from smoke_flythrough_obj_texture_bundle import render_markdown as render_smoke_markdown
 from smoke_flythrough_obj_texture_bundle import smoke_bundle
@@ -58,6 +60,9 @@ DEFAULT_GALLERY_OUT = FLYTHROUGH_ROOT / "texture-triage-gallery-practical-350-te
 DEFAULT_BUILD_REPORT = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "practical-package-build-report.json"
 )
+DEFAULT_TEXTURE_GAP_JSON = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "texture-gap-report.json"
+DEFAULT_TEXTURE_GAP_MD = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "TEXTURE_GAP_REPORT.md"
+DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
 
 DEFAULT_MISSING_MANIFEST_INDEX = 121
 DEFAULT_MISSING_ORIGINAL_SOURCE_OBJ = "Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj"
@@ -230,6 +235,9 @@ def build_practical_package(
     smoke_markdown_out: Path = DEFAULT_SMOKE_MD,
     combined_root: Path = DEFAULT_COMBINED_ROOT,
     gallery_out: Path = DEFAULT_GALLERY_OUT,
+    texture_gap_json_out: Path = DEFAULT_TEXTURE_GAP_JSON,
+    texture_gap_markdown_out: Path = DEFAULT_TEXTURE_GAP_MD,
+    probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
     build_report_out: Path = DEFAULT_BUILD_REPORT,
     max_gallery_cards: int = 400,
 ) -> dict[str, Any]:
@@ -281,6 +289,17 @@ def build_practical_package(
     gallery_html = render_gallery(manifest, html_out=gallery_out, repo_root=repo_root, max_cards=max_gallery_cards)
     _write_text(gallery_out, gallery_html)
 
+    texture_gap_report = build_texture_gap_report(
+        repo_root=repo_root,
+        manifest=manifest,
+        manifest_path=manifest_out,
+        triage_report_path=textureless_triage_path,
+        recovery_report_path=texture_recovery_report_path,
+        probe_refresh_report_path=probe_refresh_report_path,
+    )
+    _write_json(texture_gap_json_out, texture_gap_report)
+    _write_text(texture_gap_markdown_out, render_texture_gap_markdown(texture_gap_report))
+
     report = {
         "schema": "flythrough-practical-package-build-report-v1",
         "generated_at": _now_iso(),
@@ -289,6 +308,7 @@ def build_practical_package(
             "redrive_output_dir": repo_relative_path(redrive_output_dir, repo_root=repo_root),
             "textureless_triage": repo_relative_path(textureless_triage_path, repo_root=repo_root),
             "texture_recovery_report": repo_relative_path(texture_recovery_report_path, repo_root=repo_root),
+            "probe_refresh_report": repo_relative_path(probe_refresh_report_path, repo_root=repo_root),
         },
         "outputs": {
             "source_substitutions": repo_relative_path(source_substitutions_out, repo_root=repo_root),
@@ -303,12 +323,17 @@ def build_practical_package(
             ),
             "combined_markdown": repo_relative_path(combined_root / "COMBINED_OBJ_PACKAGE.md", repo_root=repo_root),
             "gallery": repo_relative_path(gallery_out, repo_root=repo_root),
+            "texture_gap_json": repo_relative_path(texture_gap_json_out, repo_root=repo_root),
+            "texture_gap_markdown": repo_relative_path(texture_gap_markdown_out, repo_root=repo_root),
         },
         "summary": {
             "manifest_entries": manifest["summary"]["total_entries"],
             "materializable_entries": manifest["summary"]["materializable_entries"],
+            "non_neutral_texture_entries": texture_gap_report["summary"]["entries_with_non_neutral_textures"],
+            "neutral_material_entries": texture_gap_report["summary"]["neutral_material_entries"],
             "source_substituted_entries": manifest["summary"]["source_substituted_entries"],
             "texture_fallback_refs": manifest["summary"]["texture_fallback_refs"],
+            "unmatched_exact_dds_refs": texture_gap_report["summary"]["unmatched_exact_dds_refs"],
             "bundle_verify_pass": bundle_verify["pass"],
             "smoke_pass": smoke_report["summary"]["pass"],
             "combined_entries": combined_report["summary"]["combined_entries"],
@@ -337,6 +362,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--smoke-markdown-out", type=Path, default=DEFAULT_SMOKE_MD)
     parser.add_argument("--combined-root", type=Path, default=DEFAULT_COMBINED_ROOT)
     parser.add_argument("--gallery-out", type=Path, default=DEFAULT_GALLERY_OUT)
+    parser.add_argument("--texture-gap-json-out", type=Path, default=DEFAULT_TEXTURE_GAP_JSON)
+    parser.add_argument("--texture-gap-markdown-out", type=Path, default=DEFAULT_TEXTURE_GAP_MD)
+    parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
     parser.add_argument("--build-report-out", type=Path, default=DEFAULT_BUILD_REPORT)
     parser.add_argument("--max-gallery-cards", type=int, default=400)
     return parser.parse_args(argv)
@@ -360,6 +388,9 @@ def main(argv: list[str] | None = None) -> int:
         smoke_markdown_out=args.smoke_markdown_out,
         combined_root=args.combined_root,
         gallery_out=args.gallery_out,
+        texture_gap_json_out=args.texture_gap_json_out,
+        texture_gap_markdown_out=args.texture_gap_markdown_out,
+        probe_refresh_report_path=args.probe_refresh_report,
         build_report_out=args.build_report_out,
         max_gallery_cards=args.max_gallery_cards,
     )
@@ -369,6 +400,8 @@ def main(argv: list[str] | None = None) -> int:
         f"entries={summary['materializable_entries']}/{summary['manifest_entries']} "
         f"source_substitutions={summary['source_substituted_entries']} "
         f"texture_fallback_refs={summary['texture_fallback_refs']} "
+        f"neutral={summary['neutral_material_entries']} "
+        f"unmatched_dds={summary['unmatched_exact_dds_refs']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']}"
