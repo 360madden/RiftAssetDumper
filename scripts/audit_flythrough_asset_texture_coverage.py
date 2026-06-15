@@ -39,6 +39,7 @@ DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-
 DEFAULT_TEXTURELESS_RECOVERY_REPORT = (
     FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "recovery" / "textureless-dds-recovery-report.json"
 )
+DEFAULT_BUNDLE_SMOKE_REPORT = FLYTHROUGH_ROOT / "evidence" / "obj-texture-bundle-smoke" / "smoke-report.json"
 
 ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
 
@@ -688,6 +689,21 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{recovery_summary.get('converted_pngs', 'n/a')} newly converted PNGs, "
             f"{recovery_summary.get('failed_conversions', 'n/a')} failed conversions."
         )
+    bundle_smoke = _load_optional_json(DEFAULT_BUNDLE_SMOKE_REPORT)
+    bundle_smoke_lines = [
+        "- `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import."
+    ]
+    if bundle_smoke:
+        smoke_summary = bundle_smoke.get("summary", {})
+        bundle_smoke_lines.append(
+            "- Latest OBJ/MTL bundle smoke report: "
+            f"pass={smoke_summary.get('pass', 'n/a')}, "
+            f"{smoke_summary.get('checked_materializable_entries', 'n/a')} checked entries, "
+            f"{smoke_summary.get('obj_issue_entries', 'n/a')} OBJ issue entries, "
+            f"{smoke_summary.get('mtl_issue_entries', 'n/a')} MTL issue entries, "
+            f"{smoke_summary.get('missing_texture_refs', 'n/a')} missing texture refs, "
+            f"{smoke_summary.get('zero_face_entries', 'n/a')} zero-face entries."
+        )
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -826,6 +842,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
         *missing_obj_repair_lines,
         *textureless_triage_lines,
         *textureless_recovery_lines,
+        *bundle_smoke_lines,
         "",
         "## Top 10 next best actions",
         "",

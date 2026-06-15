@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T00:39:35.419419Z
+**Generated**: 2026-06-15T00:46:58.489576Z
 
 ## Why this exists
 
@@ -110,6 +110,8 @@ Optional heuristic expansion:
 - Latest textureless-asset triage report: 18 neutral rows, 2 rows with mesh-level DDS refs, 2 neutral asset IDs with refs, 6 unique DDS refs, 6 already converted, 0 missing converted PNGs, 0 of the missing refs catalog-backed.
 - `scripts/recover_flythrough_textureless_dds.py` name-matches, extracts, converts, and records DDS refs from the textureless triage report.
 - Latest textureless DDS recovery report: 6 refs, 0 currently missing conversion targets, 0 name matches, 0 newly converted PNGs, 0 failed conversions.
+- `scripts/smoke_flythrough_obj_texture_bundle.py` parses the generated OBJ/MTL bundle, validates material directives, face indices, and MTL texture references before external viewer import.
+- Latest OBJ/MTL bundle smoke report: pass=True, 349 checked entries, 0 OBJ issue entries, 0 MTL issue entries, 0 missing texture refs, 79 zero-face entries.
 
 ## Top 10 next best actions
 

@@ -441,10 +441,80 @@ def mtl_lines(material_name: str, chosen_textures: dict[str, str], *, mtl_path: 
     return lines
 
 
+def _obj_attribute_counts(lines: list[str]) -> tuple[int, int, int]:
+    vertices = sum(1 for line in lines if line.startswith("v "))
+    texture_coords = sum(1 for line in lines if line.startswith("vt "))
+    normals = sum(1 for line in lines if line.startswith("vn "))
+    return vertices, texture_coords, normals
+
+
+def _positive_index_in_bounds(value: str, count: int) -> bool:
+    try:
+        index = int(value)
+    except ValueError:
+        return False
+    return 1 <= index <= count
+
+
+def normalize_face_token_for_available_attributes(token: str, *, texture_coord_count: int, normal_count: int) -> str:
+    """Drop OBJ face UV/normal references when the referenced arrays are absent.
+
+    Some source OBJs use ``v/vt/vn`` face tokens even when no ``vn`` lines were
+    emitted. Many viewers are tolerant, but downstream importers can reject
+    those dangling normal references. The generated consumer bundle should be
+    stricter than the raw source exports, so it only preserves UV/normal indices
+    that point at available arrays.
+    """
+
+    parts = token.split("/")
+    vertex = parts[0]
+    texture_coord = parts[1] if len(parts) > 1 and parts[1] else None
+    normal = parts[2] if len(parts) > 2 and parts[2] else None
+
+    keep_texture_coord = (
+        texture_coord is not None
+        and texture_coord_count > 0
+        and _positive_index_in_bounds(texture_coord, texture_coord_count)
+    )
+    keep_normal = normal is not None and normal_count > 0 and _positive_index_in_bounds(normal, normal_count)
+
+    if keep_normal:
+        return f"{vertex}/{texture_coord if keep_texture_coord else ''}/{normal}"
+    if keep_texture_coord:
+        return f"{vertex}/{texture_coord}"
+    return vertex
+
+
+def normalize_obj_faces_for_available_attributes(lines: list[str]) -> list[str]:
+    _, texture_coord_count, normal_count = _obj_attribute_counts(lines)
+    normalized: list[str] = []
+    for line in lines:
+        if not line.startswith("f "):
+            normalized.append(line)
+            continue
+        tokens = line.split()
+        normalized.append(
+            " ".join(
+                [tokens[0]]
+                + [
+                    normalize_face_token_for_available_attributes(
+                        token,
+                        texture_coord_count=texture_coord_count,
+                        normal_count=normal_count,
+                    )
+                    for token in tokens[1:]
+                ]
+            )
+        )
+    return normalized
+
+
 def obj_with_material_text(source_obj: Path, *, mtllib: str, material_name: str) -> str:
     text = source_obj.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
-    body = [line for line in lines if not line.startswith("mtllib ") and not line.startswith("usemtl ")]
+    body = normalize_obj_faces_for_available_attributes(
+        [line for line in lines if not line.startswith("mtllib ") and not line.startswith("usemtl ")]
+    )
     header = [f"mtllib {mtllib}", f"usemtl {material_name}"]
     return "\n".join(header + body) + "\n"
 

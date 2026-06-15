@@ -15,6 +15,7 @@ from build_flythrough_obj_texture_manifest import (  # noqa: E402
     classify_texture_role,
     common_candidate_texture_names,
     normalize_converted_texture_path,
+    normalize_face_token_for_available_attributes,
     obj_with_material_text,
     verify_bundle,
     write_bundle,
@@ -382,3 +383,31 @@ def test_obj_with_material_text_removes_existing_material_directives(tmp_path: P
     source_obj.write_text("mtllib old.mtl\nusemtl old\nv 0 0 0\n", encoding="utf-8")
     out = obj_with_material_text(source_obj, mtllib="new.mtl", material_name="newmat")
     assert out == "mtllib new.mtl\nusemtl newmat\nv 0 0 0\n"
+
+
+def test_normalize_face_token_drops_missing_normal_reference() -> None:
+    assert normalize_face_token_for_available_attributes("3/2/9", texture_coord_count=4, normal_count=0) == "3/2"
+    assert normalize_face_token_for_available_attributes("3/2/9", texture_coord_count=0, normal_count=0) == "3"
+    assert normalize_face_token_for_available_attributes("3/2/9", texture_coord_count=4, normal_count=12) == "3/2/9"
+    assert normalize_face_token_for_available_attributes("3/2/99", texture_coord_count=4, normal_count=12) == "3/2"
+
+
+def test_obj_with_material_text_normalizes_faces_for_missing_normals(tmp_path: Path) -> None:
+    source_obj = tmp_path / "source.obj"
+    source_obj.write_text(
+        "\n".join(
+            [
+                "v 0 0 0",
+                "v 1 0 0",
+                "v 0 1 0",
+                "vt 0 0",
+                "vt 1 0",
+                "vt 0 1",
+                "f 1/1/1 2/2/2 3/3/3",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    out = obj_with_material_text(source_obj, mtllib="new.mtl", material_name="newmat")
+    assert "f 1/1 2/2 3/3\n" in out
