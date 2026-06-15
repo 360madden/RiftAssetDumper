@@ -81,6 +81,9 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assets64_path = tmp_path / "Exports" / "assets64.entries.jsonl"
     probe_report_path = tmp_path / "Assets" / "build" / "flythrough" / "probe-refresh.json"
     probe_path = tmp_path / "Exports" / "probe-nif-mesh-aaaaaaaaaaaaaaaa-mesh7.json"
+    flythrough_index_path = tmp_path / "Assets" / "build" / "flythrough" / "flythrough-index.json"
+    worlds_root = tmp_path / "Assets" / "build" / "flythrough" / "objs" / "worlds"
+    world_path = worlds_root / "aaaaaaaaaaaaaaaa.world.json"
 
     _write_json(manifest_path, manifest)
     _write_json(
@@ -181,6 +184,35 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
             ],
         },
     )
+    _write_json(
+        flythrough_index_path,
+        {
+            "assets": {
+                "aaaaaaaaaaaaaaaa": {
+                    "world_json": "aaaaaaaaaaaaaaaa.world.json",
+                }
+            }
+        },
+    )
+    _write_json(
+        world_path,
+        {
+            "NodeCount": 1,
+            "MeshCount": 1,
+            "MeshesAttached": 1,
+            "Nodes": [
+                {
+                    "BlockIndex": 0,
+                    "Name": "SceneNode",
+                    "ChildNodes": [
+                        {"BlockIndex": 2, "TypeName": "NiMaterialProperty", "Size": 68},
+                        {"BlockIndex": 7, "TypeName": "NiMesh", "Size": 193},
+                    ],
+                }
+            ],
+            "Meshes": [{"BlockIndex": 7, "Size": 193, "ParentNiNodeIndex": 0}],
+        },
+    )
 
     report = build_neutral_row_provenance_report(
         repo_root=tmp_path,
@@ -189,6 +221,8 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
         unresolved_texture_report_path=unresolved_path,
         assets64_entries_path=assets64_path,
         probe_refresh_report_path=probe_report_path,
+        flythrough_index_path=flythrough_index_path,
+        worlds_root=worlds_root,
     )
 
     assert report["summary"]["neutral_rows"] == 3
@@ -198,6 +232,9 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert report["summary"]["unique_neutral_asset_ids"] == 1
     assert report["summary"]["source_substitution_candidate_asset_ids"] == 1
     assert report["summary"]["neutral_asset_rows_with_assets64_manifest_entry"] == 1
+    assert report["summary"]["neutral_rows_with_world_context"] == 1
+    assert report["summary"]["neutral_rows_with_named_parent_node"] == 0
+    assert report["summary"]["neutral_rows_with_world_mesh_size_mismatch"] == 0
     assert report["classification_counts"] == {
         "asset-backed-probed-no-mesh-or-link-textures": 1,
         "idless-provenance-gap": 1,
@@ -207,6 +244,8 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert asset_group["asset_id"] == "aaaaaaaaaaaaaaaa"
     assert asset_group["texture_link_row_count"] == 0
     assert asset_group["candidate_links"] == 1
+    assert asset_group["world_context_exists"] is True
+    assert asset_group["world_mesh_sizes"] == [193]
     source_row = next(row for row in report["rows"] if row["manifest_index"] == 12)
     assert source_row["source_substitution_candidate_manifest_entries"][0]["IdPrefix"] == "bbbbbbbbbbbbbbbb"
 
@@ -226,6 +265,11 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                 "neutral_rows_with_mesh_dds_refs": 0,
                 "neutral_rows_with_texture_link_rows": 0,
                 "asset_backed_rows_with_no_mesh_or_link_textures": 1,
+                "neutral_rows_with_world_context": 1,
+                "neutral_rows_with_named_parent_node": 0,
+                "neutral_rows_with_named_scene_nodes": 0,
+                "neutral_rows_with_world_mesh_size_mismatch": 0,
+                "neutral_rows_with_world_texture_nodes": 0,
             },
             "classification_counts": {"asset-backed-probed-no-mesh-or-link-textures": 1},
             "asset_groups": [
@@ -235,6 +279,12 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                     "mesh_blocks": ["7"],
                     "asset_manifest_entries": [{"Index": 100, "PakIndex": 5, "PakOffset": 123, "Size": 75}],
                     "probe_outputs": ["Exports/probe-nif-mesh-aaaaaaaaaaaaaaaa-mesh7.json"],
+                    "world_context_exists": True,
+                    "world_parent_node_names": ["SceneNode"],
+                    "world_named_nodes": [],
+                    "world_mesh_sizes": [193],
+                    "world_mesh_size_mismatch_rows": [],
+                    "world_texture_property_nodes": 0,
                     "candidate_links": 1,
                     "pairings": 0,
                     "mesh_dds_refs": [],

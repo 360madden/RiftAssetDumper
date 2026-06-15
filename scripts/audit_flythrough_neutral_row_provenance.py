@@ -32,6 +32,8 @@ DEFAULT_UNRESOLVED_TEXTURE_REPORT = (
 )
 DEFAULT_ASSETS64_ENTRIES = REPO_ROOT / "Exports" / "assets64.entries.jsonl"
 DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
+DEFAULT_FLYTHROUGH_INDEX = FLYTHROUGH_ROOT / "flythrough-index.json"
+DEFAULT_WORLDS_ROOT = FLYTHROUGH_ROOT / "objs" / "worlds"
 DEFAULT_JSON_OUT = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "neutral-row-provenance-report.json"
 )
@@ -213,6 +215,115 @@ def _compact_probe_target(target: dict[str, Any] | None) -> dict[str, Any] | Non
     return {key: target.get(key) for key in keys if key in target}
 
 
+def _compact_world_child(child: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: child.get(key)
+        for key in (
+            "BlockIndex",
+            "TypeName",
+            "Size",
+        )
+        if key in child
+    }
+
+
+def _world_path_for_asset(
+    *,
+    repo_root: Path,
+    asset_id: str,
+    flythrough_index: dict[str, Any],
+    worlds_root: Path,
+) -> Path:
+    asset = flythrough_index.get("assets", {}).get(asset_id.lower())
+    world_json = asset.get("world_json") if isinstance(asset, dict) else None
+    if isinstance(world_json, str) and world_json:
+        path = Path(world_json)
+        if path.is_absolute():
+            return path
+        if "/" in world_json or "\\" in world_json:
+            return repo_path_from_relative(repo_root, world_json)
+        return worlds_root / world_json
+    return worlds_root / f"{asset_id.lower()}.world.json"
+
+
+def _summarize_world_context(
+    *,
+    repo_root: Path,
+    asset_id: str | None,
+    mesh_block: str | int | None,
+    flythrough_index: dict[str, Any],
+    worlds_root: Path,
+) -> dict[str, Any] | None:
+    if not asset_id:
+        return None
+    path = _world_path_for_asset(
+        repo_root=repo_root,
+        asset_id=asset_id,
+        flythrough_index=flythrough_index,
+        worlds_root=worlds_root,
+    )
+    rel_path = repo_relative_path(path, repo_root=repo_root)
+    if not path.exists():
+        return {"path": rel_path, "exists": False}
+    try:
+        world = _load_json(path)
+    except OSError, json.JSONDecodeError:
+        return {"path": rel_path, "exists": True, "parse_error": True}
+
+    nodes = [node for node in world.get("Nodes", []) if isinstance(node, dict)]
+    meshes = [mesh for mesh in world.get("Meshes", []) if isinstance(mesh, dict)]
+    nodes_by_index = {str(node.get("BlockIndex")): node for node in nodes}
+    target_mesh = next((mesh for mesh in meshes if str(mesh.get("BlockIndex")) == str(mesh_block)), None)
+    parent = nodes_by_index.get(str((target_mesh or {}).get("ParentNiNodeIndex")))
+    child_nodes = [child for node in nodes for child in node.get("ChildNodes", []) if isinstance(child, dict)]
+    child_type_counts = Counter(str(child.get("TypeName")) for child in child_nodes if child.get("TypeName"))
+    named_nodes = sorted(
+        {
+            str(node.get("Name"))
+            for node in nodes
+            if isinstance(node.get("Name"), str) and node.get("Name") and node.get("Name") != "SceneNode"
+        }
+    )
+
+    return {
+        "path": rel_path,
+        "exists": True,
+        "parse_error": False,
+        "node_count": world.get("NodeCount"),
+        "mesh_count": world.get("MeshCount"),
+        "meshes_attached": world.get("MeshesAttached"),
+        "named_nodes": named_nodes,
+        "target_mesh": {
+            "block_index": (target_mesh or {}).get("BlockIndex"),
+            "size": (target_mesh or {}).get("Size"),
+            "parent_node_index": (target_mesh or {}).get("ParentNiNodeIndex"),
+        }
+        if target_mesh
+        else None,
+        "parent_node": {
+            "block_index": parent.get("BlockIndex"),
+            "name": parent.get("Name"),
+            "child_nodes": [_compact_world_child(child) for child in parent.get("ChildNodes", [])],
+        }
+        if parent
+        else None,
+        "sibling_meshes": [
+            {
+                "block_index": mesh.get("BlockIndex"),
+                "size": mesh.get("Size"),
+                "parent_node_index": mesh.get("ParentNiNodeIndex"),
+            }
+            for mesh in meshes
+            if str(mesh.get("BlockIndex")) != str(mesh_block)
+        ],
+        "child_type_counts": _counter_to_sorted_dict(child_type_counts),
+        "texture_property_nodes": sum(
+            count for type_name, count in child_type_counts.items() if "Texture" in str(type_name)
+        ),
+        "material_property_nodes": int(child_type_counts.get("NiMaterialProperty", 0)),
+    }
+
+
 def _count_or_value(value: Any) -> int | None:
     if value is None:
         return None
@@ -355,6 +466,8 @@ def _build_provenance_row(
     asset_entries: dict[str, list[dict[str, Any]]],
     unresolved_assets: dict[str, dict[str, Any]],
     probe_target: dict[str, Any] | None,
+    flythrough_index: dict[str, Any],
+    worlds_root: Path,
 ) -> dict[str, Any]:
     asset_id = entry.get("asset_id")
     asset_id_key = asset_id.lower() if isinstance(asset_id, str) and asset_id else None
@@ -370,6 +483,20 @@ def _build_provenance_row(
     candidate_id = _source_substitution_candidate_id(entry)
     compact_target = _compact_probe_target(probe_target)
     probe_file = _summarize_probe_file(repo_root, (compact_target or {}).get("output"), entry.get("mesh_block"))
+    world_context = _summarize_world_context(
+        repo_root=repo_root,
+        asset_id=asset_id_key,
+        mesh_block=entry.get("mesh_block"),
+        flythrough_index=flythrough_index,
+        worlds_root=worlds_root,
+    )
+    world_mesh_size = (world_context or {}).get("target_mesh", {}).get("size") if world_context else None
+    manifest_mesh_size = entry.get("mesh_size")
+    world_mesh_size_matches_manifest = (
+        world_mesh_size == manifest_mesh_size
+        if world_mesh_size is not None and manifest_mesh_size is not None
+        else None
+    )
     return {
         "manifest_index": entry.get("manifest_index"),
         "asset_id": asset_id,
@@ -398,6 +525,8 @@ def _build_provenance_row(
         "source_substitution_candidate_manifest_entries": asset_entries.get(candidate_id or "", []),
         "probe_target": compact_target,
         "probe_file": probe_file,
+        "world_context": world_context,
+        "world_mesh_size_matches_manifest": world_mesh_size_matches_manifest,
         "classification": classification,
         "next_best_action": next_action,
         "durable_texture_truth": False,
@@ -418,6 +547,31 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         probe_paths = sorted(
             {str(row.get("probe_file", {}).get("path")) for row in asset_rows if row.get("probe_file", {}).get("path")}
         )
+        world_contexts = [
+            row.get("world_context")
+            for row in asset_rows
+            if isinstance(row.get("world_context"), dict) and row.get("world_context", {}).get("exists")
+        ]
+        parent_names = sorted(
+            {
+                str(context.get("parent_node", {}).get("name"))
+                for context in world_contexts
+                if context.get("parent_node", {}).get("name")
+            }
+        )
+        named_nodes = sorted(
+            {str(name) for context in world_contexts for name in context.get("named_nodes", []) if name}
+        )
+        world_mesh_sizes = sorted(
+            {
+                int(context.get("target_mesh", {}).get("size"))
+                for context in world_contexts
+                if context.get("target_mesh", {}).get("size") is not None
+            }
+        )
+        world_mismatch_rows = [
+            row.get("manifest_index") for row in asset_rows if row.get("world_mesh_size_matches_manifest") is False
+        ]
         classifications = Counter(str(row.get("classification")) for row in asset_rows)
         first = asset_rows[0]
         probe_target = first.get("probe_target") or {}
@@ -431,6 +585,14 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "texture_link_row_count": max(int(row.get("texture_link_row_count") or 0) for row in asset_rows),
                 "probe_outputs": probe_paths,
                 "probe_exists": any(row.get("probe_file", {}).get("exists") for row in asset_rows),
+                "world_context_exists": bool(world_contexts),
+                "world_parent_node_names": parent_names,
+                "world_named_nodes": named_nodes,
+                "world_mesh_sizes": world_mesh_sizes,
+                "world_mesh_size_mismatch_rows": world_mismatch_rows,
+                "world_texture_property_nodes": max(
+                    [int(context.get("texture_property_nodes") or 0) for context in world_contexts] or [0]
+                ),
                 "candidate_links": probe_target.get("candidate_links"),
                 "pairings": probe_target.get("pairings"),
                 "attribute_sets": probe_target.get("attribute_sets"),
@@ -452,12 +614,15 @@ def build_neutral_row_provenance_report(
     unresolved_texture_report_path: Path = DEFAULT_UNRESOLVED_TEXTURE_REPORT,
     assets64_entries_path: Path = DEFAULT_ASSETS64_ENTRIES,
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
+    flythrough_index_path: Path = DEFAULT_FLYTHROUGH_INDEX,
+    worlds_root: Path = DEFAULT_WORLDS_ROOT,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     manifest = manifest or _load_json(manifest_path)
     texture_gap_report = _load_optional_json(texture_gap_report_path)
     unresolved_report = _load_optional_json(unresolved_texture_report_path)
     probe_refresh_report = _load_optional_json(probe_refresh_report_path)
+    flythrough_index = _load_optional_json(flythrough_index_path)
 
     entries_by_index = _entries_by_index(manifest)
     gap_rows = _neutral_gap_rows(texture_gap_report, manifest)
@@ -487,6 +652,8 @@ def build_neutral_row_provenance_report(
                 asset_entries=asset_entries,
                 unresolved_assets=unresolved_assets,
                 probe_target=probe_by_index.get(int(manifest_index)) if isinstance(manifest_index, int) else None,
+                flythrough_index=flythrough_index,
+                worlds_root=worlds_root,
             )
         )
 
@@ -511,6 +678,29 @@ def build_neutral_row_provenance_report(
     rows_with_texture_link_rows = [row for row in provenance_rows if int(row.get("texture_link_row_count") or 0) > 0]
     rows_with_mesh_dds_refs = [row for row in provenance_rows if row.get("mesh_dds_refs") or row.get("row_dds_refs")]
     source_substituted_rows = [row for row in provenance_rows if row.get("source_substitution")]
+    rows_with_world_context = [
+        row
+        for row in provenance_rows
+        if isinstance(row.get("world_context"), dict)
+        and row.get("world_context", {}).get("exists")
+        and not row.get("world_context", {}).get("parse_error")
+    ]
+    rows_with_named_parent = [
+        row
+        for row in rows_with_world_context
+        if row.get("world_context", {}).get("parent_node", {}).get("name") not in (None, "", "SceneNode")
+    ]
+    rows_with_named_scene_nodes = [
+        row for row in rows_with_world_context if row.get("world_context", {}).get("named_nodes")
+    ]
+    rows_with_world_mesh_size_mismatch = [
+        row for row in rows_with_world_context if row.get("world_mesh_size_matches_manifest") is False
+    ]
+    rows_with_world_texture_nodes = [
+        row
+        for row in rows_with_world_context
+        if int(row.get("world_context", {}).get("texture_property_nodes") or 0) > 0
+    ]
 
     return {
         "schema": "flythrough-neutral-row-provenance-v1",
@@ -521,6 +711,8 @@ def build_neutral_row_provenance_report(
             "unresolved_texture_report": repo_relative_path(unresolved_texture_report_path, repo_root=repo_root),
             "assets64_entries": repo_relative_path(assets64_entries_path, repo_root=repo_root),
             "probe_refresh_report": repo_relative_path(probe_refresh_report_path, repo_root=repo_root),
+            "flythrough_index": repo_relative_path(flythrough_index_path, repo_root=repo_root),
+            "worlds_root": repo_relative_path(worlds_root, repo_root=repo_root),
         },
         "summary": {
             "neutral_rows": len(provenance_rows),
@@ -536,6 +728,11 @@ def build_neutral_row_provenance_report(
             "asset_backed_rows_with_no_mesh_or_link_textures": classification_counts.get(
                 "asset-backed-probed-no-mesh-or-link-textures", 0
             ),
+            "neutral_rows_with_world_context": len(rows_with_world_context),
+            "neutral_rows_with_named_parent_node": len(rows_with_named_parent),
+            "neutral_rows_with_named_scene_nodes": len(rows_with_named_scene_nodes),
+            "neutral_rows_with_world_mesh_size_mismatch": len(rows_with_world_mesh_size_mismatch),
+            "neutral_rows_with_world_texture_nodes": len(rows_with_world_texture_nodes),
         },
         "classification_counts": _counter_to_sorted_dict(classification_counts),
         "review_material_counts": _counter_to_sorted_dict(review_counts),
@@ -566,6 +763,20 @@ def _asset_manifest_note(entries: list[dict[str, Any]]) -> str:
     )
 
 
+def _scene_context_note(group: dict[str, Any]) -> str:
+    if not group.get("world_context_exists"):
+        return "missing"
+    parent_names = _format_code_list(group.get("world_parent_node_names", []))
+    named_nodes = _format_code_list(group.get("world_named_nodes", []))
+    mesh_sizes = _format_code_list(group.get("world_mesh_sizes", []))
+    mismatch_rows = _format_code_list(group.get("world_mesh_size_mismatch_rows", []))
+    texture_nodes = int(group.get("world_texture_property_nodes") or 0)
+    return (
+        f"parent={parent_names}; named={named_nodes}; world_mesh_size={mesh_sizes}; "
+        f"mismatch_rows={mismatch_rows}; texture_nodes={texture_nodes}"
+    )
+
+
 def render_markdown(report: dict[str, Any]) -> str:
     summary = report["summary"]
     lines = [
@@ -587,6 +798,11 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral rows with mesh DDS refs | {summary['neutral_rows_with_mesh_dds_refs']} |",
         f"| Neutral rows with texture-link rows | {summary['neutral_rows_with_texture_link_rows']} |",
         f"| Asset-backed rows with no mesh/link texture evidence | {summary['asset_backed_rows_with_no_mesh_or_link_textures']} |",
+        f"| Neutral rows with world/scene context | {summary.get('neutral_rows_with_world_context', 0)} |",
+        f"| Neutral rows with named parent nodes | {summary.get('neutral_rows_with_named_parent_node', 0)} |",
+        f"| Neutral rows with named scene nodes | {summary.get('neutral_rows_with_named_scene_nodes', 0)} |",
+        f"| Neutral rows with world mesh-size mismatch | {summary.get('neutral_rows_with_world_mesh_size_mismatch', 0)} |",
+        f"| Neutral rows with world texture-property nodes | {summary.get('neutral_rows_with_world_texture_nodes', 0)} |",
         "",
         "## Classification",
         "",
@@ -603,8 +819,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "## Asset-backed neutral IDs",
             "",
-            "| Asset ID | Rows | Mesh | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
-            "|---|---|---|---|---|---:|---:|---|---:|---|",
+            "| Asset ID | Rows | Mesh | Scene context | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
+            "|---|---|---|---|---|---|---:|---:|---|---:|---|",
         ]
     )
     asset_groups = report.get("asset_groups", [])
@@ -613,6 +829,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(
                 f"| `{group.get('asset_id')}` | {_format_code_list(group.get('manifest_indices', []))} | "
                 f"{_format_code_list(group.get('mesh_blocks', []))} | "
+                f"{_scene_context_note(group)} | "
                 f"{_asset_manifest_note(group.get('asset_manifest_entries', []))} | "
                 f"{_format_code_list(group.get('probe_outputs', []))} | "
                 f"{group.get('candidate_links') if group.get('candidate_links') is not None else 'n/a'} | "
@@ -650,6 +867,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             "## Interpretation",
             "",
             "- The asset-backed neutral rows have asset IDs, assets64 metadata, and focused probe files, but no mesh DDS refs or texture-link rows in current evidence.",
+            "- World sidecars now add scene context for the neutral asset IDs; named parent/nodes are evidence for provenance review, not texture truth.",
             "- That makes parent, non-mesh, or provenance reference discovery the best next asset/texture workflow, not broad CI work.",
             "- Id-less rows need identity/provenance recovery before any texture assignment can become durable truth.",
             "- The source-substituted row remains practical access only until the original source OBJ or a stronger replacement proof is recovered.",
@@ -672,6 +890,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--unresolved-texture-report", type=Path, default=DEFAULT_UNRESOLVED_TEXTURE_REPORT)
     parser.add_argument("--assets64-entries", type=Path, default=DEFAULT_ASSETS64_ENTRIES)
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
+    parser.add_argument("--flythrough-index", type=Path, default=DEFAULT_FLYTHROUGH_INDEX)
+    parser.add_argument("--worlds-root", type=Path, default=DEFAULT_WORLDS_ROOT)
     parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT)
     parser.add_argument("--markdown-out", type=Path, default=DEFAULT_MARKDOWN_OUT)
     return parser.parse_args(argv)
@@ -686,6 +906,8 @@ def main(argv: list[str] | None = None) -> int:
         unresolved_texture_report_path=args.unresolved_texture_report,
         assets64_entries_path=args.assets64_entries,
         probe_refresh_report_path=args.probe_refresh_report,
+        flythrough_index_path=args.flythrough_index,
+        worlds_root=args.worlds_root,
     )
     write_report_outputs(report, json_out=args.json_out, markdown_out=args.markdown_out)
     summary = report["summary"]
@@ -696,6 +918,9 @@ def main(argv: list[str] | None = None) -> int:
         f"unique_assets={summary['unique_neutral_asset_ids']} "
         f"idless={summary['idless_neutral_rows']} "
         f"probe_files={summary['neutral_rows_with_probe_file']} "
+        f"world={summary['neutral_rows_with_world_context']} "
+        f"named_parent={summary['neutral_rows_with_named_parent_node']} "
+        f"world_mesh_mismatch={summary['neutral_rows_with_world_mesh_size_mismatch']} "
         f"mesh_dds_rows={summary['neutral_rows_with_mesh_dds_refs']} "
         f"texture_link_rows={summary['neutral_rows_with_texture_link_rows']}"
     )
