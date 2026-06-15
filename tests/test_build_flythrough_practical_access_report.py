@@ -105,6 +105,7 @@ def _neutral_provenance_report() -> dict:
                 "world_parent_node_names": ["prop"],
                 "world_named_nodes": ["blade_base", "blade_tip"],
                 "world_mesh_size_mismatch_rows": [],
+                "world_non_texture_property_type_counts": {"NiMaterialProperty": 1},
                 "mesh_dds_refs": [],
                 "texture_link_row_count": 0,
                 "next_best_action": "Inspect parent, non-mesh, or provenance references.",
@@ -178,5 +179,6 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
     assert "Assets/build/flythrough/gallery/index.html" in markdown
     assert "n_ds_eternal_assault_flowers_01_c.dds" in markdown
     assert "b5dc665faa848f85" in markdown
+    assert "NiMaterialProperty" in markdown
     assert "Visual texture fallbacks are usability aids" in markdown
     assert "## Top 10 next asset-focused actions" in markdown

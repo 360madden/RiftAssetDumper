@@ -207,6 +207,7 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
                     "Name": "SceneNode",
                     "ChildNodes": [
                         {"BlockIndex": 2, "TypeName": "NiMaterialProperty", "Size": 68},
+                        {"BlockIndex": 3, "TypeName": "NiVertexColorProperty", "Size": 14},
                         {"BlockIndex": 7, "TypeName": "NiMesh", "Size": 193},
                     ],
                 }
@@ -273,6 +274,7 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert report["summary"]["neutral_rows_with_world_context"] == 1
     assert report["summary"]["neutral_rows_with_named_parent_node"] == 0
     assert report["summary"]["neutral_rows_with_world_mesh_size_mismatch"] == 0
+    assert report["summary"]["neutral_rows_with_world_non_texture_property_nodes"] == 1
     assert report["summary"]["idless_rows_with_source_geometry"] == 1
     assert report["summary"]["idless_rows_without_candidate_geometry"] == 2
     assert report["summary"]["source_substitution_rows_with_missing_original"] == 1
@@ -287,6 +289,10 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert asset_group["candidate_links"] == 1
     assert asset_group["world_context_exists"] is True
     assert asset_group["world_mesh_sizes"] == [193]
+    assert asset_group["world_non_texture_property_type_counts"] == {
+        "NiMaterialProperty": 1,
+        "NiVertexColorProperty": 1,
+    }
     source_row = next(row for row in report["rows"] if row["manifest_index"] == 12)
     assert source_row["source_substitution_candidate_manifest_entries"][0]["IdPrefix"] == "bbbbbbbbbbbbbbbb"
     assert source_row["coverage_entry"]["candidate_geometry_status"] == "no-source-geometry"
@@ -312,6 +318,7 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                 "neutral_rows_with_named_scene_nodes": 0,
                 "neutral_rows_with_world_mesh_size_mismatch": 0,
                 "neutral_rows_with_world_texture_nodes": 0,
+                "neutral_rows_with_world_non_texture_property_nodes": 1,
                 "idless_rows_with_source_geometry": 0,
                 "idless_rows_without_candidate_geometry": 0,
                 "source_substitution_rows_with_missing_original": 0,
@@ -330,6 +337,7 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                     "world_mesh_sizes": [193],
                     "world_mesh_size_mismatch_rows": [],
                     "world_texture_property_nodes": 0,
+                    "world_non_texture_property_type_counts": {"NiMaterialProperty": 1},
                     "candidate_links": 1,
                     "pairings": 0,
                     "mesh_dds_refs": [],
@@ -342,5 +350,6 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
     )
 
     assert "aaaaaaaaaaaaaaaa" in markdown
+    assert "NiMaterialProperty" in markdown
     assert "parent, non-mesh, or provenance" in markdown
     assert "not broad CI work" in markdown

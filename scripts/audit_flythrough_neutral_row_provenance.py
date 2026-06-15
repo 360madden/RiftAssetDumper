@@ -313,6 +313,13 @@ def _summarize_world_context(
     parent = nodes_by_index.get(str((target_mesh or {}).get("ParentNiNodeIndex")))
     child_nodes = [child for node in nodes for child in node.get("ChildNodes", []) if isinstance(child, dict)]
     child_type_counts = Counter(str(child.get("TypeName")) for child in child_nodes if child.get("TypeName"))
+    non_texture_property_type_counts = Counter(
+        {
+            type_name: count
+            for type_name, count in child_type_counts.items()
+            if "Property" in type_name and "Texture" not in type_name
+        }
+    )
     named_nodes = sorted(
         {
             str(node.get("Name"))
@@ -357,6 +364,9 @@ def _summarize_world_context(
             count for type_name, count in child_type_counts.items() if "Texture" in str(type_name)
         ),
         "material_property_nodes": int(child_type_counts.get("NiMaterialProperty", 0)),
+        "vertex_color_property_nodes": int(child_type_counts.get("NiVertexColorProperty", 0)),
+        "non_texture_property_nodes": sum(non_texture_property_type_counts.values()),
+        "non_texture_property_type_counts": _counter_to_sorted_dict(non_texture_property_type_counts),
     }
 
 
@@ -611,6 +621,10 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         world_mismatch_rows = [
             row.get("manifest_index") for row in asset_rows if row.get("world_mesh_size_matches_manifest") is False
         ]
+        world_non_texture_property_counts: Counter[str] = Counter()
+        for context in world_contexts:
+            for type_name, count in context.get("non_texture_property_type_counts", {}).items():
+                world_non_texture_property_counts[str(type_name)] += int(count)
         classifications = Counter(str(row.get("classification")) for row in asset_rows)
         first = asset_rows[0]
         probe_target = first.get("probe_target") or {}
@@ -632,6 +646,10 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "world_texture_property_nodes": max(
                     [int(context.get("texture_property_nodes") or 0) for context in world_contexts] or [0]
                 ),
+                "world_non_texture_property_nodes": max(
+                    [int(context.get("non_texture_property_nodes") or 0) for context in world_contexts] or [0]
+                ),
+                "world_non_texture_property_type_counts": _counter_to_sorted_dict(world_non_texture_property_counts),
                 "candidate_links": probe_target.get("candidate_links"),
                 "pairings": probe_target.get("pairings"),
                 "attribute_sets": probe_target.get("attribute_sets"),
@@ -744,6 +762,11 @@ def build_neutral_row_provenance_report(
         for row in rows_with_world_context
         if int(row.get("world_context", {}).get("texture_property_nodes") or 0) > 0
     ]
+    rows_with_world_non_texture_property_nodes = [
+        row
+        for row in rows_with_world_context
+        if int(row.get("world_context", {}).get("non_texture_property_nodes") or 0) > 0
+    ]
     idless_rows = [row for row in provenance_rows if not row.get("asset_id")]
     idless_rows_with_source_geometry = [
         row for row in idless_rows if row.get("coverage_entry", {}).get("exists_on_disk") is True
@@ -792,6 +815,7 @@ def build_neutral_row_provenance_report(
             "neutral_rows_with_named_scene_nodes": len(rows_with_named_scene_nodes),
             "neutral_rows_with_world_mesh_size_mismatch": len(rows_with_world_mesh_size_mismatch),
             "neutral_rows_with_world_texture_nodes": len(rows_with_world_texture_nodes),
+            "neutral_rows_with_world_non_texture_property_nodes": len(rows_with_world_non_texture_property_nodes),
             "idless_rows_with_source_geometry": len(idless_rows_with_source_geometry),
             "idless_rows_without_candidate_geometry": len(idless_rows_without_candidate_geometry),
             "source_substitution_rows_with_missing_original": len(source_substitution_rows_with_missing_original),
@@ -825,6 +849,12 @@ def _asset_manifest_note(entries: list[dict[str, Any]]) -> str:
     )
 
 
+def _format_count_map(values: dict[str, Any]) -> str:
+    if not values:
+        return "none"
+    return ", ".join(f"`{key}`:{values[key]}" for key in sorted(values))
+
+
 def _scene_context_note(group: dict[str, Any]) -> str:
     if not group.get("world_context_exists"):
         return "missing"
@@ -833,9 +863,10 @@ def _scene_context_note(group: dict[str, Any]) -> str:
     mesh_sizes = _format_code_list(group.get("world_mesh_sizes", []))
     mismatch_rows = _format_code_list(group.get("world_mesh_size_mismatch_rows", []))
     texture_nodes = int(group.get("world_texture_property_nodes") or 0)
+    non_texture_props = _format_count_map(group.get("world_non_texture_property_type_counts", {}))
     return (
         f"parent={parent_names}; named={named_nodes}; world_mesh_size={mesh_sizes}; "
-        f"mismatch_rows={mismatch_rows}; texture_nodes={texture_nodes}"
+        f"mismatch_rows={mismatch_rows}; texture_nodes={texture_nodes}; non_texture_props={non_texture_props}"
     )
 
 
@@ -865,6 +896,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral rows with named scene nodes | {summary.get('neutral_rows_with_named_scene_nodes', 0)} |",
         f"| Neutral rows with world mesh-size mismatch | {summary.get('neutral_rows_with_world_mesh_size_mismatch', 0)} |",
         f"| Neutral rows with world texture-property nodes | {summary.get('neutral_rows_with_world_texture_nodes', 0)} |",
+        f"| Neutral rows with world non-texture property nodes | {summary.get('neutral_rows_with_world_non_texture_property_nodes', 0)} |",
         f"| Id-less rows with source geometry on disk | {summary.get('idless_rows_with_source_geometry', 0)} |",
         f"| Id-less rows without candidate geometry | {summary.get('idless_rows_without_candidate_geometry', 0)} |",
         f"| Source substitutions with missing original source | {summary.get('source_substitution_rows_with_missing_original', 0)} |",

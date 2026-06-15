@@ -178,6 +178,7 @@ def _neutral_asset_queue(neutral_provenance_report: dict[str, Any]) -> list[dict
                 "world_named_nodes": group.get("world_named_nodes", []),
                 "world_mesh_sizes": group.get("world_mesh_sizes", []),
                 "world_mesh_size_mismatch_rows": group.get("world_mesh_size_mismatch_rows", []),
+                "world_non_texture_property_type_counts": group.get("world_non_texture_property_type_counts", {}),
                 "candidate_links": group.get("candidate_links", 0),
                 "mesh_dds_refs": group.get("mesh_dds_refs", []),
                 "texture_link_row_count": group.get("texture_link_row_count", 0),
@@ -415,6 +416,12 @@ def render_markdown(report: dict[str, Any]) -> str:
             if item.get("world_mesh_size_mismatch_rows"):
                 scene_bits.append(
                     "mismatch rows=" + ", ".join(str(row) for row in item["world_mesh_size_mismatch_rows"])
+                )
+            if item.get("world_non_texture_property_type_counts"):
+                property_counts = item["world_non_texture_property_type_counts"]
+                scene_bits.append(
+                    "non-texture props="
+                    + ", ".join(f"`{key}`:{property_counts[key]}" for key in sorted(property_counts))
                 )
             evidence = (
                 f"mesh DDS refs={len(item.get('mesh_dds_refs', []))}; "
