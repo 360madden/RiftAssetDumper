@@ -84,6 +84,7 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     flythrough_index_path = tmp_path / "Assets" / "build" / "flythrough" / "flythrough-index.json"
     worlds_root = tmp_path / "Assets" / "build" / "flythrough" / "objs" / "worlds"
     world_path = worlds_root / "aaaaaaaaaaaaaaaa.world.json"
+    coverage_path = tmp_path / "Assets" / "build" / "flythrough" / "coverage-audit.json"
 
     _write_json(manifest_path, manifest)
     _write_json(
@@ -213,6 +214,42 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
             "Meshes": [{"BlockIndex": 7, "Size": 193, "ParentNiNodeIndex": 0}],
         },
     )
+    _write_json(
+        coverage_path,
+        {
+            "obj_file_level": {
+                "entries": [
+                    {
+                        "manifest_index": 10,
+                        "path": "Exports/asset.obj",
+                        "exists_on_disk": True,
+                        "asset_id": "aaaaaaaaaaaaaaaa",
+                        "candidate_status": None,
+                        "candidate_geometry_status": None,
+                        "geometry_line_count": 10,
+                    },
+                    {
+                        "manifest_index": 11,
+                        "path": "Exports/idless.obj",
+                        "exists_on_disk": True,
+                        "asset_id": None,
+                        "candidate_status": "no-geometry-signature-match",
+                        "candidate_geometry_status": "no-candidate-geometry-match",
+                        "geometry_line_count": 48,
+                    },
+                    {
+                        "manifest_index": 12,
+                        "path": "Exports/missing.obj",
+                        "exists_on_disk": False,
+                        "asset_id": None,
+                        "candidate_status": "no-geometry-signature-match",
+                        "candidate_geometry_status": "no-source-geometry",
+                        "geometry_line_count": None,
+                    },
+                ]
+            }
+        },
+    )
 
     report = build_neutral_row_provenance_report(
         repo_root=tmp_path,
@@ -223,6 +260,7 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
         probe_refresh_report_path=probe_report_path,
         flythrough_index_path=flythrough_index_path,
         worlds_root=worlds_root,
+        coverage_audit_path=coverage_path,
     )
 
     assert report["summary"]["neutral_rows"] == 3
@@ -235,6 +273,9 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert report["summary"]["neutral_rows_with_world_context"] == 1
     assert report["summary"]["neutral_rows_with_named_parent_node"] == 0
     assert report["summary"]["neutral_rows_with_world_mesh_size_mismatch"] == 0
+    assert report["summary"]["idless_rows_with_source_geometry"] == 1
+    assert report["summary"]["idless_rows_without_candidate_geometry"] == 2
+    assert report["summary"]["source_substitution_rows_with_missing_original"] == 1
     assert report["classification_counts"] == {
         "asset-backed-probed-no-mesh-or-link-textures": 1,
         "idless-provenance-gap": 1,
@@ -248,6 +289,7 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     assert asset_group["world_mesh_sizes"] == [193]
     source_row = next(row for row in report["rows"] if row["manifest_index"] == 12)
     assert source_row["source_substitution_candidate_manifest_entries"][0]["IdPrefix"] == "bbbbbbbbbbbbbbbb"
+    assert source_row["coverage_entry"]["candidate_geometry_status"] == "no-source-geometry"
 
 
 def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
@@ -270,6 +312,9 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                 "neutral_rows_with_named_scene_nodes": 0,
                 "neutral_rows_with_world_mesh_size_mismatch": 0,
                 "neutral_rows_with_world_texture_nodes": 0,
+                "idless_rows_with_source_geometry": 0,
+                "idless_rows_without_candidate_geometry": 0,
+                "source_substitution_rows_with_missing_original": 0,
             },
             "classification_counts": {"asset-backed-probed-no-mesh-or-link-textures": 1},
             "asset_groups": [

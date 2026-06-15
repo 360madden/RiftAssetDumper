@@ -34,6 +34,7 @@ DEFAULT_ASSETS64_ENTRIES = REPO_ROOT / "Exports" / "assets64.entries.jsonl"
 DEFAULT_PROBE_REFRESH_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "probe-refresh-report.json"
 DEFAULT_FLYTHROUGH_INDEX = FLYTHROUGH_ROOT / "flythrough-index.json"
 DEFAULT_WORLDS_ROOT = FLYTHROUGH_ROOT / "objs" / "worlds"
+DEFAULT_COVERAGE_AUDIT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
 DEFAULT_JSON_OUT = (
     FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks" / "neutral-row-provenance-report.json"
 )
@@ -190,6 +191,41 @@ def probe_targets_by_index(probe_refresh_report: dict[str, Any]) -> dict[int, di
             if isinstance(manifest_index, int):
                 out[manifest_index] = target
     return out
+
+
+def coverage_entries_by_index(coverage_audit: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    out: dict[int, dict[str, Any]] = {}
+    for row in coverage_audit.get("obj_file_level", {}).get("entries", []):
+        if isinstance(row, dict) and isinstance(row.get("manifest_index"), int):
+            out[int(row["manifest_index"])] = row
+    return out
+
+
+def _compact_coverage_entry(row: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not row:
+        return None
+    keys = (
+        "manifest_index",
+        "path",
+        "exists_on_disk",
+        "asset_id",
+        "candidate_status",
+        "candidate_asset_ids",
+        "candidate_geometry_status",
+        "geometry_matching_candidate_asset_ids",
+        "candidate_texture_set_status",
+        "geometry_hash",
+        "geometry_line_count",
+        "mesh_block",
+        "mesh_size",
+        "vertex_count",
+        "face_count",
+        "faced",
+        "provenance",
+        "texture_status",
+        "texture_link_rows",
+    )
+    return {key: row.get(key) for key in keys if key in row}
 
 
 def _compact_probe_target(target: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -468,6 +504,7 @@ def _build_provenance_row(
     probe_target: dict[str, Any] | None,
     flythrough_index: dict[str, Any],
     worlds_root: Path,
+    coverage_entry: dict[str, Any] | None,
 ) -> dict[str, Any]:
     asset_id = entry.get("asset_id")
     asset_id_key = asset_id.lower() if isinstance(asset_id, str) and asset_id else None
@@ -502,6 +539,7 @@ def _build_provenance_row(
         "asset_id": asset_id,
         "source_obj": entry.get("source_obj"),
         "original_source_obj": entry.get("original_source_obj"),
+        "original_source_exists": entry.get("original_source_exists"),
         "mesh_block": entry.get("mesh_block"),
         "mesh_size": entry.get("mesh_size"),
         "vertex_count": entry.get("vertex_count"),
@@ -527,6 +565,7 @@ def _build_provenance_row(
         "probe_file": probe_file,
         "world_context": world_context,
         "world_mesh_size_matches_manifest": world_mesh_size_matches_manifest,
+        "coverage_entry": _compact_coverage_entry(coverage_entry),
         "classification": classification,
         "next_best_action": next_action,
         "durable_texture_truth": False,
@@ -616,6 +655,7 @@ def build_neutral_row_provenance_report(
     probe_refresh_report_path: Path = DEFAULT_PROBE_REFRESH_REPORT,
     flythrough_index_path: Path = DEFAULT_FLYTHROUGH_INDEX,
     worlds_root: Path = DEFAULT_WORLDS_ROOT,
+    coverage_audit_path: Path = DEFAULT_COVERAGE_AUDIT,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     manifest = manifest or _load_json(manifest_path)
@@ -623,11 +663,13 @@ def build_neutral_row_provenance_report(
     unresolved_report = _load_optional_json(unresolved_texture_report_path)
     probe_refresh_report = _load_optional_json(probe_refresh_report_path)
     flythrough_index = _load_optional_json(flythrough_index_path)
+    coverage_audit = _load_optional_json(coverage_audit_path)
 
     entries_by_index = _entries_by_index(manifest)
     gap_rows = _neutral_gap_rows(texture_gap_report, manifest)
     unresolved_assets = unresolved_assets_by_id(unresolved_report)
     probe_by_index = probe_targets_by_index(probe_refresh_report)
+    coverage_by_index = coverage_entries_by_index(coverage_audit)
 
     asset_ids: set[str] = set()
     for gap_row in gap_rows:
@@ -654,6 +696,7 @@ def build_neutral_row_provenance_report(
                 probe_target=probe_by_index.get(int(manifest_index)) if isinstance(manifest_index, int) else None,
                 flythrough_index=flythrough_index,
                 worlds_root=worlds_root,
+                coverage_entry=coverage_by_index.get(int(manifest_index)) if isinstance(manifest_index, int) else None,
             )
         )
 
@@ -701,6 +744,21 @@ def build_neutral_row_provenance_report(
         for row in rows_with_world_context
         if int(row.get("world_context", {}).get("texture_property_nodes") or 0) > 0
     ]
+    idless_rows = [row for row in provenance_rows if not row.get("asset_id")]
+    idless_rows_with_source_geometry = [
+        row for row in idless_rows if row.get("coverage_entry", {}).get("exists_on_disk") is True
+    ]
+    idless_rows_without_candidate_geometry = [
+        row
+        for row in idless_rows
+        if row.get("coverage_entry", {}).get("candidate_geometry_status")
+        in {"no-candidate-geometry-match", "no-source-geometry"}
+    ]
+    source_substitution_rows_with_missing_original = [
+        row
+        for row in source_substituted_rows
+        if row.get("coverage_entry", {}).get("exists_on_disk") is False or row.get("original_source_exists") is False
+    ]
 
     return {
         "schema": "flythrough-neutral-row-provenance-v1",
@@ -713,6 +771,7 @@ def build_neutral_row_provenance_report(
             "probe_refresh_report": repo_relative_path(probe_refresh_report_path, repo_root=repo_root),
             "flythrough_index": repo_relative_path(flythrough_index_path, repo_root=repo_root),
             "worlds_root": repo_relative_path(worlds_root, repo_root=repo_root),
+            "coverage_audit": repo_relative_path(coverage_audit_path, repo_root=repo_root),
         },
         "summary": {
             "neutral_rows": len(provenance_rows),
@@ -733,6 +792,9 @@ def build_neutral_row_provenance_report(
             "neutral_rows_with_named_scene_nodes": len(rows_with_named_scene_nodes),
             "neutral_rows_with_world_mesh_size_mismatch": len(rows_with_world_mesh_size_mismatch),
             "neutral_rows_with_world_texture_nodes": len(rows_with_world_texture_nodes),
+            "idless_rows_with_source_geometry": len(idless_rows_with_source_geometry),
+            "idless_rows_without_candidate_geometry": len(idless_rows_without_candidate_geometry),
+            "source_substitution_rows_with_missing_original": len(source_substitution_rows_with_missing_original),
         },
         "classification_counts": _counter_to_sorted_dict(classification_counts),
         "review_material_counts": _counter_to_sorted_dict(review_counts),
@@ -803,6 +865,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral rows with named scene nodes | {summary.get('neutral_rows_with_named_scene_nodes', 0)} |",
         f"| Neutral rows with world mesh-size mismatch | {summary.get('neutral_rows_with_world_mesh_size_mismatch', 0)} |",
         f"| Neutral rows with world texture-property nodes | {summary.get('neutral_rows_with_world_texture_nodes', 0)} |",
+        f"| Id-less rows with source geometry on disk | {summary.get('idless_rows_with_source_geometry', 0)} |",
+        f"| Id-less rows without candidate geometry | {summary.get('idless_rows_without_candidate_geometry', 0)} |",
+        f"| Source substitutions with missing original source | {summary.get('source_substitution_rows_with_missing_original', 0)} |",
         "",
         "## Classification",
         "",
@@ -845,18 +910,26 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "## Id-less and source-substituted neutral rows",
             "",
-            "| Row | Classification | Review material | Candidate asset | Source | Next action |",
-            "|---:|---|---|---|---|---|",
+            "| Row | Classification | Review material | Candidate asset | Coverage status | Source | Next action |",
+            "|---:|---|---|---|---|---|---|",
         ]
     )
     special_rows = [row for row in report.get("rows", []) if not row.get("asset_id") or row.get("source_substitution")]
     if special_rows:
         for row in special_rows:
             candidate = row.get("source_substitution_candidate_asset_id")
+            coverage = row.get("coverage_entry") or {}
+            coverage_note = (
+                f"exists={coverage.get('exists_on_disk')}; "
+                f"candidate={coverage.get('candidate_status') or 'n/a'}; "
+                f"geometry={coverage.get('candidate_geometry_status') or 'n/a'}; "
+                f"lines={coverage.get('geometry_line_count') or 'n/a'}"
+            )
             lines.append(
                 f"| {row.get('manifest_index')} | `{row.get('classification')}` | "
                 f"`{row.get('review_material_kind') or 'n/a'}` | "
-                f"`{candidate or 'n/a'}` | `{row.get('source_obj')}` | {row.get('next_best_action')} |"
+                f"`{candidate or 'n/a'}` | {coverage_note} | "
+                f"`{row.get('source_obj')}` | {row.get('next_best_action')} |"
             )
     else:
         lines.append("| _none_ | none | none | none | none | none |")
@@ -870,6 +943,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             "- World sidecars now add scene context for the neutral asset IDs; named parent/nodes are evidence for provenance review, not texture truth.",
             "- That makes parent, non-mesh, or provenance reference discovery the best next asset/texture workflow, not broad CI work.",
             "- Id-less rows need identity/provenance recovery before any texture assignment can become durable truth.",
+            "- Coverage-audit geometry status is attached to id-less rows so rows with source geometry can be separated from the missing-original source substitution.",
             "- The source-substituted row remains practical access only until the original source OBJ or a stronger replacement proof is recovered.",
             "",
         ]
@@ -892,6 +966,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--probe-refresh-report", type=Path, default=DEFAULT_PROBE_REFRESH_REPORT)
     parser.add_argument("--flythrough-index", type=Path, default=DEFAULT_FLYTHROUGH_INDEX)
     parser.add_argument("--worlds-root", type=Path, default=DEFAULT_WORLDS_ROOT)
+    parser.add_argument("--coverage-audit", type=Path, default=DEFAULT_COVERAGE_AUDIT)
     parser.add_argument("--json-out", type=Path, default=DEFAULT_JSON_OUT)
     parser.add_argument("--markdown-out", type=Path, default=DEFAULT_MARKDOWN_OUT)
     return parser.parse_args(argv)
@@ -908,6 +983,7 @@ def main(argv: list[str] | None = None) -> int:
         probe_refresh_report_path=args.probe_refresh_report,
         flythrough_index_path=args.flythrough_index,
         worlds_root=args.worlds_root,
+        coverage_audit_path=args.coverage_audit,
     )
     write_report_outputs(report, json_out=args.json_out, markdown_out=args.markdown_out)
     summary = report["summary"]
@@ -921,6 +997,7 @@ def main(argv: list[str] | None = None) -> int:
         f"world={summary['neutral_rows_with_world_context']} "
         f"named_parent={summary['neutral_rows_with_named_parent_node']} "
         f"world_mesh_mismatch={summary['neutral_rows_with_world_mesh_size_mismatch']} "
+        f"idless_no_candidate_geometry={summary['idless_rows_without_candidate_geometry']} "
         f"mesh_dds_rows={summary['neutral_rows_with_mesh_dds_refs']} "
         f"texture_link_rows={summary['neutral_rows_with_texture_link_rows']}"
     )

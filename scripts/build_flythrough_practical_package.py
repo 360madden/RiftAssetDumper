@@ -405,6 +405,12 @@ def build_practical_package(
             "neutral_provenance_world_mesh_size_mismatch_rows": neutral_provenance_report["summary"][
                 "neutral_rows_with_world_mesh_size_mismatch"
             ],
+            "neutral_provenance_idless_without_candidate_geometry": neutral_provenance_report["summary"][
+                "idless_rows_without_candidate_geometry"
+            ],
+            "neutral_provenance_source_substitution_missing_original": neutral_provenance_report["summary"][
+                "source_substitution_rows_with_missing_original"
+            ],
             "bundle_verify_pass": bundle_verify["pass"],
             "smoke_pass": smoke_report["summary"]["pass"],
             "combined_entries": combined_report["summary"]["combined_entries"],
@@ -489,6 +495,7 @@ def main(argv: list[str] | None = None) -> int:
         f"asset_no_mesh_link={summary['neutral_provenance_asset_backed_no_mesh_or_link_textures']} "
         f"world_context={summary['neutral_provenance_world_context_rows']} "
         f"named_parent={summary['neutral_provenance_named_parent_rows']} "
+        f"idless_no_geom_candidate={summary['neutral_provenance_idless_without_candidate_geometry']} "
         f"bundle={summary['bundle_verify_pass']} smoke={summary['smoke_pass']} "
         f"combined={summary['combined_entries']} skipped={summary['combined_skipped_entries']} "
         f"gallery={summary['gallery_exists']}"
