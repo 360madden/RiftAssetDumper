@@ -553,6 +553,9 @@ def build_practical_package(
             "neutral_provenance_asset_backed_no_mesh_or_link_textures": neutral_provenance_report["summary"][
                 "asset_backed_rows_with_no_mesh_or_link_textures"
             ],
+            "neutral_provenance_material_or_vertex_color_only_rows": neutral_provenance_report["summary"][
+                "neutral_rows_with_material_or_vertex_color_only_evidence"
+            ],
             "neutral_provenance_world_context_rows": neutral_provenance_report["summary"][
                 "neutral_rows_with_world_context"
             ],
@@ -684,6 +687,7 @@ def main(argv: list[str] | None = None) -> int:
         f"recovery_unmatched={summary['texture_recovery_unmatched_refs']} "
         f"neutral_provenance_assets={summary['neutral_provenance_asset_ids']} "
         f"asset_no_mesh_link={summary['neutral_provenance_asset_backed_no_mesh_or_link_textures']} "
+        f"material_vertex_only={summary['neutral_provenance_material_or_vertex_color_only_rows']} "
         f"world_context={summary['neutral_provenance_world_context_rows']} "
         f"named_parent={summary['neutral_provenance_named_parent_rows']} "
         f"idless_no_geom_candidate={summary['neutral_provenance_idless_without_candidate_geometry']} "

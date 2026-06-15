@@ -218,7 +218,12 @@ def _neutral_asset_queue(neutral_provenance_report: dict[str, Any]) -> list[dict
                 "world_named_nodes": group.get("world_named_nodes", []),
                 "world_mesh_sizes": group.get("world_mesh_sizes", []),
                 "world_mesh_size_mismatch_rows": group.get("world_mesh_size_mismatch_rows", []),
+                "world_texture_property_nodes": group.get("world_texture_property_nodes", 0),
+                "world_material_property_nodes": group.get("world_material_property_nodes", 0),
+                "world_vertex_color_property_nodes": group.get("world_vertex_color_property_nodes", 0),
                 "world_non_texture_property_type_counts": group.get("world_non_texture_property_type_counts", {}),
+                "material_or_vertex_color_only": group.get("material_or_vertex_color_only", False),
+                "classification_counts": group.get("classification_counts", {}),
                 "candidate_links": group.get("candidate_links", 0),
                 "mesh_dds_refs": group.get("mesh_dds_refs", []),
                 "texture_link_row_count": group.get("texture_link_row_count", 0),
@@ -278,7 +283,7 @@ def _next_best_actions(summary: dict[str, Any]) -> list[str]:
     return [
         "Continue exact recovery for the remaining Eternal Assault flower DDS refs before promoting fallback textures.",
         "Review row 118 in the gallery/combined import and keep its flower textures marked non-durable unless exact DDS proof appears.",
-        "Inspect the five asset-backed neutral IDs for parent, non-mesh, or provenance references beyond normal mesh/link evidence.",
+        "Extract or verify material/vertex-color fields for asset-backed neutral IDs before assigning any guessed DDS texture truth.",
         "Prioritize the neutral IDs with named scene context or mesh-size mismatches because they have the strongest extra provenance clues.",
         "Recover source identity/provenance for id-less rows 5 and 6 before assigning texture truth.",
         "Prove or replace row 121's practical source substitution by finding the original source OBJ or stronger replacement evidence.",
@@ -398,6 +403,15 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
             )
         if item.get("world_non_texture_property_type_counts"):
             scene_parts.append("non_texture_props=" + _format_counts(item["world_non_texture_property_type_counts"]))
+        scene_parts.append(f"texture_props={item.get('world_texture_property_nodes', 0)}")
+        if item.get("material_or_vertex_color_only"):
+            scene_parts.append(
+                "material_or_vertex_color_only="
+                f"material={item.get('world_material_property_nodes', 0)},"
+                f"vertex_color={item.get('world_vertex_color_property_nodes', 0)}"
+            )
+        if item.get("classification_counts"):
+            scene_parts.append("classifications=" + _format_counts(item["classification_counts"]))
         rows.append(
             {
                 "priority": 2,
@@ -670,6 +684,9 @@ def build_access_report(
             package_summary.get("neutral_material_entries", texture_summary.get("neutral_material_entries", 0)) or 0
         ),
         "asset_backed_neutral_rows": int(neutral_summary.get("asset_backed_neutral_rows", 0) or 0),
+        "material_or_vertex_color_only_neutral_rows": int(
+            neutral_summary.get("neutral_rows_with_material_or_vertex_color_only_evidence", 0) or 0
+        ),
         "idless_neutral_rows": int(neutral_summary.get("idless_neutral_rows", 0) or 0),
         "source_substituted_entries": int(package_summary.get("source_substituted_entries", 0) or 0),
         "texture_fallback_refs": int(package_summary.get("texture_fallback_refs", 0) or 0),
@@ -764,6 +781,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         (f"| Rows with non-neutral textures/fallbacks | {summary['rows_with_non_neutral_textures_or_fallbacks']} |"),
         f"| Neutral review rows | {summary['neutral_review_rows']} |",
         f"| Asset-backed neutral rows | {summary['asset_backed_neutral_rows']} |",
+        f"| Material/vertex-color-only neutral rows | {summary['material_or_vertex_color_only_neutral_rows']} |",
         f"| Id-less/source-substituted neutral rows | {summary['idless_neutral_rows']} |",
         f"| Texture fallback refs | {summary['texture_fallback_refs']} |",
         f"| Exact DDS gaps | {summary['exact_dds_gaps']} |",

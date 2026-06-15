@@ -110,6 +110,7 @@ def _neutral_provenance_report() -> dict:
     return {
         "summary": {
             "asset_backed_neutral_rows": 10,
+            "neutral_rows_with_material_or_vertex_color_only_evidence": 2,
             "idless_neutral_rows": 3,
         },
         "asset_groups": [
@@ -120,10 +121,15 @@ def _neutral_provenance_report() -> dict:
                 "world_parent_node_names": ["prop"],
                 "world_named_nodes": ["blade_base", "blade_tip"],
                 "world_mesh_size_mismatch_rows": [],
+                "world_texture_property_nodes": 0,
+                "world_material_property_nodes": 1,
+                "world_vertex_color_property_nodes": 1,
                 "world_non_texture_property_type_counts": {"NiMaterialProperty": 1},
+                "material_or_vertex_color_only": True,
+                "classification_counts": {"asset-backed-material-or-vertex-color-only": 2},
                 "mesh_dds_refs": [],
                 "texture_link_row_count": 0,
-                "next_best_action": "Inspect parent, non-mesh, or provenance references.",
+                "next_best_action": "Treat as material/vertex-color-only evidence for now.",
             }
         ],
         "rows": [
@@ -193,6 +199,7 @@ def test_build_access_report_summarizes_access_and_review_queues() -> None:
     assert report["summary"]["materialized_obj_rows"] == 350
     assert report["summary"]["rows_with_non_neutral_textures_or_fallbacks"] == 337
     assert report["summary"]["neutral_review_rows"] == 13
+    assert report["summary"]["material_or_vertex_color_only_neutral_rows"] == 2
     assert report["summary"]["exact_dds_gaps"] == 2
     assert report["summary"]["texture_recovery_name_matches"] == 0
     assert report["summary"]["texture_recovery_unmatched_refs"] == 2
@@ -222,6 +229,7 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
     assert "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.html" in markdown
     assert "n_ds_eternal_assault_flowers_01_c.dds" in markdown
     assert "Recovery name matches for exact DDS gaps" in markdown
+    assert "Material/vertex-color-only neutral rows" in markdown
     assert "zero exact archive/name matches" in markdown
     assert "b5dc665faa848f85" in markdown
     assert "replacement=v50/vt50/f71" in markdown
@@ -263,6 +271,9 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert neutral_row["review_material_color"] == "0.350000 0.550000 1.000000"
     assert "no row textures" in neutral_row["review_material_reason"]
     assert "non_texture_props=NiMaterialProperty=1" in neutral_row["evidence"]
+    assert "texture_props=0" in neutral_row["evidence"]
+    assert "material_or_vertex_color_only=material=1,vertex_color=1" in neutral_row["evidence"]
+    assert "asset-backed-material-or-vertex-color-only=2" in neutral_row["evidence"]
 
     idless_row = next(row for row in rows if row["queue"] == "idless-or-source-substituted")
     assert idless_row["priority"] == 3

@@ -461,6 +461,7 @@ def classify_neutral_row(
     entry: dict[str, Any],
     gap_row: dict[str, Any],
     probe_target: dict[str, Any] | None,
+    world_context: dict[str, Any] | None,
     texture_link_row_count: int,
 ) -> tuple[str, str]:
     if entry.get("source_substitution"):
@@ -484,6 +485,25 @@ def classify_neutral_row(
         return (
             "has-texture-link-rows-needs-manifest-wiring",
             "Reconcile existing texture-link evidence with this manifest row.",
+        )
+    if (
+        probe_target
+        and probe_target.get("probe_exists") is True
+        and isinstance(world_context, dict)
+        and world_context.get("exists") is True
+        and not world_context.get("parse_error")
+        and int(world_context.get("texture_property_nodes") or 0) == 0
+        and (
+            int(world_context.get("material_property_nodes") or 0) > 0
+            or int(world_context.get("vertex_color_property_nodes") or 0) > 0
+        )
+    ):
+        return (
+            "asset-backed-material-or-vertex-color-only",
+            (
+                "Treat as material/vertex-color-only evidence for now; extract material or vertex-color fields "
+                "before assigning fallback texture truth."
+            ),
         )
     if probe_target and probe_target.get("probe_exists") is True:
         return (
@@ -521,12 +541,6 @@ def _build_provenance_row(
     texture_link_row_count = 0
     if asset_id_key and asset_id_key in unresolved_assets:
         texture_link_row_count = int(unresolved_assets[asset_id_key].get("texture_link_row_count") or 0)
-    classification, next_action = classify_neutral_row(
-        entry=entry,
-        gap_row=gap_row,
-        probe_target=probe_target,
-        texture_link_row_count=texture_link_row_count,
-    )
     candidate_id = _source_substitution_candidate_id(entry)
     compact_target = _compact_probe_target(probe_target)
     probe_file = _summarize_probe_file(repo_root, (compact_target or {}).get("output"), entry.get("mesh_block"))
@@ -536,6 +550,13 @@ def _build_provenance_row(
         mesh_block=entry.get("mesh_block"),
         flythrough_index=flythrough_index,
         worlds_root=worlds_root,
+    )
+    classification, next_action = classify_neutral_row(
+        entry=entry,
+        gap_row=gap_row,
+        probe_target=probe_target,
+        world_context=world_context,
+        texture_link_row_count=texture_link_row_count,
     )
     world_mesh_size = (world_context or {}).get("target_mesh", {}).get("size") if world_context else None
     manifest_mesh_size = entry.get("mesh_size")
@@ -622,12 +643,25 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             row.get("manifest_index") for row in asset_rows if row.get("world_mesh_size_matches_manifest") is False
         ]
         world_non_texture_property_counts: Counter[str] = Counter()
+        world_material_property_nodes = 0
+        world_vertex_color_property_nodes = 0
         for context in world_contexts:
             for type_name, count in context.get("non_texture_property_type_counts", {}).items():
                 world_non_texture_property_counts[str(type_name)] += int(count)
+            world_material_property_nodes = max(
+                world_material_property_nodes,
+                int(context.get("material_property_nodes") or 0),
+            )
+            world_vertex_color_property_nodes = max(
+                world_vertex_color_property_nodes,
+                int(context.get("vertex_color_property_nodes") or 0),
+            )
         classifications = Counter(str(row.get("classification")) for row in asset_rows)
         first = asset_rows[0]
         probe_target = first.get("probe_target") or {}
+        material_or_vertex_color_only = all(
+            row.get("classification") == "asset-backed-material-or-vertex-color-only" for row in asset_rows
+        )
         out.append(
             {
                 "asset_id": asset_id,
@@ -646,10 +680,13 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "world_texture_property_nodes": max(
                     [int(context.get("texture_property_nodes") or 0) for context in world_contexts] or [0]
                 ),
+                "world_material_property_nodes": world_material_property_nodes,
+                "world_vertex_color_property_nodes": world_vertex_color_property_nodes,
                 "world_non_texture_property_nodes": max(
                     [int(context.get("non_texture_property_nodes") or 0) for context in world_contexts] or [0]
                 ),
                 "world_non_texture_property_type_counts": _counter_to_sorted_dict(world_non_texture_property_counts),
+                "material_or_vertex_color_only": material_or_vertex_color_only,
                 "candidate_links": probe_target.get("candidate_links"),
                 "pairings": probe_target.get("pairings"),
                 "attribute_sets": probe_target.get("attribute_sets"),
@@ -767,6 +804,9 @@ def build_neutral_row_provenance_report(
         for row in rows_with_world_context
         if int(row.get("world_context", {}).get("non_texture_property_nodes") or 0) > 0
     ]
+    rows_with_material_or_vertex_color_only_evidence = [
+        row for row in provenance_rows if row.get("classification") == "asset-backed-material-or-vertex-color-only"
+    ]
     idless_rows = [row for row in provenance_rows if not row.get("asset_id")]
     idless_rows_with_source_geometry = [
         row for row in idless_rows if row.get("coverage_entry", {}).get("exists_on_disk") is True
@@ -809,6 +849,10 @@ def build_neutral_row_provenance_report(
             "neutral_rows_with_texture_link_rows": len(rows_with_texture_link_rows),
             "asset_backed_rows_with_no_mesh_or_link_textures": classification_counts.get(
                 "asset-backed-probed-no-mesh-or-link-textures", 0
+            )
+            + classification_counts.get(
+                "asset-backed-material-or-vertex-color-only",
+                0,
             ),
             "neutral_rows_with_world_context": len(rows_with_world_context),
             "neutral_rows_with_named_parent_node": len(rows_with_named_parent),
@@ -816,6 +860,9 @@ def build_neutral_row_provenance_report(
             "neutral_rows_with_world_mesh_size_mismatch": len(rows_with_world_mesh_size_mismatch),
             "neutral_rows_with_world_texture_nodes": len(rows_with_world_texture_nodes),
             "neutral_rows_with_world_non_texture_property_nodes": len(rows_with_world_non_texture_property_nodes),
+            "neutral_rows_with_material_or_vertex_color_only_evidence": len(
+                rows_with_material_or_vertex_color_only_evidence
+            ),
             "idless_rows_with_source_geometry": len(idless_rows_with_source_geometry),
             "idless_rows_without_candidate_geometry": len(idless_rows_without_candidate_geometry),
             "source_substitution_rows_with_missing_original": len(source_substitution_rows_with_missing_original),
@@ -897,6 +944,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"| Neutral rows with world mesh-size mismatch | {summary.get('neutral_rows_with_world_mesh_size_mismatch', 0)} |",
         f"| Neutral rows with world texture-property nodes | {summary.get('neutral_rows_with_world_texture_nodes', 0)} |",
         f"| Neutral rows with world non-texture property nodes | {summary.get('neutral_rows_with_world_non_texture_property_nodes', 0)} |",
+        f"| Neutral rows with material/vertex-color-only evidence | {summary.get('neutral_rows_with_material_or_vertex_color_only_evidence', 0)} |",
         f"| Id-less rows with source geometry on disk | {summary.get('idless_rows_with_source_geometry', 0)} |",
         f"| Id-less rows without candidate geometry | {summary.get('idless_rows_without_candidate_geometry', 0)} |",
         f"| Source substitutions with missing original source | {summary.get('source_substitution_rows_with_missing_original', 0)} |",
@@ -916,8 +964,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "## Asset-backed neutral IDs",
             "",
-            "| Asset ID | Rows | Mesh | Scene context | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
-            "|---|---|---|---|---|---|---:|---:|---|---:|---|",
+            "| Asset ID | Rows | Mesh | Scene context | Material-only evidence | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
+            "|---|---|---|---|---|---|---|---:|---:|---|---:|---|",
         ]
     )
     asset_groups = report.get("asset_groups", [])
@@ -927,6 +975,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"| `{group.get('asset_id')}` | {_format_code_list(group.get('manifest_indices', []))} | "
                 f"{_format_code_list(group.get('mesh_blocks', []))} | "
                 f"{_scene_context_note(group)} | "
+                f"{'yes' if group.get('material_or_vertex_color_only') else 'no'} | "
                 f"{_asset_manifest_note(group.get('asset_manifest_entries', []))} | "
                 f"{_format_code_list(group.get('probe_outputs', []))} | "
                 f"{group.get('candidate_links') if group.get('candidate_links') is not None else 'n/a'} | "
@@ -935,7 +984,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"{group.get('texture_link_row_count', 0)} | {group.get('next_best_action')} |"
             )
     else:
-        lines.append("| _none_ | none | none | none | none | 0 | 0 | none | 0 | none |")
+        lines.append("| _none_ | none | none | none | none | none | none | 0 | 0 | none | 0 | none |")
 
     lines.extend(
         [
@@ -972,7 +1021,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "## Interpretation",
             "",
             "- The asset-backed neutral rows have asset IDs, assets64 metadata, and focused probe files, but no mesh DDS refs or texture-link rows in current evidence.",
-            "- World sidecars now add scene context for the neutral asset IDs; named parent/nodes are evidence for provenance review, not texture truth.",
+            "- World sidecars now separate ordinary missing-texture work from material/vertex-color-only evidence: rows with zero texture-property nodes plus material or vertex-color properties should not receive guessed DDS truth.",
+            "- Named parent/nodes remain evidence for provenance review, not texture truth.",
             "- That makes parent, non-mesh, or provenance reference discovery the best next asset/texture workflow, not broad CI work.",
             "- Id-less rows need identity/provenance recovery before any texture assignment can become durable truth.",
             "- Coverage-audit geometry status is attached to id-less rows so rows with source geometry can be separated from the missing-original source substitution.",
@@ -1029,6 +1079,7 @@ def main(argv: list[str] | None = None) -> int:
         f"world={summary['neutral_rows_with_world_context']} "
         f"named_parent={summary['neutral_rows_with_named_parent_node']} "
         f"world_mesh_mismatch={summary['neutral_rows_with_world_mesh_size_mismatch']} "
+        f"material_vertex_only={summary['neutral_rows_with_material_or_vertex_color_only_evidence']} "
         f"idless_no_candidate_geometry={summary['idless_rows_without_candidate_geometry']} "
         f"mesh_dds_rows={summary['neutral_rows_with_mesh_dds_refs']} "
         f"texture_link_rows={summary['neutral_rows_with_texture_link_rows']}"
