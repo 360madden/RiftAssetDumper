@@ -128,12 +128,13 @@ Optional heuristic expansion:
 - Practical 350 + texture fallbacks smoke/package: `Assets/build/flythrough/evidence/practical-350-texture-fallbacks/obj-texture-bundle-smoke.json` reports pass=True, 350 checked entries, 0 OBJ issues, 0 MTL issues, 0 missing textures; `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/combined.obj` reports 350 combined entries, 0 skipped, 23421 vertices, 30935 faces, 158 copied texture files, verify_pass=True.
 - The practical 350 + texture fallbacks combined-package report/Markdown now explicitly lists practical source substitutions and texture fallbacks: 1 non-durable source substitution, 1 texture-fallback entry, 2 non-durable texture fallback refs, all marked `durable_truth=false` in `Assets/build/flythrough/combined-obj-package-practical-350-texture-fallbacks/COMBINED_OBJ_PACKAGE.md`.
 - Practical 350 + texture fallbacks gallery: `Assets/build/flythrough/texture-triage-gallery-practical-350-texture-fallbacks/index.html` renders 350 materialized cards, 0 remaining rows, and explicit practical source substitution / texture fallback tables containing row 121, row 118, and `durable=false` labels.
+- One-command rebuild: `python scripts/build_flythrough_practical_package.py` regenerates source substitutions, texture fallbacks, the 350-row manifest/CSV, per-row OBJ/MTL bundle, smoke report, combined OBJ package, gallery, and `Assets/build/flythrough/evidence/practical-350-texture-fallbacks/practical-package-build-report.json`; latest summary is 350/350 materializable, 1 source substitution, 2 texture fallback refs, bundle=True, smoke=True, combined=350, skipped=0, gallery=True.
 
 ## Top 10 next best actions
 
 1. Smoke-import the portable combined full-available OBJ/MTL/textures package in Blender or an MTL-aware viewer.
 2. Smoke-import the practical 350 combined package in Blender or an MTL-aware viewer and inspect the source-substituted mesh17 row.
-3. Open `Assets/build/flythrough/texture-triage-gallery-practical-350-texture-fallbacks/index.html`, review row 118 and row 121 boundary labels, then smoke-import the package.
+3. Run `python scripts/build_flythrough_practical_package.py` when regenerating practical artifacts, then open `Assets/build/flythrough/texture-triage-gallery-practical-350-texture-fallbacks/index.html` and smoke-import the package.
 4. Continue exact recovery/proof for the 2 `n_ds_eternal_assault_flowers_01_*` DDS refs; the practical fallbacks are not durable truth.
 5. Decide whether any of the other 12/14 successful linked-stream redrives should feed a generated review bundle or remain evidence-only.
 6. Investigate the two redrive failures with no float32 position candidates (`03dc62be8b1706fc`, `1183a447da3621f2`).
