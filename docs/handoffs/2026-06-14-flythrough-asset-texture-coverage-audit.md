@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T01:43:40.579868Z
+**Generated**: 2026-06-15T01:46:01.435449Z
 
 ## Why this exists
 
@@ -100,7 +100,7 @@ Optional heuristic expansion:
 - 1 entry remains skipped: the missing source OBJ path.
 - `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
 - `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`.
-- Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 repaired.
+- Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 same-size file candidates, 0 repaired.
 - Latest missing OBJ classifier: 8 similar existing candidate(s), 0 derived no-face variant(s) matching the expected SHA-256.
 - `scripts/probe_flythrough_textureless_meshes.py` refreshes focused live-root `probe-nif-mesh` JSON for textureless-scope asset/mesh rows, so triage can find row-scoped DDS refs instead of guessing.
 - Latest textureless probe refresh report: 6 asset/mesh targets, 0 commands run, 1 targets with mesh-level DDS refs, 2 unique mesh-level DDS refs.

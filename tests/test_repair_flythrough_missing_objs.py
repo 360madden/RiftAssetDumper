@@ -43,7 +43,14 @@ def test_build_repair_report_copies_only_exact_sha_matches(tmp_path: Path) -> No
     )
 
     dry = build_repair_report(repo_root=tmp_path, export_manifest_path=manifest, scan_roots=[tmp_path / "Exports"])
-    assert dry["summary"] == {"missing_entries": 1, "repairable_exact_sha": 1, "repaired": 0, "unrepaired": 1}
+    assert dry["summary"] == {
+        "missing_entries": 1,
+        "repairable_exact_sha": 1,
+        "same_size_file_matches": 1,
+        "repaired": 0,
+        "unrepaired": 1,
+    }
+    assert dry["entries"][0]["same_size_file_candidates"][0]["matches_expected_sha"] is True
     assert target.exists() is False
 
     applied = build_repair_report(
@@ -52,7 +59,13 @@ def test_build_repair_report_copies_only_exact_sha_matches(tmp_path: Path) -> No
         scan_roots=[tmp_path / "Exports"],
         apply=True,
     )
-    assert applied["summary"] == {"missing_entries": 1, "repairable_exact_sha": 1, "repaired": 1, "unrepaired": 0}
+    assert applied["summary"] == {
+        "missing_entries": 1,
+        "repairable_exact_sha": 1,
+        "same_size_file_matches": 1,
+        "repaired": 1,
+        "unrepaired": 0,
+    }
     assert target.read_text(encoding="utf-8") == "v 0 0 0\n"
 
 
@@ -101,8 +114,15 @@ def test_build_repair_report_leaves_unmatched_missing_entry_unrepaired(tmp_path:
         scan_roots=[tmp_path / "Exports"],
         apply=True,
     )
-    assert report["summary"] == {"missing_entries": 1, "repairable_exact_sha": 0, "repaired": 0, "unrepaired": 1}
+    assert report["summary"] == {
+        "missing_entries": 1,
+        "repairable_exact_sha": 0,
+        "same_size_file_matches": 0,
+        "repaired": 0,
+        "unrepaired": 1,
+    }
     assert report["entries"][0]["repair_status"] == "not-repairable"
+    assert report["entries"][0]["same_size_file_candidates"] == []
     candidates = report["entries"][0]["similar_existing_candidates"]
     assert candidates[0]["path"] == "Exports/existing/decode-nif-geometry-mesh17.obj"
     assert candidates[0]["score_reasons"] == ["same-mesh-block", "same-vertex-count"]

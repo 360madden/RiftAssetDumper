@@ -657,6 +657,7 @@ def render_markdown(audit: dict[str, Any]) -> str:
             "- Latest exact-hash repair report: "
             f"{repair_summary.get('missing_entries', 'n/a')} missing, "
             f"{repair_summary.get('repairable_exact_sha', 'n/a')} exact SHA-256 duplicate matches, "
+            f"{repair_summary.get('same_size_file_matches', 'n/a')} same-size file candidates, "
             f"{repair_summary.get('repaired', 'n/a')} repaired."
         )
         if similar_candidates:

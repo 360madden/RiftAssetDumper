@@ -63,6 +63,13 @@ def repo_path_from_relative(repo_root: Path, relative: str) -> Path:
     return repo_root.joinpath(*relative.split("/"))
 
 
+def entry_mesh_size(entry: dict[str, Any]) -> Any:
+    sibling_pair = entry.get("sibling_pair")
+    if isinstance(sibling_pair, dict) and sibling_pair.get("mesh_size") is not None:
+        return sibling_pair.get("mesh_size")
+    return entry.get("mesh_size")
+
+
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as f:
@@ -87,6 +94,7 @@ def manifest_missing_entries(export_manifest: dict[str, Any], *, repo_root: Path
                 "sha256": entry.get("sha256"),
                 "file_size": entry.get("file_size"),
                 "mesh_block": entry.get("mesh_block"),
+                "mesh_size": entry_mesh_size(entry),
                 "vertex_count": entry.get("vertex_count", 0),
                 "face_count": entry.get("face_count", 0),
                 "faced": bool(entry.get("faced")),
@@ -107,6 +115,44 @@ def build_sha_index(scan_roots: list[Path], *, repo_root: Path) -> dict[str, lis
             digest = file_sha256(obj_path)
             out.setdefault(digest, []).append(rel_path)
     return out
+
+
+def same_size_file_candidates(
+    scan_roots: list[Path],
+    *,
+    expected_size: int | None,
+    expected_sha: str | None,
+    repo_root: Path,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    if expected_size is None:
+        return []
+
+    candidates: list[dict[str, Any]] = []
+    for root in scan_roots:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*")):
+            if not path.is_file():
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            if size != expected_size:
+                continue
+            digest = file_sha256(path)
+            candidates.append(
+                {
+                    "path": repo_relative_path(path, repo_root=repo_root),
+                    "suffix": path.suffix.lower(),
+                    "sha256": digest,
+                    "matches_expected_sha": bool(expected_sha and digest == expected_sha),
+                }
+            )
+            if len(candidates) >= limit:
+                return candidates
+    return candidates
 
 
 def text_without_face_lines(path: Path, *, newline: str = "\n", extra_suffix: str = "") -> bytes:
@@ -149,9 +195,11 @@ def score_candidate(entry: dict[str, Any], missing: dict[str, Any]) -> tuple[int
         ("mesh_block", 4, "same-mesh-block"),
         ("vertex_count", 3, "same-vertex-count"),
         ("face_count", 2, "same-face-count"),
+        ("mesh_size", 2, "same-mesh-size"),
         ("file_size", 2, "same-file-size"),
     ):
-        if entry.get(key) == missing.get(key):
+        entry_value = entry_mesh_size(entry) if key == "mesh_size" else entry.get(key)
+        if missing.get(key) is not None and entry_value == missing.get(key):
             score += weight
             reasons.append(label)
     if Path(str(entry.get("path", ""))).name == Path(str(missing.get("path", ""))).name:
@@ -199,6 +247,7 @@ def candidate_entries_for_missing(
                 "sha256": entry.get("sha256"),
                 "file_size": entry.get("file_size"),
                 "mesh_block": entry.get("mesh_block"),
+                "mesh_size": entry_mesh_size(entry),
                 "vertex_count": entry.get("vertex_count", 0),
                 "face_count": entry.get("face_count", 0),
                 "faced": bool(entry.get("faced")),
@@ -236,6 +285,14 @@ def build_repair_report(
     for entry in missing:
         sha = entry.get("sha256")
         matches = sha_index.get(str(sha), []) if sha else []
+        expected_size = entry.get("file_size") if isinstance(entry.get("file_size"), int) else None
+        expected_sha = str(sha) if sha else None
+        same_size_candidates = same_size_file_candidates(
+            scan_roots,
+            expected_size=expected_size,
+            expected_sha=expected_sha,
+            repo_root=repo_root,
+        )
         repair_status = "not-repairable"
         copied_from = None
         if matches:
@@ -255,6 +312,7 @@ def build_repair_report(
             {
                 **entry,
                 "exact_sha_matches": matches,
+                "same_size_file_candidates": same_size_candidates,
                 "similar_existing_candidates": candidate_entries_for_missing(
                     export_entries,
                     entry,
@@ -276,6 +334,7 @@ def build_repair_report(
         "summary": {
             "missing_entries": len(missing),
             "repairable_exact_sha": sum(1 for entry in entries if entry["exact_sha_matches"]),
+            "same_size_file_matches": sum(len(entry["same_size_file_candidates"]) for entry in entries),
             "repaired": repaired,
             "unrepaired": len(missing) - repaired,
         },
