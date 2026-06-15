@@ -16,12 +16,16 @@ Selection rules (deterministic; see `cohort.md` for rationale):
    asset whose transform deviates from identity (translation any component
    > 1e-6, OR rotation != 3x3 identity, OR scale != 1.0 ± 1e-6).
 2. **Per-family selection** (top 4 MeshSize families: 325, 305, 329, 321):
-   take the first 10 (or family-size, whichever is smaller) alphabetically-
+   take the first 5 (or family-size, whichever is smaller) alphabetically-
    sorted members of each family.
-3. **Edge cases** (5 hand-picked): high scene-graph complexity (multi-mesh,
-   large-hierarchy, MB-variant, orphan-mesh regression).
+3. **Edge cases** (3 hand-picked): high scene-graph complexity (multi-mesh,
+   MB-variant, orphan-mesh regression).
 4. **Pos-only no-texture** (1 subsampled): one of the 5 unresolvable
    textureless assets, intentionally subsampled to keep cohort size in band.
+
+Target size: ~25 assets (was 39; trimmed per C2 plan v0.3 optimization to
+fit V4 Pro 1-page briefs). The 4 non-id + ~18 family + 3 edge + 1 pos-only
+= 26 with current MeshSize family sizes.
 
 The output is byte-stable for an unchanged `flythrough-index.json`. Run this
 any time the index changes; the cohort is regenerated in one pass.
@@ -57,23 +61,23 @@ from build_world_placed_merge import (  # noqa: E402
 log = logging.getLogger("build_cycle_2_cohort")
 
 # Project layout: this script lives at `<workspace>/Assets/scripts/build_cycle_2_cohort.py`,
-# so `parents[2]` is the workspace root and `REPO_ROOT / "Assets" / ...` resolves to
-# `<workspace>/Assets/...` correctly. Using `parents[1]` would double the "Assets/"
-# prefix because the project root is itself the "Assets" directory.
+# so `parents[2]` is the workspace root (`C:\RIFT MODDING`) and `REPO_ROOT / "Assets" / ...`
+# resolves to `<workspace>/Assets/...` which is the project root + the actual data location.
+# The data files (flythrough-index.json, world.jsons) live at this doubled path because
+# the project is rooted at `C:\RIFT MODDING\Assets` (the "Assets" repo) but the data was
+# historically generated under `<workspace>/Assets/Assets/build/...`.
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INDEX = REPO_ROOT / "Assets" / "build" / "flythrough" / "flythrough-index.json"
-DEFAULT_WORLDS = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs" / "worlds"
-DEFAULT_SCENE_GRAPH_MANIFEST = REPO_ROOT / "Assets" / "build" / "flythrough" / "scene-graph-manifest.json"
+DEFAULT_INDEX = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "flythrough-index.json"
+DEFAULT_WORLDS = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "objs" / "worlds"
+DEFAULT_SCENE_GRAPH_MANIFEST = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "scene-graph-manifest.json"
 DEFAULT_OUT = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage1" / "cohort.json"
 
 NON_IDENTITY_TOLERANCE = 1e-6
 IDENTITY_TRANSLATION: list[float] = [0, 0, 0]
 TOP_FAMILIES: list[int] = [325, 305, 329, 321]
-FAMILY_TAKE = 10
+FAMILY_TAKE = 5
 EDGE_CASES: list[tuple[str, str, str]] = [
     ("1ecdbaf5a2576ba5", "multi-mesh-11", "11-mesh NIF (Guardian_fe_room) - max meshes in cohort"),
-    ("cf54e712ff57eaac", "multi-mesh-32", "32-mesh NIF - largest mesh count; 17 nodes"),
-    ("95d9b14a964e67c8", "large-hierarchy", "17 nodes - largest hierarchy"),
     ("42024b768fcd2e2b", "mb-variant", "MeshSize 305 with MB=6 (float2) + MB=34 (float3) - proven Z-source pair"),
     ("6fc01704d4a509d5", "orphan-mesh-test", "Single-mesh NIF in TestOrphanMeshResolution regression test"),
 ]
@@ -255,13 +259,15 @@ def build_cohort(
         "edge_case_count": len(EDGE_CASES),
         "pos_only_subsample_count": 1,
         "non_identity_count": len(non_id_ids),
+        "target_band": "20-30",
         "rationale": (
-            "Curated subset of 30-50 assets spanning the non-identity transform "
-            "assets, top 4 MeshSize families (325, 305, 329, 321), and 5 edge "
-            "cases plus 1 pos-only no-texture subsample. Used for C2-2..C2-8 "
-            "analysis and validation. The cohort is a working subset, not durable "
-            "truth; C2-6 produces per-asset manifests which are the durable cycle "
-            "2 output."
+            "Curated subset of ~25 assets spanning the non-identity transform "
+            "assets (4), top 4 MeshSize families (325, 305, 329, 321) at 5 each "
+            "(capped at family size), 3 edge cases, and 1 pos-only no-texture "
+            "subsample. Sized for V4 Pro 1-page briefs (was 39 in C2 plan v0.2; "
+            "trimmed in v0.3). Used for C2-2..C2-8 analysis and validation. The "
+            "cohort is a working subset, not durable truth; C2-6 produces per-"
+            "asset manifests which are the durable cycle 2 output."
         ),
         "cohort": cohort,
     }
