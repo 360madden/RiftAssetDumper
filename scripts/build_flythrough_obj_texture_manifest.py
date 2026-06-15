@@ -40,6 +40,7 @@ FLYTHROUGH_ROOT = REPO_ROOT / "Assets" / "build" / "flythrough"
 DEFAULT_MANIFEST_OUT = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.json"
 DEFAULT_CSV_OUT = FLYTHROUGH_ROOT / "flythrough-obj-texture-manifest.csv"
 DEFAULT_BUNDLE_ROOT = FLYTHROUGH_ROOT / "obj-texture-bundle"
+DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
 
 SLUG_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
@@ -100,6 +101,52 @@ def load_converted_texture_paths(
                 path_value,
                 repo_root=repo_root,
             )
+    return out
+
+
+def load_converted_dds_to_png_names(converted_manifest_path: Path = DEFAULT_CONVERTED_MANIFEST) -> dict[str, str]:
+    """Return normalized DDS basename -> converted PNG basename."""
+
+    manifest = _load_json(converted_manifest_path)
+    out: dict[str, str] = {}
+    for entry in manifest.get("Entries", []):
+        if not isinstance(entry, dict):
+            continue
+        png_name = entry.get("png_name")
+        original_basename = entry.get("original_basename")
+        if not isinstance(png_name, str) or not png_name:
+            continue
+        if isinstance(original_basename, str) and original_basename:
+            dds_name = original_basename.lower()
+            if not dds_name.endswith(".dds"):
+                dds_name += ".dds"
+            out[dds_name] = Path(png_name).name
+    return out
+
+
+def textureless_triage_row_textures(
+    triage_report_path: Path = DEFAULT_TEXTURELESS_TRIAGE_REPORT,
+    *,
+    converted_manifest_path: Path = DEFAULT_CONVERTED_MANIFEST,
+) -> dict[int, list[str]]:
+    """Return manifest index -> converted PNGs found through textureless DDS triage."""
+
+    if not triage_report_path.exists():
+        return {}
+    report = _load_json(triage_report_path)
+    dds_to_png = load_converted_dds_to_png_names(converted_manifest_path)
+    out: dict[int, list[str]] = {}
+    for row in report.get("rows", []):
+        if not isinstance(row, dict):
+            continue
+        manifest_index = row.get("manifest_index")
+        if not isinstance(manifest_index, int):
+            continue
+        textures = [
+            dds_to_png[ref] for ref in row.get("row_dds_refs", []) if isinstance(ref, str) and ref in dds_to_png
+        ]
+        if textures:
+            out[manifest_index] = sorted(set(textures))
     return out
 
 
@@ -206,6 +253,9 @@ def build_manifest(
     bundle_root: Path = DEFAULT_BUNDLE_ROOT,
     allow_single_candidate_materials: bool = False,
     allow_common_candidate_materials: bool = False,
+    allow_textureless_triage_materials: bool = False,
+    textureless_triage_report_path: Path = DEFAULT_TEXTURELESS_TRIAGE_REPORT,
+    converted_manifest_path: Path = DEFAULT_CONVERTED_MANIFEST,
     materialize_untextured: bool = False,
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
@@ -221,8 +271,17 @@ def build_manifest(
     no_texture = 0
     single_candidate_materialized = 0
     common_candidate_materialized = 0
+    textureless_triage_materialized = 0
     untextured_materialized = 0
     entries_lacking_texture_links = 0
+    textureless_triage_textures = (
+        textureless_triage_row_textures(
+            textureless_triage_report_path,
+            converted_manifest_path=converted_manifest_path,
+        )
+        if allow_textureless_triage_materials
+        else {}
+    )
 
     for entry in audit["obj_file_level"]["entries"]:
         linked_texture_names = [texture_name_from_path_or_name(name) for name in entry.get("linked_textures", [])]
@@ -248,6 +307,11 @@ def build_manifest(
                 linked_texture_names = candidate_textures
                 texture_source = "common-candidate-textures"
                 borrowed_texture_asset_id = ",".join(candidate_ids)
+        if allow_textureless_triage_materials and not linked_texture_names:
+            triage_textures = textureless_triage_textures.get(int(entry["manifest_index"]), [])
+            if triage_textures:
+                linked_texture_names = triage_textures
+                texture_source = "textureless-triage-probe"
 
         texture_rows = [
             {
@@ -275,6 +339,8 @@ def build_manifest(
                 single_candidate_materialized += 1
             if texture_source == "common-candidate-textures":
                 common_candidate_materialized += 1
+            if texture_source == "textureless-triage-probe":
+                textureless_triage_materialized += 1
             if texture_source == "untextured-neutral":
                 untextured_materialized += 1
         elif not source_exists:
@@ -330,9 +396,11 @@ def build_manifest(
             "entries_lacking_texture_links": entries_lacking_texture_links,
             "allow_single_candidate_materials": allow_single_candidate_materials,
             "allow_common_candidate_materials": allow_common_candidate_materials,
+            "allow_textureless_triage_materials": allow_textureless_triage_materials,
             "materialize_untextured": materialize_untextured,
             "single_candidate_materialized_entries": single_candidate_materialized,
             "common_candidate_materialized_entries": common_candidate_materialized,
+            "textureless_triage_materialized_entries": textureless_triage_materialized,
             "untextured_materialized_entries": untextured_materialized,
             "converted_texture_paths": len(converted_texture_paths),
             "bundle_root": bundle_rel,
@@ -551,6 +619,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="For id-less OBJ entries with multiple candidates, borrow textures only when all candidates share one texture set.",
     )
     parser.add_argument(
+        "--allow-textureless-triage-materials",
+        action="store_true",
+        help="Use converted DDS refs from textureless probe triage as row-scoped material evidence.",
+    )
+    parser.add_argument(
+        "--textureless-triage-report",
+        type=Path,
+        default=DEFAULT_TEXTURELESS_TRIAGE_REPORT,
+        help="Textureless triage report JSON used by --allow-textureless-triage-materials.",
+    )
+    parser.add_argument(
+        "--converted-manifest",
+        type=Path,
+        default=DEFAULT_CONVERTED_MANIFEST,
+        help="Converted texture manifest used for textureless triage DDS→PNG mapping.",
+    )
+    parser.add_argument(
         "--materialize-untextured",
         action="store_true",
         help="Generate neutral MTL/OBJ bundle rows for existing OBJs that still have no texture links.",
@@ -570,6 +655,9 @@ def main(argv: list[str] | None = None) -> int:
         bundle_root=args.bundle_root,
         allow_single_candidate_materials=args.allow_single_candidate_materials,
         allow_common_candidate_materials=args.allow_common_candidate_materials,
+        allow_textureless_triage_materials=args.allow_textureless_triage_materials,
+        textureless_triage_report_path=args.textureless_triage_report,
+        converted_manifest_path=args.converted_manifest,
         materialize_untextured=args.materialize_untextured,
     )
     _write_json(args.manifest_out, manifest)
@@ -604,6 +692,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{summary['entries_missing_source_obj']} missing source, "
         f"{summary['single_candidate_materialized_entries']} single-candidate materialized, "
         f"{summary['common_candidate_materialized_entries']} common-candidate materialized, "
+        f"{summary['textureless_triage_materialized_entries']} textureless-triage materialized, "
         f"{summary['untextured_materialized_entries']} untextured-neutral materialized"
     )
     return 0

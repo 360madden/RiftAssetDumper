@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -269,6 +270,71 @@ def test_build_manifest_can_materialize_untextured_existing_obj_as_neutral(tmp_p
     assert neutral["summary"]["untextured_materialized_entries"] == 1
     assert neutral["entries"][0]["texture_source"] == "untextured-neutral"
     assert neutral["entries"][0]["chosen_material_textures"] == {}
+
+
+def test_build_manifest_can_use_textureless_triage_converted_refs(tmp_path: Path) -> None:
+    audit = {
+        "schema": "flythrough-asset-texture-coverage-audit-v1",
+        "obj_file_level": {
+            "entry_texture_status_breakdown": {"no-linked-textures": 1},
+            "entries_without_asset_id_candidate_status_breakdown": {},
+            "entries": [
+                {
+                    "manifest_index": 7,
+                    "path": "Exports/textureless.obj",
+                    "exists_on_disk": True,
+                    "asset_id": "abcdef0123456789",
+                    "candidate_asset_ids": [],
+                    "texture_status": "no-linked-textures",
+                    "linked_textures": [],
+                }
+            ],
+        },
+    }
+    triage_report = tmp_path / "textureless-triage.json"
+    converted_manifest = tmp_path / "converted-manifest.json"
+    triage_report.write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "manifest_index": 7,
+                        "row_dds_refs": ["recovered_wall_c.dds", "still_missing_n.dds"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    converted_manifest.write_text(
+        json.dumps(
+            {
+                "Entries": [
+                    {
+                        "original_basename": "recovered_wall_c",
+                        "png_name": "12345678_recovered_wall_c.png",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manifest = build_manifest(
+        repo_root=tmp_path,
+        audit=audit,
+        converted_texture_paths={
+            "12345678_recovered_wall_c.png": "Assets/build/flythrough/textures/converted/12345678_recovered_wall_c.png"
+        },
+        allow_textureless_triage_materials=True,
+        textureless_triage_report_path=triage_report,
+        converted_manifest_path=converted_manifest,
+    )
+    assert manifest["summary"]["materializable_entries"] == 1
+    assert manifest["summary"]["textureless_triage_materialized_entries"] == 1
+    assert manifest["summary"]["entries_lacking_texture_links"] == 0
+    assert manifest["entries"][0]["texture_source"] == "textureless-triage-probe"
+    assert manifest["entries"][0]["chosen_material_textures"]["diffuse"] == "12345678_recovered_wall_c.png"
 
 
 def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 # Flythrough Asset + Texture Coverage Audit
 
-**Generated**: 2026-06-15T00:10:41.193372Z
+**Generated**: 2026-06-15T00:29:15.984200Z
 
 ## Why this exists
 
@@ -84,7 +84,7 @@ Expected default bundle summary from this audit:
 - 323 materializable OBJ entries.
 - 323 generated OBJ files and 323 generated MTL files.
 - 27 skipped entries: 26 without textures and 1 missing source OBJ.
-- 13176 converted PNG paths available to the manifest.
+- 13177 converted PNG paths available to the manifest.
 
 Optional heuristic expansion:
 
@@ -97,23 +97,28 @@ Optional heuristic expansion:
 - 4 ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.
 - 331 total OBJ entries become materializable with both candidate options.
 - 19 entries remain skipped after both candidate options.
+- `--allow-textureless-triage-materials` can use row-scoped converted DDS refs discovered by the textureless triage report.
+- 1 neutral OBJ row currently has converted textureless-triage DDS evidence.
 - `--materialize-untextured` adds neutral MTLs for existing OBJ rows that still lack texture evidence; it does not claim texture coverage.
-- 18 existing textureless OBJ rows become neutral-materialized with that option.
+- 17 existing textureless OBJ rows still become neutral-materialized when triage textures plus neutral materials are enabled.
 - 349 total OBJ entries become materializable with candidate borrowing plus neutral materials.
 - 1 entry remains skipped: the missing source OBJ path.
 - `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.
 - `scripts/repair_flythrough_missing_objs.py --apply` attempts exact SHA-256 duplicate recovery for missing manifest OBJ paths and writes `Assets/build/flythrough/evidence/missing-obj-repair/repair-report.json`.
 - Latest exact-hash repair report: 1 missing, 0 exact SHA-256 duplicate matches, 0 repaired.
+- `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`.
+- Latest textureless-asset triage report: 18 neutral rows, 2 rows with mesh-level DDS refs, 2 neutral asset IDs with refs, 6 unique DDS refs, 1 already converted, 5 missing converted PNGs, 0 of the missing refs catalog-backed.
+- Missing converted DDS targets found in probe evidence: `d_ft_banner_01_c.dds`, `d_ft_core_floor_01_c.dds`, `d_ft_core_floor_01_n.dds`, `d_ft_core_floor_01_s.dds`, `p_mc_ironshield_01_n.dds`.
 
 ## Top 10 next best actions
 
-1. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
-2. Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.
-3. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
-4. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
-5. Investigate the 2 existing no-match fallback OBJ rows separately.
-6. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
-7. Investigate the 10 indexed asset IDs with no linked textures.
-8. Improve material role inference for special maps such as glow, masks, and alpha.
+1. Name-recover/extract the remaining probe-only DDS refs from the textureless-asset triage report.
+2. Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.
+3. Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.
+4. Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.
+5. Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.
+6. Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.
+7. Investigate the 2 existing no-match fallback OBJ rows separately.
+8. Keep investigating indexed asset IDs that still lack linked textures after DDS-ref triage.
 9. Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.
 10. Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.

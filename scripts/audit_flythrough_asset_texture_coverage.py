@@ -35,6 +35,7 @@ DEFAULT_CONVERTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "converted-manifest.
 DEFAULT_EXTRACTED_MANIFEST = FLYTHROUGH_ROOT / "textures" / "extracted-manifest.json"
 DEFAULT_JSON_OUT = FLYTHROUGH_ROOT / "evidence" / "asset-texture-coverage" / "coverage-audit.json"
 DEFAULT_MISSING_OBJ_REPAIR_REPORT = FLYTHROUGH_ROOT / "evidence" / "missing-obj-repair" / "repair-report.json"
+DEFAULT_TEXTURELESS_TRIAGE_REPORT = FLYTHROUGH_ROOT / "evidence" / "textureless-assets" / "textureless-triage.json"
 
 ASSET_ID_RE = re.compile(r"(?<![0-9a-fA-F])([0-9a-fA-F]{16})(?![0-9a-fA-F])")
 
@@ -499,14 +500,14 @@ def build_audit(
     material_refs = _scan_obj_material_refs(exports_root, repo_root) if scan_material_refs else {}
 
     top_actions = [
+        "Name-recover/extract the remaining probe-only DDS refs from the textureless-asset triage report.",
         "Open the full-available texture triage gallery and review the 349 preview cards plus 1 missing-source gap.",
         "Smoke-import the full-available OBJ/MTL bundle in RiftFlythrough or Blender.",
+        "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
         "Resolve/classify the 4 single-match id-less OBJ entries into asset IDs.",
         "Investigate the 4 ambiguous id-less OBJ groups with stronger hashes/signatures.",
         "Investigate the 2 existing no-match fallback OBJ rows separately.",
-        "Fix or regenerate the missing manifest source path: `Exports/Exports/decode-nif-geometry/decode-nif-geometry-mesh17.obj`.",
-        "Investigate the 10 indexed asset IDs with no linked textures.",
-        "Improve material role inference for special maps such as glow, masks, and alpha.",
+        "Keep investigating indexed asset IDs that still lack linked textures after DDS-ref triage.",
         "Promote neutral materials to real textures only when new evidence links those OBJ rows to texture references.",
         "Keep generated OBJ/PNG/DDS artifacts out of git; commit only scripts, reports, and small fixtures.",
     ]
@@ -637,6 +638,39 @@ def render_markdown(audit: dict[str, Any]) -> str:
             f"{repair_summary.get('repairable_exact_sha', 'n/a')} exact SHA-256 duplicate matches, "
             f"{repair_summary.get('repaired', 'n/a')} repaired."
         )
+    textureless_triage = _load_optional_json(DEFAULT_TEXTURELESS_TRIAGE_REPORT)
+    textureless_triage_lines = [
+        "- `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`."
+    ]
+    textureless_triage_materializable = 0
+    if textureless_triage:
+        triage_summary = textureless_triage.get("summary", {})
+        textureless_triage_materializable = sum(
+            1 for row in textureless_triage.get("rows", []) if row.get("row_dds_refs_present_in_converted")
+        )
+        missing_refs = sorted(
+            {
+                ref
+                for asset_report in textureless_triage.get("assets", [])
+                for ref in asset_report.get("asset_dds_refs_missing_from_converted", [])
+            }
+        )
+        textureless_triage_lines.append(
+            "- Latest textureless-asset triage report: "
+            f"{triage_summary.get('neutral_rows', 'n/a')} neutral rows, "
+            f"{triage_summary.get('neutral_rows_with_mesh_dds_refs', 'n/a')} rows with mesh-level DDS refs, "
+            f"{triage_summary.get('neutral_asset_ids_with_any_dds_refs', 'n/a')} neutral asset IDs with refs, "
+            f"{triage_summary.get('unique_dds_refs', 'n/a')} unique DDS refs, "
+            f"{triage_summary.get('unique_dds_refs_present_in_converted', 'n/a')} already converted, "
+            f"{triage_summary.get('unique_dds_refs_missing_from_converted', 'n/a')} missing converted PNGs, "
+            f"{triage_summary.get('missing_converted_dds_refs_with_catalog_match', 'n/a')} of the missing refs catalog-backed."
+        )
+        if missing_refs:
+            textureless_triage_lines.append(
+                "- Missing converted DDS targets found in probe evidence: "
+                + ", ".join(f"`{ref}`" for ref in missing_refs)
+                + "."
+            )
 
     lines = [
         "# Flythrough Asset + Texture Coverage Audit",
@@ -765,12 +799,15 @@ def render_markdown(audit: dict[str, Any]) -> str:
         f"- {common_candidate_materializable} ambiguous id-less OBJ entries are eligible for common-candidate texture borrowing.",
         f"- {common_heuristic_materializable} total OBJ entries become materializable with both candidate options.",
         f"- {common_heuristic_skipped} entries remain skipped after both candidate options.",
+        "- `--allow-textureless-triage-materials` can use row-scoped converted DDS refs discovered by the textureless triage report.",
+        f"- {textureless_triage_materializable} neutral OBJ row currently has converted textureless-triage DDS evidence.",
         "- `--materialize-untextured` adds neutral MTLs for existing OBJ rows that still lack texture evidence; it does not claim texture coverage.",
-        f"- {neutral_materialized} existing textureless OBJ rows become neutral-materialized with that option.",
+        f"- {max(neutral_materialized - textureless_triage_materializable, 0)} existing textureless OBJ rows still become neutral-materialized when triage textures plus neutral materials are enabled.",
         f"- {full_available_materializable} total OBJ entries become materializable with candidate borrowing plus neutral materials.",
         f"- {full_available_skipped} entry remains skipped: the missing source OBJ path.",
         "- `scripts/build_flythrough_texture_triage_gallery.py --manifest Assets/build/flythrough/flythrough-obj-texture-manifest-full-available.json --out Assets/build/flythrough/texture-triage-gallery-full-available/index.html` renders the full-available local HTML triage gallery.",
         *missing_obj_repair_lines,
+        *textureless_triage_lines,
         "",
         "## Top 10 next best actions",
         "",
