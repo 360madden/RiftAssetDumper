@@ -124,6 +124,11 @@ def _neutral_provenance_report() -> dict:
                 "world_texture_property_nodes": 0,
                 "world_material_property_nodes": 1,
                 "world_vertex_color_property_nodes": 1,
+                "world_material_property_blocks": [{"BlockIndex": 2, "TypeName": "NiMaterialProperty", "Size": 68}],
+                "world_vertex_color_property_blocks": [
+                    {"BlockIndex": 3, "TypeName": "NiVertexColorProperty", "Size": 14}
+                ],
+                "world_texture_property_blocks": [],
                 "world_non_texture_property_type_counts": {"NiMaterialProperty": 1},
                 "material_or_vertex_color_only": True,
                 "classification_counts": {"asset-backed-material-or-vertex-color-only": 2},
@@ -272,6 +277,9 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert "no row textures" in neutral_row["review_material_reason"]
     assert "non_texture_props=NiMaterialProperty=1" in neutral_row["evidence"]
     assert "texture_props=0" in neutral_row["evidence"]
+    assert "material_blocks=#2:NiMaterialProperty(68)" in neutral_row["evidence"]
+    assert "vertex_color_blocks=#3:NiVertexColorProperty(14)" in neutral_row["evidence"]
+    assert "texture_blocks=none" in neutral_row["evidence"]
     assert "material_or_vertex_color_only=material=1,vertex_color=1" in neutral_row["evidence"]
     assert "asset-backed-material-or-vertex-color-only=2" in neutral_row["evidence"]
 

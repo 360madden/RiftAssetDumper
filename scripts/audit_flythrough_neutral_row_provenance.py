@@ -263,6 +263,58 @@ def _compact_world_child(child: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _world_property_blocks(child_nodes: list[dict[str, Any]], type_name: str) -> list[dict[str, Any]]:
+    return [
+        _compact_world_child(child)
+        for child in child_nodes
+        if str(child.get("TypeName") or "").lower() == type_name.lower()
+    ]
+
+
+def _world_texture_property_blocks(child_nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        _compact_world_child(child)
+        for child in child_nodes
+        if "texture" in str(child.get("TypeName") or "").lower()
+        and "property" in str(child.get("TypeName") or "").lower()
+    ]
+
+
+def _node_child_refs(node: dict[str, Any]) -> list[int]:
+    refs: list[int] = []
+    for key in ("Children", "Effects"):
+        values = node.get(key, [])
+        if not isinstance(values, list):
+            continue
+        refs.extend(int(value) for value in values if isinstance(value, int) and value >= 0)
+    return refs
+
+
+def _property_scope_nodes(
+    parent: dict[str, Any] | None, nodes_by_index: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Return target parent node plus ancestors whose properties may apply to the target mesh."""
+
+    if not parent:
+        return []
+    parent_by_child: dict[str, dict[str, Any]] = {}
+    for node in nodes_by_index.values():
+        for child_ref in _node_child_refs(node):
+            parent_by_child.setdefault(str(child_ref), node)
+
+    scope: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    current: dict[str, Any] | None = parent
+    while current:
+        block_index = str(current.get("BlockIndex"))
+        if block_index in seen:
+            break
+        seen.add(block_index)
+        scope.append(current)
+        current = parent_by_child.get(block_index)
+    return scope
+
+
 def _world_path_for_asset(
     *,
     repo_root: Path,
@@ -312,6 +364,11 @@ def _summarize_world_context(
     target_mesh = next((mesh for mesh in meshes if str(mesh.get("BlockIndex")) == str(mesh_block)), None)
     parent = nodes_by_index.get(str((target_mesh or {}).get("ParentNiNodeIndex")))
     child_nodes = [child for node in nodes for child in node.get("ChildNodes", []) if isinstance(child, dict)]
+    parent_child_nodes = [child for child in (parent or {}).get("ChildNodes", []) if isinstance(child, dict)]
+    property_scope_nodes = _property_scope_nodes(parent, nodes_by_index)
+    property_scope_child_nodes = [
+        child for node in property_scope_nodes for child in node.get("ChildNodes", []) if isinstance(child, dict)
+    ]
     child_type_counts = Counter(str(child.get("TypeName")) for child in child_nodes if child.get("TypeName"))
     non_texture_property_type_counts = Counter(
         {
@@ -365,6 +422,21 @@ def _summarize_world_context(
         ),
         "material_property_nodes": int(child_type_counts.get("NiMaterialProperty", 0)),
         "vertex_color_property_nodes": int(child_type_counts.get("NiVertexColorProperty", 0)),
+        "parent_material_property_blocks": _world_property_blocks(parent_child_nodes, "NiMaterialProperty"),
+        "parent_vertex_color_property_blocks": _world_property_blocks(parent_child_nodes, "NiVertexColorProperty"),
+        "parent_texture_property_blocks": _world_texture_property_blocks(parent_child_nodes),
+        "property_scope_nodes": [
+            {"block_index": node.get("BlockIndex"), "name": node.get("Name")} for node in property_scope_nodes
+        ],
+        "applicable_material_property_blocks": _world_property_blocks(
+            property_scope_child_nodes,
+            "NiMaterialProperty",
+        ),
+        "applicable_vertex_color_property_blocks": _world_property_blocks(
+            property_scope_child_nodes,
+            "NiVertexColorProperty",
+        ),
+        "applicable_texture_property_blocks": _world_texture_property_blocks(property_scope_child_nodes),
         "non_texture_property_nodes": sum(non_texture_property_type_counts.values()),
         "non_texture_property_type_counts": _counter_to_sorted_dict(non_texture_property_type_counts),
     }
@@ -378,6 +450,20 @@ def _count_or_value(value: Any) -> int | None:
     if isinstance(value, (list, dict, tuple, set)):
         return len(value)
     return None
+
+
+def _unique_world_blocks(contexts: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    blocks: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
+    for context in contexts:
+        values = context.get(key, [])
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if not isinstance(value, dict):
+                continue
+            compact = _compact_world_child(value)
+            blocks[(compact.get("BlockIndex"), compact.get("TypeName"), compact.get("Size"))] = compact
+    return [blocks[key] for key in sorted(blocks, key=lambda item: (str(item[0]), str(item[1]), str(item[2])))]
 
 
 def _mesh_block_matches(mesh: dict[str, Any], mesh_block: str | int | None) -> bool:
@@ -682,6 +768,18 @@ def _group_asset_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 ),
                 "world_material_property_nodes": world_material_property_nodes,
                 "world_vertex_color_property_nodes": world_vertex_color_property_nodes,
+                "world_material_property_blocks": _unique_world_blocks(
+                    world_contexts,
+                    "applicable_material_property_blocks",
+                ),
+                "world_vertex_color_property_blocks": _unique_world_blocks(
+                    world_contexts,
+                    "applicable_vertex_color_property_blocks",
+                ),
+                "world_texture_property_blocks": _unique_world_blocks(
+                    world_contexts,
+                    "applicable_texture_property_blocks",
+                ),
                 "world_non_texture_property_nodes": max(
                     [int(context.get("non_texture_property_nodes") or 0) for context in world_contexts] or [0]
                 ),
@@ -902,6 +1000,16 @@ def _format_count_map(values: dict[str, Any]) -> str:
     return ", ".join(f"`{key}`:{values[key]}" for key in sorted(values))
 
 
+def _format_world_blocks(values: list[dict[str, Any]]) -> str:
+    if not values:
+        return "none"
+    return ", ".join(
+        f"`#{value.get('BlockIndex')}:{value.get('TypeName')}({value.get('Size')})`"
+        for value in values
+        if isinstance(value, dict)
+    )
+
+
 def _scene_context_note(group: dict[str, Any]) -> str:
     if not group.get("world_context_exists"):
         return "missing"
@@ -964,8 +1072,8 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
             "## Asset-backed neutral IDs",
             "",
-            "| Asset ID | Rows | Mesh | Scene context | Material-only evidence | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
-            "|---|---|---|---|---|---|---|---:|---:|---|---:|---|",
+            "| Asset ID | Rows | Mesh | Scene context | Material blocks | Vertex-color blocks | Material-only evidence | assets64 metadata | Probe | Candidate links | Pairings | Mesh DDS refs | Texture-link rows | Next action |",
+            "|---|---|---|---|---|---|---|---|---|---:|---:|---|---:|---|",
         ]
     )
     asset_groups = report.get("asset_groups", [])
@@ -975,6 +1083,8 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"| `{group.get('asset_id')}` | {_format_code_list(group.get('manifest_indices', []))} | "
                 f"{_format_code_list(group.get('mesh_blocks', []))} | "
                 f"{_scene_context_note(group)} | "
+                f"{_format_world_blocks(group.get('world_material_property_blocks', []))} | "
+                f"{_format_world_blocks(group.get('world_vertex_color_property_blocks', []))} | "
                 f"{'yes' if group.get('material_or_vertex_color_only') else 'no'} | "
                 f"{_asset_manifest_note(group.get('asset_manifest_entries', []))} | "
                 f"{_format_code_list(group.get('probe_outputs', []))} | "
@@ -984,7 +1094,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                 f"{group.get('texture_link_row_count', 0)} | {group.get('next_best_action')} |"
             )
     else:
-        lines.append("| _none_ | none | none | none | none | none | none | 0 | 0 | none | 0 | none |")
+        lines.append("| _none_ | none | none | none | none | none | none | none | none | 0 | 0 | none | 0 | none |")
 
     lines.extend(
         [

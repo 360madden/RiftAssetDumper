@@ -221,6 +221,9 @@ def _neutral_asset_queue(neutral_provenance_report: dict[str, Any]) -> list[dict
                 "world_texture_property_nodes": group.get("world_texture_property_nodes", 0),
                 "world_material_property_nodes": group.get("world_material_property_nodes", 0),
                 "world_vertex_color_property_nodes": group.get("world_vertex_color_property_nodes", 0),
+                "world_material_property_blocks": group.get("world_material_property_blocks", []),
+                "world_vertex_color_property_blocks": group.get("world_vertex_color_property_blocks", []),
+                "world_texture_property_blocks": group.get("world_texture_property_blocks", []),
                 "world_non_texture_property_type_counts": group.get("world_non_texture_property_type_counts", {}),
                 "material_or_vertex_color_only": group.get("material_or_vertex_color_only", False),
                 "classification_counts": group.get("classification_counts", {}),
@@ -316,6 +319,15 @@ def _format_counts(values: dict[str, Any]) -> str:
     return ", ".join(f"{key}={values[key]}" for key in sorted(values))
 
 
+def _format_property_blocks(values: list[dict[str, Any]]) -> str:
+    blocks = [
+        f"#{value.get('BlockIndex')}:{value.get('TypeName')}({value.get('Size')})"
+        for value in values
+        if isinstance(value, dict)
+    ]
+    return ",".join(blocks) if blocks else "none"
+
+
 def _review_material_csv_fields(kind: str | None) -> dict[str, str]:
     if not kind:
         return {
@@ -404,6 +416,11 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
         if item.get("world_non_texture_property_type_counts"):
             scene_parts.append("non_texture_props=" + _format_counts(item["world_non_texture_property_type_counts"]))
         scene_parts.append(f"texture_props={item.get('world_texture_property_nodes', 0)}")
+        scene_parts.append(f"material_blocks={_format_property_blocks(item.get('world_material_property_blocks', []))}")
+        scene_parts.append(
+            f"vertex_color_blocks={_format_property_blocks(item.get('world_vertex_color_property_blocks', []))}"
+        )
+        scene_parts.append(f"texture_blocks={_format_property_blocks(item.get('world_texture_property_blocks', []))}")
         if item.get("material_or_vertex_color_only"):
             scene_parts.append(
                 "material_or_vertex_color_only="

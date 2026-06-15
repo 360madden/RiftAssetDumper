@@ -296,6 +296,12 @@ def test_build_neutral_row_provenance_report_classifies_remaining_texture_work(t
     }
     assert asset_group["world_material_property_nodes"] == 1
     assert asset_group["world_vertex_color_property_nodes"] == 1
+    assert asset_group["world_material_property_blocks"] == [
+        {"BlockIndex": 2, "TypeName": "NiMaterialProperty", "Size": 68}
+    ]
+    assert asset_group["world_vertex_color_property_blocks"] == [
+        {"BlockIndex": 3, "TypeName": "NiVertexColorProperty", "Size": 14}
+    ]
     assert asset_group["material_or_vertex_color_only"] is True
     source_row = next(row for row in report["rows"] if row["manifest_index"] == 12)
     assert source_row["source_substitution_candidate_manifest_entries"][0]["IdPrefix"] == "bbbbbbbbbbbbbbbb"
@@ -344,6 +350,10 @@ def test_render_markdown_points_next_work_at_asset_texture_provenance() -> None:
                     "world_texture_property_nodes": 0,
                     "world_material_property_nodes": 1,
                     "world_vertex_color_property_nodes": 1,
+                    "world_material_property_blocks": [{"BlockIndex": 2, "TypeName": "NiMaterialProperty", "Size": 68}],
+                    "world_vertex_color_property_blocks": [
+                        {"BlockIndex": 3, "TypeName": "NiVertexColorProperty", "Size": 14}
+                    ],
                     "world_non_texture_property_type_counts": {"NiMaterialProperty": 1},
                     "material_or_vertex_color_only": True,
                     "candidate_links": 1,
