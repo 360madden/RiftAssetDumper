@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,7 @@ DEFAULT_COMBINED_REPORT = (
 DEFAULT_REPORT_OUT = PRACTICAL_EVIDENCE_ROOT / "practical-access-report.json"
 DEFAULT_MARKDOWN_OUT = PRACTICAL_EVIDENCE_ROOT / "PRACTICAL_350_ACCESS.md"
 DEFAULT_REVIEW_QUEUE_CSV_OUT = PRACTICAL_EVIDENCE_ROOT / "PRACTICAL_350_REVIEW_QUEUE.csv"
+DEFAULT_REVIEW_QUEUE_HTML_OUT = PRACTICAL_EVIDENCE_ROOT / "PRACTICAL_350_REVIEW_QUEUE.html"
 REVIEW_QUEUE_FIELDS = [
     "priority",
     "queue",
@@ -137,6 +140,11 @@ def _entrypoints(build_report: dict[str, Any]) -> list[dict[str, str]]:
             "kind": "review_queue_csv",
             "path": str(outputs.get("review_queue_csv") or outputs.get("access_review_queue_csv") or ""),
             "purpose": "Spreadsheet-friendly queue for exact DDS, neutral provenance, and id-less/source-substitution review.",
+        },
+        {
+            "kind": "review_queue_html",
+            "path": str(outputs.get("review_queue_html") or outputs.get("access_review_queue_html") or ""),
+            "purpose": "Clickable review dashboard grouped by exact DDS, neutral provenance, and id-less/source-substitution queues.",
         },
     ]
 
@@ -447,6 +455,155 @@ def write_review_queue_csv(path: Path, report: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _html_escape(value: Any) -> str:
+    return html.escape("" if value is None else str(value), quote=True)
+
+
+def _repo_relative_href(value: str, *, html_out: Path, repo_root: Path) -> str:
+    if not value:
+        return ""
+    target, separator, fragment = value.partition("#")
+    href = ""
+    if target:
+        target_path = repo_root.joinpath(*target.replace("\\", "/").split("/"))
+        href = _to_posix(os.path.relpath(target_path, html_out.parent))
+    if separator:
+        href += f"#{fragment}"
+    return href
+
+
+def _html_gallery_links(value: str, *, html_out: Path, repo_root: Path) -> str:
+    links = []
+    for raw_link in [part.strip() for part in value.split(";") if part.strip()]:
+        label = raw_link.rsplit("#row-", maxsplit=1)[-1] if "#row-" in raw_link else raw_link
+        href = _repo_relative_href(raw_link, html_out=html_out, repo_root=repo_root)
+        links.append(f'<a href="{_html_escape(href)}">row {_html_escape(label)}</a>')
+    return " ".join(links) if links else ""
+
+
+def _queue_label(queue: str) -> str:
+    labels = {
+        "exact-dds-recovery": "Exact DDS Recovery",
+        "neutral-asset-provenance": "Neutral Asset Provenance",
+        "idless-or-source-substituted": "Id-less Or Source-substituted",
+    }
+    return labels.get(queue, queue.replace("-", " ").title())
+
+
+def render_review_queue_html(report: dict[str, Any], *, html_out: Path, repo_root: Path = REPO_ROOT) -> str:
+    rows = review_queue_rows(report)
+    by_queue: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by_queue.setdefault(str(row.get("queue") or "review"), []).append(row)
+    summary = report.get("summary", {})
+    queue_counts = {queue: len(queue_rows) for queue, queue_rows in sorted(by_queue.items())}
+    material_kinds = sorted({str(row.get("review_material_kind")) for row in rows if row.get("review_material_kind")})
+
+    metric_cards = "\n".join(
+        f'<span class="metric"><strong>{_html_escape(label)}</strong> {_html_escape(value)}</span>'
+        for label, value in [
+            ("OBJ rows", f"{summary.get('materialized_obj_rows')}/{summary.get('total_obj_rows')}"),
+            ("non-neutral", summary.get("rows_with_non_neutral_textures_or_fallbacks")),
+            ("neutral review", summary.get("neutral_review_rows")),
+            ("exact DDS gaps", summary.get("exact_dds_gaps")),
+            ("recovery matches", summary.get("texture_recovery_name_matches")),
+            ("recovery unmatched", summary.get("texture_recovery_unmatched_refs")),
+            ("queue rows", len(rows)),
+        ]
+    )
+    nav = "\n".join(
+        f'<a href="#queue-{_html_escape(queue)}">{_html_escape(_queue_label(queue))} ({count})</a>'
+        for queue, count in queue_counts.items()
+    )
+    material_filters = " ".join(
+        f'<a href="#material-{_html_escape(kind)}">{_html_escape(kind)}</a>' for kind in material_kinds
+    )
+
+    sections = []
+    material_anchor_kinds: set[str] = set()
+    for queue, queue_rows in sorted(by_queue.items(), key=lambda item: min(int(row["priority"]) for row in item[1])):
+        body_rows = []
+        for row in sorted(queue_rows, key=lambda item: (int(item["priority"]), str(item["manifest_indices"]))):
+            material_kind = str(row.get("review_material_kind") or "")
+            material_anchor = ""
+            if material_kind and material_kind not in material_anchor_kinds:
+                material_anchor_kinds.add(material_kind)
+                material_anchor = f' id="material-{_html_escape(material_kind)}"'
+            body_rows.append(
+                f"""
+<tr class="priority-{_html_escape(row.get("priority"))}">
+  <td class="num">{_html_escape(row.get("priority"))}</td>
+  <td><code>{_html_escape(row.get("manifest_indices"))}</code></td>
+  <td>{_html_escape(row.get("asset_id"))}</td>
+  <td><code>{_html_escape(row.get("subject"))}</code></td>
+  <td>{_html_escape(row.get("evidence"))}</td>
+  <td>{_html_gallery_links(str(row.get("gallery_links") or ""), html_out=html_out, repo_root=repo_root)}</td>
+  <td{material_anchor}>{_html_escape(material_kind)}</td>
+  <td>{_html_escape(row.get("review_material_color"))}</td>
+  <td>{_html_escape(row.get("review_material_reason"))}</td>
+  <td>{_html_escape(row.get("next_action"))}</td>
+</tr>
+"""
+            )
+        sections.append(
+            f"""
+<section id="queue-{_html_escape(queue)}">
+  <h2>{_html_escape(_queue_label(queue))} <span>{len(queue_rows)}</span></h2>
+  <table>
+    <thead>
+      <tr><th>Priority</th><th>Rows</th><th>Asset</th><th>Subject</th><th>Evidence</th><th>Gallery</th><th>Review material</th><th>Color</th><th>Reason</th><th>Next action</th></tr>
+    </thead>
+    <tbody>{"".join(body_rows)}</tbody>
+  </table>
+</section>
+"""
+        )
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practical 350 Review Queue</title>
+  <style>
+    body {{ margin: 0; font-family: system-ui, sans-serif; background: #111827; color: #e5e7eb; }}
+    header {{ padding: 24px; background: #020617; border-bottom: 1px solid #334155; }}
+    main {{ padding: 24px; }}
+    a {{ color: #93c5fd; }}
+    code {{ color: #fca5a5; }}
+    table {{ width: 100%; border-collapse: collapse; margin: 12px 0 28px; font-size: 13px; }}
+    th, td {{ border-bottom: 1px solid #334155; padding: 8px; text-align: left; vertical-align: top; }}
+    th {{ color: #bfdbfe; position: sticky; top: 0; background: #111827; }}
+    h2 span {{ color: #93c5fd; font-size: 16px; }}
+    .metric, nav a {{ display: inline-block; margin: 4px 8px 4px 0; padding: 5px 9px; border-radius: 999px; background: #1f2937; }}
+    .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+    .priority-1 {{ background: rgba(127, 29, 29, .18); }}
+    .priority-2 {{ background: rgba(120, 53, 15, .18); }}
+    .priority-3 {{ background: rgba(30, 64, 175, .15); }}
+    .small {{ color: #cbd5e1; font-size: 12px; }}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Practical 350 Review Queue</h1>
+    <p class="small">Generated {_html_escape(_now_iso())}. This dashboard is for asset/texture review only; visual fallbacks and colored neutral materials remain non-durable unless exact source/texture proof exists.</p>
+    <div>{metric_cards}</div>
+    <nav>{nav}</nav>
+    <p class="small">Review materials: {material_filters or "none"}</p>
+  </header>
+  <main>{"".join(sections)}</main>
+</body>
+</html>
+"""
+
+
+def write_review_queue_html(path: Path, report: dict[str, Any], *, repo_root: Path = REPO_ROOT) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(render_review_queue_html(report, html_out=path, repo_root=repo_root), encoding="utf-8", newline="\n")
+    tmp.replace(path)
+
+
 def build_access_report(
     *,
     manifest: dict[str, Any],
@@ -707,6 +864,7 @@ def build_practical_access_report(
     report_out: Path = DEFAULT_REPORT_OUT,
     markdown_out: Path = DEFAULT_MARKDOWN_OUT,
     review_queue_csv_out: Path = DEFAULT_REVIEW_QUEUE_CSV_OUT,
+    review_queue_html_out: Path = DEFAULT_REVIEW_QUEUE_HTML_OUT,
 ) -> dict[str, Any]:
     report = build_access_report(
         manifest=_load_json(manifest_path),
@@ -728,13 +886,16 @@ def build_practical_access_report(
         "json": repo_relative_path(report_out, repo_root=repo_root),
         "markdown": repo_relative_path(markdown_out, repo_root=repo_root),
         "review_queue_csv": repo_relative_path(review_queue_csv_out, repo_root=repo_root),
+        "review_queue_html": repo_relative_path(review_queue_html_out, repo_root=repo_root),
     }
     for entrypoint in report.get("entrypoints", []):
-        if entrypoint.get("kind") == "review_queue_csv":
-            entrypoint["path"] = report["outputs"]["review_queue_csv"]
+        if entrypoint.get("kind") in {"review_queue_csv", "review_queue_html"}:
+            output_key = str(entrypoint["kind"])
+            entrypoint["path"] = report["outputs"][output_key]
     _write_json(report_out, report)
     _write_text(markdown_out, render_markdown(report))
     write_review_queue_csv(review_queue_csv_out, report)
+    write_review_queue_html(review_queue_html_out, report, repo_root=repo_root)
     return report
 
 
@@ -750,6 +911,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--report-out", type=Path, default=DEFAULT_REPORT_OUT)
     parser.add_argument("--markdown-out", type=Path, default=DEFAULT_MARKDOWN_OUT)
     parser.add_argument("--review-queue-csv-out", type=Path, default=DEFAULT_REVIEW_QUEUE_CSV_OUT)
+    parser.add_argument("--review-queue-html-out", type=Path, default=DEFAULT_REVIEW_QUEUE_HTML_OUT)
     return parser.parse_args(argv)
 
 
@@ -766,6 +928,7 @@ def main(argv: list[str] | None = None) -> int:
         report_out=args.report_out,
         markdown_out=args.markdown_out,
         review_queue_csv_out=args.review_queue_csv_out,
+        review_queue_html_out=args.review_queue_html_out,
     )
     summary = report["summary"]
     print(

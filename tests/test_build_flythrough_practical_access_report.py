@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from build_flythrough_practical_access_report import (  # noqa: E402
     build_access_report,
     render_markdown,
+    render_review_queue_html,
     review_queue_rows,
 )
 
@@ -51,6 +52,7 @@ def _build_report() -> dict:
             "neutral_provenance_markdown": "Assets/build/flythrough/evidence/NEUTRAL_ROW_PROVENANCE.md",
             "unresolved_texture_markdown": "Assets/build/flythrough/evidence/UNRESOLVED_TEXTURE_EVIDENCE.md",
             "review_queue_csv": "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.csv",
+            "review_queue_html": "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.html",
         },
         "summary": {
             "manifest_entries": 350,
@@ -193,6 +195,7 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
     assert "# Practical 350 OBJ Access Report" in markdown
     assert "Assets/build/flythrough/gallery/index.html" in markdown
     assert "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.csv" in markdown
+    assert "Assets/build/flythrough/evidence/PRACTICAL_350_REVIEW_QUEUE.html" in markdown
     assert "n_ds_eternal_assault_flowers_01_c.dds" in markdown
     assert "Recovery name matches for exact DDS gaps" in markdown
     assert "zero exact archive/name matches" in markdown
@@ -242,3 +245,26 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert idless_row["filter_tag"] == "id-less"
     assert idless_row["review_material_kind"] == "idless-no-texture-candidate"
     assert idless_row["review_material_color"] == "1.000000 0.650000 0.250000"
+
+
+def test_render_review_queue_html_groups_rows_and_links_gallery(tmp_path: Path) -> None:
+    report = build_access_report(
+        manifest=_manifest(),
+        build_report=_build_report(),
+        texture_gap_report=_texture_gap_report(),
+        unresolved_texture_report=_unresolved_texture_report(),
+        neutral_provenance_report=_neutral_provenance_report(),
+        combined_report=_combined_report(),
+    )
+    html_out = tmp_path / "Assets" / "build" / "flythrough" / "evidence" / "PRACTICAL_350_REVIEW_QUEUE.html"
+
+    text = render_review_queue_html(report, html_out=html_out, repo_root=tmp_path)
+
+    assert "Practical 350 Review Queue" in text
+    assert "Exact DDS Recovery" in text
+    assert "Neutral Asset Provenance" in text
+    assert "Id-less Or Source-substituted" in text
+    assert "../gallery/index.html#row-118" in text
+    assert "asset-id-no-linked-textures" in text
+    assert "0.350000 0.550000 1.000000" in text
+    assert "No durable asset ID or texture candidate is available" in text
