@@ -131,7 +131,7 @@ def texture_name_to_assets(flythrough_index: dict[str, Any]) -> dict[str, list[s
 def inventory_reference_context(inventory: dict[str, Any], asset_ids: set[str]) -> dict[str, dict[str, Any]]:
     """Collect compact model/DDS string reference context by asset id."""
 
-    contexts = {
+    contexts: dict[str, dict[str, Any]] = {
         asset_id: {
             "model_paths": [],
             "dds_refs": [],
