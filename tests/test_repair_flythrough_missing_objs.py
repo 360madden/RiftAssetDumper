@@ -57,12 +57,32 @@ def test_build_repair_report_copies_only_exact_sha_matches(tmp_path: Path) -> No
 
 
 def test_build_repair_report_leaves_unmatched_missing_entry_unrepaired(tmp_path: Path) -> None:
-    _write(tmp_path / "Exports" / "existing" / "other.obj", "v 1 0 0\n")
+    similar = _write(
+        tmp_path / "Exports" / "existing" / "decode-nif-geometry-mesh17.obj",
+        "\n".join(
+            [
+                "v 1 0 0",
+                "v 0 1 0",
+                "f 1 2 1",
+                "",
+            ]
+        ),
+    )
     target = tmp_path / "Exports" / "missing" / "target.obj"
     manifest = tmp_path / "Exports" / "export-manifest.json"
     _write_manifest(
         manifest,
         [
+            {
+                "path": str(similar),
+                "sha256": file_sha256(similar),
+                "file_size": similar.stat().st_size,
+                "mesh_block": "17",
+                "vertex_count": 50,
+                "face_count": 1,
+                "faced": True,
+                "asset_id": "abcdef0123456789",
+            },
             {
                 "path": str(target),
                 "sha256": "0" * 64,
@@ -71,7 +91,7 @@ def test_build_repair_report_leaves_unmatched_missing_entry_unrepaired(tmp_path:
                 "vertex_count": 50,
                 "face_count": 0,
                 "faced": False,
-            }
+            },
         ],
     )
 
@@ -83,4 +103,9 @@ def test_build_repair_report_leaves_unmatched_missing_entry_unrepaired(tmp_path:
     )
     assert report["summary"] == {"missing_entries": 1, "repairable_exact_sha": 0, "repaired": 0, "unrepaired": 1}
     assert report["entries"][0]["repair_status"] == "not-repairable"
+    candidates = report["entries"][0]["similar_existing_candidates"]
+    assert candidates[0]["path"] == "Exports/existing/decode-nif-geometry-mesh17.obj"
+    assert candidates[0]["score_reasons"] == ["same-mesh-block", "same-vertex-count"]
+    assert candidates[0]["derived_no_face_variants"][0]["variant"] == "no-face-lf"
+    assert candidates[0]["derived_no_face_variants"][0]["matches_expected_sha"] is False
     assert target.exists() is False

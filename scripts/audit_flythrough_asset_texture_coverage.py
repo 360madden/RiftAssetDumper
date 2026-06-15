@@ -642,12 +642,29 @@ def render_markdown(audit: dict[str, Any]) -> str:
     ]
     if missing_obj_repair:
         repair_summary = missing_obj_repair.get("summary", {})
+        similar_candidates = [
+            candidate
+            for entry in missing_obj_repair.get("entries", [])
+            for candidate in entry.get("similar_existing_candidates", [])
+        ]
+        derived_matches = [
+            variant
+            for candidate in similar_candidates
+            for variant in candidate.get("derived_no_face_variants", [])
+            if variant.get("matches_expected_sha")
+        ]
         missing_obj_repair_lines.append(
             "- Latest exact-hash repair report: "
             f"{repair_summary.get('missing_entries', 'n/a')} missing, "
             f"{repair_summary.get('repairable_exact_sha', 'n/a')} exact SHA-256 duplicate matches, "
             f"{repair_summary.get('repaired', 'n/a')} repaired."
         )
+        if similar_candidates:
+            missing_obj_repair_lines.append(
+                "- Latest missing OBJ classifier: "
+                f"{len(similar_candidates)} similar existing candidate(s), "
+                f"{len(derived_matches)} derived no-face variant(s) matching the expected SHA-256."
+            )
     textureless_triage = _load_optional_json(DEFAULT_TEXTURELESS_TRIAGE_REPORT)
     textureless_triage_lines = [
         "- `scripts/triage_flythrough_textureless_assets.py` scans neutral-materialized rows for latent DDS references in probe JSON and writes `Assets/build/flythrough/evidence/textureless-assets/textureless-triage.json`."
