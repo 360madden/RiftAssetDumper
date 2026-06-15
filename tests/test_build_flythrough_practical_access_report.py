@@ -138,7 +138,31 @@ def _neutral_provenance_report() -> dict:
                     "geometry_line_count": 48,
                 },
                 "next_best_action": "Recover asset identity/source provenance first.",
-            }
+            },
+            {
+                "manifest_index": 121,
+                "classification": "source-substitution-provenance-gap",
+                "review_material_kind": "source-substitution-no-textures",
+                "source_obj": "Assets/build/flythrough/evidence/candidate-mesh17.obj",
+                "source_substitution_candidate_asset_id": "07f37c99a80da009",
+                "source_substitution": {
+                    "candidate_asset_id": "07f37c99a80da009",
+                    "replacement_obj_sha1": "abc123",
+                    "candidate_export_mode": "experimental",
+                    "replacement_geometry": {
+                        "vertex_count": 50,
+                        "texcoord_count": 50,
+                        "normal_count": 0,
+                        "face_count": 71,
+                    },
+                },
+                "original_source_exists": False,
+                "coverage_entry": {
+                    "candidate_geometry_status": "no-source-geometry",
+                    "geometry_line_count": None,
+                },
+                "next_best_action": "Prove or replace the practical source substitute.",
+            },
         ],
     }
 
@@ -200,6 +224,8 @@ def test_render_markdown_keeps_downstream_paths_and_truth_boundaries_visible() -
     assert "Recovery name matches for exact DDS gaps" in markdown
     assert "zero exact archive/name matches" in markdown
     assert "b5dc665faa848f85" in markdown
+    assert "replacement=v50/vt50/f71" in markdown
+    assert "sha1=abc123" in markdown
     assert "NiMaterialProperty" in markdown
     assert "Visual texture fallbacks are usability aids" in markdown
     assert "## Top 10 next asset-focused actions" in markdown
@@ -245,6 +271,14 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert idless_row["filter_tag"] == "id-less"
     assert idless_row["review_material_kind"] == "idless-no-texture-candidate"
     assert idless_row["review_material_color"] == "1.000000 0.650000 0.250000"
+
+    source_row = next(row for row in rows if row["manifest_indices"] == "121")
+    assert source_row["filter_tag"] == "source-substitution"
+    assert source_row["asset_id"] == "07f37c99a80da009"
+    assert source_row["review_material_kind"] == "source-substitution-no-textures"
+    assert "replacement_sha1=abc123" in source_row["evidence"]
+    assert "replacement_geometry=v50/vt50/vn0/f71" in source_row["evidence"]
+    assert "export_mode=experimental" in source_row["evidence"]
 
 
 def test_render_review_queue_html_groups_rows_and_links_gallery(tmp_path: Path) -> None:

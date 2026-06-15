@@ -160,6 +160,21 @@ def repo_path_from_relative(repo_root: Path, relative: str) -> Path:
     return repo_root.joinpath(*_to_posix(relative).split("/"))
 
 
+def obj_geometry_counts(path: Path) -> dict[str, int]:
+    counts = {"vertex_count": 0, "normal_count": 0, "texcoord_count": 0, "face_count": 0}
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if line.startswith("v "):
+                counts["vertex_count"] += 1
+            elif line.startswith("vn "):
+                counts["normal_count"] += 1
+            elif line.startswith("vt "):
+                counts["texcoord_count"] += 1
+            elif line.startswith("f "):
+                counts["face_count"] += 1
+    return counts
+
+
 def build_source_substitution_payload(
     *,
     repo_root: Path,
@@ -183,6 +198,7 @@ def build_source_substitution_payload(
     replacement_source = redrive_output_dir / str(redrive_entry["obj_path"])
     if not replacement_source.exists():
         raise FileNotFoundError(f"Redrive OBJ candidate is missing: {replacement_source}")
+    replacement_geometry = obj_geometry_counts(replacement_source)
 
     return {
         "schema": "flythrough-source-substitutions-v1",
@@ -193,8 +209,15 @@ def build_source_substitution_payload(
                 "manifest_index": manifest_index,
                 "original_source_obj": original_source_obj,
                 "replacement_source_obj": repo_relative_path(replacement_source, repo_root=repo_root),
+                "replacement_obj_sha1": redrive_entry.get("obj_sha1"),
+                "replacement_obj_bytes": redrive_entry.get("obj_bytes"),
+                "replacement_geometry": replacement_geometry,
                 "candidate_asset_id": candidate_asset_id,
+                "candidate_mesh_block": redrive_entry.get("mesh_block"),
+                "candidate_export_mode": redrive_entry.get("export_mode"),
+                "candidate_export_status": redrive_entry.get("status"),
                 "evidence_manifest": repo_relative_path(redrive_manifest_path, repo_root=repo_root),
+                "evidence_command": redrive_entry.get("command"),
                 "review_status": "candidate-practical-access",
                 "durable_truth": False,
                 "reason": (

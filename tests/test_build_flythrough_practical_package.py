@@ -25,7 +25,7 @@ def test_build_source_substitution_payload_uses_exported_redrive_obj(tmp_path: P
     redrive_output_dir = tmp_path / "Assets" / "build" / "flythrough" / "evidence" / "redrive-objs"
     obj_path = redrive_output_dir / "decode-nif-geometry-07f37c99a80da009" / "decode-nif-geometry" / "mesh17.obj"
     obj_path.parent.mkdir(parents=True)
-    obj_path.write_text("v 0 0 0\n", encoding="utf-8")
+    obj_path.write_text("v 0 0 0\nv 1 0 0\nvt 0 0\nf 1/1 2/1 1/1\n", encoding="utf-8")
     redrive_manifest = tmp_path / "redrive.json"
     _write_json(
         redrive_manifest,
@@ -34,7 +34,12 @@ def test_build_source_substitution_payload_uses_exported_redrive_obj(tmp_path: P
                 {
                     "nif_hash": "07f37c99a80da009",
                     "status": "exported",
+                    "export_mode": "experimental",
+                    "mesh_block": 17,
                     "obj_path": "decode-nif-geometry-07f37c99a80da009/decode-nif-geometry/mesh17.obj",
+                    "obj_sha1": "abc123",
+                    "obj_bytes": 42,
+                    "command": "decode-nif-geometry --id 07f37c99a80da009 --mesh-block 17 --write-obj",
                 }
             ]
         },
@@ -53,6 +58,17 @@ def test_build_source_substitution_payload_uses_exported_redrive_obj(tmp_path: P
     assert payload["entries"][0]["replacement_source_obj"].endswith(
         "decode-nif-geometry-07f37c99a80da009/decode-nif-geometry/mesh17.obj"
     )
+    assert payload["entries"][0]["replacement_obj_sha1"] == "abc123"
+    assert payload["entries"][0]["replacement_obj_bytes"] == 42
+    assert payload["entries"][0]["replacement_geometry"] == {
+        "vertex_count": 2,
+        "normal_count": 0,
+        "texcoord_count": 1,
+        "face_count": 1,
+    }
+    assert payload["entries"][0]["candidate_mesh_block"] == 17
+    assert payload["entries"][0]["candidate_export_mode"] == "experimental"
+    assert payload["entries"][0]["evidence_command"].startswith("decode-nif-geometry")
 
 
 def test_build_texture_fallback_payload_uses_top_recovery_candidate(tmp_path: Path) -> None:

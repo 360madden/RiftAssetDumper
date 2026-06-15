@@ -247,6 +247,7 @@ def _idless_or_substituted_queue(neutral_provenance_report: dict[str, Any]) -> l
                 "classification": classification,
                 "review_material_kind": row.get("review_material_kind"),
                 "source_obj": row.get("source_obj"),
+                "source_substitution": row.get("source_substitution"),
                 "candidate_asset_id": row.get("source_substitution_candidate_asset_id"),
                 "original_source_exists": row.get("original_source_exists"),
                 "geometry_status": coverage.get("candidate_geometry_status"),
@@ -421,6 +422,25 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
         manifest_index = item.get("manifest_index")
         classification = str(item.get("classification") or "")
         review_material_kind = item.get("review_material_kind")
+        substitution = item.get("source_substitution") if isinstance(item.get("source_substitution"), dict) else {}
+        replacement_geometry = (
+            substitution.get("replacement_geometry")
+            if isinstance(substitution.get("replacement_geometry"), dict)
+            else {}
+        )
+        substitution_bits = []
+        if substitution.get("replacement_obj_sha1"):
+            substitution_bits.append(f"replacement_sha1={substitution.get('replacement_obj_sha1')}")
+        if replacement_geometry:
+            substitution_bits.append(
+                "replacement_geometry="
+                f"v{replacement_geometry.get('vertex_count')}/"
+                f"vt{replacement_geometry.get('texcoord_count')}/"
+                f"vn{replacement_geometry.get('normal_count')}/"
+                f"f{replacement_geometry.get('face_count')}"
+            )
+        if substitution.get("candidate_export_mode"):
+            substitution_bits.append(f"export_mode={substitution.get('candidate_export_mode')}")
         rows.append(
             {
                 "priority": 3,
@@ -432,6 +452,7 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                     f"original_source_exists={item.get('original_source_exists')}; "
                     f"geometry={item.get('geometry_status')}; lines={item.get('geometry_line_count')}; "
                     f"source={item.get('source_obj')}"
+                    + (f"; {'; '.join(substitution_bits)}" if substitution_bits else "")
                 ),
                 "durable_truth": False,
                 "gallery_links": _gallery_links(gallery_path, [manifest_index]),
@@ -832,9 +853,26 @@ def render_markdown(report: dict[str, Any]) -> str:
             ["| Row | Classification | Geometry/source status | Source | Next action |", "|---:|---|---|---|---|"]
         )
         for item in idless_queue:
+            substitution = item.get("source_substitution") if isinstance(item.get("source_substitution"), dict) else {}
+            replacement_geometry = (
+                substitution.get("replacement_geometry")
+                if isinstance(substitution.get("replacement_geometry"), dict)
+                else {}
+            )
+            replacement_bits = []
+            if replacement_geometry:
+                replacement_bits.append(
+                    "replacement="
+                    f"v{replacement_geometry.get('vertex_count')}/"
+                    f"vt{replacement_geometry.get('texcoord_count')}/"
+                    f"f{replacement_geometry.get('face_count')}"
+                )
+            if substitution.get("replacement_obj_sha1"):
+                replacement_bits.append(f"sha1={substitution.get('replacement_obj_sha1')}")
             status = (
                 f"original_source_exists={item.get('original_source_exists')}; "
                 f"geometry={item.get('geometry_status')}; lines={item.get('geometry_line_count')}"
+                + (f"; {'; '.join(replacement_bits)}" if replacement_bits else "")
             )
             lines.append(
                 f"| {item.get('manifest_index')} | `{item.get('classification')}` | {status} | "
