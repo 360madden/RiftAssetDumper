@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from build_flythrough_obj_texture_manifest import NEUTRAL_REVIEW_MATERIALS
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLYTHROUGH_ROOT = REPO_ROOT / "Assets" / "build" / "flythrough"
 PRACTICAL_EVIDENCE_ROOT = FLYTHROUGH_ROOT / "evidence" / "practical-350-texture-fallbacks"
@@ -35,6 +37,9 @@ REVIEW_QUEUE_FIELDS = [
     "durable_truth",
     "gallery_links",
     "filter_tag",
+    "review_material_kind",
+    "review_material_color",
+    "review_material_reason",
     "next_action",
 ]
 
@@ -209,6 +214,7 @@ def _neutral_asset_queue(neutral_provenance_report: dict[str, Any]) -> list[dict
                 "candidate_links": group.get("candidate_links", 0),
                 "mesh_dds_refs": group.get("mesh_dds_refs", []),
                 "texture_link_row_count": group.get("texture_link_row_count", 0),
+                "review_material_kind": group.get("review_material_kind", "asset-id-no-linked-textures"),
                 "next_action": group.get(
                     "next_best_action",
                     "Inspect parent, non-mesh, or provenance references; normal mesh/link evidence is empty.",
@@ -296,6 +302,24 @@ def _format_counts(values: dict[str, Any]) -> str:
     return ", ".join(f"{key}={values[key]}" for key in sorted(values))
 
 
+def _review_material_csv_fields(kind: str | None) -> dict[str, str]:
+    if not kind:
+        return {
+            "review_material_kind": "",
+            "review_material_color": "",
+            "review_material_reason": "",
+        }
+    material = NEUTRAL_REVIEW_MATERIALS.get(kind, {})
+    color = material.get("diffuse_color")
+    return {
+        "review_material_kind": kind,
+        "review_material_color": (
+            " ".join(f"{float(component):.6f}" for component in color) if isinstance(color, list) else ""
+        ),
+        "review_material_reason": str(material.get("reason") or ""),
+    }
+
+
 def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten access report queues into a spreadsheet-friendly review queue."""
 
@@ -321,6 +345,7 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                     "durable_truth": False,
                     "gallery_links": "",
                     "filter_tag": "texture-fallback",
+                    **_review_material_csv_fields(None),
                     "next_action": item.get("next_action"),
                 }
             )
@@ -345,12 +370,14 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                     "durable_truth": fallback.get("durable_truth"),
                     "gallery_links": _gallery_links(gallery_path, [manifest_index]),
                     "filter_tag": "texture-fallback",
+                    **_review_material_csv_fields(None),
                     "next_action": item.get("next_action"),
                 }
             )
 
     for item in queues.get("neutral_asset_provenance", []):
         manifest_indices = item.get("manifest_indices", [])
+        review_material_kind = str(item.get("review_material_kind") or "asset-id-no-linked-textures")
         scene_parts = []
         if item.get("world_parent_node_names"):
             scene_parts.append("parents=" + ",".join(str(value) for value in item["world_parent_node_names"]))
@@ -377,6 +404,7 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "durable_truth": False,
                 "gallery_links": _gallery_links(gallery_path, manifest_indices),
                 "filter_tag": "neutral",
+                **_review_material_csv_fields(review_material_kind),
                 "next_action": item.get("next_action"),
             }
         )
@@ -384,6 +412,7 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
     for item in queues.get("idless_or_source_substituted_rows", []):
         manifest_index = item.get("manifest_index")
         classification = str(item.get("classification") or "")
+        review_material_kind = item.get("review_material_kind")
         rows.append(
             {
                 "priority": 3,
@@ -399,6 +428,7 @@ def review_queue_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "durable_truth": False,
                 "gallery_links": _gallery_links(gallery_path, [manifest_index]),
                 "filter_tag": "source-substitution" if "source-substitution" in classification else "id-less",
+                **_review_material_csv_fields(str(review_material_kind) if review_material_kind else None),
                 "next_action": item.get("next_action"),
             }
         )

@@ -219,6 +219,7 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert exact_row["manifest_indices"] == "118"
     assert exact_row["gallery_links"] == "Assets/build/flythrough/gallery/index.html#row-118"
     assert exact_row["durable_truth"] is False
+    assert exact_row["review_material_kind"] == ""
     assert "recovery_name_matches=0" in exact_row["evidence"]
     assert "recovery_unmatched=True" in exact_row["evidence"]
     assert "replacement=n_ds_ruinouspassage_flowers_01_c.dds" in exact_row["evidence"]
@@ -229,6 +230,9 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert neutral_row["gallery_links"] == (
         "Assets/build/flythrough/gallery/index.html#row-89; Assets/build/flythrough/gallery/index.html#row-324"
     )
+    assert neutral_row["review_material_kind"] == "asset-id-no-linked-textures"
+    assert neutral_row["review_material_color"] == "0.350000 0.550000 1.000000"
+    assert "no row textures" in neutral_row["review_material_reason"]
     assert "non_texture_props=NiMaterialProperty=1" in neutral_row["evidence"]
 
     idless_row = next(row for row in rows if row["queue"] == "idless-or-source-substituted")
@@ -236,3 +240,5 @@ def test_review_queue_rows_link_gallery_anchors_and_keep_truth_boundaries() -> N
     assert idless_row["manifest_indices"] == "5"
     assert idless_row["gallery_links"] == "Assets/build/flythrough/gallery/index.html#row-5"
     assert idless_row["filter_tag"] == "id-less"
+    assert idless_row["review_material_kind"] == "idless-no-texture-candidate"
+    assert idless_row["review_material_color"] == "1.000000 0.650000 0.250000"
