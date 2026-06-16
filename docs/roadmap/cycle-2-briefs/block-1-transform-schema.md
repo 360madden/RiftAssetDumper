@@ -98,3 +98,10 @@ must validate against the locked schema with the same exit code.
    `asset-mesh-manifest-v1`? (Schema gap #3.)
 9. **Should `world.accumulated_transform` vs `declared_transform` be split?**
    (Schema gap #4; current `world_transform_summary` collapses both.)
+
+## Identity cohort scale-out (C2-2.4 batch)
+
+- **5 identity manifests built** via `python scripts/build_scene_manifest.py --asset-id <id>` for the first 5 distinct identity asset IDs from `transform-examples.json`
+- **9/9 manifests validate** against `scene-manifest-v1.draft.schema.json` with exit code 0 (4 non-id + 5 id)
+- **4 contrast tests added** to `tests/test_build_scene_manifest.py`: `test_find_id_asset_ids_returns_nonzero`, `test_identity_manifests_have_identity_transform`, `test_non_id_manifests_have_non_identity_transform`, `test_both_cohorts_share_consumer_ready_false`
+- **Schema-scale contrast**: 4 non-id (`world_transform_identity=false`, translation != 0) + 5 id (`world_transform_identity=true`, translation=`[0,0,0]`). Both cohorts share `consumer_ready=false` until the C2-3.x extraction pass runs (the gate is about data extraction completeness, not transform identity)
