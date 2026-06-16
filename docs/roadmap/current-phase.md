@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-16 (Cycle 2 COMPLETE — all 7 phases DONE; 153/217 consumer-ready; RiftFlythrough delivery shipped)
+**Last Updated**: 2026-06-16 (Cycle 2 COMPLETE — all 7 phases DONE; v0.8 NIF-confirmed 217/217; 153/217 consumer-ready; RiftFlythrough delivery shipped)
 
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
@@ -10,6 +10,13 @@
 >   obj_sha1 populated from flythrough-index for all 217 stage6 manifests
 > - **v0.7 material inference**: material_status inferred from flythrough texture
 >   linkage — 153/217 assets consumer_ready
+> - **v0.8 NIF-confirmed material scan**: `scripts/scan_nif_material_properties.py`
+>   runs `probe-nif` per asset (217/217), extracts `NiTexturingProperty` (212/217 >0),
+>   `NiMaterialProperty` (217/217 >0), `NiVertexColorProperty` (217/217 >0) block counts.
+>   `build_materials()` now prefers confirmed counts over inference. 5 assets confirmed
+>   material-color-only (zero NiTexturingProperty). `texture_property_count`,
+>   `material_property_count`, `vertex_color_property_count`, `scanned_at` populated.
+>   PRODUCER_VERSION bumped to v0.8.
 > - **C2-7 ship-kill**: 241 manifests validated by 22-test suite + 9th guard,
 >   decision SHIP with evidence at `docs/roadmap/cycle-2-briefs/block-4-ship-kill-brief.md`
 > - **Stage8 delivery**: `riftflythrough-delivery.json` (153 assets, 14.7K vertices,
@@ -58,8 +65,8 @@
 | 9 | **v0.6 Geometry enrichment** | ✅ Complete | vertex_count, face_count, mesh_block, render_class, obj_sha1 |
 | 10 | **v0.7 Material inference** | ✅ Complete | 153/217 consumer_ready via texture-linkage inference |
 | 11 | **Stage8 RiftFlythrough delivery** | ✅ Complete | `riftflythrough-delivery.json` copied to sibling project |
-| 12 | **NIF-level material scan (post-C2 follow-up)** | ⏸ Optional | Would populate texture_property_count, material_property_count, scanned_at |
-| 13 | **2 faced-but-textureless asset investigation** | ⏸ Optional | MS=193, MS=272 pos-only recovered; genuinely no texture linkage |
+| 12 | **v0.8 NIF-level material scan** | ✅ Complete | 217/217 NIF-confirmed; 212 textured, 5 material-color-only; scanned_at populated |
+| 13 | **5 textureless asset investigation** | ✅ Complete | All 5 confirmed genuinely material-color-only; zero NiTexturingProperty blocks |
 
 ---
 
@@ -139,12 +146,14 @@
 |--------|------:|
 | Phases | C2-1 through C2-7 (all DONE) |
 | Per-asset manifests | 241 (217 stage6 + 24 stage2) |
+| NIF-confirmed material data | 217/217 (100%) |
 | Consumer-ready assets | 153/217 (70.5%) |
 | Total vertices | 14,696 |
 | Total faces | 23,634 |
 | Linked textures | 404 across 153 assets |
 | Mesh size families | 19 |
 | Guard passes | 241/241 (schema, OBJ, world, transforms, textures, version) |
+| Producer version | v0.8 (NIF-confirmed material data) |
 | Test suite | 55 tests (38 scene-manifest + 17 builder) |
 | Ship-kill decision | **SHIP** |
 
