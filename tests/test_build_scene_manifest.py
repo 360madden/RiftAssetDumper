@@ -235,11 +235,19 @@ def _load_sample(asset_id: str) -> dict[str, Any]:
     reason="non-id sample batch not yet built",
 )
 def test_find_id_asset_ids_returns_nonzero() -> None:
-    """Mirror of test_find_non_id_asset_ids_returns_4: identity cohort is also populated."""
+    """Mirror of test_find_non_id_asset_ids_returns_4: identity cohort is also populated.
+
+    Pinned to 20 after the C2-2.4 dedupe pass; ``identity_examples`` in
+    ``transform-examples.json`` had 2 internal duplicate pairs that collapsed
+    to 20 distinct asset_ids. If the cohort regenerates, this pin catches
+    regressions.
+    """
     ids = find_id_asset_ids()
-    assert len(ids) > 0, "identity_examples should not be empty"
+    assert len(ids) == 20, f"identity cohort should be 20 distinct ids, got {len(ids)}"
     for i in ids:
         assert len(i) == 16 and all(c in "0123456789abcdef" for c in i)
+    # Uniqueness check: no duplicate asset_ids in the list
+    assert len(set(ids)) == len(ids), "identity cohort contains duplicate asset_ids"
 
 
 @pytest.mark.skipif(

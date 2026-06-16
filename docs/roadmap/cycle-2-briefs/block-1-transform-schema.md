@@ -105,3 +105,10 @@ must validate against the locked schema with the same exit code.
 - **9/9 manifests validate** against `scene-manifest-v1.draft.schema.json` with exit code 0 (4 non-id + 5 id)
 - **4 contrast tests added** to `tests/test_build_scene_manifest.py`: `test_find_id_asset_ids_returns_nonzero`, `test_identity_manifests_have_identity_transform`, `test_non_id_manifests_have_non_identity_transform`, `test_both_cohorts_share_consumer_ready_false`
 - **Schema-scale contrast**: 4 non-id (`world_transform_identity=false`, translation != 0) + 5 id (`world_transform_identity=true`, translation=`[0,0,0]`). Both cohorts share `consumer_ready=false` until the C2-3.x extraction pass runs (the gate is about data extraction completeness, not transform identity)
+
+## Identity cohort source-data dedupe (C2-2.4 follow-on)
+
+- **identity_examples count collapsed 22 -> 20**: original list had 2 internal duplicate pairs (entries 18=19 both `1ecdbaf5a2576ba5`; entries 6=20 both `42024b768fcd2e2b`). Dedupe pass preserves first-occurrence order; no asset_ids were added or removed on disk.
+- **non_identity_examples unchanged**: same dedupe audit was not needed (4 distinct entries, no internal duplicates).
+- **Source-of-truth updated**: `transform-examples.json._meta.identity_examples_dedup_notes` records the change. Cohort definition = **24 total (4 non-id + 20 distinct id)**, matching the 24 on-disk `sample-manifest-*.json` files.
+- **Test pinned**: `test_find_id_asset_ids_returns_nonzero` now asserts `len(ids) == 20` and uniqueness, so cohort regressions are caught at the test level (loose `> 0` would have silently passed against any future shrinkage).
