@@ -1,6 +1,6 @@
 ﻿# C2-3.1 Texture Coverage Report (draft)
 
-Generated: `2026-06-16T11:23:14Z`  
+Generated: `2026-06-16T11:28:24Z`  
 Producer: `build_texture_coverage.py` (vv0.1)  
 Cohort: 24 (identity=20, non_identity=4)
 
