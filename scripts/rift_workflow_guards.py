@@ -2573,3 +2573,194 @@ def descriptor_consistency_guard(report_path: str | Path) -> None:
         "Hard errors remain candidate-only classification flags; "
         "no geometry truth or role promotion is asserted."
     )
+
+
+# ============================================================================
+# SceneManifestValidationGuard (C2-7.2 ship-kill consumer contract guard)
+# ============================================================================
+
+SCENE_MANIFEST_STAGE6_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage6"
+SCENE_MANIFEST_STAGE2_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
+SCENE_MANIFEST_PACK_PATH = (
+    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage4" / "scene-manifest-pack-v1.json"
+)
+SCENE_MANIFEST_SCHEMA_PATH = (
+    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "scene-manifest-v1.schema.json"
+)
+SCENE_MANIFEST_STAGE7_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage7"
+SCENE_MANIFEST_GUARD_JSON = "scene-manifest-validation-guard.json"
+SCENE_MANIFEST_GUARD_MD = "scene-manifest-validation-guard.md"
+
+
+def scene_manifest_validation_guard() -> None:
+    """C2-7.2 Ship-kill consumer contract guard: validate all scene manifests.
+
+    Validates schema, OBJ/world paths, transform finiteness, texture sources,
+    and producer version across all 241 manifests (217 stage6 + 24 stage2).
+    Generates stage7/scene-manifest-validation-guard.{json,md} reports.
+    Raises ValueError on any assertion failure.
+    """
+    import math
+    import os
+
+    try:
+        from jsonschema import Draft202012Validator
+    except ImportError as e:
+        raise ValueError(f"jsonschema not installed: {e}") from e
+
+    schema_data = json.loads(SCENE_MANIFEST_SCHEMA_PATH.read_text(encoding="utf-8-sig"))
+    validator = Draft202012Validator(schema_data)
+
+    stage6_paths = sorted(SCENE_MANIFEST_STAGE6_DIR.glob("manifest-*.json"))
+    stage2_paths = sorted(SCENE_MANIFEST_STAGE2_DIR.glob("sample-manifest-*.json"))
+
+    assert_proof_guard(len(stage6_paths) == 217, f"Expected 217 stage6 manifests, found {len(stage6_paths)}.")
+    assert_proof_guard(len(stage2_paths) == 24, f"Expected 24 stage2 samples, found {len(stage2_paths)}.")
+
+    pack_ok = True
+    pack_entry_count = 0
+    try:
+        pack = json.loads(SCENE_MANIFEST_PACK_PATH.read_text(encoding="utf-8-sig"))
+        pack_entry_count = len(pack.get("entries", []))
+    except FileNotFoundError:
+        pack_ok = False
+
+    schema_failures: list[str] = []
+    obj_missing: list[str] = []
+    world_missing: list[str] = []
+    non_finite: list[str] = []
+    bad_source: list[str] = []
+    scene_sourced: list[str] = []
+    bad_version: list[str] = []
+    schema_invalid_flag: list[str] = []
+
+    valid_sources = {"scene", "flythrough", "unknown"}
+    all_paths = list(stage6_paths) + list(stage2_paths)
+    total_manifests = len(all_paths)
+    total_valid = 0
+
+    for path in all_paths:
+        manifest = json.loads(path.read_text(encoding="utf-8-sig"))
+        aid = manifest.get("asset_id", "unknown")
+
+        errors = [
+            f"{'/'.join(str(p) for p in err.absolute_path)}: {err.message}" for err in validator.iter_errors(manifest)
+        ]
+        if errors:
+            schema_failures.append(f"{aid}: {errors[0]}")
+        else:
+            total_valid += 1
+
+        if not manifest.get("validation", {}).get("schema_valid", False):
+            schema_invalid_flag.append(aid)
+
+        obj_path = manifest.get("geometry", {}).get("obj_path", "")
+        if not os.path.exists(obj_path):
+            obj_missing.append(f"{aid}: {obj_path}")
+
+        world_json = manifest.get("world", {}).get("world_json", "")
+        if not os.path.exists(world_json):
+            world_missing.append(f"{aid}: {world_json}")
+
+        ts = manifest.get("world", {}).get("world_transform_summary", {})
+        for vec_name in ("translation", "rotation"):
+            vec = ts.get(vec_name, [])
+            for i, v in enumerate(vec):
+                if not math.isfinite(v):
+                    non_finite.append(f"{aid} {vec_name}[{i}]={v}")
+                    break
+        s = ts.get("scale", 1.0)
+        if not math.isfinite(s):
+            non_finite.append(f"{aid} scale={s}")
+
+        src = manifest.get("textures", {}).get("source", "unknown")
+        if src not in valid_sources:
+            bad_source.append(f"{aid}: '{src}'")
+        if src == "scene":
+            scene_sourced.append(aid)
+
+        ver = manifest.get("producer", {}).get("version", "")
+        if ver != "v0.7":
+            bad_version.append(f"{aid}: version={ver}")
+
+    assert_proof_guard(len(schema_failures) == 0, f"{len(schema_failures)} schema failures")
+    assert_proof_guard(len(obj_missing) == 0, f"{len(obj_missing)} missing OBJ paths")
+    assert_proof_guard(len(world_missing) == 0, f"{len(world_missing)} missing world paths")
+    assert_proof_guard(len(non_finite) == 0, f"{len(non_finite)} non-finite transforms")
+    assert_proof_guard(len(bad_source) == 0, f"{len(bad_source)} invalid texture sources")
+    assert_proof_guard(len(scene_sourced) == 0, f"{len(scene_sourced)} scene-sourced textures")
+    assert_proof_guard(len(bad_version) == 0, f"{len(bad_version)} bad producer versions")
+    assert_proof_guard(len(schema_invalid_flag) == 0, f"{len(schema_invalid_flag)} schema_valid=False")
+
+    source_counts: dict[str, int] = {"scene": 0, "flythrough": 0, "unknown": 0}
+    for path in stage6_paths:
+        m = json.loads(path.read_text(encoding="utf-8-sig"))
+        src = m.get("textures", {}).get("source", "unknown")
+        source_counts[src] = source_counts.get(src, 0) + 1
+
+    verdict = (
+        "PASS"
+        if (
+            total_valid == total_manifests
+            and len(obj_missing) == 0
+            and len(world_missing) == 0
+            and len(non_finite) == 0
+            and len(bad_source) == 0
+            and len(schema_invalid_flag) == 0
+        )
+        else "FAIL"
+    )
+
+    SCENE_MANIFEST_STAGE7_DIR.mkdir(parents=True, exist_ok=True)
+    json_path = SCENE_MANIFEST_STAGE7_DIR / SCENE_MANIFEST_GUARD_JSON
+    md_path = SCENE_MANIFEST_STAGE7_DIR / SCENE_MANIFEST_GUARD_MD
+
+    report = {
+        "Schema": "scene-manifest-validation-guard/v1",
+        "Verdict": verdict,
+        "TotalManifests": total_manifests,
+        "Stage6Count": len(stage6_paths),
+        "Stage2Count": len(stage2_paths),
+        "SchemaValid": total_valid,
+        "SchemaFailures": len(schema_failures),
+        "ObjPathsMissing": len(obj_missing),
+        "WorldPathsMissing": len(world_missing),
+        "NonFiniteTransforms": len(non_finite),
+        "InvalidTextureSource": len(bad_source),
+        "SceneSourcedTextures": len(scene_sourced),
+        "BadProducerVersion": len(bad_version),
+        "SchemaInvalidFlag": len(schema_invalid_flag),
+        "PackOk": pack_ok,
+        "PackEntryCount": pack_entry_count,
+        "TextureSourceDistribution": source_counts,
+    }
+    json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    md_lines = [
+        "# Scene Manifest Validation Guard",
+        "",
+        f"**Verdict: {verdict}**",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| Total manifests | {total_manifests} |",
+        f"| Stage6 scale-out | {len(stage6_paths)} |",
+        f"| Stage2 samples | {len(stage2_paths)} |",
+        f"| Schema valid | {total_valid}/{total_manifests} |",
+        f"| OBJ paths missing | {len(obj_missing)} |",
+        f"| World paths missing | {len(world_missing)} |",
+        f"| Non-finite transforms | {len(non_finite)} |",
+        f"| Invalid texture source | {len(bad_source)} |",
+        f"| Scene-sourced textures | {len(scene_sourced)} |",
+        f"| Bad producer version | {len(bad_version)} |",
+        "",
+        "## Texture Source Distribution",
+        "",
+        f"| scene | {source_counts.get('scene', 0)} |",
+        f"| flythrough | {source_counts.get('flythrough', 0)} |",
+        f"| unknown | {source_counts.get('unknown', 0)} |",
+    ]
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+
+    print("\n--- SceneManifestValidationGuard C2-7.2 ship-kill consumer contract guard")
+    print(f"Manifests: {total_manifests} (stage6={len(stage6_paths)}, stage2={len(stage2_paths)})")

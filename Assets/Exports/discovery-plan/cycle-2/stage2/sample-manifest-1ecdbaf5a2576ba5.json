@@ -1,20 +1,21 @@
 {
-  "SchemaVersion": "scene-manifest/v1-draft",
+  "SchemaVersion": "scene-manifest/v1",
   "asset_id": "1ecdbaf5a2576ba5",
-  "generated_at": "2026-06-16T11:09:10Z",
+  "generated_at": "2026-06-16T13:18:40Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
-    "version": "v0.4",
+    "version": "v0.7",
     "command": "python scripts/build_scene_manifest.py --asset-id 1ecdbaf5a2576ba5"
   },
   "geometry": {
-    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\1ecdbaf5a2576ba5.obj",
-    "mesh_block": null,
+    "obj_path": "C:\\RIFT MODDING\\Assets\\Exports\\decode-nif-geometry-1ecdbaf5a2576ba5.json\\decode-nif-geometry-mesh78.obj",
+    "mesh_block": "M#78",
     "mesh_size": 321,
-    "vertex_count": 0,
-    "face_count": 0,
+    "vertex_count": 60,
+    "face_count": 58,
     "has_faces": true,
-    "render_class": "unknown"
+    "render_class": "faced",
+    "obj_sha1": "7d90be7318d24590647d6b90bd574e088af39d1f"
   },
   "world": {
     "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\1ecdbaf5a2576ba5.world.json",
@@ -53,24 +54,50 @@
     "world_transform_identity": true
   },
   "materials": {
-    "material_status": "unknown",
+    "material_status": "textured",
     "texture_property_count": 0,
     "material_property_count": 0,
     "vertex_color_property_count": 0,
+    "scanned_at": null,
     "notes": [
-      "material data not yet extracted from NIF - status=unknown (cohort has_faces=True)"
+      "material_status=textured inferred from flythrough texture linkage (texture bindings confirmed by pipeline); not yet confirmed by NIF-level material property scan"
     ]
   },
   "textures": {
-    "linked_texture_count": 0,
-    "linked_textures": [],
+    "source": "flythrough",
+    "linked_texture_count": 23,
+    "linked_textures": [
+      "0558cc91_normal_blank.png",
+      "1b5d3829_d_fort_stone_mathosian_room_parts_03_s.png",
+      "1e9dced1_environmentmap_blank.png",
+      "1fcf6b67_p_c_banner_guardian_01_s.png",
+      "26c9d986_1h_sword_015_c.png",
+      "27553b9e_p_c_banner_guardian_01_n.png",
+      "32f175d2_m_c_harbor_floor_tile_01_n.png",
+      "33dd1cca_d_fort_stone_mathosian_room_parts_01_n.png",
+      "37527ca7_d_fort_stone_mathosian_door_01_c.png",
+      "46ab6ba5_p_mc_ironshield_01_n.png",
+      "5a21fcce_m_c_cartel_road_01.png",
+      "5bb080b3_a_mc_dawnseeker_floor_01_cyl.png",
+      "640bfba1_d_fort_stone_mathosian_door_01_s.png",
+      "695215d2_p_c_banner_guardian_01_c.png",
+      "8170b1b0_m_c_cartel_road_01_n.png",
+      "85995af3_d_fort_stone_mathosian_room_parts_03_c.png",
+      "9f74d81b_d_fort_stone_mathosian_room_parts_01_c.png",
+      "a093b9bf_d_fort_stone_mathosian_room_parts_03_n.png",
+      "a3c8bca4_d_fort_stone_mathosian_door_01_n.png",
+      "b687a695_m_c_harbor_floor_tile_old_01_s.png",
+      "babff381_d_fort_stone_mathosian_room_parts_01_s.png",
+      "e3e22c1f_p_mc_ironshield_01_c.png",
+      "ffadecc9_m_c_harbor_floor_tile_old_01.png"
+    ],
     "missing_texture_count": 0,
     "placeholder_texture_count": 0
   },
   "provenance": {
     "cohort": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
     "source_nif_hash": "1ecdbaf5a2576ba5",
-    "flythrough_index_entry": null,
+    "flythrough_index_entry": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\flythrough-index.json",
     "evidence_files": [
       "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\1ecdbaf5a2576ba5.world.json",
       "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
@@ -79,14 +106,8 @@
   },
   "validation": {
     "schema_valid": true,
-    "consumer_ready": false,
-    "warnings": [
-      "vertex_count=0 and face_count=0 - geometry not yet extracted from OBJ",
-      "render_class=unknown - OBJ classify pass not yet run",
-      "mesh_block=null - world.json BlockIndex not yet mapped to the locked M#N convention",
-      "material_status=unknown - NIF material properties not yet scanned",
-      "linked_textures=[] - texture linkage not yet populated"
-    ],
+    "consumer_ready": true,
+    "warnings": [],
     "errors": []
   }
 }

@@ -130,6 +130,7 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `ghidra_function_site_target_guard` | Fails closed on unsafe/duplicated FunctionSiteSurvey report paths | ✅ PASSED |
 | `ghidra_pairing_non_export_guard` | Fails closed if Ghidra evidence enters decode/export paths | ✅ PASSED |
 | `ghidra_attribute_candidate_guard` | Locks the current incomplete-group baseline for Ghidra attribute candidates | ✅ PASSED |
+| `scene_manifest_validation_guard` | Validates all 241 stage6+stage2 scene manifests across schema, OBJ paths, world paths, transform finiteness, texture.source enum, producer version | ✅ PASSED (241/241) |
 
 ### Discovery suite (`discovery-suite` command)
 
@@ -210,7 +211,7 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - **MeshSize enrichment** — `infer_meshsizes.py` boosted probe lookup from 176→318 entries, **100% coverage** (43 exact matches, 87 VC-proximity, 12 sibling-pair)
 - **Live archive** (26GB, 244 files, 263,957 entries) used directly — `Source/` deleted (166MB reclaimed). All Python scripts default to live game path.
 - **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites)
-- All 8 proof guards PASSED on full inventory
+- - All 9 proof guards PASSED on full inventory
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
@@ -326,18 +327,26 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - **M1.4 (305-family comparison)** — ✅ COMPLETE. Handoff: `docs/handoffs/2026-06-m1.4-305-family-comparison.md`. Cross-family structural comparison: attrSets=1/0 pattern confirmed across families.
 - **M1.5 (Phase 1 exit consolidation)** — ✅ COMPLETE. Handoff: `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`. Comprehensive Phase 1 capstone handoff with unified cross-family evidence.
 
-## Recent Cycle 2 (C2) advances (active: V4P12 awaiting)
+## Recent Cycle 2 (C2) advances (COMPLETE — all 7 phases DONE; SHIPPED)
 
-> **Overrides the 2026-06-13 "Flythrough Bridge Plan COMPLETE"** entry. Cycle 2 is the
-> active lane (consumer visual fidelity via scene-manifest/world reconstruction).
-> FT-1..FT-8 still ships as plan closure, but C2-V4P12 is the next operator-side step.
+> **Cycle 2 is COMPLETE.** All phases C2-1 through C2-7 delivered, ship-kill decision SHIP.
+> 153/217 (70.5%) assets are consumer-ready with geometry, transforms, textures, and materials.
+> Stage8 RiftFlythrough delivery JSON shipped to sibling project.
 
-- **C2-2.4 ✅** — `scripts/build_scene_manifest.py` (~295 lines) + `tests/test_build_scene_manifest.py` (16 tests) + 24/24 sample manifests built at `Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-*.json`. Generators: `--asset-id`, `--all-non-id`, `--out`, `--validate-only`. Validates against `scene-manifest-v1.draft.schema.json` (JSON Schema 2020-12, 24/24 exit 0).
-- **C2-2.5 ✅** (DONE; V4P12 FIRED) — `docs/roadmap/cycle-2-briefs/block-1-transform-schema.md` is the durable V4 Pro brief; `docs/handoffs/2026-06-16-c2-2.5-v4p12-fired.md` is the session-start handoff. State machine: `python scripts/cycle_2_plan.py status` → `Current: C2-V4P12 / C2-V4P12`. V4 Pro: 0/4 sessions used.
-- **Cohort dedupe (C2-2.4 follow-on)** — `transform-examples.json` identity_examples collapsed 22 → 20 (removed 2 internal duplicate pairs: entries 18=19 both `1ecdbaf5a2576ba5`; entries 6=20 both `42024b768fcd2e2b`). Cohort definition = **24** (4 non-id + 20 distinct id), matching 24 on-disk files. Provenance recorded at `_meta.identity_examples_dedup_notes`. Test pin: `test_find_id_asset_ids_returns_nonzero` asserts `len(ids) == 20` + uniqueness, catching future regressions.
-- **C2-3.1 ✅** — `scripts/build_texture_coverage.py` (~310 lines) + `tests/test_build_texture_coverage.py` (17 tests) + `Assets/Exports/discovery-plan/cycle-2/stage3/texture-coverage.{json,md}`. Per-cohort-asset matrix combining scene-manifest `textures` block + flythrough-index.json `linked_textures`. **Critical finding: 23/24 cohort assets show `scene.linked_texture_count=0` vs `fly.linked_textures.count>0`** — direct evidence the scene-manifest v1 draft schema lacks a `textures.source: "scene"|"flythrough"|"unknown"` discriminant. Handoff at `docs/handoffs/2026-06-16-c2-3.1-firing.md` with M3 recommendation for V4 Pro.
-- **Current-phase overrides** — `docs/roadmap/current-phase.md` updated 2026-06-16: C2-V4P12 marked FIRED, post-V4P12 lanes (C2-3.x → C2-4.x → C2-5.x) elevated above historical 51-phase rows.
-- **CI green sequence (post-C2)** — Commits `accff2b` (current-phase override) → `fe95f0c` (C2-3.1 profiler) → `6860f79` (C2-3.1 results handoff) → `72866a6` (MD031 fix). All pushed to `origin/main`. CI status check at https://github.com/<org>/RiftModding-Assets/actions for run verdicts.
+- **C2-2.4 ✅** — `scripts/build_scene_manifest.py` (~295 lines) + `tests/test_build_scene_manifest.py` (17 tests) + 24/24 sample manifests built at `Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-*.json`. Generators: `--asset-id`, `--all-non-id`, `--all-flythrough`, `--out`, `--validate-only`. Validates against `scene-manifest-v1.draft.schema.json` (JSON Schema 2020-12, 24/24 exit 0).
+- **C2-2.5 ✅** (DONE; V4P12 FIRED) — `docs/roadmap/cycle-2-briefs/block-1-transform-schema.md` is the durable V4 Pro brief; `docs/handoffs/2026-06-16-c2-2.5-v4p12-fired.md` is the session-start handoff.
+- **Cohort dedupe (C2-2.4 follow-on)** — `transform-examples.json` identity_examples collapsed 22 → 20 (removed 2 internal duplicate pairs). Cohort definition = **24** (4 non-id + 20 distinct id), matching 24 on-disk files.
+- **C2-3.1 ✅** — `scripts/build_texture_coverage.py` (~310 lines) + `tests/test_build_texture_coverage.py` (17 tests) + `Assets/Exports/discovery-plan/cycle-2/stage3/texture-coverage.{json,md}`. **Critical finding: 23/24 cohort assets show `scene.linked_texture_count=0` vs `fly.linked_textures.count>0`** — direct evidence the scene-manifest v1 draft schema lacks a `textures.source` discriminant.
+- **C2-4 ✅** — `build_scene_manifest.py --all-flythrough` generates 217 per-asset stage6 manifests.
+- **C2-5 ✅** — Aggregate pack built: `stage4/scene-manifest-pack-v1.json` (24 entries, 15/24 consumer-ready).
+- **C2-6 ✅** — Scale-out to full 217-asset cohort.
+- **C2-7 ✅ (SHIP)** — `tests/test_scene_manifest_validation.py` (22 tests) + `scene_manifest_validation_guard()` (9th guard, 241/241 PASS) + ship-kill brief at `docs/roadmap/cycle-2-briefs/block-4-ship-kill-brief.md`.
+- **v0.6 Geometry enrichment** — `build_geometry()` populates `vertex_count`, `face_count`, `has_faces`, `mesh_block` (M#N), `mesh_size`, `render_class` (faced/point-only/unknown), and `obj_sha1` from flythrough-index. 155 faced, 62 point-only, 217/217 with obj_sha1 + M#N.
+- **v0.7 Material inference** — `build_materials()` infers `material_status` from flythrough texture linkage: `linked_textures` non-empty → "textured" (212 assets), faced but no textures → "material-or-vertex-color-only" (2 assets), otherwise "unknown" (3 assets). **153/217 (70.5%) assets consumer_ready** — up from 0/217.
+- **Stage8 RiftFlythrough delivery** — `scripts/build_riftflythrough_delivery.py` filters 153 consumer-ready assets into `riftflythrough-delivery.json` (14,696 vertices, 23,634 faces, 404 linked textures, 19 mesh families) + markdown report. Copied to `C:\RIFT MODDING\RiftFlythrough\js\riftflythrough-delivery.json`.
+- **9th proof guard** — `scene_manifest_validation_guard()` validates all 241 manifests across schema, OBJ paths, world paths, transform finiteness, texture.source enum, and producer version. 241/241 PASS.
+- **Current-phase overrides** — `docs/roadmap/current-phase.md` updated 2026-06-16: all C2 phases marked DONE, Cycle 2 marked COMPLETE with SHIP decision.
+- **CI green sequence (post-C2)** — Commits `accff2b` through `72866a6` (C2-3.1 profiler + handoff fixes). All pushed to `origin/main`.
 
 ## Agent model strategy
 

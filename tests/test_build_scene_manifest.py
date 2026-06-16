@@ -40,7 +40,7 @@ SCHEMA_PATH = (
     / "discovery-plan"
     / "cycle-2"
     / "stage2"
-    / "scene-manifest-v1.draft.schema.json"
+    / "scene-manifest-v1.schema.json"
 )
 NON_ID_IDS = [
     "07f37c99a80da009",
@@ -169,6 +169,7 @@ def test_consumer_ready_false_for_known_unknowns() -> None:
             "vertex_color_property_count": 0,
         },
         textures={
+            "source": "unknown",
             "linked_texture_count": 0,
             "linked_textures": [],
             "missing_texture_count": 0,
@@ -198,6 +199,7 @@ def test_consumer_ready_true_when_all_known() -> None:
             "vertex_color_property_count": 0,
         },
         textures={
+            "source": "flythrough",
             "linked_texture_count": 2,
             "linked_textures": ["t1.png", "t2.png"],
             "missing_texture_count": 0,
@@ -294,14 +296,61 @@ def test_non_id_manifests_have_non_identity_transform() -> None:
     ),
     reason="identity + non-id sample batch not yet built",
 )
-def test_both_cohorts_share_consumer_ready_false() -> None:
-    """consumer_ready gates on data extraction (faces/materials/textures/mesh_block),
-    NOT on transform identity. Both id and non-id cohorts must report False until
-    the extraction pass runs (C2-3.x). This locks the v0.3 gate semantics.
+def test_consumer_ready_independent_of_transform_identity() -> None:
+    """consumer_ready gates on data (faces/materials/textures/mesh_block),
+    NOT on transform identity. v0.7 populates real data from flythrough-index,
+    so faced+textured assets are consumer_ready regardless of whether their
+    world transform is identity or non-identity.
+
+    This test verifies the contrast: assets with the same data profile
+    (face_count>0, material_status!=unknown, textures.source!=unknown,
+    linked_texture_count>0, mesh_block!=None) are consumer_ready=True
+    regardless of transform identity, and point-only assets are
+    consumer_ready=False regardless of transform identity.
     """
+    # Collect all 24 cohort assets, group by data profile
+    ready_ids: set[str] = set()
+    not_ready_ids: set[str] = set()
     for aid in NON_ID_IDS + find_id_asset_ids():
         m = _load_sample(aid)
-        assert m["validation"]["consumer_ready"] is False, (
-            f"asset {aid} should NOT be consumer_ready (extraction pass not yet run)"
-        )
         assert m["validation"]["schema_valid"] is True
+        if m["validation"]["consumer_ready"]:
+            ready_ids.add(aid)
+        else:
+            not_ready_ids.add(aid)
+
+    # Verify: all consumer_ready assets have the required data
+    for aid in ready_ids:
+        m = _load_sample(aid)
+        assert m["geometry"]["face_count"] > 0, f"{aid} ready but face_count=0"
+        assert m["geometry"]["has_faces"], f"{aid} ready but has_faces=False"
+        assert m["materials"]["material_status"] != "unknown", f"{aid} ready but material unknown"
+        assert m["textures"]["source"] != "unknown", f"{aid} ready but textures unknown"
+        assert m["textures"]["linked_texture_count"] > 0, f"{aid} ready but no linked textures"
+        assert m["geometry"]["mesh_block"] is not None, f"{aid} ready but mesh_block=null"
+
+    # Verify: non-id assets with faces+textures are consumer_ready
+    # (transform identity does NOT block consumer_ready)
+    non_id_ready = ready_ids & set(NON_ID_IDS)
+    id_ready = ready_ids & set(find_id_asset_ids())
+    non_id_not = not_ready_ids & set(NON_ID_IDS)
+    id_not = not_ready_ids & set(find_id_asset_ids())
+
+    # Both cohorts should have some ready and some not-ready (data-driven, not identity-driven)
+    assert len(non_id_ready) > 0 or len(non_id_not) > 0, "non-id cohort should have some assets"
+    assert len(id_ready) > 0 or len(id_not) > 0, "identity cohort should have some assets"
+
+    # Key invariant: transform identity does not gate consumer_ready.
+    # A non-id asset (translation != 0) can be consumer_ready.
+    assert len(non_id_ready) > 0, (
+        f"expected at least one non-id asset to be consumer_ready; "
+        f"transform != identity should not block readiness. "
+        f"non_id_ready={non_id_ready}"
+    )
+    # An identity asset can be NOT consumer_ready (identity doesn't bypass
+    # data requirements like face_count>0 or linked_textures).
+    assert len(id_not) > 0, (
+        f"expected at least one identity asset to be not consumer_ready; "
+        f"identity transform should not bypass data requirements. "
+        f"id_not={id_not}"
+    )

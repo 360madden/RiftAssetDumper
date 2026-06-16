@@ -1,20 +1,21 @@
 {
-  "SchemaVersion": "scene-manifest/v1-draft",
+  "SchemaVersion": "scene-manifest/v1",
   "asset_id": "593ea328978bde38",
-  "generated_at": "2026-06-16T05:12:30Z",
+  "generated_at": "2026-06-16T13:18:35Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
-    "version": "v0.4",
+    "version": "v0.7",
     "command": "python scripts/build_scene_manifest.py --asset-id 593ea328978bde38"
   },
   "geometry": {
-    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\593ea328978bde38.obj",
-    "mesh_block": null,
-    "mesh_size": null,
-    "vertex_count": 0,
-    "face_count": 0,
-    "has_faces": false,
-    "render_class": "unknown"
+    "obj_path": "C:\\RIFT MODDING\\Assets\\Exports\\decode-nif-geometry-593ea328978bde38.json\\decode-nif-geometry-mesh17.obj",
+    "mesh_block": "M#17",
+    "mesh_size": 276,
+    "vertex_count": 50,
+    "face_count": 71,
+    "has_faces": true,
+    "render_class": "faced",
+    "obj_sha1": "98fc30c6134ddc56e1623b7d8909e056342cdf9c"
   },
   "world": {
     "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\593ea328978bde38.world.json",
@@ -53,24 +54,28 @@
     "world_transform_identity": false
   },
   "materials": {
-    "material_status": "unknown",
+    "material_status": "textured",
     "texture_property_count": 0,
     "material_property_count": 0,
     "vertex_color_property_count": 0,
+    "scanned_at": null,
     "notes": [
-      "material data not yet extracted from NIF - status=unknown (cohort has_faces=False)"
+      "material_status=textured inferred from flythrough texture linkage (texture bindings confirmed by pipeline); not yet confirmed by NIF-level material property scan"
     ]
   },
   "textures": {
-    "linked_texture_count": 0,
-    "linked_textures": [],
+    "source": "flythrough",
+    "linked_texture_count": 1,
+    "linked_textures": [
+      "a6ad5487_diffuse_blank.png"
+    ],
     "missing_texture_count": 0,
     "placeholder_texture_count": 0
   },
   "provenance": {
     "cohort": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
     "source_nif_hash": "593ea328978bde38",
-    "flythrough_index_entry": null,
+    "flythrough_index_entry": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\flythrough-index.json",
     "evidence_files": [
       "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\593ea328978bde38.world.json",
       "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
@@ -79,14 +84,8 @@
   },
   "validation": {
     "schema_valid": true,
-    "consumer_ready": false,
-    "warnings": [
-      "vertex_count=0 and face_count=0 - geometry not yet extracted from OBJ",
-      "render_class=unknown - OBJ classify pass not yet run",
-      "mesh_block=null - world.json BlockIndex not yet mapped to the locked M#N convention",
-      "material_status=unknown - NIF material properties not yet scanned",
-      "linked_textures=[] - texture linkage not yet populated"
-    ],
+    "consumer_ready": true,
+    "warnings": [],
     "errors": []
   }
 }

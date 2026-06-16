@@ -1,20 +1,21 @@
 {
-  "SchemaVersion": "scene-manifest/v1-draft",
+  "SchemaVersion": "scene-manifest/v1",
   "asset_id": "0d9a25c9a6af7b18",
-  "generated_at": "2026-06-16T06:33:07Z",
+  "generated_at": "2026-06-16T13:18:36Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
-    "version": "v0.4",
+    "version": "v0.7",
     "command": "python scripts/build_scene_manifest.py --asset-id 0d9a25c9a6af7b18"
   },
   "geometry": {
-    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\0d9a25c9a6af7b18.obj",
-    "mesh_block": null,
+    "obj_path": "C:\\RIFT MODDING\\Assets\\Exports\\obj-exports\\decode-nif-geometry-0d9a25c9a6af7b18\\decode-nif-geometry\\decode-nif-geometry-mesh27.obj",
+    "mesh_block": "M#27",
     "mesh_size": 325,
-    "vertex_count": 0,
+    "vertex_count": 22,
     "face_count": 0,
     "has_faces": false,
-    "render_class": "unknown"
+    "render_class": "point-only",
+    "obj_sha1": "0e440d0f327f6791f63ec7eea468f5f3eda706a8"
   },
   "world": {
     "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\0d9a25c9a6af7b18.world.json",
@@ -53,24 +54,33 @@
     "world_transform_identity": true
   },
   "materials": {
-    "material_status": "unknown",
+    "material_status": "textured",
     "texture_property_count": 0,
     "material_property_count": 0,
     "vertex_color_property_count": 0,
+    "scanned_at": null,
     "notes": [
-      "material data not yet extracted from NIF - status=unknown (cohort has_faces=False)"
+      "material_status=textured inferred from flythrough texture linkage (texture bindings confirmed by pipeline); not yet confirmed by NIF-level material property scan"
     ]
   },
   "textures": {
-    "linked_texture_count": 0,
-    "linked_textures": [],
+    "source": "flythrough",
+    "linked_texture_count": 6,
+    "linked_textures": [
+      "0131c945_a_f_iron_pine_forge_wallwood_03_n.png",
+      "0557dbe4_a_f_iron_pine_forge_ceiling_01_n.png",
+      "31716be7_a_f_iron_pine_forge_wallwood_03_s.png",
+      "66a02f28_a_f_iron_pine_forge_ceiling_01_c.png",
+      "85aa462b_gloss_blank.png",
+      "94a3d888_a_f_iron_pine_forge_wallwood_03_c.png"
+    ],
     "missing_texture_count": 0,
     "placeholder_texture_count": 0
   },
   "provenance": {
     "cohort": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
     "source_nif_hash": "0d9a25c9a6af7b18",
-    "flythrough_index_entry": null,
+    "flythrough_index_entry": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\flythrough-index.json",
     "evidence_files": [
       "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\0d9a25c9a6af7b18.world.json",
       "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
@@ -81,11 +91,7 @@
     "schema_valid": true,
     "consumer_ready": false,
     "warnings": [
-      "vertex_count=0 and face_count=0 - geometry not yet extracted from OBJ",
-      "render_class=unknown - OBJ classify pass not yet run",
-      "mesh_block=null - world.json BlockIndex not yet mapped to the locked M#N convention",
-      "material_status=unknown - NIF material properties not yet scanned",
-      "linked_textures=[] - texture linkage not yet populated"
+      "face_count=0 (point-only asset) - no face data"
     ],
     "errors": []
   }
