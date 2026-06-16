@@ -1,0 +1,483 @@
+﻿{
+  "plan": "cycle-2",
+  "step": "C2-2.1",
+  "generated_at": "2026-06-16",
+  "cohort_source": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
+  "worlds_source": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds",
+  "cohort_size": 26,
+  "available_count": 26,
+  "missing_count": 0,
+  "finite_count": 26,
+  "identity_count": 22,
+  "non_identity_count": 4,
+  "method": "scale -> rotate -> translate accumulator (matches build_world_placed_merge.py)",
+  "tolerance": 1e-06,
+  "family_counts": {
+    "non-identity-transform": 4,
+    "meshsize-325": 5,
+    "meshsize-305": 5,
+    "meshsize-329": 3,
+    "meshsize-321": 5,
+    "multi-mesh-11": 1,
+    "mb-variant": 1,
+    "orphan-mesh-test": 1,
+    "pos-only-no-texture": 1
+  },
+  "data_source": "Direct walk of the current v0.3 cohort world.json files with the same Scale -> Rotate -> Translate accumulator used by scripts/build_world_placed_merge.py.",
+  "full_217_scale_check": {
+    "count": 217,
+    "min": 1.0,
+    "max": 1.0,
+    "all_unity_within_tolerance": true,
+    "note": "All flythrough world.json scale values are checked with the production accumulator."
+  },
+  "non_identity_examples": [
+    {
+      "asset_id": "07f37c99a80da009",
+      "raw_cohort_asset_id": "07f37c99a80da009.world",
+      "family": "non-identity-transform",
+      "mesh_size": null,
+      "node_count": 12,
+      "mesh_count": 1,
+      "world_json": "07f37c99a80da009.world.json",
+      "world_translation": [
+        8.820713,
+        -0.849012,
+        0.075887
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 1.001414,
+      "is_identity_transform": false,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "2c85cfa17543443b",
+      "raw_cohort_asset_id": "2c85cfa17543443b.world",
+      "family": "non-identity-transform",
+      "mesh_size": null,
+      "node_count": 12,
+      "mesh_count": 1,
+      "world_json": "2c85cfa17543443b.world.json",
+      "world_translation": [
+        -8.820713,
+        0.849012,
+        -0.075887
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 1.001414,
+      "is_identity_transform": false,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "4a97d66a665a538e",
+      "raw_cohort_asset_id": "4a97d66a665a538e.world",
+      "family": "non-identity-transform",
+      "mesh_size": null,
+      "node_count": 2,
+      "mesh_count": 1,
+      "world_json": "4a97d66a665a538e.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.025591,
+      "is_identity_transform": false,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "593ea328978bde38",
+      "raw_cohort_asset_id": "593ea328978bde38.world",
+      "family": "non-identity-transform",
+      "mesh_size": null,
+      "node_count": 12,
+      "mesh_count": 1,
+      "world_json": "593ea328978bde38.world.json",
+      "world_translation": [
+        -8.820713,
+        0.849012,
+        -0.075887
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 1.001414,
+      "is_identity_transform": false,
+      "all_fields_finite": true
+    }
+  ],
+  "identity_examples": [
+    {
+      "asset_id": "000b6b5d431aea29",
+      "raw_cohort_asset_id": "000b6b5d431aea29",
+      "family": "meshsize-325",
+      "mesh_size": 325,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "000b6b5d431aea29.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0257d1da99060ed8",
+      "raw_cohort_asset_id": "0257d1da99060ed8",
+      "family": "meshsize-325",
+      "mesh_size": 325,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0257d1da99060ed8.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0631a80d1a32416b",
+      "raw_cohort_asset_id": "0631a80d1a32416b",
+      "family": "meshsize-325",
+      "mesh_size": 325,
+      "node_count": 2,
+      "mesh_count": 2,
+      "world_json": "0631a80d1a32416b.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0a555da05e47f47e",
+      "raw_cohort_asset_id": "0a555da05e47f47e",
+      "family": "meshsize-325",
+      "mesh_size": 325,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0a555da05e47f47e.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0d9a25c9a6af7b18",
+      "raw_cohort_asset_id": "0d9a25c9a6af7b18",
+      "family": "meshsize-325",
+      "mesh_size": 325,
+      "node_count": 2,
+      "mesh_count": 2,
+      "world_json": "0d9a25c9a6af7b18.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "42024b768fcd2e2b",
+      "raw_cohort_asset_id": "42024b768fcd2e2b",
+      "family": "meshsize-305",
+      "mesh_size": 305,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "42024b768fcd2e2b.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "5b986fcd70579a94",
+      "raw_cohort_asset_id": "5b986fcd70579a94",
+      "family": "meshsize-305",
+      "mesh_size": 305,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "5b986fcd70579a94.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "6cc30b261e38cd3a",
+      "raw_cohort_asset_id": "6cc30b261e38cd3a",
+      "family": "meshsize-305",
+      "mesh_size": 305,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "6cc30b261e38cd3a.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "96616acc5854775a",
+      "raw_cohort_asset_id": "96616acc5854775a",
+      "family": "meshsize-305",
+      "mesh_size": 305,
+      "node_count": 2,
+      "mesh_count": 2,
+      "world_json": "96616acc5854775a.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "c10a3107712da43d",
+      "raw_cohort_asset_id": "c10a3107712da43d",
+      "family": "meshsize-305",
+      "mesh_size": 305,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "c10a3107712da43d.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "8e01613d7ce9e297",
+      "raw_cohort_asset_id": "8e01613d7ce9e297",
+      "family": "meshsize-329",
+      "mesh_size": 329,
+      "node_count": 1,
+      "mesh_count": 2,
+      "world_json": "8e01613d7ce9e297.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "d5119cba71be06ee",
+      "raw_cohort_asset_id": "d5119cba71be06ee",
+      "family": "meshsize-329",
+      "mesh_size": 329,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "d5119cba71be06ee.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "e3de1077a37d0337",
+      "raw_cohort_asset_id": "e3de1077a37d0337",
+      "family": "meshsize-329",
+      "mesh_size": 329,
+      "node_count": 1,
+      "mesh_count": 2,
+      "world_json": "e3de1077a37d0337.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0d000181e2ef66e7",
+      "raw_cohort_asset_id": "0d000181e2ef66e7",
+      "family": "meshsize-321",
+      "mesh_size": 321,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0d000181e2ef66e7.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0e60c972f3ba4ca0",
+      "raw_cohort_asset_id": "0e60c972f3ba4ca0",
+      "family": "meshsize-321",
+      "mesh_size": 321,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0e60c972f3ba4ca0.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0e9b9261b8f43e6b",
+      "raw_cohort_asset_id": "0e9b9261b8f43e6b",
+      "family": "meshsize-321",
+      "mesh_size": 321,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0e9b9261b8f43e6b.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "10a089b859691d0b",
+      "raw_cohort_asset_id": "10a089b859691d0b",
+      "family": "meshsize-321",
+      "mesh_size": 321,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "10a089b859691d0b.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "1ecdbaf5a2576ba5",
+      "raw_cohort_asset_id": "1ecdbaf5a2576ba5",
+      "family": "meshsize-321",
+      "mesh_size": 321,
+      "node_count": 10,
+      "mesh_count": 11,
+      "world_json": "1ecdbaf5a2576ba5.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "6fc01704d4a509d5",
+      "raw_cohort_asset_id": "6fc01704d4a509d5",
+      "family": "orphan-mesh-test",
+      "mesh_size": 325,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "6fc01704d4a509d5.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    },
+    {
+      "asset_id": "0e0c61ad75d2af1e",
+      "raw_cohort_asset_id": "0e0c61ad75d2af1e",
+      "family": "pos-only-no-texture",
+      "mesh_size": 193,
+      "node_count": 1,
+      "mesh_count": 1,
+      "world_json": "0e0c61ad75d2af1e.world.json",
+      "world_translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_scale": 1.0,
+      "rotation_max_delta": 0.0,
+      "is_identity_transform": true,
+      "all_fields_finite": true
+    }
+  ],
+  "missing_examples": [],
+  "summary": {
+    "non_identity_translation_assets": 3,
+    "non_identity_rotation_only_assets": 1,
+    "total_non_identity_assets": 4,
+    "identity_assets": 22,
+    "max_translation_magnitude": 8.861803,
+    "all_scales_unity": true,
+    "all_fields_finite": true
+  },
+  "_meta": {
+    "identity_examples_dedup_notes": "Entries 18=19 and 6=20 in the original list were duplicate asset_ids; deduplicated to 20 distinct entries on disk."
+  }
+}
