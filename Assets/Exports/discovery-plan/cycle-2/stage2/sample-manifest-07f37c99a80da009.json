@@ -1,0 +1,92 @@
+{
+  "SchemaVersion": "scene-manifest/v1-draft",
+  "asset_id": "07f37c99a80da009",
+  "generated_at": "2026-06-15T18:45:00Z",
+  "producer": {
+    "tool": "cycle-2-stage2-sample",
+    "version": "v0.3",
+    "command": null
+  },
+  "geometry": {
+    "obj_path": "Assets/build/flythrough/objs/07f37c99a80da009.obj",
+    "mesh_block": null,
+    "mesh_size": 276,
+    "vertex_count": 0,
+    "face_count": 0,
+    "has_faces": false,
+    "render_class": "unknown"
+  },
+  "world": {
+    "world_json": "Assets/build/flythrough/objs/worlds/07f37c99a80da009.world.json",
+    "node_count": 12,
+    "mesh_count": 1,
+    "transform_semantics": "mesh-parent-chain",
+    "coordinate_system": {
+      "handedness": "right",
+      "up_axis": "Y",
+      "forward_axis": "-Z",
+      "translation_layout": "xyz",
+      "rotation_layout": "row-major-3x3",
+      "scale_layout": "uniform-float",
+      "trs_composition": "v_world = R * (S * v_local) + T",
+      "identity_tolerance": 1e-6
+    },
+    "world_transform_summary": {
+      "translation": [
+        8.820713,
+        -0.8490117,
+        0.07588669
+      ],
+      "rotation": [
+        -0.0014138671,
+        0.9977186,
+        0.06749602,
+        -0.98390645,
+        0.010672182,
+        -0.17836529,
+        -0.17867868,
+        -0.066661954,
+        0.9816466
+      ],
+      "scale": 1.0
+    },
+    "world_transform_identity": false
+  },
+  "materials": {
+    "material_status": "unknown",
+    "texture_property_count": 0,
+    "material_property_count": 0,
+    "vertex_color_property_count": 0,
+    "notes": [
+      "first sample - material data not yet extracted from NIF"
+    ]
+  },
+  "textures": {
+    "linked_texture_count": 0,
+    "linked_textures": [],
+    "missing_texture_count": 0,
+    "placeholder_texture_count": 0
+  },
+  "provenance": {
+    "cohort": "Assets/Exports/discovery-plan/cycle-2/stage1/cohort.json",
+    "source_nif_hash": "07f37c99a80da009",
+    "flythrough_index_entry": null,
+    "evidence_files": [
+      "Assets/build/flythrough/objs/worlds/07f37c99a80da009.world.json",
+      "Assets/Exports/discovery-plan/cycle-2/stage2/transform-examples.json",
+      "Assets/Exports/discovery-plan/cycle-2/stage2/coordinate-contract.md"
+    ]
+  },
+  "validation": {
+    "schema_valid": true,
+    "consumer_ready": false,
+    "warnings": [
+      "vertex_count=0 and face_count=0 - geometry not yet extracted from OBJ",
+      "material_status=unknown - NIF material properties not yet scanned",
+      "linked_textures=[] - texture linkage not yet populated",
+      "producer.command=null - sample was hand-authored from scripts/_extract_sample_manifest_data.py output",
+      "mesh_block=null - world.json BlockIndex=17 not yet mapped to the locked M#N convention"
+    ],
+    "errors": []
+  }
+}
