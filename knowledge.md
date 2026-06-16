@@ -326,6 +326,19 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - **M1.4 (305-family comparison)** — ✅ COMPLETE. Handoff: `docs/handoffs/2026-06-m1.4-305-family-comparison.md`. Cross-family structural comparison: attrSets=1/0 pattern confirmed across families.
 - **M1.5 (Phase 1 exit consolidation)** — ✅ COMPLETE. Handoff: `docs/handoffs/2026-06-m1.5-phase1-exit-consolidation.md`. Comprehensive Phase 1 capstone handoff with unified cross-family evidence.
 
+## Recent Cycle 2 (C2) advances (active: V4P12 awaiting)
+
+> **Overrides the 2026-06-13 "Flythrough Bridge Plan COMPLETE"** entry. Cycle 2 is the
+> active lane (consumer visual fidelity via scene-manifest/world reconstruction).
+> FT-1..FT-8 still ships as plan closure, but C2-V4P12 is the next operator-side step.
+
+- **C2-2.4 ✅** — `scripts/build_scene_manifest.py` (~295 lines) + `tests/test_build_scene_manifest.py` (16 tests) + 24/24 sample manifests built at `Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-*.json`. Generators: `--asset-id`, `--all-non-id`, `--out`, `--validate-only`. Validates against `scene-manifest-v1.draft.schema.json` (JSON Schema 2020-12, 24/24 exit 0).
+- **C2-2.5 ✅** (DONE; V4P12 FIRED) — `docs/roadmap/cycle-2-briefs/block-1-transform-schema.md` is the durable V4 Pro brief; `docs/handoffs/2026-06-16-c2-2.5-v4p12-fired.md` is the session-start handoff. State machine: `python scripts/cycle_2_plan.py status` → `Current: C2-V4P12 / C2-V4P12`. V4 Pro: 0/4 sessions used.
+- **Cohort dedupe (C2-2.4 follow-on)** — `transform-examples.json` identity_examples collapsed 22 → 20 (removed 2 internal duplicate pairs: entries 18=19 both `1ecdbaf5a2576ba5`; entries 6=20 both `42024b768fcd2e2b`). Cohort definition = **24** (4 non-id + 20 distinct id), matching 24 on-disk files. Provenance recorded at `_meta.identity_examples_dedup_notes`. Test pin: `test_find_id_asset_ids_returns_nonzero` asserts `len(ids) == 20` + uniqueness, catching future regressions.
+- **C2-3.1 ✅** — `scripts/build_texture_coverage.py` (~310 lines) + `tests/test_build_texture_coverage.py` (17 tests) + `Assets/Exports/discovery-plan/cycle-2/stage3/texture-coverage.{json,md}`. Per-cohort-asset matrix combining scene-manifest `textures` block + flythrough-index.json `linked_textures`. **Critical finding: 23/24 cohort assets show `scene.linked_texture_count=0` vs `fly.linked_textures.count>0`** — direct evidence the scene-manifest v1 draft schema lacks a `textures.source: "scene"|"flythrough"|"unknown"` discriminant. Handoff at `docs/handoffs/2026-06-16-c2-3.1-firing.md` with M3 recommendation for V4 Pro.
+- **Current-phase overrides** — `docs/roadmap/current-phase.md` updated 2026-06-16: C2-V4P12 marked FIRED, post-V4P12 lanes (C2-3.x → C2-4.x → C2-5.x) elevated above historical 51-phase rows.
+- **CI green sequence (post-C2)** — Commits `accff2b` (current-phase override) → `fe95f0c` (C2-3.1 profiler) → `6860f79` (C2-3.1 results handoff) → `72866a6` (MD031 fix). All pushed to `origin/main`. CI status check at https://github.com/<org>/RiftModding-Assets/actions for run verdicts.
+
 ## Agent model strategy
 
 The `.agents/` directory contains 10 custom agent definitions with a tiered model strategy:
