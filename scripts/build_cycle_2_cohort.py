@@ -34,6 +34,14 @@ Usage:
     python scripts/build_cycle_2_cohort.py
     python scripts/build_cycle_2_cohort.py --dry-run
     python scripts/build_cycle_2_cohort.py --out <path>
+
+Git quirks (read before committing regenerated output):
+    - `Assets/Exports/` is gitignored (see `.gitignore`). After running this
+      script, the regenerated `cohort.json` + `cohort.md` will NOT appear in
+      `git add` without `-f`. Use `git add -f Assets/Exports/...` to stage
+      them, or document the regeneration as a local-only run.
+    - The pre-commit `markdownlint-fix` hook may auto-format the committed
+      markdown; re-run `git status` after commit to catch any leftovers.
 """
 
 from __future__ import annotations
@@ -64,6 +72,13 @@ log = logging.getLogger("build_cycle_2_cohort")
 # so `parents[2]` is the workspace root (`C:\RIFT MODDING`). The cycle-2 source data and
 # committed handoff artifacts live under `<workspace>/Assets/Assets/...`: the first
 # `Assets` is the repo root, the second is the historical generated-data subtree.
+#
+# TODO(pre-existing-data-smell): the doubled `Assets/Assets/` path is a historical
+# data-location artifact (the live TWAD output was originally dumped into
+# `C:\RIFT MODDING\Assets\Assets\...` before the repo layout was normalized).
+# A clean fix would either (a) hardcode a `DATA_ROOT` env var, (b) add a
+# `--data-root` CLI flag, or (c) move the data to the canonical
+# `Assets/build/...` path. Tracked as a follow-up; not a v0.3 blocker.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INDEX = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "flythrough-index.json"
 DEFAULT_WORLDS = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "objs" / "worlds"

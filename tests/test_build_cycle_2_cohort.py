@@ -42,7 +42,10 @@ def test_dry_run_smoke() -> None:
     assert summary["plan"] == "cycle-2"
     assert summary["step"] == "C2-1.4"
     assert 20 <= summary["cohort_size"] <= 30, f"cohort_size {summary['cohort_size']} outside 20-30 band"
-    assert summary["non_identity_count"] == 4
+    # Use >= 4 (not == 4) so a future world.json regeneration that surfaces a
+    # 5th non-id asset doesn't break the test. The 4 known IDs are still
+    # asserted via the subset check below.
+    assert summary["non_identity_count"] >= 4, f"non_identity_count {summary['non_identity_count']} < 4"
     # Lock the v0.3 contract: target_band + family_take_per_family
     assert summary.get("target_band") == "20-30", f"target_band {summary.get('target_band')} != 20-30"
     assert summary.get("family_take_per_family") == 5, f"family_take {summary.get('family_take_per_family')} != 5"
@@ -58,9 +61,13 @@ def test_dry_run_smoke() -> None:
 
 @pytest.mark.skipif(not COHORT_JSON.exists(), reason="cohort.json not yet generated")
 def test_committed_cohort_in_band() -> None:
-    """The on-disk cohort.json must be in the 30-50 band and have 4 non-id entries."""
+    """The on-disk cohort.json must be in the 20-30 band and have >= 4 non-id entries."""
     cohort = json.loads(COHORT_JSON.read_text(encoding="utf-8-sig"))
     assert 20 <= cohort["cohort_size"] <= 30
+    # Use >= 4 (not == 4) so a future world.json regeneration that surfaces a
+    # 5th non-id asset doesn't break the test. The 4 known IDs are still
+    # asserted via the subset check below.
+    assert cohort["non_identity_count"] >= 4, f"non_identity_count {cohort['non_identity_count']} < 4"
     # Lock the v0.3 contract on the on-disk cohort.json
     assert cohort.get("target_band") == "20-30", f"target_band {cohort.get('target_band')} != 20-30"
     assert cohort.get("family_take_per_family") == 5, f"family_take {cohort.get('family_take_per_family')} != 5"
