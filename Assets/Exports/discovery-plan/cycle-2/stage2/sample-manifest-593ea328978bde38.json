@@ -1,14 +1,14 @@
 {
   "SchemaVersion": "scene-manifest/v1-draft",
-  "asset_id": "07f37c99a80da009",
+  "asset_id": "593ea328978bde38",
   "generated_at": "2026-06-16T05:12:30Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
     "version": "v0.4",
-    "command": "python scripts/build_scene_manifest.py --asset-id 07f37c99a80da009"
+    "command": "python scripts/build_scene_manifest.py --asset-id 593ea328978bde38"
   },
   "geometry": {
-    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\07f37c99a80da009.obj",
+    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\593ea328978bde38.obj",
     "mesh_block": null,
     "mesh_size": null,
     "vertex_count": 0,
@@ -17,7 +17,7 @@
     "render_class": "unknown"
   },
   "world": {
-    "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\07f37c99a80da009.world.json",
+    "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\593ea328978bde38.world.json",
     "node_count": 12,
     "mesh_count": 1,
     "transform_semantics": "mesh-parent-chain",
@@ -33,19 +33,19 @@
     },
     "world_transform_summary": {
       "translation": [
-        8.820713,
-        -0.8490117,
-        0.07588669
+        -8.820713,
+        0.84901184,
+        -0.07588663
       ],
       "rotation": [
         -0.0014138671,
         0.9977186,
-        0.06749602,
+        0.06749601,
         -0.98390645,
-        0.010672182,
-        -0.17836529,
-        -0.17867868,
-        -0.066661954,
+        0.010672177,
+        -0.17836525,
+        -0.17867863,
+        -0.06666195,
         0.9816466
       ],
       "scale": 1
@@ -69,10 +69,10 @@
   },
   "provenance": {
     "cohort": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
-    "source_nif_hash": "07f37c99a80da009",
+    "source_nif_hash": "593ea328978bde38",
     "flythrough_index_entry": null,
     "evidence_files": [
-      "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\07f37c99a80da009.world.json",
+      "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\593ea328978bde38.world.json",
       "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
       "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\coordinate-contract.md"
     ]
