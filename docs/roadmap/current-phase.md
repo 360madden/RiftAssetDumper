@@ -1,6 +1,21 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-13 (all phases complete; project at autonomous completion)
+**Last Updated**: 2026-06-16 (Cycle 2 in progress; C2-V4P12 fired and awaiting V4 Pro)
+
+> **Active cycle (2026-06-16 override of the 2026-06-13 "all complete" entry)** —
+> a new **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** has been
+> added on top of the 51 historical phases. It is *not* done. M3 finished all
+> preparation steps (C2-1 through C2-2.5) and the **V4P12 review session has
+> been fired**. The next action is for V4 Pro (GPT-5.5) to execute the session;
+> M3 cannot execute that block itself.
+>
+> **Pointers**:
+>
+> - Plan: `docs/roadmap/cycle-2-scene-manifest-plan.md` (v0.3; 4 V4 Pro sessions)
+> - State machine: `Assets/build/cycle-2/.state.json` → `current_step: C2-V4P12`
+> - Input brief for V4 Pro: `docs/roadmap/cycle-2-briefs/block-1-transform-schema.md`
+> - Session-start handoff: `docs/handoffs/2026-06-16-c2-2.5-v4p12-fired.md`
+> - Cohort: 24/24 sample manifests built (`Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-*.json`)
 
 ---
 
@@ -21,15 +36,22 @@
 
 ## Next Actions
 
-All planned work is complete. The project is at autonomous completion. See `docs/handoffs/2026-06-project-completion-final-handoff.md` for the comprehensive capstone.
+Cycle 2 is the active lane (everything below this section from the 2026-06-13
+update is **historically accurate** but no longer represents the next action).
 
 | # | Action | Status | Reference |
 |---|---|---|---|
-| 1 | **Ghidra proof lane** | ✅ Complete | 3/3 steps |
-| 2 | **Source/ deletion + live path switch** | ✅ Complete | 9 Python scripts updated; live archive used directly |
-| 3 | **Flythrough Bridge (FT-1..FT-8)** | ✅ Complete | `flythrough-index.json` delivered |
-| 4 | **Phase 1 Position Source Family Proof** | ✅ Complete | M1.1-M1.5 all finalized |
-| 5 | **Documentation hygiene** | ✅ Complete | `docs/` updated; stale drafts removed; knowledge.md current |
+| 1 | **Cycle 2 — C2-V4P12 (V4 Pro session)** | 🔥 FIRED (awaiting V4 Pro execution) | `docs/handoffs/2026-06-16-c2-2.5-v4p12-fired.md` |
+| 2 | **Cycle 2 — C2-2.5 (Stage 2 handoff + combined brief)** | ✅ Complete (DONE) | Brief at `docs/roadmap/cycle-2-briefs/block-1-transform-schema.md` |
+| 3 | **Cycle 2 — C2-2.4 (coordinate contract + schema sketch + builder)** | ✅ Complete (DONE) | 24/24 sample manifests validate; schema validator exits 0 |
+| 4 | **Cycle 2 — C2-3.x (texture-coverage profiler) — post-V4P12** | ⏸ Pending | Awaiting V4P12 return before firing |
+| 5 | **Cycle 2 — C2-4.x (per-asset manifest run for full cohort) — post-V4P12** | ⏸ Pending | ≥95% of cohort has locked-schema manifest |
+| 6 | **Cycle 2 — C2-5.x (aggregate pack + dedupe + stats) — post-V4P12** | ⏸ Pending | Final delivery for C2 |
+| 7 | **Ghidra proof lane** | ✅ Complete (historical) | 3/3 steps |
+| 8 | **Source/ deletion + live path switch** | ✅ Complete (historical) | 9 Python scripts updated; live archive used directly |
+| 9 | **Flythrough Bridge (FT-1..FT-8)** | ✅ Complete (historical) | `flythrough-index.json` delivered |
+| 10 | **Phase 1 Position Source Family Proof** | ✅ Complete (historical) | M1.1-M1.5 all finalized |
+| 11 | **Documentation hygiene** | ✅ Complete (historical) | `docs/` updated; stale drafts removed; knowledge.md current |
 
 ---
 
