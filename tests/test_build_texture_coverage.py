@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
 STAGE2 = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 STAGE3 = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage3"
-FLYTHROUGH_INDEX = REPO_ROOT / "Assets" / "build" / "flythrough" / "flythrough-index.json"
+FLYTHROUGH_INDEX_PATH = REPO_ROOT / "Assets" / "build" / "flythrough" / "flythrough-index.json"
 sys.path.insert(0, str(SCRIPTS))
 
 from build_texture_coverage import (  # noqa: E402
@@ -36,7 +36,6 @@ from build_texture_coverage import (  # noqa: E402
     _scene_manifest_textures,
     build_report,
 )
-
 
 # ---------- _cohort_asset_ids ----------
 
