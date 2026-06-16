@@ -112,3 +112,13 @@ must validate against the locked schema with the same exit code.
 - **non_identity_examples unchanged**: same dedupe audit was not needed (4 distinct entries, no internal duplicates).
 - **Source-of-truth updated**: `transform-examples.json._meta.identity_examples_dedup_notes` records the change. Cohort definition = **24 total (4 non-id + 20 distinct id)**, matching the 24 on-disk `sample-manifest-*.json` files.
 - **Test pinned**: `test_find_id_asset_ids_returns_nonzero` now asserts `len(ids) == 20` and uniqueness, so cohort regressions are caught at the test level (loose `> 0` would have silently passed against any future shrinkage).
+
+## C2-3.1 texture coverage input
+
+- **Profiler shipped**: `scripts/build_texture_coverage.py` + `tests/test_build_texture_coverage.py` (17 tests). Profiling matrix combines scene-manifest `textures` block (from C2-2.4 sample-manifests) AND flythrough-index.json `linked_textures` (from FT plan Phase 21).
+- **Output**: `Assets/Exports/discovery-plan/cycle-2/stage3/texture-coverage.{json,md}` — 24/24 cohort assets profiled.
+- **Headline finding**: **23 of 24 cohort assets (~96%) show `scene.linked_texture_count=0` vs `fly.linked_textures.count>0`**. Reading: the scene-manifest stage2 builder (`scripts/build_scene_manifest.py`) reads only `world.json` (carrying `ParentNiNodeIndex` + transforms), which has no texture bindings. So `textures.linked_texture_count` is naturally 0 for the whole cohort. Meanwhile, flythrough-index has texture data for 207/217 assets (Phase 21 linkage database). The 23 vs 1 disparity is the **structured signal**, not random noise.
+- **NEW schema gap (proposed by M3)**: add `textures.source: "scene"|"flythrough"|"unknown"` enum to the v1 draft schema. This forces every scene-manifest `textures` block to declare its source-of-truth, and unlocks honest future coverage profiling. Without this discriminant, downstream consumers cannot tell where a `linked_texture_count` came from.
+- **producer.command pattern**: the texture-coverage producer carries the full CLI command + input file list, so the run is reproducible byte-for-byte from any future state.
+- **Implication for `consumer_ready` gating**: V4 Pro should consider making `consumer_ready=true` require (a) `textures.source` is set to a known value AND (b) `linked_texture_count > 0 OR linked_textures is genuinely empty (textureless surfaces are valid)`. The current draft schema's `consumer_ready` gate is silent on texture source.
+- **Full evidence**: `docs/handoffs/2026-06-16-c2-3.1-firing.md` — data-led handoff with M3's priority recommendation: this gap should rank **highest** among the 5 schema gaps V4 Pro must resolve (above the 4 originally listed in the Open questions section).
