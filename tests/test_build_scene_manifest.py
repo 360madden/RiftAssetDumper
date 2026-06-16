@@ -16,6 +16,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -25,6 +26,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 from build_scene_manifest import (  # noqa: E402
     COORDINATE_SYSTEM,
+    find_id_asset_ids,
     find_non_id_asset_ids,
     is_identity_transform,
     validate_against_schema,
@@ -212,3 +214,86 @@ def test_schema_file_exists_and_is_2020_12() -> None:
     assert SCHEMA_PATH.exists(), f"schema not found: {SCHEMA_PATH}"
     s = json.loads(SCHEMA_PATH.read_text(encoding="utf-8-sig"))
     assert s["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+
+
+# ---------- IDENTITY vs NON-ID contrast (C2-2.4 batch) ----------
+
+SAMPLE_DIR = (
+    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
+)
+
+
+def _load_sample(asset_id: str) -> dict[str, Any]:
+    path = SAMPLE_DIR / f"sample-manifest-{asset_id}.json"
+    assert path.exists(), f"sample missing: {path}"
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8-sig"))
+    return data
+
+
+@pytest.mark.skipif(
+    not all((SAMPLE_DIR / f"sample-manifest-{aid}.json").exists() for aid in NON_ID_IDS),
+    reason="non-id sample batch not yet built",
+)
+def test_find_id_asset_ids_returns_nonzero() -> None:
+    """Mirror of test_find_non_id_asset_ids_returns_4: identity cohort is also populated."""
+    ids = find_id_asset_ids()
+    assert len(ids) > 0, "identity_examples should not be empty"
+    for i in ids:
+        assert len(i) == 16 and all(c in "0123456789abcdef" for c in i)
+
+
+@pytest.mark.skipif(
+    not all(
+        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
+        for aid in NON_ID_IDS + find_id_asset_ids()
+    ),
+    reason="identity + non-id sample batch not yet built",
+)
+def test_identity_manifests_have_identity_transform() -> None:
+    """Identity cohort must report world_transform_identity=True.
+
+    This is the schema-scale contrast: 4 non-id (translation != 0) + N id
+    (translation == 0). The builder must distinguish them correctly.
+    """
+    for aid in find_id_asset_ids():
+        m = _load_sample(aid)
+        assert m["world"]["world_transform_identity"] is True, (
+            f"identity asset {aid} should have identity transform"
+        )
+        assert m["world"]["world_transform_summary"]["translation"] == [0, 0, 0]
+
+
+@pytest.mark.skipif(
+    not all(
+        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
+        for aid in NON_ID_IDS + find_id_asset_ids()
+    ),
+    reason="identity + non-id sample batch not yet built",
+)
+def test_non_id_manifests_have_non_identity_transform() -> None:
+    """Non-id cohort must report world_transform_identity=False (locks the v0.3 contrast)."""
+    for aid in NON_ID_IDS:
+        m = _load_sample(aid)
+        assert m["world"]["world_transform_identity"] is False, (
+            f"non-id asset {aid} should have non-identity transform"
+        )
+
+
+@pytest.mark.skipif(
+    not all(
+        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
+        for aid in NON_ID_IDS + find_id_asset_ids()
+    ),
+    reason="identity + non-id sample batch not yet built",
+)
+def test_both_cohorts_share_consumer_ready_false() -> None:
+    """consumer_ready gates on data extraction (faces/materials/textures/mesh_block),
+    NOT on transform identity. Both id and non-id cohorts must report False until
+    the extraction pass runs (C2-3.x). This locks the v0.3 gate semantics.
+    """
+    for aid in NON_ID_IDS + find_id_asset_ids():
+        m = _load_sample(aid)
+        assert m["validation"]["consumer_ready"] is False, (
+            f"asset {aid} should NOT be consumer_ready (extraction pass not yet run)"
+        )
+        assert m["validation"]["schema_valid"] is True

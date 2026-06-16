@@ -306,6 +306,16 @@ def find_non_id_asset_ids() -> list[str]:
     return [e.get("asset_id", e.get("id", "")) for e in t.get("non_identity_examples", [])]
 
 
+def find_id_asset_ids() -> list[str]:
+    """Return the identity (translation == 0) asset IDs from transform-examples.json.
+
+    Mirrors find_non_id_asset_ids so tests can lock both sides of the contrast
+    in lockstep with the transform-examples source-of-truth.
+    """
+    t = json.loads(TRANSFORM_EXAMPLES.read_text(encoding="utf-8-sig"))
+    return [e.get("asset_id", e.get("id", "")) for e in t.get("identity_examples", [])]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build scene-manifest/v1-draft entry for one asset")
     parser.add_argument("--asset-id", help="Asset ID (16-char hex). Mutually exclusive with --all-non-id.")
