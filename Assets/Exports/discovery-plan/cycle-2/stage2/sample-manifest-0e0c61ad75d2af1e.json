@@ -1,10 +1,10 @@
 {
   "SchemaVersion": "scene-manifest/v1",
   "asset_id": "0e0c61ad75d2af1e",
-  "generated_at": "2026-06-16T13:18:40Z",
+  "generated_at": "2026-06-16T17:25:31Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
-    "version": "v0.7",
+    "version": "v0.8",
     "command": "python scripts/build_scene_manifest.py --asset-id 0e0c61ad75d2af1e"
   },
   "geometry": {
@@ -56,11 +56,11 @@
   "materials": {
     "material_status": "material-or-vertex-color-only",
     "texture_property_count": 0,
-    "material_property_count": 0,
-    "vertex_color_property_count": 0,
-    "scanned_at": null,
+    "material_property_count": 2,
+    "vertex_color_property_count": 2,
+    "scanned_at": "2026-06-16T17:19:54Z",
     "notes": [
-      "material_status=material-or-vertex-color-only inferred from faced=True + no linked textures; not yet confirmed by NIF-level material property scan"
+      "material_status=material-or-vertex-color-only confirmed by NIF-level material property scan (NiTexturingProperty=0, NiMaterialProperty=2, NiVertexColorProperty=2, nif_version=20.6.0.0)"
     ]
   },
   "textures": {

@@ -1,10 +1,10 @@
 {
   "SchemaVersion": "scene-manifest/v1",
   "asset_id": "0e60c972f3ba4ca0",
-  "generated_at": "2026-06-16T13:18:39Z",
+  "generated_at": "2026-06-16T17:25:30Z",
   "producer": {
     "tool": "scripts/build_scene_manifest.py",
-    "version": "v0.7",
+    "version": "v0.8",
     "command": "python scripts/build_scene_manifest.py --asset-id 0e60c972f3ba4ca0"
   },
   "geometry": {
@@ -55,12 +55,12 @@
   },
   "materials": {
     "material_status": "textured",
-    "texture_property_count": 0,
-    "material_property_count": 0,
-    "vertex_color_property_count": 0,
-    "scanned_at": null,
+    "texture_property_count": 1,
+    "material_property_count": 2,
+    "vertex_color_property_count": 2,
+    "scanned_at": "2026-06-16T17:19:54Z",
     "notes": [
-      "material_status=textured inferred from flythrough texture linkage (texture bindings confirmed by pipeline); not yet confirmed by NIF-level material property scan"
+      "material_status=textured confirmed by NIF-level material property scan (NiTexturingProperty=1, NiMaterialProperty=2, NiVertexColorProperty=2, nif_version=20.6.0.0)"
     ]
   },
   "textures": {

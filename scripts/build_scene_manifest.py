@@ -54,8 +54,15 @@ SCHEMA_PATH = (
 )
 DEFAULT_OUT_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 SCALE_OUT_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage6"
+MATERIAL_SCAN_RESULTS = (
+    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage3" / "material-scan-results.json"
+)
 PRODUCER_TOOL = "scripts/build_scene_manifest.py"
-PRODUCER_VERSION = "v0.7"
+PRODUCER_VERSION = "v0.8"
+
+_material_scan_cache: dict[str, dict[str, Any]] | None = None
+_material_scan_scanned_at: str | None = None
+_material_scan_loaded: bool = False
 
 # Schema-defined constants (mirrors coordinate-contract.md)
 COORDINATE_SYSTEM: dict[str, Any] = {
@@ -255,21 +262,84 @@ def build_world(
     }
 
 
+def load_material_scan_results() -> tuple[dict[str, dict[str, Any]], str | None]:
+    """Load the consolidated NIF material scan results (cached).
+
+    Returns (results_dict, scanned_at_timestamp).
+    Returns ({}, None) if the scan results file does not exist or is unreadable.
+    """
+    global _material_scan_cache, _material_scan_scanned_at, _material_scan_loaded
+    if _material_scan_loaded:
+        cache = _material_scan_cache if _material_scan_cache is not None else {}
+        return cache, _material_scan_scanned_at
+    _material_scan_loaded = True
+    try:
+        data = json.loads(MATERIAL_SCAN_RESULTS.read_text(encoding="utf-8-sig"))
+        _material_scan_cache = data.get("results", {})
+        _material_scan_scanned_at = data.get("scanned_at")
+        return _material_scan_cache, _material_scan_scanned_at
+    except FileNotFoundError, json.JSONDecodeError, OSError:
+        _material_scan_cache = {}
+        _material_scan_scanned_at = None
+        return {}, None
+
+
 def build_materials(
+    asset_id: str,
     cohort_entry: dict[str, Any] | None,
     flythrough_entry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the materials sub-record.
 
-    v0.7: infers material_status from flythrough texture linkage when a direct
-    NIF-level material scan is not yet available. The inference is honest about
-    its provenance in the notes field.
+    v0.8: prefers confirmed NIF-level material property counts from
+    ``material-scan-results.json`` (populated by ``scan_nif_material_properties.py``).
+    Falls back to v0.7 inference from flythrough texture linkage when scan data is
+    not yet available.
 
-    Inference rules:
+    Confirmed status rules (scan data present):
+    - texture_property_count > 0 → "textured"
+    - material_property_count > 0 or vertex_color_property_count > 0 (no texture) → "material-or-vertex-color-only"
+    - all three counts == 0 → "missing" (NIF has no material properties)
+
+    Inference rules (scan data absent, v0.7 fallback):
     - linked_textures non-empty → "textured" (flythrough pipeline confirmed bindings)
     - faced=True but no linked_textures → "material-or-vertex-color-only"
     - otherwise → "unknown" (point-only + no textures = no material signal)
     """
+    scan_results, scan_scanned_at = load_material_scan_results()
+    scan = scan_results.get(asset_id)
+
+    if scan is not None:
+        # Confirmed NIF-level data
+        tex_count = scan.get("texture_property_count", 0)
+        mat_count = scan.get("material_property_count", 0)
+        vc_count = scan.get("vertex_color_property_count", 0)
+        scanned_at = scan_scanned_at  # top-level timestamp, shared by all scanned assets
+
+        if tex_count > 0:
+            material_status = "textured"
+        elif mat_count > 0 or vc_count > 0:
+            material_status = "material-or-vertex-color-only"
+        else:
+            material_status = "missing"
+
+        nif_version = scan.get("nif_version", "")
+        notes = [
+            f"material_status={material_status} confirmed by NIF-level material property scan"
+            f" (NiTexturingProperty={tex_count}, NiMaterialProperty={mat_count},"
+            f" NiVertexColorProperty={vc_count}, nif_version={nif_version})"
+        ]
+
+        return {
+            "material_status": material_status,
+            "texture_property_count": tex_count,
+            "material_property_count": mat_count,
+            "vertex_color_property_count": vc_count,
+            "scanned_at": scanned_at,
+            "notes": notes,
+        }
+
+    # --- v0.7 fallback: inference from flythrough linkage ---
     if flythrough_entry:
         linked = flythrough_entry.get("linked_textures")
         has_textures = isinstance(linked, list) and len(linked) > 0
@@ -419,7 +489,7 @@ def build_manifest(asset_id: str) -> dict[str, Any]:
     )
     geometry = build_geometry(asset_id, cohort_entry, flythrough_entry)
     world_rec = build_world(asset_id, world, flythrough_entry)
-    materials = build_materials(cohort_entry, flythrough_entry)
+    materials = build_materials(asset_id, cohort_entry, flythrough_entry)
     textures = build_textures(flythrough_entry)
     provenance = build_provenance(asset_id, cohort_entry, flythrough_entry)
     validation = build_validation(geometry, materials, textures)

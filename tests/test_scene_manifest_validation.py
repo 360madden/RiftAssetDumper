@@ -32,7 +32,8 @@ SCHEMA_PATH = STAGE2_DIR / "scene-manifest-v1.schema.json"
 
 def _load_json(path: Path) -> dict[str, Any]:
     """Load a JSON file with utf-8-sig encoding."""
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    result: Any = json.loads(path.read_text(encoding="utf-8-sig"))
+    return result  # type: ignore[no-any-return]
 
 
 def _validate_schema(manifest: dict[str, Any]) -> list[str]:
@@ -316,14 +317,14 @@ def test_all_stage6_schema_valid_flag_is_true() -> None:
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
     reason="stage6 manifests not yet built",
 )
-def test_all_stage6_producer_version_is_v0_7() -> None:
-    """All scale-out manifests must be built by producer v0.7 (material-inferred)."""
+def test_all_stage6_producer_version_is_v0_8() -> None:
+    """All scale-out manifests must be built by producer v0.8 (NIF-confirmed material data)."""
     paths = _stage6_manifest_paths()
     bad: list[str] = []
     for path in paths:
         manifest = _load_json(path)
         ver = manifest["producer"]["version"]
-        if ver != "v0.7":
+        if ver != "v0.8":
             bad.append(f"{manifest['asset_id']}: version={ver}")
     assert bad == [], f"{len(bad)}/{len(paths)} manifests have wrong producer version"
 
