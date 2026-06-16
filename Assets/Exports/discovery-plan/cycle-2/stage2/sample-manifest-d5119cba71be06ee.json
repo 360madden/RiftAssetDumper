@@ -1,0 +1,92 @@
+{
+  "SchemaVersion": "scene-manifest/v1-draft",
+  "asset_id": "d5119cba71be06ee",
+  "generated_at": "2026-06-16T11:09:08Z",
+  "producer": {
+    "tool": "scripts/build_scene_manifest.py",
+    "version": "v0.4",
+    "command": "python scripts/build_scene_manifest.py --asset-id d5119cba71be06ee"
+  },
+  "geometry": {
+    "obj_path": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\d5119cba71be06ee.obj",
+    "mesh_block": null,
+    "mesh_size": 329,
+    "vertex_count": 0,
+    "face_count": 0,
+    "has_faces": false,
+    "render_class": "unknown"
+  },
+  "world": {
+    "world_json": "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\d5119cba71be06ee.world.json",
+    "node_count": 1,
+    "mesh_count": 1,
+    "transform_semantics": "mesh-parent-chain",
+    "coordinate_system": {
+      "handedness": "right",
+      "up_axis": "Y",
+      "forward_axis": "-Z",
+      "translation_layout": "xyz",
+      "rotation_layout": "row-major-3x3",
+      "scale_layout": "uniform-float",
+      "trs_composition": "v_world = R * (S * v_local) + T",
+      "identity_tolerance": 1e-06
+    },
+    "world_transform_summary": {
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": 1
+    },
+    "world_transform_identity": true
+  },
+  "materials": {
+    "material_status": "unknown",
+    "texture_property_count": 0,
+    "material_property_count": 0,
+    "vertex_color_property_count": 0,
+    "notes": [
+      "material data not yet extracted from NIF - status=unknown (cohort has_faces=False)"
+    ]
+  },
+  "textures": {
+    "linked_texture_count": 0,
+    "linked_textures": [],
+    "missing_texture_count": 0,
+    "placeholder_texture_count": 0
+  },
+  "provenance": {
+    "cohort": "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage1\\cohort.json",
+    "source_nif_hash": "d5119cba71be06ee",
+    "flythrough_index_entry": null,
+    "evidence_files": [
+      "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\objs\\worlds\\d5119cba71be06ee.world.json",
+      "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
+      "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\coordinate-contract.md"
+    ]
+  },
+  "validation": {
+    "schema_valid": true,
+    "consumer_ready": false,
+    "warnings": [
+      "vertex_count=0 and face_count=0 - geometry not yet extracted from OBJ",
+      "render_class=unknown - OBJ classify pass not yet run",
+      "mesh_block=null - world.json BlockIndex not yet mapped to the locked M#N convention",
+      "material_status=unknown - NIF material properties not yet scanned",
+      "linked_textures=[] - texture linkage not yet populated"
+    ],
+    "errors": []
+  }
+}
