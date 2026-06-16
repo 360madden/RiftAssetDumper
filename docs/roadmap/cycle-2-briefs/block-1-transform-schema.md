@@ -16,7 +16,7 @@
 
 ---
 
-## One-page brief
+## V4P12 input brief
 
 Cycle 2’s goal is consumer visual fidelity: decoded meshes must become
 **placed, textured, consumer-usable world assets**. Current RiftFlythrough
