@@ -1,0 +1,574 @@
+﻿{
+  "SchemaVersion": "texture-coverage/v1-draft",
+  "generated_at": "2026-06-16T11:23:14Z",
+  "producer": {
+    "name": "build_texture_coverage.py",
+    "version": "v0.1",
+    "command": "python build_texture_coverage.py --cohort C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json --flythrough-index C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\flythrough-index.json",
+    "input_files": [
+      "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2\\transform-examples.json",
+      "C:\\RIFT MODDING\\Assets\\Assets\\Exports\\discovery-plan\\cycle-2\\stage2/sample-manifest-*.json (24 files)",
+      "C:\\RIFT MODDING\\Assets\\Assets\\build\\flythrough\\flythrough-index.json"
+    ]
+  },
+  "cohort_size": 24,
+  "cohort_identity_count": 20,
+  "cohort_non_identity_count": 4,
+  "coverage_summary": {
+    "covered": 0,
+    "partial": 0,
+    "textureless": 24,
+    "missing-flythrough": 0,
+    "missing-manifest": 0,
+    "contradictions": 23
+  },
+  "entries": [
+    {
+      "asset_id": "000b6b5d431aea29",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "d04ae452_h_b_marble_pink_01_c.png",
+          "d2b723fd_h_b_marble_black_01_n.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0257d1da99060ed8",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "37732288_n_dr_accent_grass_01_c.png",
+          "601eaf9a_n_p_stillmoor_grass_tufts_s.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0631a80d1a32416b",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 4,
+        "linked_textures": [
+          "1ca09027_h_m_dim_carpet_tiles_01_c_green.png",
+          "2a1d70eb_h_m_dim_carpet_tiles_02_n_blue.png",
+          "b110fb0c_h_m_dim_carpet_tiles_01_n_blue.png",
+          "ce411f0d_h_m_dim_carpet_tiles_02_c_green.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=4 (delta=+4; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0a555da05e47f47e",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 4,
+        "linked_textures": [
+          "077276b0_h_b_metal_iron_01_n.png",
+          "1e9dced1_environmentmap_blank.png",
+          "33b528be_h_b_metal_gold_01_c.png",
+          "466ce250_h_b_metal_gold_01_s.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=4 (delta=+4; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0d9a25c9a6af7b18",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 6,
+        "linked_textures": [
+          "0131c945_a_f_iron_pine_forge_wallwood_03_n.png",
+          "0557dbe4_a_f_iron_pine_forge_ceiling_01_n.png",
+          "31716be7_a_f_iron_pine_forge_wallwood_03_s.png",
+          "66a02f28_a_f_iron_pine_forge_ceiling_01_c.png",
+          "85aa462b_gloss_blank.png",
+          "94a3d888_a_f_iron_pine_forge_wallwood_03_c.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=6 (delta=+6; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "42024b768fcd2e2b",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "3913aa78_vfx_ui_auctioneer.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "5b986fcd70579a94",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "2d4f2bbf_sky_dimensions_halloween_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "6cc30b261e38cd3a",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "ab66658e_vfx_ui_banker.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "96616acc5854775a",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 6,
+        "linked_textures": [
+          "01e5f548_h_m_dim_set1_ceiling_01_n.png",
+          "05af13e4_h_m_dim_set1_ceiling_01_s.png",
+          "069de159_h_m_dim_set1_ceiling_01_c.png",
+          "36b8db33_h_m_dim_set1_floor_05_s.png",
+          "38108934_h_m_dim_set1_floor_05_c.png",
+          "dca10e4f_h_m_dim_set1_floor_02_n.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=6 (delta=+6; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "c10a3107712da43d",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "9016077e_vfx_ui_auto_push_quest_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "8e01613d7ce9e297",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "085cfbbf_sky_lar_hod_skygradient_01.png",
+          "abbc6318_sky_lar_nexus_cloud_skygradient_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "d5119cba71be06ee",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "e51e7e30_directional_glow_1.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "e3de1077a37d0337",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "40ea265b_sky_tg_cm_nebula_skygradient_01.png",
+          "56c434ff_sky_tg_mt_sharax_nebula_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0d000181e2ef66e7",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "53907066_n_ec_grass_02_s.png",
+          "eae709a5_n_ec_grass_02_c.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0e60c972f3ba4ca0",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "6f741d1f_n_j_plants_tree_ng_01_s.png",
+          "6f9d46bc_n_ad_plants_01_c.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0e9b9261b8f43e6b",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "447ec3e2_sky_shared_starmap.png",
+          "b21d7842_sky_conquest_gradient_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "10a089b859691d0b",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 2,
+        "linked_textures": [
+          "06dfd02c_h_b_roof_tile_adobe_01_n.png",
+          "1e23f126_h_b_roof_tile_adobe_01_c.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=2 (delta=+2; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "1ecdbaf5a2576ba5",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 23,
+        "linked_textures": [
+          "0558cc91_normal_blank.png",
+          "1b5d3829_d_fort_stone_mathosian_room_parts_03_s.png",
+          "1e9dced1_environmentmap_blank.png",
+          "1fcf6b67_p_c_banner_guardian_01_s.png",
+          "26c9d986_1h_sword_015_c.png",
+          "27553b9e_p_c_banner_guardian_01_n.png",
+          "32f175d2_m_c_harbor_floor_tile_01_n.png",
+          "33dd1cca_d_fort_stone_mathosian_room_parts_01_n.png",
+          "37527ca7_d_fort_stone_mathosian_door_01_c.png",
+          "46ab6ba5_p_mc_ironshield_01_n.png",
+          "5a21fcce_m_c_cartel_road_01.png",
+          "5bb080b3_a_mc_dawnseeker_floor_01_cyl.png",
+          "640bfba1_d_fort_stone_mathosian_door_01_s.png",
+          "695215d2_p_c_banner_guardian_01_c.png",
+          "8170b1b0_m_c_cartel_road_01_n.png",
+          "85995af3_d_fort_stone_mathosian_room_parts_03_c.png",
+          "9f74d81b_d_fort_stone_mathosian_room_parts_01_c.png",
+          "a093b9bf_d_fort_stone_mathosian_room_parts_03_n.png",
+          "a3c8bca4_d_fort_stone_mathosian_door_01_n.png",
+          "b687a695_m_c_harbor_floor_tile_old_01_s.png",
+          "babff381_d_fort_stone_mathosian_room_parts_01_s.png",
+          "e3e22c1f_p_mc_ironshield_01_c.png",
+          "ffadecc9_m_c_harbor_floor_tile_old_01.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=23 (delta=+23; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "6fc01704d4a509d5",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "a6ad5487_diffuse_blank.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "0e0c61ad75d2af1e",
+      "cohort_kind": "identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 0,
+        "linked_textures": []
+      },
+      "coverage_status": "textureless",
+      "contradiction": false
+    },
+    {
+      "asset_id": "07f37c99a80da009",
+      "cohort_kind": "non_identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "a6ad5487_diffuse_blank.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "2c85cfa17543443b",
+      "cohort_kind": "non_identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "a6ad5487_diffuse_blank.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "4a97d66a665a538e",
+      "cohort_kind": "non_identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "fe0ade02_magma_1.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    },
+    {
+      "asset_id": "593ea328978bde38",
+      "cohort_kind": "non_identity",
+      "in_flythrough_index": true,
+      "scene_manifest_textures": {
+        "linked_texture_count": 0,
+        "linked_textures": [],
+        "missing_texture_count": 0,
+        "placeholder_texture_count": 0
+      },
+      "flythrough_index_textures": {
+        "asset_in_index": true,
+        "linked_texture_count": 1,
+        "linked_textures": [
+          "a6ad5487_diffuse_blank.png"
+        ]
+      },
+      "coverage_status": "textureless",
+      "contradiction": true,
+      "contradiction_notes": "linked_texture_count mismatch: scene=0 flythrough=1 (delta=+1; flythrough has more textures than scene-manifest)"
+    }
+  ]
+}
