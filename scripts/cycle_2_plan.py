@@ -12,7 +12,7 @@ Usage:
     python scripts/cycle_2_plan.py step --next
     python scripts/cycle_2_plan.py step --id C2-5.3
     python scripts/cycle_2_plan.py complete --id C2-5.3 --evidence path/to/evidence
-    python scripts/cycle_2_plan.py v4-done --id C2-V4P1 --output path/to/v4-pro-output.md
+    python scripts/cycle_2_plan.py v4-done --id C2-V4P12 --output path/to/v4-pro-output.md
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from typing import Any
 log = logging.getLogger("cycle_2_plan")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_STATE = REPO_ROOT / "build" / "cycle-2" / ".state.json"
+DEFAULT_STATE = REPO_ROOT / "Assets" / "build" / "cycle-2" / ".state.json"
 
 # ASCII-safe status icons (emoji can break on Windows cp1252 consoles)
 _ICONS: dict[str, str] = {
@@ -43,9 +43,8 @@ _ICONS: dict[str, str] = {
 }
 
 # Step dependency order: all steps in execution order (M3 + V4 Pro interleaved).
-# C2-2.5 and C2-3.5 (M3 implements V4 Pro decisions) come AFTER C2-V4P1, matching
-# the plan's narrative flow: data prep (2.1-2.4, 3.1-3.4) -> V4 Pro block 1 ->
-# M3 implementation (2.5, 3.5) -> next phase.
+# v0.3 merged transform + coordinate + schema prep into C2-2 and replaced
+# C2-V4P1/C2-V4P2 with the combined C2-V4P12 gate.
 STEP_ORDER: list[str] = [
     # C2-1 Bootstrap
     "C2-1.1",
@@ -58,67 +57,52 @@ STEP_ORDER: list[str] = [
     "C2-2.2",
     "C2-2.3",
     "C2-2.4",
-    # C2-3 Coordinate data (M3 data prep)
+    "C2-2.5",
+    # V4 Pro Block 1+2 (combined)
+    "C2-V4P12",
+    # C2-3 Material closure
     "C2-3.1",
     "C2-3.2",
     "C2-3.3",
     "C2-3.4",
-    # V4 Pro Block 1
-    "C2-V4P1",
-    # M3 implements V4 Pro's transform + coordinate decisions
-    "C2-2.5",
     "C2-3.5",
-    # C2-4 Material closure
+    # V4 Pro Block 3 (conditional)
+    "C2-V4P3",
+    # C2-4 Batch reconstruction
     "C2-4.1",
     "C2-4.2",
     "C2-4.3",
     "C2-4.4",
     "C2-4.5",
-    # V4 Pro Block 3 (conditional)
-    "C2-V4P3",
-    # C2-5 Schema prep
+    # C2-5 Consumer validation
     "C2-5.1",
     "C2-5.2",
     "C2-5.3",
     "C2-5.4",
     "C2-5.5",
-    # V4 Pro Block 2
-    "C2-V4P2",
-    # C2-6 Batch reconstruction
+    # C2-6 Scale-out
     "C2-6.1",
     "C2-6.2",
     "C2-6.3",
     "C2-6.4",
     "C2-6.5",
-    # C2-7 Consumer validation
+    # V4 Pro Block 4
+    "C2-V4P4",
+    # C2-7 Final validation / ship-kill
     "C2-7.1",
     "C2-7.2",
     "C2-7.3",
-    "C2-7.4",
-    "C2-7.5",
-    # C2-8 Scale-out
-    "C2-8.1",
-    "C2-8.2",
-    "C2-8.3",
-    "C2-8.4",
-    "C2-8.5",
-    # V4 Pro Block 4
-    "C2-V4P4",
-    # C2-9 Validation
-    "C2-9.1",
-    "C2-9.2",
-    "C2-9.3",
-    "C2-9.4",
-    "C2-9.5",
     # V4 Pro Block 5
     "C2-V4P5",
+    "C2-7.4",
+    "C2-7.5",
 ]
 
-V4_PRO_BLOCK_IDS: set[str] = {"C2-V4P1", "C2-V4P2", "C2-V4P3", "C2-V4P4", "C2-V4P5"}
+V4_PRO_BLOCK_IDS: set[str] = {"C2-V4P12", "C2-V4P3", "C2-V4P4", "C2-V4P5"}
 CONDITIONAL_V4_BLOCKS: set[str] = {"C2-V4P3"}  # Only fires if closure 50-79%
-V4_SESSION_LIMIT = 5
+V4_SESSION_LIMIT = 4
 
-PHASES: list[str] = [f"C2-{n}" for n in range(1, 10)]
+PHASES: list[str] = [f"C2-{n}" for n in range(1, 8)]
 
 # Explicit phase membership: maps each phase to its complete step list, REGARDLESS
 # of where those steps appear in STEP_ORDER. This decouples "phase membership" from
@@ -135,8 +119,6 @@ PHASE_STEPS: dict[str, list[str]] = {
     "C2-5": ["C2-5.1", "C2-5.2", "C2-5.3", "C2-5.4", "C2-5.5"],
     "C2-6": ["C2-6.1", "C2-6.2", "C2-6.3", "C2-6.4", "C2-6.5"],
     "C2-7": ["C2-7.1", "C2-7.2", "C2-7.3", "C2-7.4", "C2-7.5"],
-    "C2-8": ["C2-8.1", "C2-8.2", "C2-8.3", "C2-8.4", "C2-8.5"],
-    "C2-9": ["C2-9.1", "C2-9.2", "C2-9.3", "C2-9.4", "C2-9.5"],
 }
 
 
@@ -148,7 +130,7 @@ def _default_state() -> dict[str, Any]:
     """Return a fresh default state with all steps pending."""
     return {
         "plan": "cycle-2-scene-manifest-plan",
-        "version": "0.2",
+        "version": "0.3",
         "current_phase": "C2-1",
         "current_step": "C2-1.1",
         "phase_status": {p: "pending" for p in PHASES},

@@ -61,16 +61,14 @@ from build_world_placed_merge import (  # noqa: E402
 log = logging.getLogger("build_cycle_2_cohort")
 
 # Project layout: this script lives at `<workspace>/Assets/scripts/build_cycle_2_cohort.py`,
-# so `parents[2]` is the workspace root (`C:\RIFT MODDING`) and `REPO_ROOT / "Assets" / ...`
-# resolves to `<workspace>/Assets/...` which is the project root + the actual data location.
-# The data files (flythrough-index.json, world.jsons) live at this doubled path because
-# the project is rooted at `C:\RIFT MODDING\Assets` (the "Assets" repo) but the data was
-# historically generated under `<workspace>/Assets/Assets/build/...`.
+# so `parents[2]` is the workspace root (`C:\RIFT MODDING`). The cycle-2 source data and
+# committed handoff artifacts live under `<workspace>/Assets/Assets/...`: the first
+# `Assets` is the repo root, the second is the historical generated-data subtree.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INDEX = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "flythrough-index.json"
 DEFAULT_WORLDS = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "objs" / "worlds"
 DEFAULT_SCENE_GRAPH_MANIFEST = REPO_ROOT / "Assets" / "Assets" / "build" / "flythrough" / "scene-graph-manifest.json"
-DEFAULT_OUT = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage1" / "cohort.json"
+DEFAULT_OUT = REPO_ROOT / "Assets" / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage1" / "cohort.json"
 
 NON_IDENTITY_TOLERANCE = 1e-6
 IDENTITY_TRANSLATION: list[float] = [0, 0, 0]

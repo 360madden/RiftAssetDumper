@@ -11,7 +11,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "build_cycle_2_cohort.py"
-COHORT_JSON = REPO_ROOT / "Exports" / "discovery-plan" / "cycle-2" / "stage1" / "cohort.json"
+COHORT_JSON = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage1" / "cohort.json"
 
 
 def test_help_exits_zero() -> None:
