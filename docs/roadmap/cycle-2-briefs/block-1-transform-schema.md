@@ -10,6 +10,9 @@
 - `Assets/Exports/discovery-plan/cycle-2/stage2/coordinate-contract.md`
 - `Assets/Exports/discovery-plan/cycle-2/stage2/schema-sketch.md`
 - `Assets/Exports/discovery-plan/cycle-2/stage2/scene-manifest-v1.draft.schema.json`
+- `Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-07f37c99a80da009.json` (first sample, non-id)
+- `Assets/Exports/discovery-plan/cycle-2/stage2/C2-2.4-iteration-notes.md` (4 schema gaps for this review)
+- `scripts/validate_scene_manifest_schema.py` (C2-2.4 acceptance: schema validates as JSON Schema 2020-12)
 
 ---
 
@@ -31,6 +34,8 @@ a durable consumer contract.
 | Identity transform assets | 22 |
 | Full flythrough scale check | 217/217 scale = 1.0 |
 | Transform field finiteness | 26/26 finite |
+| First sample manifest built | `07f37c99a80da009` (non-id, translation `[8.82, -0.85, 0.08]`, `consumer_ready=false`) |
+| Schema validator | exits 0 on the draft schema + first sample |
 
 ### Draft decisions from M3
 
@@ -55,6 +60,17 @@ Return a concise decision doc with:
    row-major 3x3, uniform scale, and `1e-6` identity tolerance.
 3. **Scene-manifest v1 field set** — accept/revise the draft schema shape:
    `geometry`, `world`, `materials`, `textures`, `provenance`, `validation`.
+   For each of the 4 schema gaps, return one of: `accept` (lock as-is),
+   `revise` (specify the change), or `defer` (park for a later V4 Pro session
+   with rationale).
+
+### Validation gate
+
+Before declaring V4P12 complete, the locked schema must pass
+`scripts/validate_scene_manifest_schema.py --schema <locked-path>` with exit
+code 0, AND the first sample
+`Assets/Exports/discovery-plan/cycle-2/stage2/sample-manifest-07f37c99a80da009.json`
+must validate against the locked schema with the same exit code.
 
 ### Hard constraints
 
@@ -64,6 +80,8 @@ Return a concise decision doc with:
   failures without evidence.
 - Do not lock a schema that cannot distinguish schema faults from
   RiftFlythrough consumer/rendering faults.
+- The draft schema **must** validate as JSON Schema 2020-12 (acceptance met via
+  `scripts/validate_scene_manifest_schema.py`; lock must preserve this).
 
 ### Open questions
 
@@ -72,3 +90,11 @@ Return a concise decision doc with:
 3. Should placeholder textures be warnings or hard consumer-ready errors?
 4. Should material/vertex-color-only assets count as materialized for C2-3?
 5. Should non-identity assets be required C2-5 screenshot fixtures?
+6. **Should `Geometry` require `vertex_count > 0` AND `face_count > 0` for
+   `consumer_ready=true`?** (Schema gap #1; current draft is too permissive.)
+7. **Should `Materials` carry a `scanned_at` timestamp** to distinguish
+   "scanned, found zero" from "never scanned"? (Schema gap #2.)
+8. **Should `geometry.obj_sha1` be added** for cross-schema consistency with
+   `asset-mesh-manifest-v1`? (Schema gap #3.)
+9. **Should `world.accumulated_transform` vs `declared_transform` be split?**
+   (Schema gap #4; current `world_transform_summary` collapses both.)
