@@ -113,15 +113,17 @@ def analyze_duplicates(
             keeper = sorted_paths[0]
             for p in sorted_paths[1:]:
                 size = p.stat().st_size
-                deletions.append({
-                    "action": "delete",
-                    "asset_id": aid,
-                    "mesh_block": mb,
-                    "path": str(p.relative_to(REPO_ROOT)),
-                    "size": size,
-                    "sha256": list(hashes.keys())[0],
-                    "reason": f"true duplicate of {keeper.relative_to(REPO_ROOT)}",
-                })
+                deletions.append(
+                    {
+                        "action": "delete",
+                        "asset_id": aid,
+                        "mesh_block": mb,
+                        "path": str(p.relative_to(REPO_ROOT)),
+                        "size": size,
+                        "sha256": list(hashes.keys())[0],
+                        "reason": f"true duplicate of {keeper.relative_to(REPO_ROOT)}",
+                    }
+                )
                 total_to_delete += 1
                 total_bytes += size
         else:
@@ -133,30 +135,34 @@ def analyze_duplicates(
                 h_keeper = h_sorted[0]
                 for p in h_sorted[1:]:
                     size = p.stat().st_size
-                    deletions.append({
-                        "action": "delete",
-                        "asset_id": aid,
-                        "mesh_block": mb,
-                        "path": str(p.relative_to(REPO_ROOT)),
-                        "size": size,
-                        "sha256": h,
-                        "reason": f"hash-group duplicate of {h_keeper.relative_to(REPO_ROOT)}",
-                    })
+                    deletions.append(
+                        {
+                            "action": "delete",
+                            "asset_id": aid,
+                            "mesh_block": mb,
+                            "path": str(p.relative_to(REPO_ROOT)),
+                            "size": size,
+                            "sha256": h,
+                            "reason": f"hash-group duplicate of {h_keeper.relative_to(REPO_ROOT)}",
+                        }
+                    )
                     total_to_delete += 1
                     total_bytes += size
             # Warn about content-mismatched groups (different export runs)
-            warnings.append({
-                "asset_id": aid,
-                "mesh_block": mb,
-                "hash_groups": len(hashes),
-                "total_files": len(paths),
-                "sha256s": list(hashes.keys()),
-                "message": (
-                    f"Found {len(hashes)} different content versions for same "
-                    f"(aid={aid}, mb={mb}). Different export runs — only "
-                    "duplicates WITHIN each hash group will be deleted."
-                ),
-            })
+            warnings.append(
+                {
+                    "asset_id": aid,
+                    "mesh_block": mb,
+                    "hash_groups": len(hashes),
+                    "total_files": len(paths),
+                    "sha256s": list(hashes.keys()),
+                    "message": (
+                        f"Found {len(hashes)} different content versions for same "
+                        f"(aid={aid}, mb={mb}). Different export runs — only "
+                        "duplicates WITHIN each hash group will be deleted."
+                    ),
+                }
+            )
 
     return deletions, total_to_delete, total_bytes, warnings
 
@@ -200,7 +206,9 @@ def print_report(
     if warnings:
         print(f"  WARNINGS ({len(warnings)} groups with different content versions):")
         for w in warnings:
-            print(f"    [!] {w['asset_id']} mb={w['mesh_block']}: {w['hash_groups']} versions, {w['total_files']} files")
+            print(
+                f"    [!] {w['asset_id']} mb={w['mesh_block']}: {w['hash_groups']} versions, {w['total_files']} files"
+            )
             print("        These are different export runs — only hash-group duplicates deleted.")
         print()
 

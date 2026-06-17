@@ -26,9 +26,35 @@ from typing import Any
 # Known copied-set mesh sizes (29 families from Phase 49 project summary)
 # ---------------------------------------------------------------------------
 KNOWN_COPIED_MESH_SIZES: set[int] = {
-    193, 197, 214, 240, 267, 272, 275, 276, 280, 297,
-    301, 305, 307, 309, 321, 325, 326, 329, 330, 337,
-    345, 354, 361, 365, 367, 370, 389, 405, 465,
+    193,
+    197,
+    214,
+    240,
+    267,
+    272,
+    275,
+    276,
+    280,
+    297,
+    301,
+    305,
+    307,
+    309,
+    321,
+    325,
+    326,
+    329,
+    330,
+    337,
+    345,
+    354,
+    361,
+    365,
+    367,
+    370,
+    389,
+    405,
+    465,
 }
 
 # ---------------------------------------------------------------------------
@@ -93,7 +119,7 @@ def extract_new_families(data: dict[str, Any]) -> dict[int, dict[str, Any]]:
                 continue
             try:
                 ms_int = int(ms)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 continue
 
             if ms_int in KNOWN_COPIED_MESH_SIZES:
@@ -125,12 +151,14 @@ def extract_new_families(data: dict[str, Any]) -> dict[int, dict[str, Any]]:
             candidate_key = (aid, mb)
             if candidate_key not in families[ms_int]["seen"]:
                 families[ms_int]["seen"].add(candidate_key)
-                families[ms_int]["candidates"].append({
-                    "id": aid,
-                    "mb": mb,
-                    "archive": archive,
-                    "entry": entry,
-                })
+                families[ms_int]["candidates"].append(
+                    {
+                        "id": aid,
+                        "mb": mb,
+                        "archive": archive,
+                        "entry": entry,
+                    }
+                )
 
     # Clean up internal tracking
     for fam in families.values():
@@ -216,12 +244,19 @@ def probe_family(
 
     # Build dotnet args directly (no Python intermediary)
     dotnet_args = [
-        "run", "--project", str(DEFAULT_PROJECT), "--",
+        "run",
+        "--project",
+        str(DEFAULT_PROJECT),
+        "--",
         "probe-nif-mesh",
-        "--root", live_root,
-        "--id", aid,
-        "--mesh-block", str(mb),
-        "--out", str(out_path),
+        "--root",
+        live_root,
+        "--id",
+        aid,
+        "--mesh-block",
+        str(mb),
+        "--out",
+        str(out_path),
     ]
     if skip_build:
         dotnet_args.insert(1, "--no-build")
@@ -256,7 +291,7 @@ def probe_family(
                 result["pairings"] = len(pairings) if isinstance(pairings, list) else 0
                 attr_sets = probe_data.get("AttributeSets", probe_data.get("MeshAttributeSets", []))
                 result["attribute_sets"] = len(attr_sets) if isinstance(attr_sets, list) else 0
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        except json.JSONDecodeError, KeyError, TypeError, ValueError:
             pass  # Fall back to regex below
 
     # Fallback: regex parsing of stdout (kept for resilience)
@@ -314,14 +349,21 @@ def export_family(
 
     # Build dotnet args directly (no Python intermediary)
     dotnet_args = [
-        "run", "--project", str(DEFAULT_PROJECT), "--",
+        "run",
+        "--project",
+        str(DEFAULT_PROJECT),
+        "--",
         "decode-nif-geometry",
-        "--root", live_root,
-        "--id", aid,
-        "--mesh-block", str(mb),
+        "--root",
+        live_root,
+        "--id",
+        aid,
+        "--mesh-block",
+        str(mb),
         "--experimental-position-source",
         "--write-obj",
-        "--out", str(decode_json_path),
+        "--out",
+        str(decode_json_path),
     ]
     if skip_build:
         dotnet_args.insert(1, "--no-build")
@@ -337,7 +379,7 @@ def export_family(
             if isinstance(decode_data, dict):
                 result["vertices"] = int(decode_data.get("Positions", decode_data.get("VertexCount", 0)))
                 result["faces"] = int(decode_data.get("Faces", 0))
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        except json.JSONDecodeError, KeyError, TypeError, ValueError:
             pass
 
     # Find the OBJ file in the output directory
@@ -384,7 +426,7 @@ def _load_live_registry() -> dict[str, Any]:
     try:
         with open(LIVE_REGISTRY_PATH, encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {"ids": {}}
 
 
@@ -431,7 +473,7 @@ def batch_probe_family(
     for i, cand in enumerate(candidates):
         aid = cand["id"]
         mb = cand["mb"]
-        print(f"      [{i+1}/{len(candidates)}] id={aid[:16]} mb={mb} ...")
+        print(f"      [{i + 1}/{len(candidates)}] id={aid[:16]} mb={mb} ...")
 
         probe_info = {
             "mesh_size": family["mesh_size"],
@@ -473,7 +515,7 @@ def print_family_table(
     print(f"  {len(families)} families found")
     print(f"{'=' * 90}")
     print(f"  {'MS':>5}  {'Candidates':>10}  {'Priority':>8}  {'Best Role':<35}  Sample IDs")
-    print(f"  {'-'*5}  {'-'*10}  {'-'*8}  {'-'*35}  {'-'*30}")
+    print(f"  {'-' * 5}  {'-' * 10}  {'-' * 8}  {'-' * 35}  {'-' * 30}")
     for f in families:
         best_role = sorted(f["roles"], key=lambda r: ROLE_PRIORITY.get(r, 0), reverse=True)
         role_str = best_role[0] if best_role else "unknown"
@@ -481,10 +523,8 @@ def print_family_table(
         n_cands = len(cands)
         sample_ids = ",".join(c["id"][:8] for c in cands[:3])
         if len(cands) > 3:
-            sample_ids += f"...+{len(cands)-3}"
-        print(
-            f"  {f['mesh_size']:>5}  {n_cands:>10}  {f['priority']:>8}  {role_str:<35}  {sample_ids}"
-        )
+            sample_ids += f"...+{len(cands) - 3}"
+        print(f"  {f['mesh_size']:>5}  {n_cands:>10}  {f['priority']:>8}  {role_str:<35}  {sample_ids}")
 
 
 def print_probe_results(results: list[dict[str, Any]]) -> None:
@@ -495,8 +535,12 @@ def print_probe_results(results: list[dict[str, Any]]) -> None:
     viable_count = sum(1 for r in results if r.get("viable"))
     probed_count = sum(1 for r in results if r.get("probed"))
     print(f"  Probed: {probed_count}/{len(results)}  Viable: {viable_count}/{len(results)}")
-    print(f"  {'MS':>5}  {'ID':<18}  {'MB':>4}  {'Verts':>6}  {'Pos':>4}  {'Norm':>4}  {'UV':>4}  {'Pairs':>5}  {'Viable':>6}  Error")
-    print(f"  {'-'*5}  {'-'*18}  {'-'*4}  {'-'*6}  {'-'*4}  {'-'*4}  {'-'*4}  {'-'*5}  {'-'*6}  {'-'*30}")
+    print(
+        f"  {'MS':>5}  {'ID':<18}  {'MB':>4}  {'Verts':>6}  {'Pos':>4}  {'Norm':>4}  {'UV':>4}  {'Pairs':>5}  {'Viable':>6}  Error"
+    )
+    print(
+        f"  {'-' * 5}  {'-' * 18}  {'-' * 4}  {'-' * 6}  {'-' * 4}  {'-' * 4}  {'-' * 4}  {'-' * 5}  {'-' * 6}  {'-' * 30}"
+    )
     for r in results:
         error = r.get("error", "")
         if error and len(error) > 60:
@@ -518,12 +562,12 @@ def print_export_results(results: list[dict[str, Any]]) -> None:
     total_verts = sum(r.get("vertices", 0) for r in results)
     print(f"  Exported: {exported_count}/{len(results)}  Faces: {total_faces}  Vertices: {total_verts}")
     print(f"  {'MS':>5}  {'Verts':>6}  {'Faces':>6}  {'Size':>8}  {'NaN':>4}  {'Status':<10}  Path")
-    print(f"  {'-'*5}  {'-'*6}  {'-'*6}  {'-'*8}  {'-'*4}  {'-'*10}  {'-'*40}")
+    print(f"  {'-' * 5}  {'-' * 6}  {'-' * 6}  {'-' * 8}  {'-' * 4}  {'-' * 10}  {'-' * 40}")
     for r in results:
         status = "OK" if r.get("exported") else "FAIL"
         print(
             f"  {r['mesh_size']:>5}  {r['vertices']:>6}  {r['faces']:>6}  "
-            f"{r['file_size']:>8}  {r['nan_count']:>4}  {status:<10}  {r.get('obj_path', r.get('error',''))[:40]}"
+            f"{r['file_size']:>8}  {r['nan_count']:>4}  {status:<10}  {r.get('obj_path', r.get('error', ''))[:40]}"
         )
 
 
@@ -608,15 +652,21 @@ def main() -> None:
             candidates = family.get("candidates", [])
             n_cands = len(candidates)
             if exhaustive and n_cands > 1:
-                print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} ({n_cands} candidates) — exhaustive batch probe...")
+                print(
+                    f"  [{i + 1}/{len(ranked)}] MeshSize={family['mesh_size']} ({n_cands} candidates) — exhaustive batch probe..."
+                )
                 result = batch_probe_family(family, live_root=args.live_root, skip_build=args.skip_build)
                 probe_results.append(result)
                 status = "VIABLE" if result.get("viable") else "all-exhausted"
-                print(f"    -> {status} (tried {result.get('candidates_tried', 0)}/{result.get('total_candidates', n_cands)} candidates)")
+                print(
+                    f"    -> {status} (tried {result.get('candidates_tried', 0)}/{result.get('total_candidates', n_cands)} candidates)"
+                )
             else:
                 # Single-candidate probe (original behavior or fallback)
                 cand = candidates[0] if candidates else {"id": "?", "mb": "?"}
-                print(f"  [{i+1}/{len(ranked)}] MeshSize={family['mesh_size']} id={cand['id'][:16]} mb={cand['mb']} ...")
+                print(
+                    f"  [{i + 1}/{len(ranked)}] MeshSize={family['mesh_size']} id={cand['id'][:16]} mb={cand['mb']} ..."
+                )
                 probe_info = {
                     "mesh_size": family["mesh_size"],
                     "id": cand["id"],
@@ -629,7 +679,9 @@ def main() -> None:
                 result = probe_family(probe_info, live_root=args.live_root, skip_build=args.skip_build)
                 probe_results.append(result)
                 status = "VIABLE" if result["viable"] else ("probed" if result["probed"] else "FAILED")
-                print(f"    -> {status} v={result['vertex_count']} pos={result['has_position']} norm={result['has_normal']} uv={result['has_uv']}")
+                print(
+                    f"    -> {status} v={result['vertex_count']} pos={result['has_position']} norm={result['has_normal']} uv={result['has_uv']}"
+                )
 
         print_probe_results(probe_results)
 
@@ -647,7 +699,7 @@ def main() -> None:
                     "id": pr["id"],
                     "mesh_block": pr["mesh_block"],
                 }
-                print(f"  [{i+1}/{len(viable)}] MeshSize={pr['mesh_size']} ...")
+                print(f"  [{i + 1}/{len(viable)}] MeshSize={pr['mesh_size']} ...")
                 result = export_family(family_info, live_root=args.live_root, skip_build=args.skip_build)
                 export_results.append(result)
                 status = "OK" if result["exported"] else "FAIL"

@@ -93,9 +93,7 @@ def _flythrough_index_assets() -> dict[str, dict[str, Any]] | None:
     return assets if isinstance(assets, dict) else None
 
 
-def _flythrough_index_textures(
-    asset_id: str, assets: dict[str, dict[str, Any]] | None
-) -> dict[str, Any]:
+def _flythrough_index_textures(asset_id: str, assets: dict[str, dict[str, Any]] | None) -> dict[str, Any]:
     """Return per-asset texture stats derived from flythrough-index.json.
 
     When ``assets`` is None (read failure), the function still returns a
@@ -131,9 +129,7 @@ def _coverage_status(scene_textures: dict[str, Any] | None, fly_textures: dict[s
     return "textureless"
 
 
-def _detect_contradiction(
-    scene_textures: dict[str, Any] | None, fly_textures: dict[str, Any]
-) -> tuple[bool, str]:
+def _detect_contradiction(scene_textures: dict[str, Any] | None, fly_textures: dict[str, Any]) -> tuple[bool, str]:
     """Detect disagreements between scene-manifest textures and flythrough-index linked_textures."""
     if scene_textures is None or not fly_textures["asset_in_index"]:
         return False, ""
@@ -142,7 +138,8 @@ def _detect_contradiction(
     if scene_linked != fly_linked:
         delta = fly_linked - scene_linked
         direction = (
-            "flythrough has more textures than scene-manifest" if delta > 0
+            "flythrough has more textures than scene-manifest"
+            if delta > 0
             else "scene-manifest has more textures than flythrough"
         )
         return True, (
@@ -152,9 +149,7 @@ def _detect_contradiction(
     return False, ""
 
 
-def _build_entry(
-    asset_id: str, cohort_kind: str, assets: dict[str, dict[str, Any]] | None
-) -> CoverageEntry:
+def _build_entry(asset_id: str, cohort_kind: str, assets: dict[str, dict[str, Any]] | None) -> CoverageEntry:
     """Build a single CoverageEntry for the cohort matrix."""
     scene_textures = _scene_manifest_textures(asset_id)
     fly_textures = _flythrough_index_textures(asset_id, assets)
@@ -163,7 +158,8 @@ def _build_entry(
         "asset_id": asset_id,
         "cohort_kind": cohort_kind,
         "in_flythrough_index": fly_textures["asset_in_index"],
-        "scene_manifest_textures": scene_textures or {
+        "scene_manifest_textures": scene_textures
+        or {
             "linked_texture_count": 0,
             "linked_textures": [],
             "missing_texture_count": 0,
@@ -255,8 +251,12 @@ def render_markdown(
     lines.append("| Status | Count |")
     lines.append("|---|---:|")
     for k in (
-        "covered", "partial", "textureless",
-        "missing-flythrough", "missing-manifest", "contradictions",
+        "covered",
+        "partial",
+        "textureless",
+        "missing-flythrough",
+        "missing-manifest",
+        "contradictions",
     ):
         lines.append(f"| {k} | {s.get(k, 0)} |")
     lines.append("")
@@ -297,9 +297,7 @@ def render_markdown(
     return "\n".join(lines)
 
 
-def write_outputs(
-    report: dict[str, Any], out_dir: Path
-) -> tuple[Path, Path]:
+def write_outputs(report: dict[str, Any], out_dir: Path) -> tuple[Path, Path]:
     """Write the texture-coverage report JSON + markdown sidecar to out_dir."""
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "texture-coverage.json"
@@ -321,14 +319,18 @@ def sha256(path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. See --help for options."""
     p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
-        "--out-dir", type=Path, default=STAGE3_DIR,
+        "--out-dir",
+        type=Path,
+        default=STAGE3_DIR,
         help=f"Output directory (default: {STAGE3_DIR})",
     )
     p.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Compute report but do not write to disk (still prints summary).",
     )
     args = p.parse_args(argv)
