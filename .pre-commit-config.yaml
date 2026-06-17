@@ -31,10 +31,14 @@ repos:
         always_run: true
 
   # ── Markdown linting ────────────────────────────────────────────
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.44.0
+  # Uses markdownlint-cli2 (same tool CI uses via DavidAnson/markdownlint-cli2-action)
+  # so local pre-commit and CI enforce identical rules. The previous setup used
+  # the legacy markdownlint-cli with --fix, which could silently rewrite files
+  # (introducing new violations — see commit f8a821c) and diverge from CI.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
     hooks:
-      - id: markdownlint-fix
+      - id: markdownlint-cli2
         args: [--config, .markdownlint.json]
         files: \.md$
 

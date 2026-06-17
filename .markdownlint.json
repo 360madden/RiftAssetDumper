@@ -18,10 +18,8 @@
   // MD034: Bare URLs — disabled because many raw URLs are intentional in research docs
   "MD034": false,
 
-  // MD029: Ordered list prefix — use consistent style
-  "MD029": {
-    "style": "ordered"
-  },
+  // MD029: Ordered list prefix — disabled (sequential numbering in handoff docs)
+  "MD029": false,
 
   // MD046: Code block style — allow both fenced and indented
   "MD046": {
@@ -54,9 +52,6 @@
 
   // MD036: Emphasis as heading — disabled (historical docs use bold for section breaks)
   "MD036": false,
-
-  // MD029: Ordered list prefix — disabled (sequential numbering in handoff docs)
-  "MD029": false,
 
   // MD033: Inline HTML — disabled (docs use id attributes for internal anchors)
   "MD033": false
