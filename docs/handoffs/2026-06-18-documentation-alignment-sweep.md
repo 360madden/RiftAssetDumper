@@ -96,9 +96,38 @@ The **historical journal / TL;DR status page**. Had frozen at "Phases 0-17 compl
 | Delivery JSON regeneration | 153 assets, 404/404 texture URLs ✅ |
 | Consumer delivery match | Stage8 ≡ RiftFlythrough (identical `generated_at`) ✅ |
 
-## Known Issue
+## 9-Guard Sweep — Complete Results
 
-- **Orphan RiftAssetDumper process** persists across sessions, blocking `attribute-extra-proof-guard` and other dotnet-dependent guards. Requires manual cleanup: `taskkill /F /IM RiftAssetDumper.exe`. **Not a regression** — pre-existing environmental issue. Other 4 guards verified passing.
+All 9 proof guards were exercised against current project state. Run in two tranches:
+
+### Tranche A: Source-code guards (no inventory needed) — 5/5 PASS
+
+| # | Guard | Result |
+|---|-------|--------|
+| 1 | `scene_manifest_validation_guard` | ✅ 241/241 PASS |
+| 2 | `ghidra_pairing_non_export_guard` | ✅ PASSED |
+| 3 | `nidatastream_parser_export_non_consumption_guard` | ✅ PASSED |
+| 7 | `ghidra_attribute_candidate_guard` | ✅ PASSED (14 groups, 0 complete) |
+| 8 | `ghidra_function_site_target_guard` | ✅ PASSED |
+
+### Tranche B: Inventory-dependent guards (full `nif-mesh-binding-inventory.json`, 377MB) — 1/4 PASS
+
+| # | Guard | Result | Detail |
+|---|-------|--------|--------|
+| 4 | `usage_access_correlation_guard` | ✅ PASSED | 5 roles confirmed, 0 pairing exceptions |
+| 5 | `position_source_sibling_lead_guard` | ❌ FAILED | `e3de1077a37d0337 block#24 payload=852` not found in live inventory |
+| 6 | `residual_lead_guard` | ❌ FAILED | `meshSize=325 residualStreamCount=113` (was 0 in copied set) |
+| 9 | `attribute_extra_proof_guard` | ❌ FAILED | Only 1 @264 group (vc=24, count=10); expected 4 groups (vc=128,95,80,64) |
+
+### Root Cause
+
+Guards 5, 6, and 9 were calibrated against the now-deleted `Source/` copied set. The live game archive (26GB, 244 files, 263,957 entries) contains **different mesh data** — the known sibling position-source leads, residual stream patterns, and @264 extra-stream groups are absent or reshaped. The guards are **working correctly** by flagging this data drift.
+
+**These are not code regressions.** The guards need recalibration if the project goal is to re-prove the same properties against live-archive data. If the copied-set baseline is the canonical truth, the guards remain correct and the live inventory simply doesn't contain the expected data.
+
+### Orphan Process Note
+
+- **Orphan RiftAssetDumper process** persists across sessions, blocking the CLI path for `attribute-extra-proof-guard` (which spawns dotnet to regenerate the inventory). The guard was run directly via Python against the existing inventory file. Manual cleanup: `taskkill /F /IM RiftAssetDumper.exe`.
 
 ## Post-Sweep State
 
