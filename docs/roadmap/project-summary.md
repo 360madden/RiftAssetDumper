@@ -1,6 +1,6 @@
 # RiftAssetDumper Project Summary
 
-**Last Updated**: 2026-06-12 (Phase 49+; manifest stats reconciled; Python 2→3 except syntax fixes)
+**Last Updated**: 2026-06-18 (Cycle 2 COMPLETE; v0.2 delivery pipeline shipped; test counts reconciled: 56 C# + 475 Python = 531 total)
 
 **Purpose**: Comprehensive overview of all 50 completed phases, current state, key discoveries, and remaining work.
 
@@ -16,9 +16,9 @@ Reverse-engineering workspace for RIFT game asset archives. Focuses on decoding 
 |---|---|---|
 | CLI dumper | C# (.NET 9) | ~15K (single Program.cs) |
 | Workflow orchestration | Python | 30+ commands in rift_workflow.py |
-| Proof guards | Python | 8 guards in rift_workflow_guards.py |
+| Proof guards | Python | 9 guards in rift_workflow_guards.py |
 | Reports | Python | 10+ report functions |
-| Tests | xUnit + pytest | 50 C# + 50 Python |
+| Tests | xUnit + pytest | 56 C# + 475 Python = 531 total |
 
 ### Key Tools
 
@@ -40,11 +40,12 @@ Descriptor subsystem, gate clearance, promotion, proof guards.
 
 - 7 gates cleared, 6 descriptor patterns proven, 49 tests, 0 regressions
 
-### Phase Group 2: Discovery & Classification (Phases 11-20)
+### Phase Group 2: Discovery & Classification (Phases 11-20) + Cycle 2 (C2-1..C2-7)
 
-Population-scale inventory, sibling pairing maps, cross-type verification.
+Population-scale inventory, sibling pairing maps, cross-type verification, scene manifest pipeline, NIF-confirmed material scan, RiftFlythrough delivery.
 
 - 142 sibling pairs across 10 MeshSize families, 9 cross-type NIFs, float2 Z-source resolved
+- **Cycle 2 SHIPPED**: 241 per-asset scene manifests (217 stage6 + 24 stage2), NIF-confirmed material properties (217/217), 153/217 consumer-ready, v0.2 delivery pipeline (404/404 texture URLs, path privacy)
 
 ### Phase Group 3: Export Pipeline (Phases 21-34)
 
@@ -140,8 +141,9 @@ Targeted probes, cluster analysis, regex bug fix, pattern matching.
 | `ruff check scripts/` | ALL CLEAN |
 | `mypy scripts/` | ALL OK |
 | `dotnet build` | 0 errors |
-| `dotnet test` | 50/50 pass |
+| `dotnet test` | 56/56 pass |
 | `dotnet format` | PASS |
+| `pytest` | 475/475 pass |
 | OBJ integrity | 0 structural issues |
 
 ---
@@ -233,9 +235,9 @@ Through systematic probes, cluster analysis, and pattern matching:
 |---|---|
 | Total phases | 51 |
 | Gates cleared | 7 |
-| Proof guards | 8 |
-| C# tests | 50 (all pass) |
-| Python tests | ~49 (all pass) |
+| Proof guards | 9 |
+| C# tests | 56 (all pass) |
+| Python tests | 475 (all pass) |
 | MeshSize families mapped | 29 (17 faced + 1 mixed + 11 pos-only) |
 | Sibling pairs | 142 |
 | Probe lookup entries | 71 |
