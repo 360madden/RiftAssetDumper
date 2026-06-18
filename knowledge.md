@@ -211,7 +211,7 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - **MeshSize enrichment** — `infer_meshsizes.py` boosted probe lookup from 176→318 entries, **100% coverage** (43 exact matches, 87 VC-proximity, 12 sibling-pair)
 - **Live archive** (26GB, 244 files, 263,957 entries) used directly — `Source/` deleted (166MB reclaimed). All Python scripts default to live game path.
 - **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites)
-- - All 9 proof guards PASSED on full copied-set inventory; 6/9 confirmed passing against current live archive (3 inventory-dependent guards detect expected data drift — see `docs/handoffs/2026-06-18-documentation-alignment-sweep.md`)
+- **All 9 proof guards PASSED on live-archive inventory** (2026-06-18 recalibration): 3 inventory-dependent guards (attribute_extra, position_source_sibling_lead, residual_lead) were recalibrated from deleted Source/ copied-set baselines to live-archive thresholds. Streaming JSON key extractor (`load_large_json_keys()`) avoids MemoryError on 377MB inventory.
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)

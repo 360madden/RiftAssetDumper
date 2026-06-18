@@ -529,6 +529,98 @@ def load_json_report(path: str | Path) -> Any:
         raise ValueError(f"Failed to parse JSON report: {path}") from exc
 
 
+def load_large_json_keys(path: str | Path, keys: tuple[str, ...]) -> dict[str, Any]:
+    """Extract specific top-level keys from a large JSON file without full load.
+
+    Uses memory-mapped I/O with bracket-depth counting to extract arrays/objects
+    by key name without decoding the entire 377MB inventory into Python memory.
+
+    Returns a dict with only the requested keys that were found.  Missing keys
+    are silently omitted — callers should assert presence themselves.
+
+    Args:
+        path: Path to the JSON file.
+        keys: Top-level keys to extract.
+
+    Returns:
+        Dict containing only the requested keys that were found in the file.
+    """
+    import mmap
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"No report found: {path}")
+
+    result: dict[str, Any] = {}
+    with path.open("rb") as fh:
+        with mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            # Skip UTF-8 BOM if present
+            start = 3 if mm[:3] == b"\xef\xbb\xbf" else 0
+
+            for key in keys:
+                key_bytes = f'"{key}"'.encode()
+                idx = mm.find(key_bytes, start)
+                if idx == -1:
+                    continue
+
+                # Find the colon after the key
+                colon = mm.find(b":", idx + len(key_bytes))
+                if colon == -1:
+                    continue
+
+                # Skip whitespace after colon
+                vs = colon + 1
+                mm_len = len(mm)
+                while vs < mm_len and mm[vs : vs + 1] in (b" ", b"\t", b"\n", b"\r"):
+                    vs += 1
+                if vs >= mm_len:
+                    continue
+
+                # Determine value type — arrays use bracket counting, objects/numbers/strings
+                # use raw_decode with a reasonable chunk
+                first_byte = mm[vs]
+                if first_byte == ord("["):  # array — count brackets
+                    depth = 1
+                    ve = vs + 1
+                    in_string = False
+                    while ve < mm_len and depth > 0:
+                        b = mm[ve]
+                        if b == ord('"') and (ve == 0 or mm[ve - 1] != ord("\\")):
+                            in_string = not in_string
+                        elif not in_string:
+                            if b == ord("["):
+                                depth += 1
+                            elif b == ord("]"):
+                                depth -= 1
+                        ve += 1
+                    chunk = mm[vs:ve].decode("utf-8")
+                    result[key] = json.loads(chunk)
+                elif first_byte == ord("{"):  # object — count braces
+                    depth = 1
+                    ve = vs + 1
+                    in_string = False
+                    while ve < mm_len and depth > 0:
+                        b = mm[ve]
+                        if b == ord('"') and (ve == 0 or mm[ve - 1] != ord("\\")):
+                            in_string = not in_string
+                        elif not in_string:
+                            if b == ord("{"):
+                                depth += 1
+                            elif b == ord("}"):
+                                depth -= 1
+                        ve += 1
+                    chunk = mm[vs:ve].decode("utf-8")
+                    result[key] = json.loads(chunk)
+                else:
+                    # Scalar / null / string — use raw_decode with a safe window
+                    window = min(64 * 1024, mm_len - vs)
+                    chunk = mm[vs : vs + window].decode("utf-8")
+                    value, _end = json.JSONDecoder().raw_decode(chunk)
+                    result[key] = value
+
+    return result
+
+
 # ============================================================================
 # Third-party tools registry (load_tools_config)
 # ============================================================================
