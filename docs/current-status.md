@@ -1,14 +1,14 @@
-> **Current state**: 350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. All 7 promotion gates CLEARED. All 8 proof guards PASSING. Phase 1 (Position Source Family Proof) COMPLETE with M1.1-M1.5. Flythrough Bridge Plan (FT-1 through FT-8) COMPLETE. See `docs/roadmap/project-roadmap.md` for full roadmap.
+> **Current state**: 350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. All 7 promotion gates CLEARED. All 9 proof guards PASSING. Phase 1 (Position Source Family Proof) COMPLETE with M1.1-M1.5. Flythrough Bridge Plan (FT-1 through FT-8) COMPLETE. Cycle 2 (Scene Manifest Pipeline) SHIPPED with v0.2 delivery. See `docs/roadmap/project-roadmap.md` for full roadmap.
 
 # Current Status — High-impact RIFT asset discoveries 🚀
 
-Date: 2026-06 (Phases 0-17 complete; 350 OBJs, 0 unknowns, 7/7 gates cleared, 8/8 guards passing)
+Date: 2026-06-18 (Phases 0-49 complete + Cycle 2 SHIPPED; 350 OBJs, 0 unknowns, 7/7 gates cleared, 9/9 guards passing; v0.2 delivery pipeline shipped — 404/404 texture URLs)
 
-**Current handoff**: `docs/handoffs/2026-06-12-project-completion.md`
+**Current handoff**: `docs/handoffs/2026-06-18-v0.2-delivery-authoritative-textures.md`
 
 ## Project completion state (June 2026)
 
-**350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. 0 unknowns remaining. 0 structural issues.** All 7 promotion gates CLEARED. All 8 proof guards PASSING. Roadmap phases 0-17 complete. Project at autonomous completion.
+**350 OBJ files (217 unique asset IDs), 270 faced, 80 position-only, 30,864 faces, 23,421 vertices across 30+ MeshSize families. 0 unknowns remaining. 0 structural issues.** All 7 promotion gates CLEARED. All 9 proof guards PASSING. Roadmap phases 0-49 complete + Cycle 2 SHIPPED. v0.2 delivery pipeline shipped (path privacy, 404/404 texture URLs).
 
 > The historical Phase 48+ section below was originally written at 268 OBJs and has been preserved. Current manifest stats supersede it.
 
@@ -40,7 +40,7 @@ Date: 2026-06 (Phases 0-17 complete; 350 OBJs, 0 unknowns, 7/7 gates cleared, 8/
 | Phase 9 | Final Clearance + Consolidation | M9.0-M9.4 | **2** | ✅ EXITED |
 | Phase 10 | Human Review + Final Promotion | M10.1-M10.2 | **2** | ✅ COMPLETE |
 
-**Project totals**: 10 phases, 35+ milestones, 7 gates cleared.
+**Project totals**: 51 phases + 1 complete cycle (C2), 35+ milestones, 7 gates cleared, 9 proof guards, 56 C# + 475 Python tests (531 total).
 
 ---
 
