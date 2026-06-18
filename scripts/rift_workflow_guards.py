@@ -2680,7 +2680,7 @@ def scene_manifest_validation_guard() -> None:
             scene_sourced.append(aid)
 
         ver = manifest.get("producer", {}).get("version", "")
-        if ver != "v0.7":
+        if ver != "v0.8":
             bad_version.append(f"{aid}: version={ver}")
 
     assert_proof_guard(len(schema_failures) == 0, f"{len(schema_failures)} schema failures")
