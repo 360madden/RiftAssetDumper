@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-16 (Cycle 2 COMPLETE — all 7 phases DONE; v0.8 NIF-confirmed 217/217; 153/217 consumer-ready; RiftFlythrough delivery shipped)
+**Last Updated**: 2026-06-18 (Cycle 2 COMPLETE; v0.2 delivery pipeline shipped — path privacy, 404/404 texture URLs; guard fix v0.7→v0.8; 4 commits post-ship)
 
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
@@ -64,9 +64,12 @@
 | 8 | **Cycle 2 — C2-7.x (ship-kill validation)** | ✅ Complete (SHIP) | 22 tests + 9th guard; 241/241 PASS |
 | 9 | **v0.6 Geometry enrichment** | ✅ Complete | vertex_count, face_count, mesh_block, render_class, obj_sha1 |
 | 10 | **v0.7 Material inference** | ✅ Complete | 153/217 consumer_ready via texture-linkage inference |
-| 11 | **Stage8 RiftFlythrough delivery** | ✅ Complete | `riftflythrough-delivery.json` copied to sibling project |
+| 11 | **Stage8 RiftFlythrough delivery (v0.1)** | ✅ Complete | `riftflythrough-delivery.json` (153 assets) copied to sibling project |
 | 12 | **v0.8 NIF-level material scan** | ✅ Complete | 217/217 NIF-confirmed; 212 textured, 5 material-color-only; scanned_at populated |
 | 13 | **5 textureless asset investigation** | ✅ Complete | All 5 confirmed genuinely material-color-only; zero NiTexturingProperty blocks |
+| 14 | **v0.2 delivery pipeline (path privacy + texture URLs)** | ✅ Complete | Absolute paths removed; 404/404 texture URLs resolved to `textures/converted/<file>.png`; `_assert_no_absolute_paths()` hard guard; 5 new tests |
+| 15 | **scene_manifest_validation_guard fix** | ✅ Complete | Bumped expected producer v0.7→v0.8; 241/241 PASS |
+| 16 | **knowledge.md update + handoff** | ✅ Complete | Test counts (56/475); v0.2 delivery pipeline details; session handoff doc |
 
 ---
 
@@ -154,7 +157,9 @@
 | Mesh size families | 19 |
 | Guard passes | 241/241 (schema, OBJ, world, transforms, textures, version) |
 | Producer version | v0.8 (NIF-confirmed material data) |
-| Test suite | 55 tests (38 scene-manifest + 17 builder) |
+| Delivery version | v0.2 (path privacy + texture URL resolution; 404/404 resolved) |
+| Test suite | 475 Python + 56 C# = 531 total |
+| New tests (v0.2) | 5 (delivery wire contract) |
 | Ship-kill decision | **SHIP** |
 
 ### Flythrough Bridge Plan (FT-1..FT-8) — ✅ COMPLETE
