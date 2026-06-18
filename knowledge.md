@@ -111,11 +111,11 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 - **Target:** Python 3.14 (ruff + mypy strict)
 - **Roles:** discovery orchestration, workflow helpers, guard/proof-validation scripts, reports, batch sweep, FT pipeline
 - **Entry point:** `scripts/rift_workflow.py` — kebab-case command dispatch with 30+ commands
-- **Guards:** `scripts/rift_workflow_guards.py` — 4 proof guards (attribute-extra, usage-access-correlation, position-source-sibling-lead, residual-lead)
+- **Guards:** `scripts/rift_workflow_guards.py` — 9 proof guards (attribute-extra, attribute-extra-sibling, usage-access-correlation, position-source-sibling-lead, residual-lead, ghidra-function-site-target, ghidra-pairing-non-export, ghidra-attribute-candidate, scene-manifest-validation)
 - **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
 - **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
 - **Batch sweep:** `scripts/batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building
-- **Tests:** `scripts/test_rift_workflow_utils.py` (49) + `tests/test_bulk_export_for_flythrough.py` (13) + `tests/test_dump_textures_for_flythrough.py` (3) + `tests/test_ft6_validation.py` + `tests/test_ft7_lod.py` (23) + `tests/test_flythrough_plan.py` = 88+ Python tests
+- **Tests:** 475 Python tests across `scripts/` and `tests/` (pytest), 56 C# xUnit tests in `src/RiftAssetDumper.Tests/`
 - **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
 
 ### Proof guards (Python, `scripts/rift_workflow_guards.py`)
@@ -211,7 +211,7 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - **MeshSize enrichment** — `infer_meshsizes.py` boosted probe lookup from 176→318 entries, **100% coverage** (43 exact matches, 87 VC-proximity, 12 sibling-pair)
 - **Live archive** (26GB, 244 files, 263,957 entries) used directly — `Source/` deleted (166MB reclaimed). All Python scripts default to live game path.
 - **Ghidra proof lane complete** (3/3 steps): parser field proof guard, sample-byte agreement (184/184 blocks pass), narrow parser patch (`--ghidra-body-offset` flag wired through all 4 body-slicing sites)
-- - All 9 proof guards PASSED on full inventory
+- - All 9 proof guards PASSED on full copied-set inventory; 6/9 confirmed passing against current live archive (3 inventory-dependent guards detect expected data drift — see `docs/handoffs/2026-06-18-documentation-alignment-sweep.md`)
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
