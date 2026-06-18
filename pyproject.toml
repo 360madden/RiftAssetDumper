@@ -65,6 +65,7 @@ module = "tests.*"
 disallow_untyped_defs = false
 disable_error_code = [
     "no-untyped-def",   # pytest fixture parameters and test helpers
+    "type-arg",         # bare dict without type args — JSON-sourced test data
 ]
 
 [[tool.mypy.overrides]]

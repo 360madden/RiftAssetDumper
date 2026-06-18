@@ -288,7 +288,8 @@ def test_build_manifest_can_borrow_common_candidate_textures_without_promoting_a
         "aaaaaaaaaaaaaaaa": ["shared_diffuse_c.png"],
         "bbbbbbbbbbbbbbbb": ["shared_diffuse_c.png"],
     }
-    assert common_candidate_texture_names(audit["obj_file_level"]["entries"][2], asset_textures) == [
+    entries: list[dict[str, object]] = audit["obj_file_level"]["entries"]  # type: ignore[index]
+    assert common_candidate_texture_names(entries[2], asset_textures) == [
         "shared_diffuse_c.png"
     ]
 
@@ -595,8 +596,8 @@ def test_write_bundle_creates_obj_with_material_refs_and_mtl(tmp_path: Path) -> 
     assert verify["pass"] is True
     assert verify["texture_refs_checked"] == 1
 
-    bundled_obj = tmp_path / manifest["entries"][0]["bundled_obj"]
-    bundled_mtl = tmp_path / manifest["entries"][0]["bundled_mtl"]
+    bundled_obj = tmp_path / str(manifest["entries"][0]["bundled_obj"])
+    bundled_mtl = tmp_path / str(manifest["entries"][0]["bundled_mtl"])
     assert bundled_obj.read_text(encoding="utf-8").startswith(
         "mtllib ../materials/mat_000_abcdef0123456789.mtl\nusemtl mat_000_abcdef0123456789\n"
     )
