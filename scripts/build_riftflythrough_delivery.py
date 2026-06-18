@@ -178,11 +178,8 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         "",
         "## What changed (v0.2)",
         "",
-        "- Removed absolute Windows paths (`obj_path`/`world_json`) — the",
-        "  consumer keys off `asset_id`; absolute paths were unreadable in a",
-        "  browser and leaked local layout.",
-        "- Added `linked_texture_urls` (NIF-confirmed basenames resolved to",
-        "  `textures/converted/<file>`), the form `world.js` consumes directly.",
+        "- Removed absolute Windows paths (`obj_path`/`world_json`) — the consumer keys off `asset_id`; absolute paths were unreadable in a browser and leaked local layout.",
+        "- Added `linked_texture_urls` (NIF-confirmed basenames resolved to `textures/converted/<file>`), the form `world.js` consumes directly.",
         "- Fixed the `REPO_ROOT` double-prefix bug and the `vv0.1` typo.",
         "",
         "## Summary",
@@ -213,7 +210,7 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         txu = e["linked_texture_url_count"]
         tf = "non-id" if not e["transform_identity"] else "id"
         lines.append(f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} |")
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def _assert_no_absolute_paths(delivery: dict[str, Any]) -> None:
