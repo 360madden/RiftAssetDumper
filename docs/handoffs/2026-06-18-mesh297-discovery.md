@@ -1,69 +1,85 @@
 # meshSize=297 TEXCOORD Discovery — Cycle 3.1
 
 **Date**: 2026-06-18
-**Status**: ✅ COMPLETE — 9 OBJs exported from previously untapped family
-**Commits**: `a499fa0` (9-guard recalibration) → mesh297-discovery
+**Status**: ✅ COMPLETE — 14 OBJs exported from previously untapped family
+**Commits**: `a499fa0` (9-guard recalibration) → `f6081ac` (initial 297 discovery) → multi-block expansion
 
 ## Discovery Path
 
-1. **Guard recalibration** (`a499fa0`): The 3 inventory-dependent guards (attribute_extra, position_source_sibling_lead, residual_lead) were recalibrated from deleted Source/ copied-set baselines to live-archive data. This exposed the meshSize=297 TEXCOORD residual stream in full detail.
+1. **Guard recalibration** (`a499fa0`): 3 inventory-dependent guards recalibrated for live archive, exposing meshSize=297 TEXCOORD residual stream.
 
-2. **Lead identification**: `residual_lead_guard` flagged meshSize=297 @24 TEXCOORD as a "singleton follow-up only" with plausible=0.9074, extent=128.0, 54 float3 vectors.
+2. **Single-block discovery**: `probe-nif-mesh` on `6f9c38ef4a6e5ab7` confirmed `DescriptorClassification: float32xvec3` at offset=24. TEXCOORD label was a string-heuristic misclassification. Exported: 54v/60f.
 
-3. **Deep probe**: `probe-nif-mesh` confirmed `DescriptorClassification: float32xvec3 (position/normal/UV vertex data)` — the TEXCOORD label was a misclassification by the string heuristic.
+3. **Batch export**: 8/9 remaining single-mesh assets exported via `decode-nif-geometry --experimental-position-source`.
 
-4. **Decode + export**: `decode-nif-geometry --experimental-position-source --write-obj` successfully exported an OBJ with 54 vertices, 60 faces, CLEAN validation.
+4. **Multi-block expansion**: `probe-nif` on `9f32d26c425ed264` revealed 8 NiMesh blocks (not just #6). Decoded 5 additional blocks (#27, #45, #59, #76, #90). Block #27 alone: 12,993v/12,991f.
 
-5. **Batch export**: 8/9 remaining meshSize=297 assets exported (1 failed: mesh block #6 missing). Total: 9 OBJs, 429 vertices, 435 faces, 0 structural issues.
+5. **Glow investigation**: meshSize=305 "glow" lead decoded but proved degenerate (all vertices at (0,0,1)) — billboard/sprite effect, not geometry.
 
 ## Key Findings
 
 | Metric | Value |
 |--------|------:|
-| Exported OBJs | 9 |
-| Total vertices | 429 |
-| Total faces | 435 |
-| NaN/Inf | 0 |
+| Total OBJs exported | **14** (9 single-mesh + 5 multi-block from 9f32d2) |
+| Total vertices | **15,315** |
+| Total faces | **15,309** |
+| NaN/Inf issues | 0 |
+| Largest single block | `9f32d2 #27` — 12,993v/12,991f |
+| Multi-block asset | `9f32d26c425ed264` — 6 blocks, 14,886v/14,874f |
 | Unique IdPrefixes | 10 |
 | Mesh blocks in family | 374 |
-| Largest mesh | `9f32d26c425ed264` — 247v/245f |
-| Failed | `0910220376b18d36` (mesh block #6 missing) |
 
-## Stream Details
+## Per-Asset Breakdown
 
-- **Offset**: 24
-- **Payload**: 648 bytes = 54 vertices × 12 bytes/vert (float3 XYZ)
-- **Classification**: float32xvec3 (position/normal/UV vertex data)
-- **Label**: TEXCOORD (string-heuristic misclassification)
-- **Topology**: degenerate-bridge UInt16BE strip
+| Asset | Mesh Block(s) | Vertices | Faces |
+|-------|:---:|---:|---:|
+| `03bcfae6561407a1` | #6 | 54 | 60 |
+| `0d1c9c5d9073ce22` | #6 | 4 | 2 |
+| `2581c6d1c4ee35b8` | #6 | 4 | 2 |
+| `6f9c38ef4a6e5ab7` | #6 | 54 | 60 |
+| `79fda55deefb4435` | #6 | 54 | 60 |
+| **`9f32d26c425ed264`** | **#6** | 247 | 245 |
+| | **#27** | **12,993** | **12,991** |
+| | **#45** | 247 | 245 |
+| | **#59** | 247 | 245 |
+| | **#76** | 164 | 162 |
+| | **#90** | 988 | 986 |
+| `cfbd6bffb7620092` | #6 | 4 | 2 |
+| `e383643b31af4ff2` | #6 | 4 | 2 |
+| `e7358576c7daf7ea` | #6 | 4 | 2 |
 
-## Remaining Work
+## Not Yet Probed
 
-- 374 mesh blocks in the family — only mesh block #6 was probed. Other blocks (#7, #27, etc.) may contain additional geometry.
-- 10 unique IdPrefixes — full 32-char IDs for all should be resolved.
-- MeshSize=297 isn't in `flythrough-index.json` or `probe-meshsize-lookup.json` — needs integration.
+- `0910220376b18d36` — mesh block #6 not found (different NIF structure)
+- 2 remaining NiMesh blocks in `9f32d26c425ed264` (8 total, 6 exported)
+- Other meshSize=297 assets may have additional blocks beyond #6
+- 374 mesh blocks total in the family — significant untapped potential
 
-## Resumption
+## Glow Investigation (Dead End)
 
-```bash
-# Probe another mesh block in the family
-dotnet run --project src/RiftAssetDumper -- probe-nif-mesh --id 6f9c38ef4a6e5ab7 --mesh-block 7
-
-# Export all mesh blocks for an asset
-python scripts/live_family_scanner.py --probe --export --limit 10 --exhaustive
-```
+- meshSize=305, offset=0, label="glow", plausible=0.9487
+- 2 samples: `fe9eb21c2bba1700` and `24a3a40e515c079c`
+- Both decoded: 15v/13f each, clean
+- All vertices at (0,0,1) — degenerate glow sprite, not usable geometry
+- **Verdict**: Dead end. Documented for completeness.
 
 ## OBJ Output
 
 ```
 Exports/discovery-plan/mesh297-probe/
-  03bcfae6561407a1/decode-nif-geometry-mesh6.obj  (54v, 60f)
-  0d1c9c5d9073ce22/decode-nif-geometry-mesh6.obj  (4v, 2f)
-  2581c6d1c4ee35b8/decode-nif-geometry-mesh6.obj  (4v, 2f)
-  6f9c38ef4a6e5ab7/decode-nif-geometry-mesh6.obj  (54v, 60f)
-  79fda55deefb4435/decode-nif-geometry-mesh6.obj  (54v, 60f)
-  9f32d26c425ed264/decode-nif-geometry-mesh6.obj  (247v, 245f)
-  cfbd6bffb7620092/decode-nif-geometry-mesh6.obj  (4v, 2f)
-  e383643b31af4ff2/decode-nif-geometry-mesh6.obj  (4v, 2f)
-  e7358576c7daf7ea/decode-nif-geometry-mesh6.obj  (4v, 2f)
+  03bcfae6561407a1/  (54v/60f)
+  0d1c9c5d9073ce22/  (4v/2f)
+  2581c6d1c4ee35b8/  (4v/2f)
+  6f9c38ef4a6e5ab7/  (54v/60f)
+  79fda55deefb4435/  (54v/60f)
+  9f32d26c425ed264/
+    decode-nif-geometry-mesh6.obj   (247v/245f)
+    9f32d2/mb27/                   (12,993v/12,991f)
+    9f32d2/mb45/                   (247v/245f)
+    9f32d2/mb59/                   (247v/245f)
+    9f32d2/mb76/                   (164v/162f)
+    9f32d2/mb90/                   (988v/986f)
+  cfbd6bffb7620092/  (4v/2f)
+  e383643b31af4ff2/  (4v/2f)
+  e7358576c7daf7ea/  (4v/2f)
 ```
