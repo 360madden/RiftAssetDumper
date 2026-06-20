@@ -55,10 +55,10 @@ def test_build_world_placed_merge_obj_header_contains_producer_version() -> None
     """_build_obj_header(N) emits the producer-version line in the OBJ header."""
     from build_world_placed_merge import _build_obj_header
 
-    header = _build_obj_header(217)
+    header = _build_obj_header(227)
     text = "".join(header)
     assert "Producer: RiftAssetDumper" in text, f"missing 'Producer: RiftAssetDumper' in OBJ header:\n{text}"
-    assert "217 assets indexed" in text, f"missing '217 assets indexed' in OBJ header:\n{text}"
+    assert "227 assets indexed" in text, f"missing '227 assets indexed' in OBJ header:\n{text}"
     assert all(line.startswith("#") for line in header if line.strip()), (
         f"OBJ header lines should all be comments (start with '#'):\n{header}"
     )

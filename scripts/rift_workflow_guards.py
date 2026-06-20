@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """RIFT asset workflow proof guards — ported from Invoke-RiftAssetWorkflow.ps1.
 
 Contains:
@@ -2637,7 +2637,7 @@ def scene_manifest_validation_guard() -> None:
     """C2-7.2 Ship-kill consumer contract guard: validate all scene manifests.
 
     Validates schema, OBJ/world paths, transform finiteness, texture sources,
-    and producer version across all 241 manifests (217 stage6 + 24 stage2).
+    and producer version across all 251 manifests (227 stage6 + 24 stage2).
     Generates stage7/scene-manifest-validation-guard.{json,md} reports.
     Raises ValueError on any assertion failure.
     """
@@ -2655,7 +2655,7 @@ def scene_manifest_validation_guard() -> None:
     stage6_paths = sorted(SCENE_MANIFEST_STAGE6_DIR.glob("manifest-*.json"))
     stage2_paths = sorted(SCENE_MANIFEST_STAGE2_DIR.glob("sample-manifest-*.json"))
 
-    assert_proof_guard(len(stage6_paths) == 217, f"Expected 217 stage6 manifests, found {len(stage6_paths)}.")
+    assert_proof_guard(len(stage6_paths) == 227, f"Expected 227 stage6 manifests, found {len(stage6_paths)}.")
     assert_proof_guard(len(stage2_paths) == 24, f"Expected 24 stage2 samples, found {len(stage2_paths)}.")
 
     pack_ok = True

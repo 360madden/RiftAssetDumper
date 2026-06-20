@@ -1,7 +1,7 @@
-"""C2-7.1 Scene Manifest Validation Suite — comprehensive consumer validation tests.
+﻿"""C2-7.1 Scene Manifest Validation Suite — comprehensive consumer validation tests.
 
 Covers:
-- Schema validation: all 217 stage6 scale-out manifests pass Draft202012Validator
+- Schema validation: all 227 stage6 scale-out manifests pass Draft202012Validator
 - Schema validation: all 24 stage2 sample manifests pass the locked schema
 - Pack integrity: scene-manifest-pack-v1.json structure validates
 - Cross-reference: pack entries match individual manifests byte-for-byte
@@ -115,10 +115,10 @@ def test_all_stage2_samples_pass_schema() -> None:
     not STAGE6_DIR.exists(),
     reason="stage6 directory not yet created",
 )
-def test_stage6_manifest_count_is_217() -> None:
-    """Scale-out must produce 217 manifests (one per flythrough-index asset)."""
+def test_stage6_manifest_count_is_227() -> None:
+    """Scale-out must produce 227 manifests (one per flythrough-index asset)."""
     paths = _stage6_manifest_paths()
-    assert len(paths) == 217, f"expected 217 stage6 manifests, got {len(paths)}"
+    assert len(paths) == 227, f"expected 227 stage6 manifests, got {len(paths)}"
 
 
 @pytest.mark.skipif(
