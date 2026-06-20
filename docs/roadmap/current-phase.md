@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-18 (Cycle 2 COMPLETE; v0.2 delivery pipeline shipped — path privacy, 404/404 texture URLs; guard fix v0.7→v0.8; 4 commits post-ship)
+**Last Updated**: 2026-06-19 (Delivery-authoritative textures shipped — builder v0.2 + consumer overlay; 404/404 NIF-confirmed texture URLs now wired into RiftFlythrough renderer; Discovery Cycle 3 added 27 OBJs from 2 new families)
 
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
@@ -30,6 +30,17 @@
 > - Enrichment handoff: `docs/handoffs/2026-06-16-cycle-2-v0.7-enrichment-handoff.md`
 > - Exit handoff: `docs/handoffs/2026-06-16-cycle-2-phase-7-exit.md`
 > - Delivery: `Assets/Exports/discovery-plan/cycle-2/stage8/riftflythrough-delivery.json`
+>
+> **Post-C2 enrichment (2026-06-19):**
+> - **Delivery-authoritative textures**: `build_riftflythrough_delivery.py` v0.2
+>   drops dead absolute paths (privacy + browser-portable), fixes the `vv0.1`
+>   typo, and resolves 404 `linked_textures` → consumer-consumable
+>   `linked_texture_urls`. RiftFlythrough `js/texture_loader.js` (new) overlays
+>   the NIF-confirmed linkage delivery-first into `textureMapUrls()`.
+>   Handoff: `docs/handoffs/2026-06-19-delivery-authoritative-textures.md`
+> - **Discovery Cycle 3**: 27 OBJs from 2 new families (meshSize 297: 17 OBJs,
+>   meshSize 321 lighthouse: 10 OBJs); 9/9 guards PASS. Not yet in
+>   flythrough-index/scene manifests. Handoff: `docs/handoffs/2026-06-18-discovery-cycle-3.md`
 
 ---
 
