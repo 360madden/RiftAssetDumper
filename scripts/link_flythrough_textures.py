@@ -89,9 +89,13 @@ def load_links() -> list[dict[str, Any]]:
         print(f"ERROR: {LINKS_PATH} not found.", file=sys.stderr)
         sys.exit(1)
     links: list[dict[str, Any]] = []
-    with open(LINKS_PATH, encoding="utf-8") as f:
+    # BOM-tolerant: utf-8-sig strips leading file BOM; the inline lstrip
+    # catches mid-stream BOMs left when concatenated C#-written JSONL files
+    # are appended (each retains its own BOM). See scripts/link_flythrough_textures.py
+    # docs note on this defensive fix (2026-06-20 cycle 3 texture fusion).
+    with open(LINKS_PATH, encoding="utf-8-sig") as f:
         for line in f:
-            line = line.strip()
+            line = line.lstrip("\ufeff").strip()
             if not line:
                 continue
             links.append(json.loads(line))
