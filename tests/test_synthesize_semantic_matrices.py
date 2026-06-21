@@ -1,4 +1,4 @@
-﻿"""Smoke tests for ``scripts/synthesize_semantic_matrices.py`` (Cycle 5 polyfill).
+"""Smoke tests for ``scripts/synthesize_semantic_matrices.py`` (Cycle 5 polyfill).
 
 Locks the classification heuristic and the wire-format round-trip:
 
@@ -24,16 +24,18 @@ either in CI or local dev).
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.synthesize_semantic_matrices import (  # noqa: E402
-    DEFAULT_ARCHIVE_INDEX_PATH,
+    ARCHIVE_TAXONOMY,
     MATRIX_FILES,
     POLYFILL_MAGIC_V1,
     POLYFILL_MAGIC_V2_ARCHIVE,
@@ -345,6 +347,50 @@ class TestArchiveClassification(unittest.TestCase):
     def test_first_match_wins_taxonomy_precedence(self) -> None:
         self.assertEqual(classify_by_archive("zone_terrain.twad"), "hint:map-zone")
 
+    def test_assets_archive_lower_numbered_routes_to_map_zone(self) -> None:
+        # Live-archive range split: assets.001-099 -> map-zone (Tier-1 firing).
+        # These three test archives exercise both single-digit and three-digit
+        # archive numbers to lock the disjoint "assets.0" / "assets.1" rules.
+        for archive in ("assets.001", "assets.005", "assets.099"):
+            self.assertEqual(
+                classify_by_archive(archive),
+                "hint:map-zone",
+                f"{archive} should match map-zone (lower-numbered assets.NNN)",
+            )
+
+    def test_assets_archive_higher_numbered_routes_to_actor_object(self) -> None:
+        # Live-archive range split: assets.200+ -> actor-object (Tier-1 firing).
+        for archive in ("assets.200", "assets.220", "assets.244"):
+            self.assertEqual(
+                classify_by_archive(archive),
+                "hint:actor-object",
+                f"{archive} should match actor-object (higher-numbered assets.NNN)",
+            )
+
+    def test_assets_archive_overrides_heuristic_in_all_lanes(self) -> None:
+        """Tier-1 archive rule overrides every vertex-count heuristic lane.
+
+        The taxonomy maps ``assets.244`` to ``hint:actor-object``.  When the
+        archive_index matches the asset, this rule must win regardless of
+        which heuristic lane (``map-zone`` / ``actor-object`` / ``waypoint-poi``)
+        would otherwise have applied.  ``subTest`` pins each lane individually
+        so a regression in any one is reported with the failing-lane name.
+        """
+        asset_id = "0123456789abcdef"
+        cases: list[tuple[str, dict[str, Any]]] = [
+            ("heuristic-map-zone", {"faced": True, "vertex_count": 500}),
+            ("heuristic-actor-object", {"faced": True, "vertex_count": 50}),
+            ("heuristic-waypoint-poi", {"faced": False}),
+        ]
+        for lane_name, asset in cases:
+            with self.subTest(lane=lane_name):
+                idx = {asset_id: ArchiveProvenance("assets.244", 42)}
+                self.assertEqual(
+                    classify_asset(asset_id, asset, archive_index=idx),
+                    "hint:actor-object",
+                    f"Tier-1 actor-object rule must win on lane={lane_name}",
+                )
+
     def test_unknown_archive_falls_through_to_heuristic(self) -> None:
         self.assertIsNone(classify_by_archive("unknown.twad"))
         asset = {"faced": True, "vertex_count": 50}
@@ -400,9 +446,15 @@ class TestArchiveClassification(unittest.TestCase):
             idx = load_archive_index(p)
         self.assertEqual(set(idx.keys()), {"1111111111111111", "5555555555555555"})
 
-    def test_load_archive_index_missing_auto_discover_returns_empty(self) -> None:
-        idx = load_archive_index(DEFAULT_ARCHIVE_INDEX_PATH)
-        self.assertEqual(idx, {})
+    # NOTE: ``test_load_archive_index_missing_auto_discover_returns_empty``
+    # was removed 2026-06-21 because the production
+    # ``Exports/discovery-plan/live-nif-archive-index.json`` is now
+    # populated by ``scripts/build_live_archive_index.py``.  The
+    # auto-discover-when-missing-path semantic is preserved by the
+    # explicit-missing branch (``raises FileNotFoundError``) covered by
+    # ``test_load_archive_index_explicit_missing_raises`` below, and is
+    # also verifiable by inspection of the ``if path == DEFAULT_ARCHIVE_INDEX_PATH``
+    # short-circuit inside ``load_archive_index``.
 
     def test_load_archive_index_explicit_missing_raises(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -477,14 +529,11 @@ class TestArchiveClassification(unittest.TestCase):
 
     def test_archive_classified_entry_round_trip_via_loader(self) -> None:
         from scripts.semantic_surface import build_semantic_block, load_all_matrices
+
         with tempfile.TemporaryDirectory() as td:
             matrix_dir = Path(td)
-            flythrough = {
-                "assets": {"0123456789abcdef": {"faced": True, "vertex_count": 5}}
-            }
-            by_hint, _ = synthesize_matrices(
-                flythrough, archive_index=self.ARCHIVE_INDEX
-            )
+            flythrough = {"assets": {"0123456789abcdef": {"faced": True, "vertex_count": 5}}}
+            by_hint, _ = synthesize_matrices(flythrough, archive_index=self.ARCHIVE_INDEX)
             for hint, entries in by_hint.items():
                 fname = MATRIX_FILES[hint]
                 report = {
@@ -505,6 +554,137 @@ class TestArchiveClassification(unittest.TestCase):
             self.assertEqual(len(matrices["hint:map-zone"]), 1)
             block = build_semantic_block("0123456789abcdef", matrix_dir)
             self.assertIn("hint:map-zone", block["categories"])
+
+    def test_archive_derived_entries_match_live_archive_filename_shape(self) -> None:
+        """Lockdown: Tier-1 archive-derived outputs use the live-archive filename shape.
+
+        When the ``archive_index`` contains real ``assets.NNN`` provenance
+        records (mirroring the shape produced by
+        ``scripts/build_live_archive_index.py``), every archive-derived entry
+        must:
+
+          a) carry ``ArchiveName`` matching ``^assets\\.\\d{3}$`` (the live shape)
+          b) carry ``DetectedType == "archive-derived"`` (Tier-1 mark)
+          c) carry ``MagicLabel == POLYFILL_MAGIC_V2_ARCHIVE`` (V2 marker)
+
+        These three invariants together ensure that the polyfill's Tier-1
+        path not only fires (MagicLabel V2) but actually persists the
+        real archive provenance on disk.  Without all three, an audit
+        that queries only one field risks the kind of false-positive that
+        bit us on 2026-06-19 (verbal Tier-1-fires claim was correct, but
+        the audit script queried the wrong key).
+        """
+        idx = {
+            "0123456789abcdef": ArchiveProvenance(archive="assets.001", entry=0),
+            "fedcba9876543210": ArchiveProvenance(archive="assets.100", entry=42),
+            "1111111111111111": ArchiveProvenance(archive="assets.244", entry=7),
+        }
+        flythrough = {
+            "assets": {
+                "0123456789abcdef": {"faced": True, "vertex_count": 50},
+                "fedcba9876543210": {"faced": True, "vertex_count": 5000},
+                "1111111111111111": {"faced": False},
+            }
+        }
+        by_hint, stats = synthesize_matrices(flythrough, archive_index=idx)
+        # synthesize reported Tier-1 archive-classified count must match index size.
+        self.assertEqual(stats["archive-classified"], 3)
+        # Walk every produced entry and assert the 3 invariants together.
+        live_archive_pattern = re.compile(r"^assets\.\d{3}$")
+        for entries in by_hint.values():
+            for row in entries:
+                if row["DetectedType"] != "archive-derived":
+                    continue
+                self.assertEqual(row["MagicLabel"], POLYFILL_MAGIC_V2_ARCHIVE)
+                self.assertRegex(row["ArchiveName"], live_archive_pattern)
+                self.assertNotEqual(row["ArchiveName"], "synthetic.twad")
+                self.assertGreaterEqual(row["EntryIndex"], 0)
+
+    def test_archive_derived_v2_label_consistent_with_provenance(self) -> None:
+        """Lockdown: V2 magic label and archive provenance are tightly coupled.
+
+        Any output entry with ``MagicLabel == POLYFILL_MAGIC_V2_ARCHIVE``
+        must carry a real ``ArchiveName`` (not the synthetic placeholder)
+        and ``DetectedType == "archive-derived"``.  Conversely, any entry
+        with the synthetic marker (``POLYFILL_MAGIC_V1`` or
+        ``ArchiveName == "synthetic.twad"``) must NOT carry the V2 label.
+        Catches the failure mode where the MagicLabel is set but the
+        archive provenance is left blank (or vice versa).
+        """
+        idx = {
+            "0123456789abcdef": ArchiveProvenance(archive="assets.075", entry=11),
+        }
+        flythrough = {
+            "assets": {
+                "0123456789abcdef": {"faced": True, "vertex_count": 50},
+                "cccccccccccccccc": {"faced": True, "vertex_count": 50},  # not in index
+            }
+        }
+        by_hint, _ = synthesize_matrices(flythrough, archive_index=idx)
+        all_rows = [r for entries in by_hint.values() for r in entries]
+        for row in all_rows:
+            if row["MagicLabel"] == POLYFILL_MAGIC_V2_ARCHIVE:
+                self.assertEqual(row["DetectedType"], "archive-derived")
+                self.assertNotEqual(row["ArchiveName"], "synthetic.twad")
+            if row["DetectedType"] == "archive-derived":
+                self.assertEqual(row["MagicLabel"], POLYFILL_MAGIC_V2_ARCHIVE)
+            if row["ArchiveName"] == "synthetic.twad":
+                self.assertNotEqual(row["MagicLabel"], POLYFILL_MAGIC_V2_ARCHIVE)
+                self.assertEqual(row["DetectedType"], "synthetic")
+
+
+class TestArchiveTaxonomyInvariants(unittest.TestCase):
+    """Regression guard pinning ``ARCHIVE_TAXONOMY`` to its live-archive shape.
+
+    Catches any duplicate-tail regression like the 2026-06-19 corruption
+    where the comment-polish script accidentally re-pasted the 3 assets.N
+    rules after the dict was already closed (12 ruff invalid-syntax errors).
+    If ``ARCHIVE_TAXONOMY`` ever gains redundant keys, loses the assets.N
+    split, or stops being a disjoint partition, this test fails closed
+    before any consumer sees a wrong classification.
+    """
+
+    def test_archive_taxonomy_total_keys_is_16(self) -> None:
+        # 13 original substring rules (world/zone/map/terrain/character/
+        # creature/npc/prop/item/object/waypoint/script/spawn) + 3
+        # assets.N rules for the live 244-archive install.
+        self.assertEqual(len(ARCHIVE_TAXONOMY), 16)
+
+    def test_archive_taxonomy_assets_n_keys_are_disjoint(self) -> None:
+        # The 3 assets.N rules must exist (heuristic split for live archive).
+        for needle in ("assets.0", "assets.1", "assets.2"):
+            self.assertIn(needle, ARCHIVE_TAXONOMY)
+        # No archive in the live range (001-244) may match two different
+        # rules under first-match-wins.  Exhaustively assert disjointness.
+        for n in range(1, 245):
+            archive_name = f"assets.{n:03d}"
+            matches = [k for k in ARCHIVE_TAXONOMY if k in archive_name]
+            self.assertEqual(
+                len(matches),
+                1,
+                f"{archive_name} matched {matches} instead of exactly 1 rule",
+            )
+
+    def test_archive_taxonomy_assets_n_split_routes_correctly(self) -> None:
+        # Boundary spot-checks: each rule fires on its expected archive set.
+        self.assertEqual(classify_by_archive("assets.001"), "hint:map-zone")
+        self.assertEqual(classify_by_archive("assets.099"), "hint:map-zone")
+        self.assertEqual(classify_by_archive("assets.100"), "hint:map-zone")
+        self.assertEqual(classify_by_archive("assets.150"), "hint:map-zone")
+        self.assertEqual(classify_by_archive("assets.199"), "hint:map-zone")
+        self.assertEqual(classify_by_archive("assets.200"), "hint:actor-object")
+        self.assertEqual(classify_by_archive("assets.244"), "hint:actor-object")
+
+    def test_archive_taxonomy_out_of_range_archive_returns_none(self) -> None:
+        # Fail-safe for hypothetical future archives beyond assets.244
+        # (would match no needle and revert asset to vertex-count heuristic).
+        # ``assets.999`` is a real fail-safe case (no needle matches).
+        # ``unknown.twad`` is another genuine miss (no needle matches).
+        # NOTE: ``assets.000`` is NOT a fail-safe case -- ``"assets.0"``
+        # is a substring of ``"assets.000"`` (first 8 chars match), so
+        # it routes to ``hint:map-zone``.
+        self.assertIsNone(classify_by_archive("assets.999"))
+        self.assertIsNone(classify_by_archive("unknown.twad"))
 
 
 if __name__ == "__main__":
