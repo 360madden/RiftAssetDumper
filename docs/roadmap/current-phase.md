@@ -32,6 +32,7 @@
 > - Delivery: `Assets/Exports/discovery-plan/cycle-2/stage8/riftflythrough-delivery.json`
 >
 > **Post-C2 enrichment (2026-06-19):**
+>
 > - **Delivery-authoritative textures**: `build_riftflythrough_delivery.py` v0.2
 >   drops dead absolute paths (privacy + browser-portable), fixes the `vv0.1`
 >   typo, and resolves 404 `linked_textures` → consumer-consumable
@@ -43,6 +44,7 @@
 >   flythrough-index/scene manifests. Handoff: `docs/handoffs/2026-06-18-discovery-cycle-3.md`
 >
 > **Cycle 5 — Semantic-Category Surface (2026-06-21):**
+>
 > - **v0.9 scene manifest optional `semantic` sub-record**: 3-matrix union
 >   (`hint:actor-object` / `hint:map-zone` / `hint:waypoint-poi`); always
 >   populated, empty contract = `{categories: [], sources: {hint: '<absent>'}}`;
