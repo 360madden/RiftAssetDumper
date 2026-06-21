@@ -76,3 +76,9 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 python_files = ["test_*.py", "*_test.py"]
 testpaths = ["tests"]
+pythonpath = ["."]
+# Cycle 5 (2026-06-21): `pythonpath = ["."]` lets test files use absolute
+# imports like ``from scripts.semantic_surface import build_semantic_block``
+# instead of the prior inline sys.path.insert hack.  Modules under
+# ``scripts/`` are top-level Python packages because they live under
+# ``scripts/__init__.py`` (see pyproject module layout).

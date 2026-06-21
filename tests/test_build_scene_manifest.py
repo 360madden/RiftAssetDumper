@@ -13,6 +13,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -103,6 +104,10 @@ def test_find_non_id_asset_ids_returns_4() -> None:
 )
 def test_all_non_id_manifests_validate() -> None:
     """Run the builder in validate-only mode for all 4 non-id assets; expect 0 errors each."""
+    # Cycle 5 (2026-06-21): the builder now imports ``scripts.semantic_surface``
+    # at module load -- the subprocess must inherit PYTHONPATH so the
+    # absolute import resolves.  Without this the subprocess exits with
+    # ``ModuleNotFoundError: No module named 'scripts.semantic_surface'``.
     r = subprocess.run(
         [
             sys.executable,
@@ -114,6 +119,7 @@ def test_all_non_id_manifests_validate() -> None:
         text=True,
         check=False,
         cwd=str(REPO_ROOT),
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
     )
     assert r.returncode == 0, f"builder exited {r.returncode}: {r.stderr}"
     for line in r.stdout.splitlines():

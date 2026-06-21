@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.riftassetdumper/schemas/scene-manifest-v1.schema.json",
   "title": "RIFT Scene Manifest v1",
-  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields. Migrated to tracked docs/schemas/ on 2026-06-21 (was gitignored under Assets/Exports/discovery-plan/cycle-2/stage2/).",
+  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields. Migrated to tracked docs/schemas/ on 2026-06-21 (was gitignored under Assets/Exports/discovery-plan/cycle-2/stage2/). Cycle 5 (2026-06-21) added optional `semantic` sub-record surfacing hint:map-zone / hint:actor-object / hint:waypoint-poi categories from asset-semantic-index/v1 matrix reports.",
   "type": "object",
   "required": [
     "SchemaVersion",
@@ -69,6 +69,10 @@
     },
     "validation": {
       "$ref": "#/$defs/Validation"
+    },
+    "semantic": {
+      "$ref": "#/$defs/Semantic",
+      "description": "Cycle 5 surface: typed semantic hint categories extracted from asset-semantic-index/v1 matrix reports. Optional; older manifests pre-dating Cycle 5 omit this field."
     }
   },
   "additionalProperties": false,
@@ -253,6 +257,27 @@
         "errors": {
           "type": "array",
           "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Semantic": {
+      "type": "object",
+      "required": ["categories", "sources"],
+      "properties": {
+        "categories": {
+          "type": "array",
+          "description": "Ordered hint categories this asset appears under (subset of hint:map-zone / hint:actor-object / hint:waypoint-poi). Empty when the asset appears in no matrix report.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "type": "object",
+          "description": "Mapping from each known hint category to its matrix-report path (matrix-relative) when the report exists, or to the literal string '<absent>' when the report is missing on disk.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

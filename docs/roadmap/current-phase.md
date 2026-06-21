@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-19 (Delivery-authoritative textures shipped — builder v0.2 + consumer overlay; 404/404 NIF-confirmed texture URLs now wired into RiftFlythrough renderer; Discovery Cycle 3 added 27 OBJs from 2 new families)
+**Last Updated**: 2026-06-21 (Cycle 5 semantic-category surface shipped — builder v0.9 scene manifest optional `semantic` + v0.3 delivery flat `semantic_categories`; 71/71 touched tests PASS; 9th guard 251/251 PASS; ruff 0; mypy 0; wire-format locked by 12 new tests in tests/test_semantic_surface.py)
 
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
@@ -41,6 +41,30 @@
 > - **Discovery Cycle 3**: 27 OBJs from 2 new families (meshSize 297: 17 OBJs,
 >   meshSize 321 lighthouse: 10 OBJs); 9/9 guards PASS. Not yet in
 >   flythrough-index/scene manifests. Handoff: `docs/handoffs/2026-06-18-discovery-cycle-3.md`
+>
+> **Cycle 5 — Semantic-Category Surface (2026-06-21):**
+> - **v0.9 scene manifest optional `semantic` sub-record**: 3-matrix union
+>   (`hint:actor-object` / `hint:map-zone` / `hint:waypoint-poi`); always
+>   populated, empty contract = `{categories: [], sources: {hint: '<absent>'}}`;
+>   sources emit basenames only (portable, no absolute paths); `ABSENT_MARKER`
+>   reserved for paths that DO NOT exist on disk.
+> - **v0.3 delivery flat `semantic_categories`**: per-entry flat list
+>   (RiftFlythrough-friendly); aggregated stats count `tagged_assets`,
+>   `distinct_hints`, and `hint_distribution` in delivery stats.
+> - **Loader module**: `scripts/semantic_surface.py` — exports `HINTS`,
+>   `ABSENT_MARKER`, `SOURCE_BASENAME_ONLY`, `DEFAULT_MATRIX_DIR`,
+>   `load_matrix`, `load_all_matrices`, `categorize_asset`,
+>   `build_semantic_block`.
+> - **Wire-format lock tests**: 12 NEW tests in `tests/test_semantic_surface.py`
+>   (loader contract; schema conformance via `$defs/Semantic`; delivery
+>   integration; migration safety for pre-Cycle-5 manifests).
+> - **Validation**: 71/71 touched tests PASS; ruff 0; mypy 0; 9th guard
+>   251/251 PASS (opt-in migration — pre-Cycle-5 manifests still validate).
+> - **Schema discipline**: `$defs/Semantic` (additionalProperties: false);
+>   `semantic` field optional in main schema; consumers must handle missing key.
+> - **Harness env fix**: `pyproject.toml` BOM stripped + CRLF normalized;
+>   `pythonpath = ["."]` added; `tests/test_build_scene_manifest.py`
+>   propagates `PYTHONPATH` to subprocess runs.
 
 ---
 
@@ -81,6 +105,7 @@
 | 14 | **v0.2 delivery pipeline (path privacy + texture URLs)** | ✅ Complete | Absolute paths removed; 404/404 texture URLs resolved to `textures/converted/<file>.png`; `_assert_no_absolute_paths()` hard guard; 5 new tests |
 | 15 | **scene_manifest_validation_guard fix** | ✅ Complete | Bumped expected producer v0.7→v0.8; 241/241 PASS |
 | 16 | **knowledge.md update + handoff** | ✅ Complete | Test counts (56/475); v0.2 delivery pipeline details; session handoff doc |
+| 17 | **Cycle 5 — Semantic-category surface** | ✅ Complete (SHIP) | v0.9 manifest optional `semantic` v0.3 delivery `semantic_categories`; 12 new wire-format lock tests; `scripts/semantic_surface.py` loader; schema `$defs/Semantic` |
 
 ---
 
@@ -152,7 +177,7 @@
 | **Phase 48** | **Pos-Only Cross-MB Audit** | **Audited 81 pos-only OBJs for recoverable faced candidates; 0 found; all genuinely pos-only** | **0** | **✅ COMPLETE** |
 | **Phase 49** | **Triangle Fan Fallback Batch Export** | **Fan fallback extended to --export-obj path; batch export 76/77 pos-only OBJs with 2,847 fan faces across 15 families** | **0** | **✅ COMPLETE** |
 
-**Project totals**: 51 phases + 1 complete cycle (C2) = 52 major deliverables. 7 gates cleared, 6 descriptor patterns proven, 9 proof guards (8 original + scene_manifest_validation_guard).
+**Project totals**: 51 phases + 1 complete cycle (C2) + 1 new complete cycle (C5) = 53 major deliverables. 7 gates cleared, 6 descriptor patterns proven, 9 proof guards (8 original + scene_manifest_validation_guard).
 
 ### Cycle 2 Completion Summary
 
@@ -172,6 +197,21 @@
 | Test suite | 475 Python + 56 C# = 531 total |
 | New tests (v0.2) | 5 (delivery wire contract) |
 | Ship-kill decision | **SHIP** |
+
+### Cycle 5 Completion Summary (Semantic-Category Surface)
+
+| Metric | Value |
+|--------|------:|
+| Producer version (scene manifest) | **v0.9** — added optional `semantic` sub-record |
+| Delivery version (RiftFlythrough) | **v0.3** — added flat `semantic_categories` + per-hint stats |
+| Loader module | `scripts/semantic_surface.py` (HINTS, ABSENT_MARKER, SOURCE_BASENAME_ONLY, ...) |
+| Wire-format lock tests | **+12** NEW in `tests/test_semantic_surface.py` |
+| Touched-suite results | 71/71 PASS (ruff 0, mypy 0) |
+| 9th-guard validation | **251/251 PASS** (opt-in migration — pre-Cycle-5 manifests still validate) |
+| Migration safety | Pre-Cycle-5 manifests with no `semantic` key still pass schema (optional) |
+| Schema additions | `$defs/Semantic` (additionalProperties: false, categories + sources) |
+| Handoff doc | `docs/handoffs/2026-06-cycle-5-semantic-surface.md` |
+| Ship decision | **SHIP** |
 
 ### Flythrough Bridge Plan (FT-1..FT-8) — ✅ COMPLETE
 

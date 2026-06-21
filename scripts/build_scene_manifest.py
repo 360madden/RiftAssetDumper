@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Build a scene-manifest/v1-draft entry for one cohort asset.
 
 Reads:
@@ -38,6 +38,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from scripts.semantic_surface import build_semantic_block as _build_semantic_block
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORLD_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs" / "worlds"
 OBJ_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs"
@@ -56,7 +58,7 @@ MATERIAL_SCAN_RESULTS = (
     REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage3" / "material-scan-results.json"
 )
 PRODUCER_TOOL = "scripts/build_scene_manifest.py"
-PRODUCER_VERSION = "v0.8"
+PRODUCER_VERSION = "v0.9"
 
 _material_scan_cache: dict[str, dict[str, Any]] | None = None
 _material_scan_scanned_at: str | None = None
@@ -491,6 +493,7 @@ def build_manifest(asset_id: str) -> dict[str, Any]:
     textures = build_textures(flythrough_entry)
     provenance = build_provenance(asset_id, cohort_entry, flythrough_entry)
     validation = build_validation(geometry, materials, textures)
+    semantic = _build_semantic_block(asset_id)
     return {
         "SchemaVersion": "scene-manifest/v1",
         "asset_id": asset_id,
@@ -506,6 +509,7 @@ def build_manifest(asset_id: str) -> dict[str, Any]:
         "textures": textures,
         "provenance": provenance,
         "validation": validation,
+        "semantic": semantic,
     }
 
 

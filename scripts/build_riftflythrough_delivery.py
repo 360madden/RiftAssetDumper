@@ -49,7 +49,7 @@ RIFTFLYTHROUGH_JS = RIFTFLYTHROUGH_DIR / "js"
 RIFTFLYTHROUGH_TEXTURES = RIFTFLYTHROUGH_DIR / "textures" / "converted"
 
 PRODUCER_TOOL = "scripts/build_riftflythrough_delivery.py"
-PRODUCER_VERSION = "v0.2"
+PRODUCER_VERSION = "v0.3"
 TEXTURE_URL_PREFIX = "textures/converted/"
 
 
@@ -123,6 +123,16 @@ def build_delivery_entry(
     linked_texture_urls = resolve_texture_urls(asset_id, linked_textures, converted_index)
     # obj_mesh hint = last path segment of obj_path (relative, just a hint).
     obj_mesh = Path(g["obj_path"]).name if g.get("obj_path") else None
+    # Cycle 5 surface: forward the typed semantic hint categories from the
+    # scene manifest (hint:map-zone / hint:actor-object / hint:waypoint-poi).
+    # Older manifests pre-dating Cycle 5 omit the semantic sub-record; we
+    # emit an empty list in that case so the consumer can rely on the
+    # field's presence.
+    semantic_block = manifest.get("semantic")
+    if isinstance(semantic_block, dict):
+        semantic_categories = list(semantic_block.get("categories") or [])
+    else:
+        semantic_categories = []
     return {
         "asset_id": asset_id,
         "obj_mesh": obj_mesh,
@@ -141,6 +151,7 @@ def build_delivery_entry(
         "linked_texture_url_count": len(linked_texture_urls),
         "linked_texture_urls": linked_texture_urls,
         "linked_textures": linked_textures,
+        "semantic_categories": semantic_categories,
     }
 
 
@@ -154,6 +165,15 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
     tex_url_assets = sum(1 for e in entries if e["linked_texture_url_count"] > 0)
     non_id = sum(1 for e in entries if not e["transform_identity"])
     mesh_families = sorted(set(e["mesh_size"] for e in entries if e["mesh_size"] is not None))
+    # Cycle 5 surfaced stats: typed semantic hint distribution
+    hint_distribution: dict[str, int] = {}
+    tagged_assets = 0
+    for e in entries:
+        cats = e.get("semantic_categories") or []
+        if cats:
+            tagged_assets += 1
+        for c in cats:
+            hint_distribution[c] = hint_distribution.get(c, 0) + 1
     return {
         "total_assets": len(entries),
         "total_vertices": total_verts,
@@ -165,6 +185,10 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
         "non_identity_transforms": non_id,
         "mesh_size_families": mesh_families,
         "family_count": len(mesh_families),
+        # Cycle 5 fields
+        "tagged_assets": tagged_assets,
+        "distinct_hints": len(hint_distribution),
+        "hint_distribution": hint_distribution,
     }
 
 
@@ -175,6 +199,10 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         "",
         f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}",
         f"**Producer:** {PRODUCER_TOOL} {PRODUCER_VERSION}",
+        "",
+        "## What changed (v0.3)",
+        "",
+        "- Added `semantic_categories: list[string]` per asset (Cycle 5 surface): typed hint tags from asset-semantic-index/v1 matrix reports (hint:map-zone / hint:actor-object / hint:waypoint-poi). Empty list when the asset appears in no matrix report.",
         "",
         "## What changed (v0.2)",
         "",
@@ -192,16 +220,21 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         f"| Linked textures (raw) | {stats['total_linked_textures']} ({stats['textured_assets']} assets) |",
         f"| Linked texture URLs (resolved) | {stats['total_linked_texture_urls']} ({stats['textured_url_assets']} assets) |",
         f"| Non-identity transforms | {stats['non_identity_transforms']} |",
+        f"| Assets with semantic hints | {stats['tagged_assets']} ({stats['distinct_hints']} distinct tags) |",
         f"| Mesh size families | {stats['family_count']} |",
         "",
         "## Mesh Size Families",
         "",
         ", ".join(str(ms) for ms in stats["mesh_size_families"]),
         "",
+        "## Semantic Hint Distribution",
+        "",
+        ", ".join(f"{k}={v}" for k, v in sorted(stats["hint_distribution"].items())) or "-",
+        "",
         "## Per-Asset Detail",
         "",
-        "| Asset ID | Mesh | Size | Vertices | Faces | TexURLs | Transform |",
-        "|---|---:|---:|---:|---:|---:|---|",
+        "| Asset ID | Mesh | Size | Vertices | Faces | TexURLs | Transform | Semantic |",
+        "|---|---:|---:|---:|---:|---:|---|---|",
     ]
     for e in sorted(entries, key=lambda x: (x["render_class"], -x["face_count"])):
         aid = e["asset_id"][:8]
@@ -209,7 +242,8 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         ms = e["mesh_size"] if e["mesh_size"] is not None else "-"
         txu = e["linked_texture_url_count"]
         tf = "non-id" if not e["transform_identity"] else "id"
-        lines.append(f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} |")
+        sem = ",".join(e.get("semantic_categories") or []) or "-"
+        lines.append(f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} | {sem} |")
     return "\n".join(lines) + "\n"
 
 
@@ -304,6 +338,10 @@ def main() -> int:
     print(f"  Tex URLs:      {stats['total_linked_texture_urls']} ({stats['textured_url_assets']} assets)")
     print(f"  Tex raw:       {stats['total_linked_textures']} ({stats['textured_assets']} assets)")
     print(f"  Transforms:    {stats['non_identity_transforms']} non-identity")
+    print(
+        f"  Semantic:      {stats['tagged_assets']} tagged assets"
+        f" ({stats['distinct_hints']} distinct hint types)"
+    )
     print(f"  Families:      {stats['family_count']} mesh sizes")
 
     # Copy to RiftFlythrough
