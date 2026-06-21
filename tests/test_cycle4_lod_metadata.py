@@ -1,6 +1,6 @@
 """Tests for ``scripts/cycle4_lod_metadata.py`` \u2014 Cycle 4.1 LOD-aware closure.
 
-Locks the v0.1 wire format:
+Locks the v0.2 wire format:
 
   * ``classify_remaining()`` groups by mesh_size, ranks by vertex_count
     desc, detects singletons, falls back to absolute-vertex-count tier for
@@ -69,6 +69,9 @@ class ClassifyByFamily(unittest.TestCase):
         for _aid, meta in result.items():
             self.assertEqual(meta["family_size"], 3)
             self.assertEqual(meta["lod_type"], "high")
+            # Cycle 4 v0.2 wire format: explicit reason_class per meta (bypasses
+            # brittle lod_reason string split that once mislabeled family_size=1 as 'family').
+            self.assertEqual(meta["reason_class"], "mesh")
 
 
 class SingletonDetection(unittest.TestCase):
@@ -84,6 +87,8 @@ class SingletonDetection(unittest.TestCase):
         self.assertEqual(meta["lod_type"], "singleton")
         self.assertEqual(meta["family_size"], 1)
         self.assertEqual(meta["lod_index"], 0)
+        # Cycle 4 v0.2 wire format: reason_class no longer mislabels singletons as 'family'.
+        self.assertEqual(meta["reason_class"], "singleton")
 
 
 class AbsoluteTierFallback(unittest.TestCase):
@@ -102,10 +107,14 @@ class AbsoluteTierFallback(unittest.TestCase):
         # Lowest-vertex asset should map to "low"
         lowest_aid = min(flythrough, key=lambda k: flythrough[k]["vertex_count"])
         self.assertEqual(result[lowest_aid]["lod_type"], "low")
+        # Cycle 4 v0.2 wire format: reason_class is 'absolute' (not the full lod_reason string).
+        for aid, meta in result.items():
+            self.assertEqual(meta["reason_class"], "absolute",
+                             f"{aid} reason_class={meta['reason_class']}")
 
 
 class PatchStage6Manifest(unittest.TestCase):
-    """``patch_stage6_manifest()`` writes the v0.1 wire format."""
+    """``patch_stage6_manifest()`` writes the v0.2 wire format (with bump from v0.1 for reason_class fix)."""
 
     def test_writes_geometry_lod_fields_and_producer_stamp(self) -> None:
         tmp = self._tmpd()
@@ -132,7 +141,7 @@ class PatchStage6Manifest(unittest.TestCase):
         self.assertEqual(patched["geometry"]["lod_type"], "singleton")
         self.assertEqual(patched["geometry"]["lod_tier_count_in_family"], 1)
         self.assertIn("scripts/cycle4_lod_metadata.py", patched["producer"]["cycle4_producers"])
-        self.assertEqual(patched["producer"]["cycle4_version"], "v0.1")
+        self.assertEqual(patched["producer"]["cycle4_version"], "v0.2")
         # legacy root `last_updated_at` must NOT remain (schema cleanup)
         self.assertNotIn("last_updated_at", patched)
         # cycle4 timestamp tracking lives under producer.cycle4_last_applied
@@ -312,6 +321,68 @@ class MarkdownRender(unittest.TestCase):
         self.assertIn("| singleton | 4 |", md)
         self.assertIn("| absolute | 5 |", md)
         self.assertIn("227", md)
+
+
+class BuildEvidenceReasonClassPipeline(unittest.TestCase):
+    """End-to-end wire format: classify_remaining → build_evidence locks the
+    reason_class distribution so singletons, mesh-rank families, and absolute
+    tiers never collapse into ambiguous labels like 'family' or untrimmed
+    lod_reason fragments.
+
+    Replaces the v0.1 brittle ``lod_reason.split('_')[0]`` heuristic that
+    mislabeled ``family_size=1`` as ``family`` and surfaced the full
+    ``absolute_tier_ms_none.vc=...`` string instead of just ``absolute``.
+    """
+
+    def test_reason_class_distribution_is_consistent(self) -> None:
+        # Mixed fixture: family-rank (mesh), singleton, absolute.
+        flythrough = {
+            # Family-rank: 3-asset family at mesh_size=405.
+            "0000000000000001": _make_flythrough_entry("0000000000000001", 100, mesh_size=405),
+            "0000000000000002": _make_flythrough_entry("0000000000000002", 75, mesh_size=405),
+            "0000000000000003": _make_flythrough_entry("0000000000000003", 50, mesh_size=405),
+            # Singleton: 1-asset family at mesh_size=275.
+            "0000000000000004": _make_flythrough_entry("0000000000000004", 87, mesh_size=275),
+            # Absolute: 2 mesh_size=None assets (one low, one high).
+            "0000000000000005": _make_flythrough_entry("0000000000000005", 5, mesh_size=None),
+            "0000000000000006": _make_flythrough_entry("0000000000000006", 200, mesh_size=None),
+        }
+        newly_classified = ic4.classify_remaining(flythrough, {})
+        # --- Per-meta invariant: every classified record carries reason_class --- #
+        for aid, meta in newly_classified.items():
+            self.assertIn(
+                "reason_class",
+                meta,
+                f"{aid} meta missing reason_class: {meta}",
+            )
+            self.assertIn(
+                meta["reason_class"],
+                {"singleton", "mesh", "absolute"},
+                f"{aid} unexpected reason_class={meta['reason_class']}",
+            )
+        # --- Distribution via real build_evidence call --- #
+        patch_results = {aid: (True, "") for aid in newly_classified}
+        evidence = ic4.build_evidence({}, newly_classified, patch_results)
+        by_reason = evidence["summary"]["by_reason_class"]
+        # Critical: no 'family' mislabel; singletons get 'singleton', not 'family'.
+        self.assertNotIn("family", by_reason, f"v0.1 bug regressed: {by_reason}")
+        # Per-class counts:
+        self.assertEqual(by_reason.get("mesh"), 3, f"mesh={by_reason.get('mesh')} (want 3)")
+        self.assertEqual(
+            by_reason.get("singleton"), 1, f"singleton={by_reason.get('singleton')} (want 1)",
+        )
+        self.assertEqual(
+            by_reason.get("absolute"), 2, f"absolute={by_reason.get('absolute')} (want 2)",
+        )
+        # Total = 6 (all newly classified).
+        self.assertEqual(sum(by_reason.values()), 6)
+        # --- Markdown labels derive directly from the distribution, so the same
+        # repair shows up at the consumer-visible surface --- #
+        md = ic4.render_markdown(evidence)
+        self.assertIn("| mesh | 3 |", md)
+        self.assertIn("| singleton | 1 |", md)
+        self.assertIn("| absolute | 2 |", md)
+        self.assertNotIn("| family |", md)
 
 
 if __name__ == "__main__":

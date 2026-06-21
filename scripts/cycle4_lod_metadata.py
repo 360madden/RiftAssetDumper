@@ -38,7 +38,7 @@ STAGE6_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "
 EVIDENCE_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "evidence" / "cycle4.1"
 
 PRODUCER_TOOL = "scripts/cycle4_lod_metadata.py"
-PRODUCER_VERSION = "v0.1"
+PRODUCER_VERSION = "v0.2"
 SCHEMA_VERSION = "cycle4-lod-metadata/v1"
 
 
@@ -62,7 +62,15 @@ def classify_remaining(
 ) -> dict[str, dict[str, Any]]:
     """Classify unclassified flythrough assets via bounded heuristics.
 
-    Returns {asset_id: {lod_index, lod_type, lod_reason, vertex_count, mesh_size, family_size}}.
+    Returns {asset_id: {lod_index, lod_type, lod_reason, reason_class, vertex_count, mesh_size, family_size}}.
+
+    Wire-format invariant (v0.2): every meta record sets ``reason_class`` to one
+    of {``singleton``, ``mesh``, ``absolute``}. Callers that need to bucket
+    classification results MUST read ``reason_class`` directly. The
+    ``lod_reason`` field is diagnostic-only (a human-readable explanation) and
+    must never be parsed back into buckets \u2014 doing so reintroduces the v0.1
+    brittleness that mislabeled ``family_size=1`` as ``family`` and surfaced
+    the full ``absolute_tier_ms_none.vc=...`` string instead of ``absolute``.
     """
     classified: dict[str, dict[str, Any]] = {}
     unclassified = sorted(
@@ -94,6 +102,7 @@ def classify_remaining(
                 "lod_index": 0,
                 "lod_type": "singleton",
                 "lod_reason": "family_size=1",
+                "reason_class": "singleton",
                 "vertex_count": flythrough_assets[aids_sorted[0]].get("vertex_count", 0),
                 "mesh_size": ms,
                 "family_size": family_size,
@@ -108,6 +117,7 @@ def classify_remaining(
                     "lod_index": rank,
                     "lod_type": tier,
                     "lod_reason": f"mesh_size={ms}_rank={rank}/{family_size}",
+                    "reason_class": "mesh",
                     "vertex_count": flythrough_assets[aid].get("vertex_count", 0),
                     "mesh_size": ms,
                     "family_size": family_size,
@@ -134,6 +144,7 @@ def classify_remaining(
                 "lod_index": 0,
                 "lod_type": tier,
                 "lod_reason": f"absolute_tier_ms_none.vc={vc}",
+                "reason_class": "absolute",
                 "vertex_count": vc,
                 "mesh_size": None,
                 "family_size": 1,
@@ -191,8 +202,10 @@ def build_evidence(
     by_reason: dict[str, int] = defaultdict(int)
     for meta in newly_classified.values():
         by_tier[meta["lod_type"]] += 1
-        reason_class = meta["lod_reason"].split("_")[0] if "_" in meta["lod_reason"] else meta["lod_reason"]
-        by_reason[reason_class] += 1
+        # Wire-format guarantee: classify_remaining sets reason_class explicitly per meta;
+        # we no longer parse lod_reason (brittle string split, captured both the
+        # `family_size=1` -> `family` mislabel and the unprefixed `absolute_tier_ms_none.vc=...` case).
+        by_reason[meta["reason_class"]] += 1
     patched_ok = sum(1 for ok, _ in patch_results.values() if ok)
     patched_failed = sum(1 for ok, _ in patch_results.values() if not ok)
     failed_ids = [aid for aid, (ok, err) in patch_results.items() if not ok]
