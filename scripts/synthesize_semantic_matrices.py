@@ -144,6 +144,30 @@ ARCHIVE_TAXONOMY: dict[str, str] = {
     "waypoint": "hint:waypoint-poi",
     "script": "hint:waypoint-poi",
     "spawn": "hint:waypoint-poi",
+    # Live-archive assets.NNN range split (Tier-1 firing support for
+    # the 244 extensionless ``assets.NNN`` archives on this 26GB live
+    # install). Lower-numbered archives cover base world / terrain
+    # geometry (map-zone); higher-numbered archives skew toward
+    # episodic props / characters / NPC gear (actor-object).
+    #
+    # Disjointness: each needle is exactly 8 characters long
+    # (``assets.N``). The 8th character is the digit ``0``, ``1``,
+    # or ``2`` so any ``assets.NXX`` matches exactly one rule under
+    # first-match-wins (no archive can match two rules). For example
+    # ``assets.150`` matches ``"assets.1"`` (not ``"assets.0"`` because
+    # the substring at offset 7 is ``"1"``, not ``"0"``).
+    #
+    # Fail-safe: archives beyond ``assets.244`` (e.g. a hypothetical
+    # ``assets.999`` from a future client) match no needle and return
+    # ``None`` so the asset reverts to the vertex-count heuristic.
+    # This is intentional -- the polyfill never blocks on an unknown
+    # archive shape.  The C# ``build-asset-semantic-index`` pipeline
+    # will eventually replace this heuristic with manifest-derived
+    # real provenance; until then, this split is the safest
+    # approximation that fires Tier-1 for every cohort asset.
+    "assets.0": "hint:map-zone",  # 001-099
+    "assets.1": "hint:map-zone",  # 100-199
+    "assets.2": "hint:actor-object",  # 200-244
 }
 
 # Marker strings for the (still-polyfill) provenance transition.  Both
