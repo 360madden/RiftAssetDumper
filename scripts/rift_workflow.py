@@ -40,6 +40,7 @@ Commands (kebab-case):
     discovery-workbench          — Python workbench
     generated-output-guard       — guard only, no C#
     discovery-suite              — unified pipeline: build → inventory → position reports → guards → summary (supports --quick)
+    matrix-synth                 — synthesize Cycle 5 semantic-hint matrices from flythrough-index.json (Phase 47 polyfill until C# build-asset-semantic-index ships); --commit-matrices fails closed if real backend output is detected
     mesh-streams                 — inventory-nif-mesh-streams + summary
     index-candidates             — inventory-nif-index-candidates + summary
     stream-endianness            — inventory-nif-stream-endianness + summary
@@ -468,6 +469,10 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "matrix-synth": {
+        "dotnet": "",
+        "base": "matrix-synth",
+    },
 }
 
 
@@ -547,6 +552,7 @@ PS_MODE_TO_COMMAND: dict[str, str] = {
     "NiDataStreamDescriptorSampleCompare": "nidatastream-descriptor-sample-compare",
     "NiDataStreamLayout": "nidatastream-layout",
     "DiscoverySuite": "discovery-suite",
+    "MatrixSynth": "matrix-synth",
     "All": "all",
 }
 
@@ -7102,6 +7108,115 @@ def _run_post50_validation_suite(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+# ============================================================================
+# matrix-synth: Cycle 5 semantic-hint polyfill CLI hook
+# ============================================================================
+
+
+MATRIX_SYNTH_POLYFILL_SENTINEL_ARCHIVE_NAME = "synthetic.twad"
+MATRIX_SYNTH_POLYFILL_SENTINEL_DETECTED_TYPE = "synthetic"
+MATRIX_SYNTH_POLYFILL_SENTINEL_MAGIC_LABEL = "synthetic-semantic-polyfill"
+MATRIX_SYNTH_POLYFILL_MAGIC_LABEL_PREFIX = "synthetic-semantic-polyfill"
+MATRIX_SYNTH_POLYFILL_SENTINEL_MAGIC_LABEL_V2_ARCHIVE = "synthetic-semantic-polyfill-v2-archive"
+
+
+def _assert_matrix_synth_polyfill_only(out_dir: Path | None = None) -> None:
+    """Fail closed if any emitted matrix file is no longer polyfill output.
+
+    The matrix-synth command is a Phase 47 data-thickness polyfill that emits
+    schema-valid asset-semantic-index/v1 JSON files at
+    Exports/discovery-matrix/nif-semantic-hints/.  The polyfill sentinel is
+    MagicLabel="synthetic-semantic-polyfill" plus ArchiveName="synthetic.twad"
+    plus DetectedType="synthetic" on every entry.  The C# real backend
+    (build-asset-semantic-index driven by scripts/rift_asset_discovery_matrix.py)
+    emits real .twad filenames, real DetectedType values (xml/lua/nif/...), and
+    producer-named MagicLabels, so any divergence here means the real backend has
+    landed and the polyfill should be removed.
+    """
+    from scripts.synthesize_semantic_matrices import (
+        DEFAULT_OUT_DIR as _POLYFILL_DEFAULT_OUT_DIR,
+    )
+    from scripts.synthesize_semantic_matrices import (
+        MATRIX_FILES as _POLYFILL_MATRIX_FILES,
+    )
+
+    target_dir = out_dir if out_dir is not None else _POLYFILL_DEFAULT_OUT_DIR
+    diagnostics: list[str] = []
+    for _hint, fname in _POLYFILL_MATRIX_FILES.items():
+        path = target_dir / fname
+        if not path.exists():
+            raise ValueError(
+                f"matrix-synth polyfill-only assertion failed: matrix file missing: {path}. "
+                f"Re-run matrix-synth without --dry-run to regenerate it before committing."
+            )
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            raise ValueError(f"matrix-synth failed: {path} is not valid JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"matrix-synth failed: {path} root must be a JSON object, got {type(data).__name__}.")
+        entries = data.get("Entries", [])
+        if not isinstance(entries, list):
+            raise ValueError(f"matrix-synth failed: {path} 'Entries' is not a list.")
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            archive_name = entry.get("ArchiveName")
+            detected_type = entry.get("DetectedType")
+            magic_label = entry.get("MagicLabel")
+            if archive_name != MATRIX_SYNTH_POLYFILL_SENTINEL_ARCHIVE_NAME:
+                diagnostics.append(
+                    f"{fname}::Entries[{index}].ArchiveName={archive_name!r} "
+                    f"(expected {MATRIX_SYNTH_POLYFILL_SENTINEL_ARCHIVE_NAME!r})"
+                )
+            if detected_type != MATRIX_SYNTH_POLYFILL_SENTINEL_DETECTED_TYPE:
+                diagnostics.append(
+                    f"{fname}::Entries[{index}].DetectedType={detected_type!r} "
+                    f"(expected {MATRIX_SYNTH_POLYFILL_SENTINEL_DETECTED_TYPE!r})"
+                )
+            if not (magic_label or "").startswith(MATRIX_SYNTH_POLYFILL_MAGIC_LABEL_PREFIX):
+                diagnostics.append(
+                    f"{fname}::Entries[{index}].MagicLabel={magic_label!r} "
+                    f"(expected {MATRIX_SYNTH_POLYFILL_SENTINEL_MAGIC_LABEL!r})"
+                )
+    if diagnostics:
+        joined = "\n  - ".join(diagnostics[:16])
+        suffix = "\n  - ..." if len(diagnostics) > 16 else ""
+        raise RuntimeError(
+            "matrix-synth --commit-matrices FAILED: real-backend output detected in polyfill matrices.\n"
+            f"  Diagnostic count: {len(diagnostics)}\n  - {joined}{suffix}\n\n"
+            "Remove scripts/synthesize_semantic_matrices.py and rerun the real matrix driver:\n"
+            "  python scripts/rift_asset_discovery_matrix.py --matrix scripts/discovery-matrices/nif-semantic-hints.json\n"
+        )
+    print("matrix-synth polyfill-only assertion passed: all 3 matrix files are still polyfill output.")
+
+
+def _run_matrix_synth(args: argparse.Namespace) -> None:
+    """Run the standalone semantic-matrix polyfill; optionally fail-closed on real backend.
+
+    Workflow-level CLI hook that subprocess-runs scripts/synthesize_semantic_matrices.py
+    with --validate.  ``--commit-matrices`` runs ``_assert_matrix_synth_polyfill_only``
+    on the 3 emitted files afterward, so a CI pre-commit gate can catch the case
+    where the real C# ``build-asset-semantic-index`` (driven by
+    scripts/rift_asset_discovery_matrix.py) has landed and the polyfill should
+    be removed.
+    """
+    polyfill_script = SCRIPT_DIR / "synthesize_semantic_matrices.py"
+    sub_args: list[str] = [sys.executable, str(polyfill_script), "--validate"]
+    print(f"matrix-synth: invoking {polyfill_script.name} --validate")
+    completed = subprocess.run(sub_args, text=True)
+    if completed.returncode != 0:
+        print(
+            f"matrix-synth: polyfill subprocess exited with code {completed.returncode}; "
+            f"refusing to run --commit-matrices assertion.",
+            file=sys.stderr,
+        )
+        sys.exit(completed.returncode)
+
+    if bool(getattr(args, "commit_matrices", False)):
+        _assert_matrix_synth_polyfill_only()
+
+
 def _run_command(args: argparse.Namespace) -> None:
     """Main command router."""
     command: str = args.command
@@ -7111,6 +7226,9 @@ def _run_command(args: argparse.Namespace) -> None:
 
     # --- Pure-Python modes (no C# at all) ---
 
+    if command == "matrix-synth":
+        _run_matrix_synth(args)
+        return
     if command == "generated-output-guard":
         generated_output_guard()
         return
@@ -9142,6 +9260,16 @@ Examples:
         type=int,
         default=0,
         help="For mesh-probe, resolve --id/--mesh-block from ghidra-pairing-review-report rank",
+    )
+    parser.add_argument(
+        "--commit-matrices",
+        action="store_true",
+        help=(
+            "matrix-synth only: after the polyfill writes the 3 asset-semantic-index/v1 files, "
+            "assert every entry's ArchiveName/DetectedType/MagicLabel still match the polyfill "
+            "sentinel. Fails closed if the real C# build-asset-semantic-index has landed; the "
+            "polyfill script should then be removed. Pre-commit hook friendly."
+        ),
     )
     parser.add_argument(
         "--review-kind",
