@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/scene-manifest-v1.schema.json",
+  "title": "RIFT Scene Manifest v1",
+  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "asset_id",
+    "generated_at",
+    "producer",
+    "geometry",
+    "world",
+    "materials",
+    "textures",
+    "provenance",
+    "validation"
+  ],
+  "properties": {
+    "SchemaVersion": {
+      "const": "scene-manifest/v1"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "object",
+      "required": ["tool", "version"],
+      "properties": {
+        "tool": { "type": "string" },
+        "version": { "type": "string" },
+        "command": { "type": ["string", "null"] },
+        "cycle4_producers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Producers that have written cycle4 LOD-aware metadata onto this manifest."
+        },
+        "cycle4_version": {
+          "type": "string",
+          "description": "Schema version of the cycle4 LOD metadata stamped onto this manifest."
+        },
+        "cycle4_last_applied": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "ISO-8601 timestamp of the most recent cycle4 LOD patch applied to this manifest."
+        }
+      },
+      "additionalProperties": false
+    },
+    "geometry": {
+      "$ref": "#/$defs/Geometry"
+    },
+    "world": {
+      "$ref": "#/$defs/World"
+    },
+    "materials": {
+      "$ref": "#/$defs/Materials"
+    },
+    "textures": {
+      "$ref": "#/$defs/Textures"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "validation": {
+      "$ref": "#/$defs/Validation"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Geometry": {
+      "type": "object",
+      "required": ["obj_path", "vertex_count", "face_count", "has_faces", "render_class"],
+      "properties": {
+        "obj_path": { "type": "string" },
+        "mesh_block": { "type": ["string", "null"] },
+        "mesh_size": { "type": ["integer", "null"], "minimum": 0 },
+        "vertex_count": { "type": "integer", "minimum": 0 },
+        "face_count": { "type": "integer", "minimum": 0 },
+        "has_faces": { "type": "boolean" },
+        "render_class": {
+          "enum": ["faced", "point-only", "degenerate", "unknown"]
+        },
+        "obj_sha1": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "lod_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Asset's rank within its MeshSize or vertex-count family (Cycle 4.1 LOD-aware)."
+        },
+        "lod_type": {
+          "type": "string",
+          "enum": ["singleton", "low", "medium", "high"],
+          "description": "LOD tier classification (Cycle 4.1)."
+        },
+        "lod_tier_count_in_family": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of assets in the same family as this asset (Cycle 4.1)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "World": {
+      "type": "object",
+      "required": [
+        "world_json",
+        "node_count",
+        "mesh_count",
+        "transform_semantics",
+        "coordinate_system",
+        "world_transform_summary",
+        "world_transform_identity"
+      ],
+      "properties": {
+        "world_json": { "type": "string" },
+        "node_count": { "type": "integer", "minimum": 0 },
+        "mesh_count": { "type": "integer", "minimum": 0 },
+        "transform_semantics": { "const": "mesh-parent-chain" },
+        "coordinate_system": { "$ref": "#/$defs/CoordinateSystem" },
+        "world_transform_summary": { "$ref": "#/$defs/WorldTransform" },
+        "world_transform_identity": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "CoordinateSystem": {
+      "type": "object",
+      "required": [
+        "handedness",
+        "up_axis",
+        "forward_axis",
+        "translation_layout",
+        "rotation_layout",
+        "scale_layout",
+        "trs_composition",
+        "identity_tolerance"
+      ],
+      "properties": {
+        "handedness": { "const": "right" },
+        "up_axis": { "const": "Y" },
+        "forward_axis": { "const": "-Z" },
+        "translation_layout": { "const": "xyz" },
+        "rotation_layout": { "const": "row-major-3x3" },
+        "scale_layout": { "const": "uniform-float" },
+        "trs_composition": { "const": "v_world = R * (S * v_local) + T" },
+        "identity_tolerance": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "WorldTransform": {
+      "type": "object",
+      "required": ["translation", "rotation", "scale"],
+      "properties": {
+        "translation": { "$ref": "#/$defs/Vec3" },
+        "rotation": { "$ref": "#/$defs/Mat3" },
+        "scale": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "Vec3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "Mat3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 9,
+      "maxItems": 9
+    },
+    "Materials": {
+      "type": "object",
+      "required": [
+        "material_status",
+        "texture_property_count",
+        "material_property_count",
+        "vertex_color_property_count",
+        "notes"
+      ],
+      "properties": {
+        "material_status": {
+          "enum": ["textured", "material-or-vertex-color-only", "missing", "unknown"]
+        },
+        "texture_property_count": { "type": "integer", "minimum": 0 },
+        "material_property_count": { "type": "integer", "minimum": 0 },
+        "vertex_color_property_count": { "type": "integer", "minimum": 0 },
+        "scanned_at": { "type": ["string", "null"], "format": "date-time" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Textures": {
+      "type": "object",
+      "required": [
+        "source",
+        "linked_texture_count",
+        "linked_textures",
+        "missing_texture_count",
+        "placeholder_texture_count"
+      ],
+      "properties": {
+        "source": {
+          "enum": ["scene", "flythrough", "unknown"]
+        },
+        "linked_texture_count": { "type": "integer", "minimum": 0 },
+        "linked_textures": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "missing_texture_count": { "type": "integer", "minimum": 0 },
+        "placeholder_texture_count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "type": "object",
+      "required": ["cohort", "source_nif_hash", "flythrough_index_entry", "evidence_files"],
+      "properties": {
+        "cohort": { "type": ["string", "null"] },
+        "source_nif_hash": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{16}$"
+        },
+        "flythrough_index_entry": { "type": ["string", "null"] },
+        "evidence_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Validation": {
+      "type": "object",
+      "required": ["schema_valid", "consumer_ready", "warnings", "errors"],
+      "properties": {
+        "schema_valid": { "type": "boolean" },
+        "consumer_ready": { "type": "boolean" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
