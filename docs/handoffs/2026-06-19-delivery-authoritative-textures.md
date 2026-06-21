@@ -66,10 +66,12 @@ The NIF-confirmed texture linkage the Assets repo is proud of was shipped over t
 ## Commits / staging
 
 **Assets repo** (uncommitted at handoff — review before commit):
+
 - `scripts/build_riftflythrough_delivery.py` (modified)
 - `tests/test_build_riftflythrough_delivery.py` (new)
 
 **RiftFlythrough repo** (uncommitted at handoff):
+
 - `js/texture_loader.js` (new)
 - `js/world.js` (modified — `textureMapUrls`)
 - `flythrough.html` (modified — one script tag)
