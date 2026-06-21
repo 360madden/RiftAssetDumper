@@ -26,7 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STAGE2_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 STAGE6_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage6"
 PACK_PATH = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage4" / "scene-manifest-pack-v1.json"
-SCHEMA_PATH = STAGE2_DIR / "scene-manifest-v1.schema.json"
+SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 
 # ---------- Helpers ----------
 

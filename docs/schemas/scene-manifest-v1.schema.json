@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.riftassetdumper/schemas/scene-manifest-v1.schema.json",
   "title": "RIFT Scene Manifest v1",
-  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields.",
+  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields. Migrated to tracked docs/schemas/ on 2026-06-21 (was gitignored under Assets/Exports/discovery-plan/cycle-2/stage2/).",
   "type": "object",
   "required": [
     "SchemaVersion",

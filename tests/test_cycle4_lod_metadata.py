@@ -29,7 +29,7 @@ import jsonschema
 ic4 = importlib.import_module("scripts.cycle4_lod_metadata")
 
 SCENE_MANIFEST_SCHEMA = json.loads(
-    Path("Assets/Exports/discovery-plan/cycle-2/stage2/scene-manifest-v1.schema.json").read_text(
+    Path("docs/schemas/scene-manifest-v1.schema.json").read_text(
         encoding="utf-8-sig"
     )
 )

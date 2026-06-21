@@ -2625,9 +2625,7 @@ SCENE_MANIFEST_STAGE2_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" 
 SCENE_MANIFEST_PACK_PATH = (
     REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage4" / "scene-manifest-pack-v1.json"
 )
-SCENE_MANIFEST_SCHEMA_PATH = (
-    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "scene-manifest-v1.schema.json"
-)
+SCENE_MANIFEST_SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 SCENE_MANIFEST_STAGE7_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage7"
 SCENE_MANIFEST_GUARD_JSON = "scene-manifest-validation-guard.json"
 SCENE_MANIFEST_GUARD_MD = "scene-manifest-validation-guard.md"

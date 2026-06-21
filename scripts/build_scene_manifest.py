@@ -49,9 +49,7 @@ TRANSFORM_EXAMPLES = (
 COORDINATE_CONTRACT = (
     REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "coordinate-contract.md"
 )
-SCHEMA_PATH = (
-    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "scene-manifest-v1.schema.json"
-)
+SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 DEFAULT_OUT_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 SCALE_OUT_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage6"
 MATERIAL_SCAN_RESULTS = (

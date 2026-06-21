@@ -25,7 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STAGE2_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 STAGE3_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage3"
 DEFAULT_OUT_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage4"
-MANIFEST_SCHEMA_PATH = STAGE2_DIR / "scene-manifest-v1.schema.json"
+MANIFEST_SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 PRODUCER_TOOL = "scripts/build_aggregate_stats.py"
 PRODUCER_VERSION = "v0.2"
 # Rounding precision for transform fingerprint comparison

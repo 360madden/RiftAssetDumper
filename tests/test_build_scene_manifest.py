@@ -33,15 +33,7 @@ from build_scene_manifest import (  # noqa: E402
 )
 
 WORLD_DIR = REPO_ROOT / "Assets" / "build" / "flythrough" / "objs" / "worlds"
-SCHEMA_PATH = (
-    REPO_ROOT
-    / "Assets"
-    / "Exports"
-    / "discovery-plan"
-    / "cycle-2"
-    / "stage2"
-    / "scene-manifest-v1.schema.json"
-)
+SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 NON_ID_IDS = [
     "07f37c99a80da009",
     "2c85cfa17543443b",
