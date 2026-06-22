@@ -24,7 +24,6 @@ either in CI or local dev).
 from __future__ import annotations
 
 import json
-import re
 import sys
 import tempfile
 import unittest
@@ -590,13 +589,12 @@ class TestArchiveClassification(unittest.TestCase):
         # synthesize reported Tier-1 archive-classified count must match index size.
         self.assertEqual(stats["archive-classified"], 3)
         # Walk every produced entry and assert the 3 invariants together.
-        live_archive_pattern = re.compile(r"^assets\.\d{3}$")
         for entries in by_hint.values():
             for row in entries:
                 if row["DetectedType"] != "archive-derived":
                     continue
                 self.assertEqual(row["MagicLabel"], POLYFILL_MAGIC_V2_ARCHIVE)
-                self.assertRegex(row["ArchiveName"], live_archive_pattern)
+                self.assertRegex(row["ArchiveName"], r"^assets\.\d{3}$")
                 self.assertNotEqual(row["ArchiveName"], "synthetic.twad")
                 self.assertGreaterEqual(row["EntryIndex"], 0)
 
