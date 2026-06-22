@@ -91,6 +91,15 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/build_world_placed_merge.py` | Hierarchy-aware world-placed merged OBJ for RiftFlythrough — applies world.json Scale→Rotate→Translate transforms to 217 OBJs |
 | `python scripts/validate_meshsize_inference.py` | Cross-validation of vc_proximity mesh_size inferences against ground truth |
 
+### Cycle 5 (Tier-1 archive provenance) scripts (Python, `scripts/`)
+
+| Command | Purpose | Cycle |
+|---------|---------|:---:|
+| `python scripts/build_live_archive_index.py --root <live> --out Exports/discovery-plan/live-nif-archive-index.json` | Atomic JSON extractor producing `live-nif-archive-index.json` (227 rows; one row per cohort asset showing source archive + entry index) | C5 |
+| `python scripts/synthesize_semantic_matrices.py --archive-index --validate` | Synthesize semantic matrices with archive-index override (Tier-1 archive-path classification before vertex-count heuristic) | C5 |
+| `pytest tests/test_build_live_archive_index.py` | build_live_archive_index unit tests (16) | C5 |
+| `pytest tests/test_synthesize_semantic_matrices.py` | synthesize_semantic_matrices unit tests + 4 ARCHIVE_TAXONOMY regression-catchers + 2 archive-derived lockdowns | C5 |
+
 ## Architecture
 
 ### .NET CLI (`src/RiftAssetDumper/`)
@@ -115,7 +124,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 - **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
 - **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
 - **Batch sweep:** `scripts/batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building
-- **Tests:** 475 Python tests across `scripts/` and `tests/` (pytest), 56 C# xUnit tests in `src/RiftAssetDumper.Tests/`
+- **Tests:** 593 Python tests across `scripts/` and `tests/` (pytest) including Cycle 5 regression-catchers + archive-derived lockdowns, 56 C# xUnit tests in `src/RiftAssetDumper.Tests/`
+- **Cycle 5 scripts (added 2026-06-21):** `synthesize_semantic_matrices.py` (Tier-1 archive-path classifier + heuristic-lane fallback) and `build_live_archive_index.py` (atomic JSON extractor for live-archive `assets.NNN` provenance). See `docs/handoffs/2026-06-21-cycle-five-tier1-archive-provenance.md` for the full work chain.
 - **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
 
 ### Proof guards (Python, `scripts/rift_workflow_guards.py`)
@@ -223,6 +233,7 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - CI green: build 0 errors, dotnet test 56/56 (C#), pytest 475/475 (Python), ruff 0, mypy 0, dotnet format clean, markdownlint 233 files, generated-output guard clean
 - **CI green sequence (2026-06-13, 4 commits)**: `910b168` (MD032 docs fix) → `88af1a9` (test1 fixture) → `ac7db4c` (test2 fixture) → `4187892` (test3 fixture) resolved pre-existing Python test fixture gaps masked by the Docs Lint failure. The `POST50_POSITION_SOURCE_REPORTS` registry in `rift_workflow.py:6235` grew from 10 to 11 reports (added `mesh329-family-attribute-role-matrix.json` from Phase 1 M1.1); 3 affected test files patched. Handoff: `docs/handoffs/2026-06-13-ci-green-4-commit-sequence.md`.
 - **Documentation alignment (2026-06-13, 6 commits)**: `a1ab091` (6 draft- handoff filenames finalized) → `31b1839` (stale note fixes) → `210624d` (7 handoff deliverables ticked) → `ef7525b` (19 convention/CI items ticked) → `673a3d2` (18 CI/build/format items ticked) → current. Total: 44 `[ ]` → `[x]` across 20+ planning docs. 1 intentional forward reference (`2026-06-12-cycle-2-phase-1-exit.md` in cycle-2 prompt template).
+- **Cycle 5 polyfill ✅ SHIPPED (2026-06-21, 4 commits)**: Tier-1 archive-path classification now drives the 227-asset cohort to **100%** archive-derived provenance (was 0/227 via heuristic fallback). NEW `scripts/build_live_archive_index.py` (atomic JSON extractor; 227 rows from 13 distinct `assets.NNN` archives). EXTENDED `scripts/synthesize_semantic_matrices.py::ARCHIVE_TAXONOMY` with disjoint `assets.0` / `assets.1` / `assets.2` substring rules covering the entire `assets.001`–`assets.244` live-archive range. NEW `tests/test_build_live_archive_index.py` (16 unit tests) + 4 `TestArchiveTaxonomyInvariants` regression-catchers + 2 archive-derived lockdown tests in `test_synthesize_semantic_matrices.py` pin the on-disk schema forward. Audit-key correctness finding: `ArchiveProvenance` is destructured into `ArchiveName` + `EntryIndex` per `docs/schemas/asset-semantic-index-v1.schema.json` (naive `e.get("ArchiveProvenance")` always returns None; use schema fields directly). 4-commit ship: `becac15` (feat build_live_archive_index) → `271a64f` (feat ARCHIVE_TAXONOMY) → `ee08521` (test TestArchiveTaxonomyInvariants + lockdowns) → `e09cb9d` (docs handoff). CI run 27913979117: 5/5 jobs SUCCESS. Handoff: `docs/handoffs/2026-06-21-cycle-five-tier1-archive-provenance.md`.
 
 ## Conventions
 
@@ -350,6 +361,84 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
 - **9th proof guard** — `scene_manifest_validation_guard()` validates all 241 manifests across schema, OBJ paths, world paths, transform finiteness, texture.source enum, and producer version. 241/241 PASS.
 - **Current-phase overrides** — `docs/roadmap/current-phase.md` updated 2026-06-16: all C2 phases marked DONE, Cycle 2 marked COMPLETE with SHIP decision.
 - **CI green sequence (post-C2)** — Commits `accff2b` through `72866a6` (C2-3.1 profiler + handoff fixes). All pushed to `origin/main`.
+
+## Recent Cycle 5 (Tier-1 archive provenance) advances (TIER-1 FIRING-RATE FIX; SHIPPED)
+
+> **Cycle 5 is COMPLETE.** The data-thickness polyfill now drives the 227-asset
+> cohort to **100% archive-derived provenance** via Tier-1 (was 0/227 via
+> heuristic fallback). Lockdown tests pin the on-disk schema forward; the
+> audit-key correctness finding explains why naive `e.get("ArchiveProvenance")`
+> returns None.
+
+- **C5-1: build_live_archive_index.py** (NEW) — atomic JSON extractor producing
+  `Exports/discovery-plan/live-nif-archive-index.json` with one row per cohort
+  asset showing source archive (`assets.NNN`) + entry index. 227 rows, 100%
+  cohort coverage from 13 distinct archives. CLI flags: `--root`, `--out`,
+  `--force`.
+- **C5-1 tests** — `tests/test_build_live_archive_index.py` (16 unit tests
+  covering schema, idempotence, missing-input handling, end-to-end against
+  the live install, missing-path branch).
+- **C5-2: ARCHIVE_TAXONOMY disjoint `assets.N` split** — Cycle 5's main
+  feature: `scripts/synthesize_semantic_matrices.py::ARCHIVE_TAXONOMY`
+  extended with 3 disjoint archive-range substring rules:
+
+  - `assets.0` → `hint:map-zone`       (`assets.001` … `assets.099`,  99 archives)
+  - `assets.1` → `hint:actor-object`   (`assets.100` … `assets.199`, 100 archives)
+  - `assets.2` → `hint:waypoint-poi`   (`assets.200` … `assets.244`,  45 archives)
+
+  These cover the entire `assets.NNN` range. Drive the Tier-1 archive-derived
+  lane to **227/227 firing rate** instead of the prior heuristic fallback.
+  Fail-safe: `classify_by_archive("assets.999")` returns None; revert to
+  vertex-count heuristic. **Long-term replacement**: C# `build-asset-semantic-index`
+  pipeline reading the manifest's real PAK listings (heuristic fail-safe
+  documented in the `ARCHIVE_TAXONOMY` docstring).
+- **C5-3: TestArchiveTaxonomyInvariants** — 4 regression-catchers in
+  `tests/test_synthesize_semantic_matrices.py`:
+
+  - `test_archive_taxonomy_total_keys_is_16` — pins `len(ARCHIVE_TAXONOMY) ==
+    16` (13 content-type + 3 archive-range). Catches duplicate-tail regressions.
+  - `test_archive_taxonomy_assets_n_keys_are_disjoint` — exhaustive assert
+    each of 244 archives matches exactly 1 of the 3 needles.
+  - `test_archive_taxonomy_assets_n_split_routes_correctly` — boundary
+    spot-checks (`assets.001`, `099`, `100`, `150`, `199`, `200`, `244`).
+  - `test_archive_taxonomy_out_of_range_archive_returns_none` — fail-safe for
+    hypothetical `assets.999` / `unknown.twad`.
+- **C5-3: archive-derived lockdown tests** — 2 new tests in
+  `tests/test_synthesize_semantic_matrices.py::TestArchiveClassification`:
+
+  - `test_archive_derived_entries_match_live_archive_filename_shape` — locks
+    `DetectedType=="archive-derived"` → `MagicLabel==V2` +
+    `ArchiveName matches ^assets\.\d{3}$` + not-synthetic + `EntryIndex >= 0`.
+  - `test_archive_derived_v2_label_consistent_with_provenance` — bidirectional
+    `MagicLabel==V2 ↔ DetectedType=="archive-derived" ↔ ArchiveName!="synthetic.twad"`
+    cross-check.
+- **Audit-key correctness finding** — naive audit scripts querying
+  `entry.get("ArchiveProvenance")` ALWAYS return None (it's a Python
+  `NamedTuple` internal to `synthesize_semantic_matrices.py`, destructured into
+  `ArchiveName` + `EntryIndex` per
+  `docs/schemas/asset-semantic-index-v1.schema.json`). Use
+  `entry["ArchiveName"]` + `entry["DetectedType"]` + `entry["MagicLabel"]`
+  per the on-disk schema. The lockdown tests pin the schema forward.
+
+### Cycle 5 ship-state — 4 commits, CI 5/5
+
+- `becac15` — `feat: build_live_archive_index extractor + tests`
+- `271a64f` — `feat: ARCHIVE_TAXONOMY disjoint assets.N split`
+- `ee08521` — `test: TestArchiveTaxonomyInvariants + archive_derived lockdowns`
+- `e09cb9d` — `docs: handoff explaining the Tier-1 firing-rate fix and the audit-key correctness finding`
+
+CI run `27913979117`: **5/5 jobs SUCCESS** (Docs Lint, .NET Build & Test,
+Python Lint & Test, Orphan Guard Regression, Summary). ruff 0, mypy 0,
+pytest 593/593, markdownlint clean.
+
+### Cycle 5 entry points (for next session discovery from Quickstart)
+
+| Command | Purpose | Cycle |
+|---------|---------|:---:|
+| `python scripts/build_live_archive_index.py --root <live> --out Exports/discovery-plan/live-nif-archive-index.json` | Atomic JSON extractor producing `live-nif-archive-index.json` (227 rows) | C5 |
+| `python scripts/synthesize_semantic_matrices.py --archive-index --validate` | Synthesize with archive-index override; writes 3 hint files at `Exports/discovery-matrix/nif-semantic-hints/` | C5 |
+| `pytest tests/test_build_live_archive_index.py` | 16 unit tests covering schema + idempotence + missing-input | C5 |
+| `pytest tests/test_synthesize_semantic_matrices.py` | Unit tests + 4 ARCHIVE_TAXONOMY regression-catchers + 2 archive-derived lockdowns | C5 |
 
 ## Agent model strategy
 
