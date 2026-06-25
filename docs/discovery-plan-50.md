@@ -1,14 +1,17 @@
 # 50-Step Autonomous Discovery Plan
 
 **Created:** 2026-05-20
-**Status:** 🟡 Revived tracker — Stage 5 active, Step 49 in progress
+**Last Updated:** 2026-06-21 (Cycle 4 mesh297+321 frontier CLOSED; Cycle 5 tier-1 archive provenance SHIPPED — subsequent discovery cycles are tracked in `knowledge.md` and `current-phase.md`, not this 50-step tracker)
+**Status:** ✅ SUPERSEDED — all 50 steps closed; later cycles (Cycle 4 mesh297+321, Cycle 5 tier-1 archive provenance) live in `knowledge.md` and `current-phase.md`
 **Game state:** RIFT client at character selection screen (live process available)
 **Conflict rule:** All outputs under ignored `Exports/discovery-plan/` — never touch shared state
 
-> Current position note (2026-05-26): this original 50-step plan was later superseded by
+> Current position note (2026-06-21): this original 50-step plan was superseded by
 > `docs/current-status.md` and staged handoffs for offline geometry/export work. Steps 1-45
 > are now treated as complete/superseded by that later evidence. Step 46 is complete via
-> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 live read completed through RiftReader and remains candidate-only. Step 49 has an initial RiftReader single-float probe, but no confirmed float3 cluster yet.
+> `docs/live-memory-readonly-safety-boundary.md`; Step 47 is complete via `scan-live-memory`; Step 48 live read completed through RiftReader and remains candidate-only. Step 49 closed as `closed-negative-current-live-state` (no confirmed float3 cluster in current live state; parser/export promotion remains blocked). Step 50 handoff `docs/handoffs/2026-05-26-final-50-step-session.md` is final.
+>
+> Subsequent discovery work — **Cycle 4 (mesh297 + mesh321 leader discovery, 27 OBJs, frontier CLOSED 2026-06-18)** and **Cycle 5 (tier-1 archive provenance: `build_live_archive_index.py` + `ARCHIVE_TAXONOMY` disjoint `assets.N` split + archive-derived lockdowns + audit-key finding)** — is tracked in `knowledge.md` and `docs/roadmap/current-phase.md`, not in this 50-step tracker.
 
 ---
 

@@ -317,14 +317,20 @@ def test_all_stage6_schema_valid_flag_is_true() -> None:
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
     reason="stage6 manifests not yet built",
 )
-def test_all_stage6_producer_version_is_v0_8() -> None:
-    """All scale-out manifests must be built by producer v0.8 (NIF-confirmed material data)."""
+def test_all_stage6_producer_version_is_v0_8_or_v0_9() -> None:
+    """All scale-out manifests are v0.8 (NIF-confirmed material data) or v0.9 (Cycle 5 semantic-category surface).
+
+    Cycle 5 (2026-06-21) bumped the scene-manifest builder from v0.8 -> v0.9 to add
+    the optional ``semantic`` sub-record (RiftFlythrough delivery v0.3).  Schema makes
+    ``semantic`` optional, so pre-Cycle-5 manifests still validate.  This test accepts
+    BOTH v0.8 (stage2 samples, pre-Cycle-5 regen) AND v0.9 (stage6 freshly regenerated).
+    """
     paths = _stage6_manifest_paths()
     bad: list[str] = []
     for path in paths:
         manifest = _load_json(path)
         ver = manifest["producer"]["version"]
-        if ver != "v0.8":
+        if ver not in ("v0.8", "v0.9"):
             bad.append(f"{manifest['asset_id']}: version={ver}")
     assert bad == [], f"{len(bad)}/{len(paths)} manifests have wrong producer version"
 

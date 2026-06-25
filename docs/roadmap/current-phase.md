@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-21 (Cycle 5 semantic-category surface shipped — builder v0.9 scene manifest optional `semantic` + v0.3 delivery flat `semantic_categories`; 71/71 touched tests PASS; 9th guard 251/251 PASS; ruff 0; mypy 0; wire-format locked by 12 new tests in tests/test_semantic_surface.py)
+**Last Updated**: 2026-06-21 (Cycle 4 mesh297+mesh321 discovery frontier CLOSED — 27 OBJs shipped across 10 assets, 9/9 guards PASS, all leads exhausted; Cycle 5 tier-1 archive provenance SHIPPED — `build_live_archive_index.py` extractor + disjoint `ARCHIVE_TAXONOMY assets.N` split + 2 archive-derived lockdown tests + audit-key finding; 593/593 tests PASS; ruff 0; mypy 0; markdownlint 0; handoffs at `docs/handoffs/2026-06-18-discovery-cycle-4.md` and `docs/handoffs/2026-06-21-cycle-five-tier1-archive-provenance.md`)
 
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
@@ -39,9 +39,14 @@
 >   `linked_texture_urls`. RiftFlythrough `js/texture_loader.js` (new) overlays
 >   the NIF-confirmed linkage delivery-first into `textureMapUrls()`.
 >   Handoff: `docs/handoffs/2026-06-19-delivery-authoritative-textures.md`
-> - **Discovery Cycle 3**: 27 OBJs from 2 new families (meshSize 297: 17 OBJs,
->   meshSize 321 lighthouse: 10 OBJs); 9/9 guards PASS. Not yet in
->   flythrough-index/scene manifests. Handoff: `docs/handoffs/2026-06-18-discovery-cycle-3.md`
+> - **Discovery Cycle 4 (mesh297 + mesh321)**: 27 OBJs from 2 new families
+>   (meshSize 297: 17 OBJs, meshSize 321 lighthouse: 10 OBJs); 9/9 guards
+>   PASS. **Frontier CLOSED 2026-06-18** -- leads exhausted (mesh297 @24
+>   TEXCOORD ✓ 17 OBJs; mesh305 @0 glow ✗ degenerate; mesh321 @204 POSITION
+>   ✓ 10 OBJs; mesh325 ✗ no leads; mesh329 @212 ✗ degenerate). 374 mesh297 +
+>   27/27 mesh321 blocks probed; authority over new MeshSize geometries
+>   ends here. Handoff:
+>   `docs/handoffs/2026-06-18-discovery-cycle-4.md`
 >
 > **Cycle 5 — Semantic-Category Surface (2026-06-21):**
 >

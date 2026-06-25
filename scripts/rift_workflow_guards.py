@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """RIFT asset workflow proof guards — ported from Invoke-RiftAssetWorkflow.ps1.
 
 Contains:
@@ -2719,7 +2719,7 @@ def scene_manifest_validation_guard() -> None:
             scene_sourced.append(aid)
 
         ver = manifest.get("producer", {}).get("version", "")
-        if ver != "v0.8":
+        if ver not in ("v0.8", "v0.9"):
             bad_version.append(f"{aid}: version={ver}")
 
     assert_proof_guard(len(schema_failures) == 0, f"{len(schema_failures)} schema failures")

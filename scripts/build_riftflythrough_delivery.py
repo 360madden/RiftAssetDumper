@@ -338,10 +338,7 @@ def main() -> int:
     print(f"  Tex URLs:      {stats['total_linked_texture_urls']} ({stats['textured_url_assets']} assets)")
     print(f"  Tex raw:       {stats['total_linked_textures']} ({stats['textured_assets']} assets)")
     print(f"  Transforms:    {stats['non_identity_transforms']} non-identity")
-    print(
-        f"  Semantic:      {stats['tagged_assets']} tagged assets"
-        f" ({stats['distinct_hints']} distinct hint types)"
-    )
+    print(f"  Semantic:      {stats['tagged_assets']} tagged assets ({stats['distinct_hints']} distinct hint types)")
     print(f"  Families:      {stats['family_count']} mesh sizes")
 
     # Copy to RiftFlythrough

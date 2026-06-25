@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Semantic category loader for scene manifests and RiftFlythrough delivery.
 
 Cycle 5 surface: read bounded asset-semantic-index/v1 matrix reports from
@@ -63,9 +63,7 @@ def _matrix_path(hint: str, matrix_dir: Path = DEFAULT_MATRIX_DIR) -> Path:
     """Return the matrix JSON path for one hint category."""
     name = MATRIX_FILE_NAMES.get(hint)
     if name is None:
-        raise ValueError(
-            f"SemanticSurface: unsupported hint {hint!r}; valid hints: {sorted(MATRIX_FILE_NAMES)}"
-        )
+        raise ValueError(f"SemanticSurface: unsupported hint {hint!r}; valid hints: {sorted(MATRIX_FILE_NAMES)}")
     return matrix_dir / name
 
 
@@ -83,7 +81,7 @@ def load_matrix(hint: str, matrix_dir: Path = DEFAULT_MATRIX_DIR) -> list[dict[s
         return []
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return []
     entries = data.get("Entries")
     if not isinstance(entries, list):
@@ -100,9 +98,7 @@ def load_all_matrices(matrix_dir: Path = DEFAULT_MATRIX_DIR) -> dict[str, list[d
     return {hint: load_matrix(hint, matrix_dir) for hint in HINTS}
 
 
-def categorize_asset(
-    asset_id: str, matrices: dict[str, list[dict[str, Any]]] | None = None
-) -> list[str]:
+def categorize_asset(asset_id: str, matrices: dict[str, list[dict[str, Any]]] | None = None) -> list[str]:
     """Return the union of hint categories an asset appears under.
 
     Each ``hint:*`` matrix report is filtered to ``asset_id`` prefix

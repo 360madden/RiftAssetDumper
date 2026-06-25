@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Build a scene-manifest/v1-draft entry for one cohort asset.
 
 Reads:
