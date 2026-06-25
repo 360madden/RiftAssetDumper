@@ -125,10 +125,10 @@ def test_stage6_manifest_count_is_227() -> None:
     not STAGE2_DIR.exists(),
     reason="stage2 directory not yet created",
 )
-def test_stage2_sample_count_is_24() -> None:
-    """Stage2 must have 24 sample manifests (4 non-id + 20 identity)."""
+def test_stage2_sample_count_is_25() -> None:
+    """Stage2 must have 25 sample manifests (4 non-id + 20 identity + 1 lighthouse b89ced7d511388d2 from Cycle 6 exhaustion)."""
     paths = _stage2_sample_paths()
-    assert len(paths) == 24, f"expected 24 stage2 samples, got {len(paths)}"
+    assert len(paths) == 25, f"expected 25 stage2 samples, got {len(paths)}"
 
 
 # ---------- Pack Integrity ----------

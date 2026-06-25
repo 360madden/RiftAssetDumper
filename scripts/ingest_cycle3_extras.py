@@ -51,7 +51,10 @@ FLYTHROUGH_INDEX = OBJ_DIR.parent / "flythrough-index.json"
 # An OBJ filename like ``decode-nif-geometry-mesh7.obj`` tells us mesh block 7.
 OBJ_FILENAME_RE = re.compile(r"decode-nif-geometry-mesh(\d+)\.obj$", re.IGNORECASE)
 ASSET_ID_RE = re.compile(r"^[0-9a-f]{16}$", re.IGNORECASE)
-PROBE_ASSET_RE = re.compile(r"^[0-9a-f]{4,16}$", re.IGNORECASE)  # retained for future cycle support — referenced by cycle-4 scaffolding
+PROBE_ASSET_RE = re.compile(
+    r"^[0-9a-f]{4,16}$", re.IGNORECASE
+)  # retained for future cycle support — referenced by cycle-4 scaffolding
+
 
 @dataclasses.dataclass
 class ObjRecord:
@@ -154,9 +157,26 @@ _EXPLICIT_DIR_MAP: dict[tuple[str, str], str] = {
     ("mesh321-probe", "mb68"): "b89ced7d511388d2",
     ("mesh321-probe", "mb92"): "b89ced7d511388d2",
     ("mesh321-probe", "mb110"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb132"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb146"): "b89ced7d511388d2",
     ("mesh321-probe", "mb159"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb176"): "b89ced7d511388d2",
     ("mesh321-probe", "mb189"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb211"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb225"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb244"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb263"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb287"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb311"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb330"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb349"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb368"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb382"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb401"): "b89ced7d511388d2",
     ("mesh321-probe", "mb425"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb444"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb463"): "b89ced7d511388d2",
+    ("mesh321-probe", "mb482"): "b89ced7d511388d2",
     ("mesh321-probe", "mb505"): "b89ced7d511388d2",
     # The lone mesh297-probe/decode-nif-geometry/ dir was a Cycle 3 side
     # channel copy from an earlier export round. Its mesh6.obj matches the
@@ -349,9 +369,7 @@ def materialize(records: list[ObjRecord], *, dry_run: bool = False) -> dict[str,
                 extra_dest = EXTRAS_DIR / f"{aid}__mb{extra.mesh_block:03d}.obj"
                 if extra_dest.exists() and extra_dest.stat().st_size > 0:
                     print(f"SKIP extra {extra_dest.name} (exists)")
-                summary["skipped"].append(
-                    {"asset_id": aid, "extra_block": extra.mesh_block, "reason": "exists"}
-                )
+                summary["skipped"].append({"asset_id": aid, "extra_block": extra.mesh_block, "reason": "exists"})
             continue
         # Copy canonical (skipped in --dry-run; preview only)
         if dry_run:
@@ -534,9 +552,7 @@ def main() -> int:
     summary_path = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-3-ingest-summary.json"
     if not args.dry_run:
         summary_path.parent.mkdir(parents=True, exist_ok=True)
-        summary_path.write_text(
-            json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
+        summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Summary: {summary_path.relative_to(REPO_ROOT)}")
     else:
         print(f"[DRY-RUN] Would write summary: {summary_path.relative_to(REPO_ROOT)}")
