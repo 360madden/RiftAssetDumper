@@ -2654,7 +2654,7 @@ def scene_manifest_validation_guard() -> None:
     stage2_paths = sorted(SCENE_MANIFEST_STAGE2_DIR.glob("sample-manifest-*.json"))
 
     assert_proof_guard(len(stage6_paths) == 227, f"Expected 227 stage6 manifests, found {len(stage6_paths)}.")
-    assert_proof_guard(len(stage2_paths) == 24, f"Expected 24 stage2 samples, found {len(stage2_paths)}.")
+    assert_proof_guard(len(stage2_paths) == 25, f"Expected 25 stage2 samples, found {len(stage2_paths)}.")
 
     pack_ok = True
     pack_entry_count = 0
