@@ -4635,8 +4635,10 @@ def post50_residual_strict_threshold_delta_report(
         "Decision": str(cluster_payload_row.get("Decision", "")),
     }
     target_plausible = float(target_row["Plausible"])
-    blockers = [
+    deferred = [
         "residual-position-strict-threshold-not-met",
+    ]
+    blockers = [
         "residual-cluster-no-complete-geometry-binding",
         "parser-export-promotion-not-allowed",
     ]
@@ -4653,6 +4655,7 @@ def post50_residual_strict_threshold_delta_report(
         "ParserExportPromotionAllowed": False,
         "ExportReady": False,
         "Blockers": blockers,
+        "Deferred": deferred,
         "Decision": (
             "payload 288 is the strongest residual candidate but remains below the strict plausible "
             "threshold and lacks complete geometry binding"

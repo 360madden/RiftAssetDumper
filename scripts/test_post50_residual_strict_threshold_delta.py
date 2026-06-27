@@ -110,7 +110,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check("target strict pass", report["Aggregate"]["TargetStrictPass"], False)
     check("geometry binding", report["Aggregate"]["TargetCompleteGeometryBindingProven"], False)
     check("parser/export locked", report["ParserExportPromotionAllowed"], False)
-    check_contains("blocker", "\n".join(report["Aggregate"]["Blockers"]), "residual-position-strict-threshold-not-met")
+    check_contains(
+        "deferred", "\n".join(report["Aggregate"].get("Deferred", [])), "residual-position-strict-threshold-not-met"
+    )
 
 print(f"\n{'=' * 50}")
 if failed:

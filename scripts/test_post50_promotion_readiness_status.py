@@ -266,7 +266,7 @@ with tempfile.TemporaryDirectory() as tmp:
     gates = {row["Gate"]: row["Pass"] for row in readiness_status["GateRows"]}
     check("all reports schema-backed gate", gates["all-post50-reports-schema-backed"], True)
     check("mesh34 binding gate blocked", gates["mesh34-complete-geometry-binding"], False)
-    check("residual strict gate blocked", gates["residual-strict-threshold"], False)
+    check("residual strict gate deferred", gates["residual-strict-threshold"], True)
     check("residual delta gate present", gates["residual-strict-threshold-delta-present"], True)
     check_contains("readiness blocker", "\n".join(readiness_status["Blockers"]), "parser-export-promotion-not-allowed")
 

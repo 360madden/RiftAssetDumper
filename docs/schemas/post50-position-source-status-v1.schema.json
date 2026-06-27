@@ -17,44 +17,112 @@
     "NextAction"
   ],
   "properties": {
-    "SchemaVersion": { "const": "post50-position-source-status/v1" },
-    "CandidateOnly": { "const": true },
-    "ReportRoot": { "type": "string", "minLength": 1 },
+    "SchemaVersion": {
+      "const": "post50-position-source-status/v1"
+    },
+    "CandidateOnly": {
+      "const": true
+    },
+    "ReportRoot": {
+      "type": "string",
+      "minLength": 1
+    },
     "ReportStatuses": {
       "type": "array",
       "minItems": 10,
-      "items": { "$ref": "#/$defs/reportStatus" }
+      "items": {
+        "$ref": "#/$defs/reportStatus"
+      }
     },
-    "ReportFreshness": { "$ref": "#/$defs/reportFreshness" },
-    "RecommendedLane": { "type": "string", "minLength": 1 },
+    "ReportFreshness": {
+      "$ref": "#/$defs/reportFreshness"
+    },
+    "RecommendedLane": {
+      "type": "string",
+      "minLength": 1
+    },
     "CandidateLanes": {
       "type": "array",
-      "items": { "$ref": "#/$defs/candidateLane" }
+      "items": {
+        "$ref": "#/$defs/candidateLane"
+      }
     },
-    "Mesh325Disposition": { "$ref": "#/$defs/mesh325Disposition" },
-    "ParserExportPromotionAllowed": { "const": false },
+    "Mesh325Disposition": {
+      "$ref": "#/$defs/mesh325Disposition"
+    },
+    "ParserExportPromotionAllowed": {
+      "const": false
+    },
     "Blockers": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "NextAction": { "type": "string", "minLength": 1 }
+    "Deferred": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "NextAction": {
+      "type": "string",
+      "minLength": 1
+    }
   },
   "additionalProperties": false,
   "$defs": {
     "reportStatus": {
       "type": "object",
-      "required": ["Key", "Path", "Exists", "Bytes", "MtimeUtc", "Schema", "CandidateOnly", "ParseError", "EvidenceLevel"],
+      "required": [
+        "Key",
+        "Path",
+        "Exists",
+        "Bytes",
+        "MtimeUtc",
+        "Schema",
+        "CandidateOnly",
+        "ParseError",
+        "EvidenceLevel"
+      ],
       "properties": {
-        "Key": { "type": "string", "minLength": 1 },
-        "Path": { "type": "string", "minLength": 1 },
-        "Exists": { "type": "boolean" },
-        "Bytes": { "type": "integer", "minimum": 0 },
-        "MtimeUtc": { "type": "string" },
-        "Schema": { "type": "string" },
-        "CandidateOnly": { "type": ["boolean", "null"] },
-        "ParseError": { "type": "string" },
+        "Key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Exists": {
+          "type": "boolean"
+        },
+        "Bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "MtimeUtc": {
+          "type": "string"
+        },
+        "Schema": {
+          "type": "string"
+        },
+        "CandidateOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ParseError": {
+          "type": "string"
+        },
         "EvidenceLevel": {
-          "enum": ["schema-backed-candidate", "raw-candidate", "missing-or-unreadable"]
+          "enum": [
+            "schema-backed-candidate",
+            "raw-candidate",
+            "missing-or-unreadable"
+          ]
         }
       },
       "additionalProperties": false
@@ -74,27 +142,55 @@
         "MissingOrUnreadableKeys"
       ],
       "properties": {
-        "ExistingReportCount": { "type": "integer", "minimum": 0 },
-        "MissingReportCount": { "type": "integer", "minimum": 0 },
-        "UnreadableReportCount": { "type": "integer", "minimum": 0 },
-        "OldestReportMtimeUtc": { "type": "string" },
-        "NewestReportMtimeUtc": { "type": "string" },
-        "MtimeRangeSeconds": { "type": "integer", "minimum": 0 },
+        "ExistingReportCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "MissingReportCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "UnreadableReportCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "OldestReportMtimeUtc": {
+          "type": "string"
+        },
+        "NewestReportMtimeUtc": {
+          "type": "string"
+        },
+        "MtimeRangeSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
         "OldestReportKeys": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "NewestReportKeys": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "OlderThanNewestKeys": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "MissingOrUnreadableKeys": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false
@@ -116,28 +212,86 @@
         "Decision"
       ],
       "properties": {
-        "Rank": { "type": "integer", "minimum": 1 },
-        "Lane": { "type": "string", "minLength": 1 },
-        "MeshSize": { "type": "integer", "minimum": 0 },
-        "Stream": { "type": "string" },
-        "Payload": { "type": ["integer", "null"], "minimum": 0 },
-        "EvidenceGroups": { "type": ["integer", "null"], "minimum": 0 },
-        "TotalStreamLinks": { "type": ["integer", "null"], "minimum": 0 },
-        "Plausible": { "type": ["number", "null"], "minimum": 0 },
-        "StrictPass": { "type": ["boolean", "null"] },
-        "ExportReady": { "type": "boolean" },
-        "Rationale": { "type": "string" },
-        "Decision": { "type": "string" }
+        "Rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "Lane": {
+          "type": "string",
+          "minLength": 1
+        },
+        "MeshSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "Stream": {
+          "type": "string"
+        },
+        "Payload": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "EvidenceGroups": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "TotalStreamLinks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "Plausible": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "StrictPass": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ExportReady": {
+          "type": "boolean"
+        },
+        "Rationale": {
+          "type": "string"
+        },
+        "Decision": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "mesh325Disposition": {
       "type": "object",
-      "required": ["MeshSize", "ResidualStreamCount", "Decision"],
+      "required": [
+        "MeshSize",
+        "ResidualStreamCount",
+        "Decision"
+      ],
       "properties": {
-        "MeshSize": { "type": "integer", "minimum": 0 },
-        "ResidualStreamCount": { "type": "integer", "minimum": 0 },
-        "Decision": { "type": "string" }
+        "MeshSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ResidualStreamCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "Decision": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     }

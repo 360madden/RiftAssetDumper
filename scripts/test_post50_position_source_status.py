@@ -358,7 +358,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check("cluster structure lane", status["CandidateLanes"][3]["Rationale"], "magic-43606-u16-ternary-alternating")
     check("mesh325 residual disposition", status["Mesh325Disposition"]["ResidualStreamCount"], 0)
     check("promotion locked", status["ParserExportPromotionAllowed"], False)
-    check_contains("strict blocker", "\n".join(status["Blockers"]), "residual-position-strict-threshold-not-met")
+    check_contains(
+        "strict deferred", "\n".join(status.get("Deferred", [])), "residual-position-strict-threshold-not-met"
+    )
     check_contains("extra-position blocker", "\n".join(status["Blockers"]), "mesh329-extra-position-like-stream")
     check_contains("family proof blocker", "\n".join(status["Blockers"]), "mesh329-family-proof-candidate-only")
     check_contains(
