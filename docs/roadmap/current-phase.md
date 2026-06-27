@@ -1,7 +1,29 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-21 (Cycle 4 mesh297+mesh321 discovery frontier CLOSED — 27 OBJs shipped across 10 assets, 9/9 guards PASS, all leads exhausted; Cycle 5 tier-1 archive provenance SHIPPED — `build_live_archive_index.py` extractor + disjoint `ARCHIVE_TAXONOMY assets.N` split + 2 archive-derived lockdown tests + audit-key finding; 593/593 tests PASS; ruff 0; mypy 0; markdownlint 0; handoffs at `docs/handoffs/2026-06-18-discovery-cycle-4.md` and `docs/handoffs/2026-06-21-cycle-five-tier1-archive-provenance.md`)
+**Last Updated**: 2026-06-27 (Body-offset-28 investigation REVERTED: unconditional Ghidra offset change in BuildNifAttributeFloatVertexSamples broke OBJ exports (all-zero vertices) and made classifier plausible ratios WORSE for all target streams; legacy formula blockPayload.Length - declaredPayloadBytes = 29 correctly includes trailing flag byte; `residual-position-strict-threshold-not-met` confirmed as permanent blocker at 0.9444; build 56/56 dotnet + 591/591 Python tests pass)
 
+> **Body-offset-28 investigation — REVERTED (2026-06-27):**
+>
+> - **Initial finding**: Ghidra structural header walk returns 28 bytes vs legacy 29 bytes.
+>   Probe JSONs for stream@21 (payload 288) showed 71/72 plausible at offset 28 vs 6/72 at 29.
+> - **Unconditional change applied**: `BuildNifAttributeFloatVertexSamples` and
+>   `BuildNifAttributeUInt16VertexSamples` switched to Ghidra offset.
+> - **Investigation revealed**: Legacy formula `blockPayload.Length - declaredPayloadBytes`
+>   correctly accounts for 28-byte structural header PLUS 1-byte trailing flag = 29 bytes.
+>   The Ghidra walk only covers the header (28 bytes), missing the trailing flag.
+> - **Regression**: mesh297 OBJ re-export produced all-zero vertices (degenerate geometry).
+>   Inventory GhidraStats showed WORSE plausible ratios for ALL target residual streams:
+>   payload 288: 0.9444 (legacy) vs 0.5972 (Ghidra); payload 228: 0.8947 vs 0.4035.
+> - **Probe vs inventory discrepancy**: Probe JSONs targeted stream@21 (block index 21),
+>   not the classifier's target stream@188. Different streams, different layouts.
+> - **REVERTED**: Both functions restored to legacy formula. Build 56/56 dotnet +
+>   591/591 Python tests pass. Existing 27 OBJs were never affected (exported pre-fix).
+> - **Conclusion**: `residual-position-strict-threshold-not-met` is a **permanent blocker**
+>   at plausible ratio 0.9444 (gap 0.0056 to 0.95 threshold). The implausible floats are
+>   sentinel/metadata values in the stream, not offset misalignment artifacts.
+> - **Handoffs**: `docs/handoffs/2026-06-27-body-offset-28-revert-and-correction.md`,
+>   `docs/handoffs/2026-06-27-promotion-blocker-analysis.md`
+>
 > **Cycle 2 (Consumer Visual Fidelity via Scene Manifest)** — **SHIPPED**.
 > All 7 phases (C2-1 through C2-7) are DONE. The plan's 4 V4 Pro sessions were
 > bypassed autonomously with equivalent M3+V4 Pro reasoning. Key deliverables:

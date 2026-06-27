@@ -4866,7 +4866,13 @@ internal static class Program
                     residual.RoleStats.RotatedFloat3Stats?.PlausibleValueRatio,
                     residual.RoleStats.RotatedFloat3Stats?.NonZeroVectorRatio,
                     residual.RoleStats.RotatedFloat3Stats?.MaxExtent,
-                    residual.RoleStats.RotatedFloat3Stats?.Prefix);
+                    residual.RoleStats.RotatedFloat3Stats?.Prefix,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.VectorCount,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.FiniteVectorRatio,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.PlausibleValueRatio,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.NonZeroVectorRatio,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.MaxExtent,
+                    residual.GhidraRoleStats?.RotatedFloat3Stats?.Prefix);
                 residualStreamGroups.Add(residualKey, residualGroup);
               }
 
@@ -5317,6 +5323,18 @@ internal static class Program
               group.RotatedFloat3PlausibleValueRatio,
               group.RotatedFloat3NonZeroVectorRatio,
               group.RotatedFloat3MaxExtent),
+          GhidraRotatedFloat3VectorCount: group.GhidraRotatedFloat3VectorCount,
+          GhidraRotatedFloat3FiniteVectorRatio: group.GhidraRotatedFloat3FiniteVectorRatio,
+          GhidraRotatedFloat3PlausibleValueRatio: group.GhidraRotatedFloat3PlausibleValueRatio,
+          GhidraRotatedFloat3NonZeroVectorRatio: group.GhidraRotatedFloat3NonZeroVectorRatio,
+          GhidraRotatedFloat3MaxExtent: group.GhidraRotatedFloat3MaxExtent,
+          GhidraRotatedFloat3Prefix: group.GhidraRotatedFloat3Prefix,
+          StrictGhidraRotatedFloat3PositionClassifierReview: BuildNifResidualPositionClassifierReview(
+              group.GhidraRotatedFloat3VectorCount,
+              group.GhidraRotatedFloat3FiniteVectorRatio,
+              group.GhidraRotatedFloat3PlausibleValueRatio,
+              group.GhidraRotatedFloat3NonZeroVectorRatio,
+              group.GhidraRotatedFloat3MaxExtent),
           Count: group.Count,
           NifPayloads: group.NifIds.Count,
           Samples: group.Samples);
@@ -9124,6 +9142,11 @@ internal static class Program
       return [];
     }
 
+    // Legacy offset: blockPayload.Length - declaredPayloadBytes accounts for the
+    // structural header PLUS the trailing flag byte between header and body data.
+    // The Ghidra structural walk (ComputeNifDataStreamPayloadPrefixBytes = 28) only
+    // covers the header fields and misses the trailing flag, causing 1-byte misalignment.
+    // Ghidra offset is available via GhidraStats in the residual stream accumulator.
     var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
     var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
     var bytesPerVector = checked(components * 4);
@@ -9180,6 +9203,11 @@ internal static class Program
       return [];
     }
 
+    // Legacy offset: blockPayload.Length - declaredPayloadBytes accounts for the
+    // structural header PLUS the trailing flag byte between header and body data.
+    // The Ghidra structural walk (ComputeNifDataStreamPayloadPrefixBytes = 28) only
+    // covers the header fields and misses the trailing flag, causing 1-byte misalignment.
+    // Ghidra offset is available via GhidraStats in the residual stream accumulator.
     var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
     var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
 
@@ -10074,6 +10102,47 @@ internal static class Program
   internal static NifDataStreamLayout AnalyzeNifDataStreamLayout(byte[] blockPayload)
   {
     return AnalyzeNifDataStreamLayout(blockPayload.AsSpan());
+  }
+
+  private static int ComputeNifDataStreamPayloadPrefixBytes(ReadOnlySpan<byte> blockPayload)
+  {
+    // Walk the structural header to find body start (Ghidra offset)
+    // Structure: [4 declared][4 second][4 pairCount][pairCount*8 pairs][4 elemCount][elemCount*4 elemDesc]
+    // Typical size is 28 bytes (pairCount=1, elemCount=1)
+    if (blockPayload.Length < 16)
+    {
+      return blockPayload.Length; // Fallback: use entire payload
+    }
+
+    try
+    {
+      var offset = 4; // Skip declared payload bytes
+      offset += 4; // Skip second uint32
+      offset += 4; // Skip descriptor pair count
+
+      var descriptorPairCount = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload.Slice(offset - 4, 4));
+      var pairBytes = checked((int)descriptorPairCount * 8);
+      if (offset + pairBytes + 8 > blockPayload.Length)
+      {
+        return blockPayload.Length; // Fallback
+      }
+      offset += pairBytes; // Skip descriptor pairs
+
+      offset += 4; // Skip element descriptor count
+      var elementDescriptorCount = BinaryPrimitives.ReadUInt32LittleEndian(blockPayload.Slice(offset - 4, 4));
+      var descriptorBytes = checked((int)elementDescriptorCount * 4);
+      if (offset + descriptorBytes > blockPayload.Length)
+      {
+        return blockPayload.Length; // Fallback
+      }
+      offset += descriptorBytes; // Skip element descriptors
+
+      return offset;
+    }
+    catch
+    {
+      return blockPayload.Length; // Fallback on any error
+    }
   }
 
   private static NifDataStreamLayout AnalyzeNifDataStreamLayout(ReadOnlySpan<byte> blockPayload)
@@ -16176,7 +16245,13 @@ internal sealed class NifMeshResidualStreamAccumulator(
     double? rotatedFloat3PlausibleValueRatio,
     double? rotatedFloat3NonZeroVectorRatio,
     double? rotatedFloat3MaxExtent,
-    List<NifFloatVectorPrefix>? rotatedFloat3Prefix)
+    List<NifFloatVectorPrefix>? rotatedFloat3Prefix,
+    int? ghidraRotatedFloat3VectorCount = null,
+    double? ghidraRotatedFloat3FiniteVectorRatio = null,
+    double? ghidraRotatedFloat3PlausibleValueRatio = null,
+    double? ghidraRotatedFloat3NonZeroVectorRatio = null,
+    double? ghidraRotatedFloat3MaxExtent = null,
+    List<NifFloatVectorPrefix>? ghidraRotatedFloat3Prefix = null)
 {
   public string Pattern { get; } = pattern;
   public uint MeshSize { get; } = meshSize;
@@ -16195,6 +16270,12 @@ internal sealed class NifMeshResidualStreamAccumulator(
   public double? RotatedFloat3NonZeroVectorRatio { get; } = rotatedFloat3NonZeroVectorRatio;
   public double? RotatedFloat3MaxExtent { get; } = rotatedFloat3MaxExtent;
   public List<NifFloatVectorPrefix>? RotatedFloat3Prefix { get; } = rotatedFloat3Prefix is null ? null : [.. rotatedFloat3Prefix];
+  public int? GhidraRotatedFloat3VectorCount { get; } = ghidraRotatedFloat3VectorCount;
+  public double? GhidraRotatedFloat3FiniteVectorRatio { get; } = ghidraRotatedFloat3FiniteVectorRatio;
+  public double? GhidraRotatedFloat3PlausibleValueRatio { get; } = ghidraRotatedFloat3PlausibleValueRatio;
+  public double? GhidraRotatedFloat3NonZeroVectorRatio { get; } = ghidraRotatedFloat3NonZeroVectorRatio;
+  public double? GhidraRotatedFloat3MaxExtent { get; } = ghidraRotatedFloat3MaxExtent;
+  public List<NifFloatVectorPrefix>? GhidraRotatedFloat3Prefix { get; } = ghidraRotatedFloat3Prefix is null ? null : [.. ghidraRotatedFloat3Prefix];
   public int Count { get; set; }
   public HashSet<string> NifIds { get; } = new(StringComparer.OrdinalIgnoreCase);
   public List<NifMeshBindingStreamSample> Samples { get; } = [];
@@ -16730,6 +16811,13 @@ internal sealed record NifMeshResidualStreamGroup(
     double? RotatedFloat3MaxExtent,
     List<NifFloatVectorPrefix>? RotatedFloat3Prefix,
     NifResidualPositionClassifierReview? StrictRotatedFloat3PositionClassifierReview,
+    int? GhidraRotatedFloat3VectorCount,
+    double? GhidraRotatedFloat3FiniteVectorRatio,
+    double? GhidraRotatedFloat3PlausibleValueRatio,
+    double? GhidraRotatedFloat3NonZeroVectorRatio,
+    double? GhidraRotatedFloat3MaxExtent,
+    List<NifFloatVectorPrefix>? GhidraRotatedFloat3Prefix,
+    NifResidualPositionClassifierReview? StrictGhidraRotatedFloat3PositionClassifierReview,
     int Count,
     int NifPayloads,
     List<NifMeshBindingStreamSample> Samples);
