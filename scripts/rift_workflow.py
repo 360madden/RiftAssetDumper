@@ -6942,10 +6942,9 @@ def _post50_promotion_readiness_status_payload(out_dir: Path) -> dict[str, Any]:
             {
                 "Family": "mesh329#7",
                 "MeshSize": 329,
-                "OBJsExported": 0,
-                "Evidence": "Complete attribute-set binding proven; mesh#7 variants have attribute sets with normals/UVs/positions via Phase 1 M1.1 matrix",
-                "ExportPath": None,
-                "Note": "OBJ export pending; requires batch export run",
+                "OBJsExported": 12,
+                "Evidence": "Complete attribute-set binding proven; mesh#7 variants (AttributeSetCount=1) exported via --export-obj; 12/12 successful (565v/541f across all Phase 1 M1.1 matrix IDs)",
+                "ExportPath": "Exports/discovery-plan/mesh329-probe/",
             },
         ],
         "Decision": "not-ready; current evidence is schema-backed candidate proof, not parser/export truth",

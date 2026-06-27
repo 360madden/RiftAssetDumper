@@ -9142,11 +9142,6 @@ internal static class Program
       return [];
     }
 
-    // Legacy offset: blockPayload.Length - declaredPayloadBytes accounts for the
-    // structural header PLUS the trailing flag byte between header and body data.
-    // The Ghidra structural walk (ComputeNifDataStreamPayloadPrefixBytes = 28) only
-    // covers the header fields and misses the trailing flag, causing 1-byte misalignment.
-    // Ghidra offset is available via GhidraStats in the residual stream accumulator.
     var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
     var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
     var bytesPerVector = checked(components * 4);
@@ -9203,11 +9198,6 @@ internal static class Program
       return [];
     }
 
-    // Legacy offset: blockPayload.Length - declaredPayloadBytes accounts for the
-    // structural header PLUS the trailing flag byte between header and body data.
-    // The Ghidra structural walk (ComputeNifDataStreamPayloadPrefixBytes = 28) only
-    // covers the header fields and misses the trailing flag, causing 1-byte misalignment.
-    // Ghidra offset is available via GhidraStats in the residual stream accumulator.
     var headerBytes = blockPayload.Length - checked((int)declaredPayloadBytes);
     var body = blockPayload.Slice(headerBytes, checked((int)declaredPayloadBytes));
 
