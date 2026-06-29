@@ -1,4 +1,4 @@
-# Project knowledge
+﻿# Project knowledge
 
 ## What this project is
 
@@ -445,7 +445,7 @@ pytest 593/593, markdownlint clean.
 
 ### Cycle 5.2 — Zone-confidence tightening (SHIPPED 2026-06-28)
 
-> Cycle 5.2 adds per-asset `first4` and `zone_confidence` fields to the
+> Cycle 5.2 adds per-asset `first4` and `confidence` fields to the
 > flythrough delivery, with a First4-discrimination lockdown that pins the
 > "First4 alone does NOT discriminate siblings from coincidental neighbors"
 > finding (empirical 8-of-8 cross-checked neighbor share in
@@ -467,7 +467,7 @@ pytest 593/593, markdownlint clean.
   the full 229-asset cohort.
 - **Schema + delivery naming convention gap** — `scene-manifest-v1.schema.json`
   Zone.first4 (pattern `^([0-9a-f]{8})?$`) maps to top-level
-  `riftflythrough-delivery.json`'s `zone_first4` (prefix-flat API).
+  `riftflythrough-delivery.json`'s `first4` (prefix-flat API).
   Documented inline in the schema description; an unifier follow-up is
   explicitly deferred to avoid a public-API break in `riftflythrough-delivery.json`.
 - **Cohort count lockdown refactor** — `test_scene_manifest_validation.py`

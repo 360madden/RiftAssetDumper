@@ -49,7 +49,7 @@ RIFTFLYTHROUGH_JS = RIFTFLYTHROUGH_DIR / "js"
 RIFTFLYTHROUGH_TEXTURES = RIFTFLYTHROUGH_DIR / "textures" / "converted"
 
 PRODUCER_TOOL = "scripts/build_riftflythrough_delivery.py"
-PRODUCER_VERSION = "v0.5"
+PRODUCER_VERSION = "v0.6"
 TEXTURE_URL_PREFIX = "textures/converted/"
 
 
@@ -145,14 +145,14 @@ def build_delivery_entry(
         zone_name = zone_block.get("name")
         zone_method = zone_block.get("method", "unmatched")
         zone_delta = zone_block.get("delta")
-        zone_first4 = zone_block.get("first4", "")
-        zone_confidence = zone_block.get("confidence")
+        first4 = zone_block.get("first4", "")
+        confidence = zone_block.get("confidence")
     else:
         zone_tuple = zone_expansion = zone_category = zone_name = None
         zone_method = "unmatched"
         zone_delta = None
-        zone_first4 = ""
-        zone_confidence = None
+        first4 = ""
+        confidence = None
     return {
         "asset_id": asset_id,
         "obj_mesh": obj_mesh,
@@ -178,8 +178,8 @@ def build_delivery_entry(
         "zone_name": zone_name,
         "zone_method": zone_method,
         "zone_delta": zone_delta,
-        "zone_first4": zone_first4,
-        "zone_confidence": zone_confidence,
+        "first4": first4,
+        "confidence": confidence,
     }
 
 
@@ -205,16 +205,16 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
     # Cycle 5.1 zone stats: zone-tuple distribution + method counts
     zone_distribution: dict[str, int] = {}
     zone_method_distribution: dict[str, int] = {}
-    zone_confidence_distribution: dict[str, int] = {}
+    confidence_distribution: dict[str, int] = {}
     zone_tagged_assets = 0
     for e in entries:
         zt = e.get("zone_tuple")
         zm = e.get("zone_method", "unmatched")
-        zc = e.get("zone_confidence")
+        zc = e.get("confidence")
         zone_method_distribution[zm] = zone_method_distribution.get(zm, 0) + 1
         # Count null confidence bucket under "null" key for clarity
         conf_key = "null" if zc is None else zc
-        zone_confidence_distribution[conf_key] = zone_confidence_distribution.get(conf_key, 0) + 1
+        confidence_distribution[conf_key] = confidence_distribution.get(conf_key, 0) + 1
         if zt is not None:
             zone_tagged_assets += 1
             zone_distribution[zt] = zone_distribution.get(zt, 0) + 1
@@ -239,7 +239,7 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
         "zone_distribution": zone_distribution,
         "zone_method_distribution": zone_method_distribution,
         # Cycle 5.2 fields
-        "zone_confidence_distribution": zone_confidence_distribution,
+        "confidence_distribution": confidence_distribution,
     }
 
 
@@ -251,9 +251,9 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}",
         f"**Producer:** {PRODUCER_TOOL} {PRODUCER_VERSION}",
         "",
-        "## What changed (v0.5)",
+        "## What changed (v0.6)",
         "",
-        "- Cycle 5.2: Added `zone_confidence` (high/medium/low/null) and `zone_first4` (4-byte NIF magic, transparency-only) to per-asset zone fields. Confidence buckets: high = direct match (delta=0) or tight sibling (|delta|<=5); medium = plausible sibling (6<=|delta|<=30); low = coincidental adjacency (|delta|>30); null = unmatched. Consumers can opt out of low-confidence attributions without re-deriving the discrimination rationale (see `docs/handoffs/2026-06-28-archive-neighbor-verification.md`). First4 is recorded for transparency; the verification handoff found all 5 closest and all 3 farthest neighbors share First4 `47616d65`, so it does NOT discriminate siblings -- Entry-Index Delta is the discriminating signal.",
+        "- Cycle 5.2 unifier: Renamed `zone_first4` -> `first4` and `zone_confidence` -> `confidence` in the per-asset delivery entries (and the top-level aggregate `zone_confidence_distribution` -> `confidence_distribution`) so the delivery JSON's API surface matches the canonical scene-manifest-v1 schema's nested `Zone.first4` / `Zone.confidence` directly. Producer version bumped to v0.6. Updated sibling RiftFlythrough consumer `transform_loader.js` to read the unprefixed keys. Hard break -- rely on `first4` / `confidence` from now on; the prefixed names are no longer emitted.",
         "",
         "## What changed (v0.5)",
         "",
@@ -307,7 +307,7 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         tf = "non-id" if not e["transform_identity"] else "id"
         sem = ",".join(e.get("semantic_categories") or []) or "-"
         zone = e.get("zone_tuple") or "-"
-        conf = e.get("zone_confidence") or "-"
+        conf = e.get("confidence") or "-"
         lines.append(
             f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} | {sem} | {zone} | {conf} |"
         )

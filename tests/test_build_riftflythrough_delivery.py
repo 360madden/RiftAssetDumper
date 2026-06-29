@@ -1,4 +1,4 @@
-"""Tests for `scripts/build_riftflythrough_delivery.py` (delivery-authoritative textures, v0.2).
+﻿"""Tests for `scripts/build_riftflythrough_delivery.py` (delivery-authoritative textures, v0.2).
 
 Covers the v0.2 contract:
   * No absolute Windows paths leak into the emitted JSON (privacy + browser-portable).
@@ -116,3 +116,100 @@ def test_texture_url_resolution_is_nonempty() -> None:
     d = json.loads(DELIVERY_JSON.read_text(encoding="utf-8"))
     total_urls = sum(e["linked_texture_url_count"] for e in d["entries"])
     assert total_urls >= 100, f"expected >=100 resolved texture URLs, got {total_urls}"
+
+
+class TestNoLegacyZoneKeysInDelivery:
+    """Lock the v0.6 unifier invariant (producer version 0.6, shipped 2026-06-28).
+
+    Post-v0.6 the delivery JSON API surface is `first4` / `confidence` (matching
+    scene-manifest-v1 schema's nested zone.first4 / zone.confidence in flattened
+    form). Any future regression -- whether at the top level or under any nested
+    restructure -- must be caught here so a silent reintroduction would break
+    the sibling RiftFlythrough consumer's transform_loader.js.
+    """
+
+    def test_no_legacy_zone_first4_or_zone_confidence_keys(self) -> None:
+        """Recursive key-set walk: LEGACY prefixed keys must be absent at any depth.
+
+        Reviewer item: replaced shallow top-level iteration with a recursive walk
+        so a future restructure that nests zone fields (e.g. entry.zone.first4
+        or summary.zone.zone_confidence) is also caught.
+        """
+        repo_root = REPO_ROOT
+        delivery_path = DELIVERY_JSON
+        if not delivery_path.exists():
+            pytest.skip(
+                f"riftflythrough-delivery.json not built yet "
+                f"({delivery_path.relative_to(repo_root)} missing); "
+                "run scripts/build_riftflythrough_delivery.py first."
+            )
+        d = json.loads(delivery_path.read_text(encoding="utf-8-sig"))
+        legacy_keys = {"zone_first4", "zone_confidence"}
+        offenders: list[list[str]] = []
+
+        def walk(node: object, path: list[str]) -> None:
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    if k in legacy_keys:
+                        offenders.append(path + [k])
+                    walk(v, path + [k])
+            elif isinstance(node, list):
+                for i, item in enumerate(node):
+                    walk(item, path + [str(i)])
+
+        walk(d, [])
+        assert not offenders, (
+            f"v0.6 unifier regression: legacy prefixed keys still appear in "
+            f"riftflythrough-delivery.json at {offenders[:3]}. The rename to "
+            f"`first4` / `confidence` was a hard break; remove them from the producer."
+        )
+
+    def test_v0_6_unifier_first4_and_confidence_keys_present(self) -> None:
+        """Value-range lockdown: new keys present AND values in expected set.
+
+        Reviewer item: catch future regressions that emit the keys but with
+        wrong values (typos, corrupted magic, off-magic). Reuses the cycle 5.2
+        TestFirst4FilterStatus invariant shape — first4 in (empty, 47616d65),
+        confidence in (high, medium, low).
+        """
+        repo_root = REPO_ROOT
+        delivery_path = DELIVERY_JSON
+        if not delivery_path.exists():
+            pytest.skip(
+                f"riftflythrough-delivery.json not built yet "
+                f"({delivery_path.relative_to(repo_root)} missing)."
+            )
+        d = json.loads(delivery_path.read_text(encoding="utf-8-sig"))
+        entries = d.get("entries") or []
+        tagged = [e for e in entries if (e.get("zone_method") or "unmatched") != "unmatched"]
+        assert tagged, "no tagged entries in delivery -- cannot validate first4/confidence keys"
+        missing_first4 = [e["asset_id"] for e in tagged if "first4" not in e]
+        missing_confidence = [e["asset_id"] for e in tagged if "confidence" not in e]
+        assert not missing_first4, (
+            f"v0.6 unifier regression: {len(missing_first4)} tagged entries lack "
+            f"first4 key; first 3: {missing_first4[:3]}"
+        )
+        assert not missing_confidence, (
+            f"v0.6 unifier regression: {len(missing_confidence)} tagged entries lack "
+            f"confidence key; first 3: {missing_confidence[:3]}"
+        )
+        # Allowed values — f-string-friendly naming (no escaped curly braces).
+        allowed_first4_values = {"", "47616d65"}
+        allowed_confidence_values = ("high", "medium", "low")
+        bad_first4 = [
+            e["asset_id"] for e in tagged
+            if e.get("first4") not in allowed_first4_values
+        ]
+        bad_confidence = [
+            e["asset_id"] for e in tagged
+            if e.get("confidence") not in allowed_confidence_values
+        ]
+        assert not bad_first4, (
+            f"v0.6 unifier regression: {len(bad_first4)} tagged entries carry "
+            f"first4 outside the allowed set [empty, 47616d65]; first 3: {bad_first4[:3]}"
+        )
+        assert not bad_confidence, (
+            f"v0.6 unifier regression: {len(bad_confidence)} tagged entries carry "
+            f"confidence outside the allowed set (high, medium, low); "
+            f"first 3: {bad_confidence[:3]}"
+        )
