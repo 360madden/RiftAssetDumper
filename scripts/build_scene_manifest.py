@@ -424,6 +424,40 @@ def build_provenance(
     }
 
 
+def build_zone(flythrough_entry: dict[str, Any] | None) -> dict[str, Any]:
+    """Build the zone sub-record from the flythrough-index entry.
+
+    Cycle 5.1 surface: per-asset zone tuple (expansion/category/zone) resolved
+    from the hint:map-zone scan. The flythrough pipeline injects a `zone`
+    sub-record into flythrough-index.json via `inject_zone_into_flythrough_index.py`;
+    this function copies that record into the scene manifest. When the
+    flythrough entry has no `zone` (e.g. legacy index without the field), the
+    fallback is method='unmatched' with null fields.
+    """
+    if flythrough_entry and isinstance(flythrough_entry.get("zone"), dict):
+        z = flythrough_entry["zone"]
+        return {
+            "tuple": z.get("tuple"),
+            "expansion": z.get("expansion"),
+            "category": z.get("category"),
+            "name": z.get("name"),
+            "method": z.get("method", "unmatched"),
+            "delta": z.get("delta"),
+            "first4": z.get("first4", ""),
+            "confidence": z.get("confidence"),
+        }
+    return {
+        "tuple": None,
+        "expansion": None,
+        "category": None,
+        "name": None,
+        "method": "unmatched",
+        "delta": None,
+        "first4": "",
+        "confidence": None,
+    }
+
+
 def build_validation(geometry: dict[str, Any], materials: dict[str, Any], textures: dict[str, Any]) -> dict[str, Any]:
     """Build the validation sub-record, computing warnings and consumer_ready flag.
 
@@ -494,6 +528,7 @@ def build_manifest(asset_id: str) -> dict[str, Any]:
     provenance = build_provenance(asset_id, cohort_entry, flythrough_entry)
     validation = build_validation(geometry, materials, textures)
     semantic = _build_semantic_block(asset_id)
+    zone = build_zone(flythrough_entry)
     return {
         "SchemaVersion": "scene-manifest/v1",
         "asset_id": asset_id,
@@ -510,6 +545,7 @@ def build_manifest(asset_id: str) -> dict[str, Any]:
         "provenance": provenance,
         "validation": validation,
         "semantic": semantic,
+        "zone": zone,
     }
 
 

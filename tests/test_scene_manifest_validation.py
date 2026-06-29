@@ -1,4 +1,4 @@
-﻿"""C2-7.1 Scene Manifest Validation Suite — comprehensive consumer validation tests.
+"""C2-7.1 Scene Manifest Validation Suite — comprehensive consumer validation tests.
 
 Covers:
 - Schema validation: all 227 stage6 scale-out manifests pass Draft202012Validator
@@ -22,6 +22,9 @@ from typing import Any
 
 import pytest
 
+# FLYTHROUGH_INDEX is the durable source-of-truth path constant in scripts/build_scene_manifest.py.
+from scripts.build_scene_manifest import FLYTHROUGH_INDEX as _FLY_INDEX
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STAGE2_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 STAGE6_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage6"
@@ -29,6 +32,7 @@ PACK_PATH = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "s
 SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "scene-manifest-v1.schema.json"
 
 # ---------- Helpers ----------
+
 
 def _load_json(path: Path) -> dict[str, Any]:
     """Load a JSON file with utf-8-sig encoding."""
@@ -39,12 +43,10 @@ def _load_json(path: Path) -> dict[str, Any]:
 def _validate_schema(manifest: dict[str, Any]) -> list[str]:
     """Validate a manifest against the locked scene-manifest v1 schema."""
     from jsonschema import Draft202012Validator
+
     schema = _load_json(SCHEMA_PATH)
     validator = Draft202012Validator(schema)
-    return [
-        f"{'/'.join(str(p) for p in err.absolute_path)}: {err.message}"
-        for err in validator.iter_errors(manifest)
-    ]
+    return [f"{'/'.join(str(p) for p in err.absolute_path)}: {err.message}" for err in validator.iter_errors(manifest)]
 
 
 def _stage6_manifest_paths() -> list[Path]:
@@ -58,6 +60,7 @@ def _stage2_sample_paths() -> list[Path]:
 
 
 # ---------- Schema Validation: Scale-out Manifests ----------
+
 
 @pytest.mark.skipif(
     not SCHEMA_PATH.exists(),
@@ -77,13 +80,13 @@ def test_all_stage6_manifests_pass_schema() -> None:
         errors = _validate_schema(manifest)
         if errors:
             failures.append((path.name, errors))
-    assert failures == [], (
-        f"{len(failures)}/{len(paths)} stage6 manifests failed schema validation:\n"
-        + "\n".join(f"  {name}: {errs}" for name, errs in failures[:10])
+    assert failures == [], f"{len(failures)}/{len(paths)} stage6 manifests failed schema validation:\n" + "\n".join(
+        f"  {name}: {errs}" for name, errs in failures[:10]
     )
 
 
 # ---------- Schema Validation: Stage2 Sample Manifests ----------
+
 
 @pytest.mark.skipif(
     not SCHEMA_PATH.exists(),
@@ -103,22 +106,45 @@ def test_all_stage2_samples_pass_schema() -> None:
         errors = _validate_schema(manifest)
         if errors:
             failures.append((path.name, errors))
-    assert failures == [], (
-        f"{len(failures)}/{len(paths)} stage2 samples failed schema validation:\n"
-        + "\n".join(f"  {name}: {errs}" for name, errs in failures[:10])
+    assert failures == [], f"{len(failures)}/{len(paths)} stage2 samples failed schema validation:\n" + "\n".join(
+        f"  {name}: {errs}" for name, errs in failures[:10]
     )
 
 
 # ---------- Schema Validation: Exact Counts ----------
 
+
 @pytest.mark.skipif(
     not STAGE6_DIR.exists(),
     reason="stage6 directory not yet created",
 )
-def test_stage6_manifest_count_is_227() -> None:
-    """Scale-out must produce 227 manifests (one per flythrough-index asset)."""
+@pytest.mark.skipif(
+    not _FLY_INDEX.exists(),
+    reason=(
+        "flythrough-index.json is gitignored and missing in this checkout; "
+        "run `python scripts/rift_workflow.py build_flythrough_objects` (or the full pipeline) first."
+    ),
+)
+def test_stage6_manifest_count_matches_flythrough_cohort_with_drift_guard() -> None:
+    """Scale-out must produce one stage6 manifest per flythrough-index asset.
+
+    Cohort grew 227 -> 229 after the cycle-5.2 zone-confidence tightening
+    landed zone attribution on the full 229-asset dispatch
+    (see docs/handoffs/2026-06-28-cycle-5.2-zone-confidence.md).
+    Asserts against the source-of-truth fly_ids count (rather than a hardcoded
+    literal) so the lockdown stays correct as the cohort evolves, plus a
+    drift guard (max 2 stale manifests tolerated) to catch silent dead data.
+    """
     paths = _stage6_manifest_paths()
-    assert len(paths) == 227, f"expected 227 stage6 manifests, got {len(paths)}"
+    fly = json.loads(_FLY_INDEX.read_text(encoding="utf-8-sig"))
+    expected = len(fly["assets"])
+    drift_tolerance = 2  # max 2 stale manifests permitted (single in-flight scale-out rerun); raise if exceeded
+    assert expected > 0, "flythrough-index.json has 0 assets - cohort corrupted or never built"
+    assert len(paths) >= expected, f"stage6 manifest count {len(paths)} is below flythrough cohort {expected}"
+    assert len(paths) <= expected + drift_tolerance, (
+        f"stage6 manifest count {len(paths)} exceeds flythrough cohort {expected}"
+        f" + drift tolerance {drift_tolerance} (stale manifests accumulating?)"
+    )
 
 
 @pytest.mark.skipif(
@@ -132,6 +158,7 @@ def test_stage2_sample_count_is_25() -> None:
 
 
 # ---------- Pack Integrity ----------
+
 
 @pytest.mark.skipif(
     not PACK_PATH.exists(),
@@ -156,6 +183,7 @@ def test_pack_entries_all_have_asset_id() -> None:
     """Every pack entry must have a valid 16-char hex asset_id."""
     pack = _load_json(PACK_PATH)
     import re
+
     hex_pat = re.compile(r"^[0-9a-f]{16}$")
     missing: list[int] = []
     for i, entry in enumerate(pack["entries"]):
@@ -178,13 +206,13 @@ def test_pack_entries_all_pass_schema() -> None:
         if errors:
             aid = entry.get("asset_id", "unknown")
             failures.append((aid, errors))
-    assert failures == [], (
-        f"{len(failures)}/{len(pack['entries'])} pack entries failed schema:\n"
-        + "\n".join(f"  {aid}: {errs}" for aid, errs in failures[:10])
+    assert failures == [], f"{len(failures)}/{len(pack['entries'])} pack entries failed schema:\n" + "\n".join(
+        f"  {aid}: {errs}" for aid, errs in failures[:10]
     )
 
 
 # ---------- OBJ Path Existence ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -199,13 +227,11 @@ def test_all_stage6_obj_paths_exist() -> None:
         obj_path = manifest["geometry"]["obj_path"]
         if not os.path.exists(obj_path):
             missing.append(f"{manifest['asset_id']}: {obj_path}")
-    assert missing == [], (
-        f"{len(missing)}/{len(paths)} manifests have missing OBJ paths:\n"
-        + "\n".join(missing[:10])
-    )
+    assert missing == [], f"{len(missing)}/{len(paths)} manifests have missing OBJ paths:\n" + "\n".join(missing[:10])
 
 
 # ---------- World.json Path Existence ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -220,13 +246,13 @@ def test_all_stage6_world_json_paths_exist() -> None:
         world_json = manifest["world"]["world_json"]
         if not os.path.exists(world_json):
             missing.append(f"{manifest['asset_id']}: {world_json}")
-    assert missing == [], (
-        f"{len(missing)}/{len(paths)} manifests have missing world_json paths:\n"
-        + "\n".join(missing[:10])
+    assert missing == [], f"{len(missing)}/{len(paths)} manifests have missing world_json paths:\n" + "\n".join(
+        missing[:10]
     )
 
 
 # ---------- Transform Finiteness ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -247,12 +273,11 @@ def test_all_stage6_transforms_are_finite() -> None:
         s = ts.get("scale", 1.0)
         if not math.isfinite(s):
             bad.append(f"{manifest['asset_id']} scale={s}")
-    assert bad == [], (
-        f"{len(bad)} non-finite transform values:\n" + "\n".join(bad[:10])
-    )
+    assert bad == [], f"{len(bad)} non-finite transform values:\n" + "\n".join(bad[:10])
 
 
 # ---------- Texture Source Enum ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -268,13 +293,11 @@ def test_all_stage6_texture_source_is_valid_enum() -> None:
         src = manifest["textures"]["source"]
         if src not in valid:
             bad.append(f"{manifest['asset_id']}: '{src}'")
-    assert bad == [], (
-        f"{len(bad)}/{len(paths)} manifests have invalid textures.source:\n"
-        + "\n".join(bad[:10])
-    )
+    assert bad == [], f"{len(bad)}/{len(paths)} manifests have invalid textures.source:\n" + "\n".join(bad[:10])
 
 
 # ---------- Texture Source Distribution ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -289,12 +312,11 @@ def test_texture_source_never_scene() -> None:
         if manifest["textures"]["source"] == "scene":
             scene_sourced.append(manifest["asset_id"])
     # 'scene' is valid but not yet populated; this test locks that baseline
-    assert len(scene_sourced) == 0, (
-        f"expected 0 'scene'-sourced textures, found {len(scene_sourced)}: {scene_sourced}"
-    )
+    assert len(scene_sourced) == 0, f"expected 0 'scene'-sourced textures, found {len(scene_sourced)}: {scene_sourced}"
 
 
 # ---------- Schema Validity Flag ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -312,6 +334,7 @@ def test_all_stage6_schema_valid_flag_is_true() -> None:
 
 
 # ---------- Producer Version ----------
+
 
 @pytest.mark.skipif(
     not STAGE6_DIR.exists() or len(list(STAGE6_DIR.glob("manifest-*.json"))) == 0,
@@ -337,6 +360,7 @@ def test_all_stage6_producer_version_is_v0_8_or_v0_9() -> None:
 
 # ---------- Cross-Reference: Pack vs Individual Manifests ----------
 
+
 @pytest.mark.skipif(
     not PACK_PATH.exists(),
     reason="scene-manifest-pack-v1.json not yet built",
@@ -361,13 +385,13 @@ def test_pack_entries_match_stage2_manifests_bytes() -> None:
         individual_normalized = {k: v for k, v in individual.items() if k != "generated_at"}
         if entry_normalized != individual_normalized:
             mismatches.append(aid)
-    assert mismatches == [], (
-        f"{len(mismatches)}/{len(pack['entries'])} pack entries differ from stage2:\n"
-        + "\n".join(mismatches[:10])
+    assert mismatches == [], f"{len(mismatches)}/{len(pack['entries'])} pack entries differ from stage2:\n" + "\n".join(
+        mismatches[:10]
     )
 
 
 # ---------- Cohort Completeness ----------
+
 
 @pytest.mark.skipif(
     not PACK_PATH.exists(),
@@ -384,12 +408,11 @@ def test_pack_covers_all_stage2_samples() -> None:
     stage2_paths = _stage2_sample_paths()
     for sp in stage2_paths:
         sample = _load_json(sp)
-        assert sample["asset_id"] in pack_ids, (
-            f"stage2 manifest {sample['asset_id']} not found in pack entries"
-        )
+        assert sample["asset_id"] in pack_ids, f"stage2 manifest {sample['asset_id']} not found in pack entries"
 
 
 # ---------- Schema File Presence ----------
+
 
 def test_schema_file_exists() -> None:
     """The locked schema must exist on disk."""

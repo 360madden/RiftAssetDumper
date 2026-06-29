@@ -1,5 +1,25 @@
 # Current Active Phase & Milestone
 
+**Last Updated**: 2026-06-28 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
+
+> **1. `docs/roadmap/semantic-discovery-roadmap.md`** — Semantic Asset Discovery for Live-Memory Validation
+>
+> Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
+>
+> **Current phase**: Phase 0 — Infrastructure Readiness & Live-Archive Baseline
+>
+> **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
+>
+> Uses Ghidra static analysis on `rift_x64.exe` to extract stable byte signatures and struct layout maps so RiftReader can pattern-scan for memory anchors instead of hardcoding offsets that break on game patches. Output is `rift-x64-signature-database.json` in `Exports/binary-phaseN/`.
+>
+> **Current phase**: Phase 0 — Ghidra Tooling Audit & Binary Baseline
+>
+> These roadmaps are **independent** — work on one does not block the other. They use different tooling (C# semantic indexer vs. Ghidra headless), different inputs (TWAD archive entries vs. rift_x64.exe), and produce different outputs (vocabulary artifacts vs. byte signature database).
+
+---
+
+## Pre-June-28 History (for reference)
+
 **Last Updated**: 2026-06-27 (Promotion scope reduction: `residual-position-strict-threshold-not-met` marked DEFERRED (permanent structural limit at 0.9444, not a bug); 3 proven families promoted: mesh297 (17 OBJs), mesh321 (10 OBJs), mesh329#7 (complete binding proof); Deferred list + PromotedFamilies section added to post50-promotion-readiness-status; body-offset-28 investigation REVERTED; build 56/56 dotnet + Python tests pass)
 
 > **Body-offset-28 investigation — REVERTED (2026-06-27):**
@@ -158,7 +178,9 @@
 
 ---
 
-## Active Focus Rules
+## Legacy Active Focus Rules (NIF Geometry Era — Archived)
+
+These rules applied during the NIF geometry discovery pipeline (Phase 1-53). They are preserved for historical reference but do NOT apply to the active semantic-discovery or binary-signature roadmaps.
 
 - Stay within stream role classification — no new export formats or archive format changes
 - Every C# change must be additive (new fields/reports, not behavioral changes to existing decode paths)

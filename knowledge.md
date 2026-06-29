@@ -124,7 +124,7 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 - **Reports:** `scripts/rift_workflow_reports.py` — 10+ report functions (gap, sibling, classifier, cluster, crosstab, workbench)
 - **Utils:** `scripts/rift_workflow_utils.py` — checked_run, load_json_report, generated_output_guard, JSON access helpers
 - **Batch sweep:** `scripts/batch_sweep.py` — 4-phase tool for OBJ integrity validation (SHA256, index bounds, NaN, negative indices), candidate discovery, batch export, and manifest building
-- **Tests:** 593 Python tests across `scripts/` and `tests/` (pytest) including Cycle 5 regression-catchers + archive-derived lockdowns, 56 C# xUnit tests in `src/RiftAssetDumper.Tests/`
+- **Tests:** 635 Python tests across `scripts/` and `tests/` (pytest) including Cycle 5 regression-catchers + archive-derived lockdowns + Cycle 5.2 zone-confidence lockdown suite (23 tests in `tests/test_build_fly_asset_zone_map.py` — derive_confidence threshold boundaries + First4 per-method invariants), 56 C# xUnit tests in `src/RiftAssetDumper.Tests/`
 - **Cycle 5 scripts (added 2026-06-21):** `synthesize_semantic_matrices.py` (Tier-1 archive-path classifier + heuristic-lane fallback) and `build_live_archive_index.py` (atomic JSON extractor for live-archive `assets.NNN` provenance). See `docs/handoffs/2026-06-21-cycle-five-tier1-archive-provenance.md` for the full work chain.
 - **All 12 PowerShell complex modes fully ported to Python** — `complex_modes` set is now empty
 
@@ -439,6 +439,45 @@ pytest 593/593, markdownlint clean.
 | `python scripts/synthesize_semantic_matrices.py --archive-index --validate` | Synthesize with archive-index override; writes 3 hint files at `Exports/discovery-matrix/nif-semantic-hints/` | C5 |
 | `pytest tests/test_build_live_archive_index.py` | 16 unit tests covering schema + idempotence + missing-input | C5 |
 | `pytest tests/test_synthesize_semantic_matrices.py` | Unit tests + 4 ARCHIVE_TAXONOMY regression-catchers + 2 archive-derived lockdowns | C5 |
+| `python scripts/build_fly_asset_zone_map.py` | (Re-)derive per-asset zone map `Exports/semantic-phase1/fly_asset_zone_map_v2.json` with First4 magic + `derive_confidence()` thresholds (5/30) | C5.2 |
+| `python scripts/inject_zone_into_flythrough_index.py` | Inject zone records (tuple / first4 / confidence) into `Assets/build/flythrough/flythrough-index.json` | C5.2 |
+| `pytest tests/test_build_fly_asset_zone_map.py` | 23 tests: 19 `TestDeriveConfidenceThresholds` parametrized boundary tests + 4 `TestFirst4FilterStatus` lockdowns (top-level claim, per-entry invariant, per-method invariants, lazy-load helper) | C5.2 |
+
+### Cycle 5.2 — Zone-confidence tightening (SHIPPED 2026-06-28)
+
+> Cycle 5.2 adds per-asset `first4` and `zone_confidence` fields to the
+> flythrough delivery, with a First4-discrimination lockdown that pins the
+> "First4 alone does NOT discriminate siblings from coincidental neighbors"
+> finding (empirical 8-of-8 cross-checked neighbor share in
+> `docs/handoffs/2026-06-28-archive-neighbor-verification.md`).
+
+- **First4 discrimination invariant** — All 229 cohort entries' `first4`
+  must be empty (unmatched) OR exactly `47616d65` (Gamebryo NIF magic).
+  Pinned by 4 `TestFirst4FilterStatus` lockdown tests including a top-level
+  `v2["first4_discriminates"] is False` capture. Resolution still uses
+  Entry-Index Δ as the discriminating signal; First4 is recorded for
+  transparency only.
+- **Confidence thresholds (5/30)** — `derive_confidence(method, delta)`:
+  - `high`: direct match (delta=0) OR tight co-bundled sibling (|delta|≤5)
+  - `medium`: plausible sibling (6 ≤ |delta| ≤ 30)
+  - `low`: coincidental adjacency (|delta| > 30)
+  Pinned by 19 parametrized boundary tests including the 5/6 and 30/31
+  thresholds (prevents silent drift). Empirical distribution matches the
+  upstream verification: 179 high / 27 medium / 23 low / 10 unmatched across
+  the full 229-asset cohort.
+- **Schema + delivery naming convention gap** — `scene-manifest-v1.schema.json`
+  Zone.first4 (pattern `^([0-9a-f]{8})?$`) maps to top-level
+  `riftflythrough-delivery.json`'s `zone_first4` (prefix-flat API).
+  Documented inline in the schema description; an unifier follow-up is
+  explicitly deferred to avoid a public-API break in `riftflythrough-delivery.json`.
+- **Cohort count lockdown refactor** — `test_scene_manifest_validation.py`
+  stage6-count assertion no longer hardcodes 227; derives from
+  `len(fly["assets"])` with a ±2 drift guard and an `expected > 0`
+  empty-cohort guard. Cohort grew 227 → 229 after zone attribution landed on
+  the full 229-asset dispatch.
+- **Handoff** — `docs/handoffs/2026-06-28-cycle-5.2-zone-confidence.md`
+  (rationale, threshold calibration, 7-step pipeline propagation, verified
+  end-state, audit-key correctness finding, deferred follow-ups).
 
 ## Agent model strategy
 

@@ -49,7 +49,7 @@ RIFTFLYTHROUGH_JS = RIFTFLYTHROUGH_DIR / "js"
 RIFTFLYTHROUGH_TEXTURES = RIFTFLYTHROUGH_DIR / "textures" / "converted"
 
 PRODUCER_TOOL = "scripts/build_riftflythrough_delivery.py"
-PRODUCER_VERSION = "v0.3"
+PRODUCER_VERSION = "v0.5"
 TEXTURE_URL_PREFIX = "textures/converted/"
 
 
@@ -133,6 +133,26 @@ def build_delivery_entry(
         semantic_categories = list(semantic_block.get("categories") or [])
     else:
         semantic_categories = []
+    # Cycle 5.1 zone surface: forward the per-asset zone tuple + method.
+    # Older manifests pre-dating Cycle 5.1 omit the zone sub-record; we
+    # emit a 'unmatched' record in that case so the consumer can rely on
+    # the field's presence.
+    zone_block = manifest.get("zone")
+    if isinstance(zone_block, dict):
+        zone_tuple = zone_block.get("tuple")
+        zone_expansion = zone_block.get("expansion")
+        zone_category = zone_block.get("category")
+        zone_name = zone_block.get("name")
+        zone_method = zone_block.get("method", "unmatched")
+        zone_delta = zone_block.get("delta")
+        zone_first4 = zone_block.get("first4", "")
+        zone_confidence = zone_block.get("confidence")
+    else:
+        zone_tuple = zone_expansion = zone_category = zone_name = None
+        zone_method = "unmatched"
+        zone_delta = None
+        zone_first4 = ""
+        zone_confidence = None
     return {
         "asset_id": asset_id,
         "obj_mesh": obj_mesh,
@@ -152,6 +172,14 @@ def build_delivery_entry(
         "linked_texture_urls": linked_texture_urls,
         "linked_textures": linked_textures,
         "semantic_categories": semantic_categories,
+        "zone_tuple": zone_tuple,
+        "zone_expansion": zone_expansion,
+        "zone_category": zone_category,
+        "zone_name": zone_name,
+        "zone_method": zone_method,
+        "zone_delta": zone_delta,
+        "zone_first4": zone_first4,
+        "zone_confidence": zone_confidence,
     }
 
 
@@ -174,6 +202,22 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
             tagged_assets += 1
         for c in cats:
             hint_distribution[c] = hint_distribution.get(c, 0) + 1
+    # Cycle 5.1 zone stats: zone-tuple distribution + method counts
+    zone_distribution: dict[str, int] = {}
+    zone_method_distribution: dict[str, int] = {}
+    zone_confidence_distribution: dict[str, int] = {}
+    zone_tagged_assets = 0
+    for e in entries:
+        zt = e.get("zone_tuple")
+        zm = e.get("zone_method", "unmatched")
+        zc = e.get("zone_confidence")
+        zone_method_distribution[zm] = zone_method_distribution.get(zm, 0) + 1
+        # Count null confidence bucket under "null" key for clarity
+        conf_key = "null" if zc is None else zc
+        zone_confidence_distribution[conf_key] = zone_confidence_distribution.get(conf_key, 0) + 1
+        if zt is not None:
+            zone_tagged_assets += 1
+            zone_distribution[zt] = zone_distribution.get(zt, 0) + 1
     return {
         "total_assets": len(entries),
         "total_vertices": total_verts,
@@ -189,6 +233,13 @@ def build_stats(entries: list[dict[str, Any]]) -> dict[str, Any]:
         "tagged_assets": tagged_assets,
         "distinct_hints": len(hint_distribution),
         "hint_distribution": hint_distribution,
+        # Cycle 5.1 fields
+        "zone_tagged_assets": zone_tagged_assets,
+        "distinct_zones": len(zone_distribution),
+        "zone_distribution": zone_distribution,
+        "zone_method_distribution": zone_method_distribution,
+        # Cycle 5.2 fields
+        "zone_confidence_distribution": zone_confidence_distribution,
     }
 
 
@@ -199,6 +250,18 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         "",
         f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}",
         f"**Producer:** {PRODUCER_TOOL} {PRODUCER_VERSION}",
+        "",
+        "## What changed (v0.5)",
+        "",
+        "- Cycle 5.2: Added `zone_confidence` (high/medium/low/null) and `zone_first4` (4-byte NIF magic, transparency-only) to per-asset zone fields. Confidence buckets: high = direct match (delta=0) or tight sibling (|delta|<=5); medium = plausible sibling (6<=|delta|<=30); low = coincidental adjacency (|delta|>30); null = unmatched. Consumers can opt out of low-confidence attributions without re-deriving the discrimination rationale (see `docs/handoffs/2026-06-28-archive-neighbor-verification.md`). First4 is recorded for transparency; the verification handoff found all 5 closest and all 3 farthest neighbors share First4 `47616d65`, so it does NOT discriminate siblings -- Entry-Index Delta is the discriminating signal.",
+        "",
+        "## What changed (v0.5)",
+        "",
+        "- Cycle 5.2: Added `zone_confidence` (high/medium/low/null) and `zone_first4` (4-byte NIF magic, transparency-only) to per-asset zone fields. Confidence buckets: high = direct match (delta=0) or tight sibling (|delta|<=5); medium = plausible sibling (6<=|delta|<=30); low = coincidental adjacency (|delta|>30); null = unmatched. Consumers can opt out of low-confidence attributions without re-deriving the discrimination rationale (see `docs/handoffs/2026-06-28-archive-neighbor-verification.md`). First4 is recorded for transparency; the verification handoff found all 5 closest and all 3 farthest neighbors share First4 `47616d65`, so it does NOT discriminate siblings -- Entry-Index Delta is the discriminating signal.",
+        "",
+        "## What changed (v0.4)",
+        "",
+        "- Added per-asset zone fields (Cycle 5.1 surface): `zone_tuple`, `zone_expansion`, `zone_category`, `zone_name`, `zone_method` (direct/neighbor/unmatched), `zone_delta` (entry-index distance). Resolved from the hint:map-zone scan via direct match or archive-neighbor +/-150 fallback. The zone_tuple is the canonical identifier (e.g. `vanilla.world_objects.props`).",
         "",
         "## What changed (v0.3)",
         "",
@@ -233,8 +296,8 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         "",
         "## Per-Asset Detail",
         "",
-        "| Asset ID | Mesh | Size | Vertices | Faces | TexURLs | Transform | Semantic |",
-        "|---|---:|---:|---:|---:|---:|---|---|",
+        "| Asset ID | Mesh | Size | Vertices | Faces | TexURLs | Transform | Semantic | Zone | Conf |",
+        "|---|---:|---:|---:|---:|---:|---|---|---|---|",
     ]
     for e in sorted(entries, key=lambda x: (x["render_class"], -x["face_count"])):
         aid = e["asset_id"][:8]
@@ -243,7 +306,11 @@ def build_markdown(entries: list[dict[str, Any]], stats: dict[str, Any]) -> str:
         txu = e["linked_texture_url_count"]
         tf = "non-id" if not e["transform_identity"] else "id"
         sem = ",".join(e.get("semantic_categories") or []) or "-"
-        lines.append(f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} | {sem} |")
+        zone = e.get("zone_tuple") or "-"
+        conf = e.get("zone_confidence") or "-"
+        lines.append(
+            f"| {aid} | {mb} | {ms} | {e['vertex_count']} | {e['face_count']} | {txu} | {tf} | {sem} | {zone} | {conf} |"
+        )
     return "\n".join(lines) + "\n"
 
 

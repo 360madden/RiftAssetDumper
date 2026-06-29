@@ -1,8 +1,8 @@
-{
+﻿{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.riftassetdumper/schemas/scene-manifest-v1.schema.json",
   "title": "RIFT Scene Manifest v1",
-  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields. Migrated to tracked docs/schemas/ on 2026-06-21 (was gitignored under Assets/Exports/discovery-plan/cycle-2/stage2/). Cycle 5 (2026-06-21) added optional `semantic` sub-record surfacing hint:map-zone / hint:actor-object / hint:waypoint-poi categories from asset-semantic-index/v1 matrix reports.",
+  "description": "Locked consumer-facing scene manifest contract. V4P12 decisions: mesh-parent-chain transform, right-handed/Y-up/-Z-forward, textures.source discriminant, obj_sha1 + scanned_at parity fields. Migrated to tracked docs/schemas/ on 2026-06-21 (was gitignored under Assets/Exports/discovery-plan/cycle-2/stage2/). Cycle 5 (2026-06-21) added optional `semantic` sub-record surfacing hint:map-zone / hint:actor-object / hint:waypoint-poi categories from asset-semantic-index/v1 matrix reports. Cycle 5.1 (2026-06-28) added optional `zone` sub-record surfacing the per-asset zone tuple (expansion/category/zone) resolved from the hint:map-zone scan via direct match or archive-neighbor fallback.",
   "type": "object",
   "required": [
     "SchemaVersion",
@@ -73,6 +73,10 @@
     "semantic": {
       "$ref": "#/$defs/Semantic",
       "description": "Cycle 5 surface: typed semantic hint categories extracted from asset-semantic-index/v1 matrix reports. Optional; older manifests pre-dating Cycle 5 omit this field."
+    },
+    "zone": {
+      "$ref": "#/$defs/Zone",
+      "description": "Cycle 5.1 surface: per-asset zone tuple (expansion/category/zone) resolved from the hint:map-zone scan. method=direct means the asset's own NIF entry in zone-full.json carries the path; method=neighbor means the closest path-bearing NIF in the same archive within +/-150 entry indices was used; method=unmatched means no path-bearing NIF was found in window. Optional; older manifests pre-dating Cycle 5.1 omit this field."
     }
   },
   "additionalProperties": false,
@@ -278,6 +282,51 @@
           "additionalProperties": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Zone": {
+      "type": "object",
+      "description": "Per-asset zone attribution resolved from the hint:map-zone scan (zone-full.json). The tuple is the canonical identifier (expansion.category.zone); the constituent fields are surfaced for consumers that prefer structured access. method discriminates how the attribution was derived.",
+      "required": ["method"],
+      "properties": {
+        "tuple": {
+          "type": ["string", "null"],
+          "description": "Canonical zone identifier of the form 'expansion.category.zone' (e.g. 'vanilla.world_objects.props'). Null when method='unmatched'."
+        },
+        "expansion": {
+          "type": ["string", "null"],
+          "enum": ["vanilla", "ep1", "ep2", "ep3", null],
+          "description": "Game expansion the zone belongs to. Defaults to 'vanilla' when the path omits the expansion segment."
+        },
+        "category": {
+          "type": ["string", "null"],
+          "description": "Top-level content category (e.g. world_objects, vfx, creatures). Null when method='unmatched'."
+        },
+        "name": {
+          "type": ["string", "null"],
+          "description": "Zone name within the category (e.g. props, architecture, nature). Null when method='unmatched'."
+        },
+        "method": {
+          "enum": ["direct", "neighbor", "unmatched"],
+          "description": "How the zone attribution was derived: direct (asset's own NIF entry in zone-full.json carries the path), neighbor (closest path-bearing NIF in same archive within +/-150 entry indices), unmatched (no path-bearing NIF in window — fields are null)."
+        },
+        "delta": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Entry-index distance to the path-bearing NIF that provided the attribution. 0 when method='direct'; 0-150 when method='neighbor'; null when method='unmatched'."
+        },
+        "first4": {
+          "type": "string",
+          "description": "First4 magic of the zone-full entry that provided the attribution (4-byte hex, lowercased). Standard Gamebryo NIF magic is 47616d65 ('Game'). Recorded for transparency only -- First4 alone does NOT discriminate siblings from coincidental neighbors; the archive-neighbor verification handoff found all 5 closest and all 3 farthest neighbors share the same First4. Entry-Index Delta is the discriminating signal. Empty string when method='unmatched'. IN DELIVERY JSON (riftflythrough-delivery.json) this field is emitted as the top-level key zone_first4 (prefix-flat API surface); the schema-side nested form zone.first4 is the durable manifest form."
+        ,
+          "pattern": "^([0-9a-f]{8})?$"
+        },
+        "confidence": {
+          "type": ["string", "null"],
+          "enum": ["high", "medium", "low", null],
+          "description": "Zone attribution confidence derived from (method, |delta|). high = direct match (delta=0) or tight co-bundled sibling (|delta|<=5); medium = plausible sibling (6<=|delta|<=30); low = coincidental adjacency (|delta|>30); null = unmatched (no attribution). Consumers can opt out of low-confidence attributions by filtering on this field. See docs/handoffs/2026-06-28-archive-neighbor-verification.md for the threshold calibration."
         }
       },
       "additionalProperties": false
