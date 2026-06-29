@@ -25,17 +25,31 @@ from typing import Any
 
 MAP_BLOB_MAGIC = 0x6906
 
+# Safety cap on records decoded per call. Legitimate RIFT map blobs contain
+# <500 strings/records, so 10_000 is ~20× the realistic ceiling per level.
+# NOTE on recursion: _decode_protobuf_like is recursive with default
+# max_depth=4 — pathological inputs could fan out to ~4 * 10_000 = 40_000
+# records before any guard bites, but that is bounded JSON output (not
+# infinite). Each level already returns early on tag=0 / EOF, so a
+# defense-in-depth total-record budget (in parse_map_blob) is a future
+# hardening if needed.
+MAX_RECORDS_PER_DECODE = 10_000
+
 
 def _decode_length_prefixed_strings(data: bytes, offset: int) -> list[tuple[int, str, int]]:
     """Decode length-prefixed ASCII strings from binary data.
 
     Returns list of (length_byte_offset, string, str_len) tuples.
     The first element is the offset of the length-prefix byte (not the string itself).
+    Bails out after ``MAX_RECORDS_PER_DECODE`` records even if more would
+    match (infinite-loop guard against malformed input).
     """
     strings: list[tuple[int, str, int]] = []
     data_len = len(data)
 
     while offset < data_len:
+        if len(strings) >= MAX_RECORDS_PER_DECODE:
+            break
         if offset + 1 > data_len:
             break
         str_len = data[offset]
@@ -60,11 +74,15 @@ def _decode_protobuf_like(data: bytes, offset: int, max_depth: int = 4) -> list[
     Each record: tag (1 byte) -> length (1 byte) -> value (N bytes).
 
     Returns list of {tag, length, value_hex, value_ascii, offset, nested} dicts.
+    Bails out after ``MAX_RECORDS_PER_DECODE`` records even if more would
+    match (infinite-loop guard against malformed input).
     """
     records: list[dict[str, Any]] = []
     data_len = len(data)
 
     while offset < data_len and max_depth > 0:
+        if len(records) >= MAX_RECORDS_PER_DECODE:
+            break
         if offset + 2 > data_len:
             break
         tag = data[offset]

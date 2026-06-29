@@ -71,11 +71,11 @@ REPO="$REPO_OVERRIDE"
 if [[ -z "$REPO" ]] && command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
     REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
     if [[ -n "$REMOTE_URL" ]]; then
-        CANDIDATE=""
-        echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]([^/]+/[^/]+)(\.git)?$#\1#' >/dev/null 2>&1 \
-            && CANDIDATE="$(echo "$REMOTE_URL" | sed -E 's#.*github\.com[:/]([^/]+/[^/]+)(\.git)?$#\1#')" \
-            || CANDIDATE=""
-        if [[ "$CANDIDATE" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+        # Single-pass sed: if the regex matches, sed outputs owner/repo; if not, it
+        # outputs the original REMOTE_URL unchanged (no -n). We therefore detect a
+        # successful substitution by comparing CANDIDATE against the unmodified input.
+        CANDIDATE="$(printf '%s' "$REMOTE_URL" | sed -E 's#.*github\.com[:/]([^/]+/[^/]+)(\.git)?$#\1#')"
+        if [[ "$CANDIDATE" != "$REMOTE_URL" && "$CANDIDATE" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
             REPO="$CANDIDATE"
         else
             echo "Note: extracted '$CANDIDATE' from origin doesn't match owner/name shape; falling through to git log fallback. Re-run with --repo OWNER/NAME to override." >&2

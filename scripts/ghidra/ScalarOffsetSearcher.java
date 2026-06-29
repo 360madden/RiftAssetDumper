@@ -104,9 +104,10 @@ public class ScalarOffsetSearcher extends GhidraScript {
                     // Get context (nearby instructions)
                     List<Map<String, String>> context = new ArrayList<>();
                     Address addr = instr.getAddress();
-                    try {                    // Previous instructions
-                    Address prevAddr = addr;
-                    for (int c = 0; c < CONTEXT_INSTRUCTIONS; c++) {
+                    try {
+                        // Previous instructions
+                        Address prevAddr = addr;
+                        for (int c = 0; c < CONTEXT_INSTRUCTIONS; c++) {
                             Address nextPrev = prevAddr.previous();
                             if (nextPrev == null) break;
                             prevAddr = nextPrev;
@@ -119,8 +120,13 @@ public class ScalarOffsetSearcher extends GhidraScript {
                                 context.add(0, ctx);
                             }
                         }
-                    } catch (Exception ignored) {}
-                    
+                    } catch (Exception ex) {
+                        // Surface (don't swallow) — log to stderr and continue.
+                        // Continues to next-context walk so partial context is still useful.
+                        printerr("WARN: scalar-offset-search failed to walk previous context near "
+                                + addr + ": " + ex.getClass().getName() + ": " + ex.getMessage());
+                    }
+
                     // Target instruction
                     Map<String, String> targetCtx = new LinkedHashMap<>();
                     targetCtx.put("address", instr.getAddress().toString());
@@ -144,7 +150,11 @@ public class ScalarOffsetSearcher extends GhidraScript {
                                 context.add(ctx);
                             }
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ex) {
+                        // Surface (don't swallow) — log to stderr and continue.
+                        printerr("WARN: scalar-offset-search failed to walk next context near "
+                                + addr + ": " + ex.getClass().getName() + ": " + ex.getMessage());
+                    }
 
                     hit.put("context", context);
                     results.add(hit);

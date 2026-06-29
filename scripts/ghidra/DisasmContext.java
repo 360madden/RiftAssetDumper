@@ -119,10 +119,21 @@ public class DisasmContext extends GhidraScript {
             switch (c) {
                 case '"': sb.append("\\\""); break;
                 case '\\': sb.append("\\\\"); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
                 case '\n': sb.append("\\n"); break;
                 case '\r': sb.append("\\r"); break;
                 case '\t': sb.append("\\t"); break;
-                default: sb.append(c);
+                default:
+                    // Per RFC 8259 §7: control characters (c < 0x20) AND the
+                    // DEL character (c == 0x7F) MUST be escaped. Other Unicode
+                    // above U+007F is allowed verbatim in JSON. RFC 8259 also
+                    // specifies uppercase hex digits in \uXXXX, so use `%04X`.
+                    if (c < 0x20 || c == 0x7F) {
+                        sb.append(String.format("\\u%04X", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
             }
         }
         return sb.toString();

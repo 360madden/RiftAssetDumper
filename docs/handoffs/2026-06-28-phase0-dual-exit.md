@@ -202,11 +202,17 @@ For Phase 2 signature validation: load `rift_x64.exe` bytes into a `FixtureProce
 
 ## CI Health Sweep
 
-| Check | Status |
-|-------|--------|
-| `ruff check scripts/` | ✅ All checks passed |
-| `mypy scripts/ --no-error-summary` | ✅ No errors |
-| `dotnet build RiftAssetDumper.slnx --nologo` | ✅ 0 warnings, 0 errors |
+| Check | Status | stdout excerpt (re-runnable) |
+|-------|--------|---------------------------|
+| `ruff check scripts/` | ✅ All checks passed | `All checks passed!` |
+| `mypy scripts/ --no-error-summary` | ✅ No errors | `Success: no issues found in <N> source files` (N grows as scripts land) |
+| `dotnet build RiftAssetDumper.slnx --nologo` | ✅ 0 warnings, 0 errors | `Build succeeded.\n       0 Warning(s)\n       0 Error(s)` |
+
+*Reproduce*: run the three commands above from the repo root on the current branch.
+Mypy's source-file count `<N>` grows as scripts land — use the placeholder, not a frozen
+number, so the excerpt doesn't go stale. Dotnet warning/error lines may vary across
+TFMs; ignore cosmetic differences and compare against the actual numeric counts
+produced locally.
 
 ---
 
