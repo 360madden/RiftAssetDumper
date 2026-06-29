@@ -32,7 +32,9 @@ def check_raises_no(desc: str, fn: Any) -> None:
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    # utf-8-sig tolerates files saved with a BOM (e.g. some editors re-add
+    # it on save). Mirrors scripts/rift_workflow_utils.py::load_json_report.
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 print("=== tracked JSON schemas ===")
