@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.riftassetdumper/schemas/scene-manifest-v1.schema.json",
   "title": "RIFT Scene Manifest v1",
