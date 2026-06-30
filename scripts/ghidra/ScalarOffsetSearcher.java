@@ -15,6 +15,7 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.scalar.Scalar;
+import ghidra.util.exception.CancelledException;
 
 import java.io.*;
 import java.util.*;
@@ -85,6 +86,10 @@ public class ScalarOffsetSearcher extends GhidraScript {
                         byte[] bytes = new byte[instr.getLength()];
                         currentProgram.getMemory().getBytes(instr.getAddress(), bytes);
                         hit.put("instructionBytes", bytesToHex(bytes));
+                    } catch (CancelledException ce) {
+                        // Same cancellation-propagation rule as the context walks —
+                        // a cancel mid-bytes-read must not be silently swallowed.
+                        throw ce;
                     } catch (Exception ex) {
                         hit.put("instructionBytes", "");
                     }
@@ -103,6 +108,7 @@ public class ScalarOffsetSearcher extends GhidraScript {
 
                     // Get context (nearby instructions)
                     List<Map<String, String>> context = new ArrayList<>();
+                    List<String> contextWarnings = null;  // folded per-hit summary
                     Address addr = instr.getAddress();
                     try {
                         // Previous instructions
@@ -120,11 +126,18 @@ public class ScalarOffsetSearcher extends GhidraScript {
                                 context.add(0, ctx);
                             }
                         }
+                    } catch (CancelledException ce) {
+                        // User cancellation must propagate. The plain `catch (Exception)` block
+                        // previously swallowed it as just-another-exception, which froze the
+                        // script run; monitor.checkCancelled() could not drain cleanup work.
+                        throw ce;
                     } catch (Exception ex) {
-                        // Surface (don't swallow) — log to stderr and continue.
-                        // Continues to next-context walk so partial context is still useful.
-                        printerr("WARN: scalar-offset-search failed to walk previous context near "
-                                + addr + ": " + ex.getClass().getName() + ": " + ex.getMessage());
+                        // Non-cancellation failure: accumulate into per-hit summary
+                        // so the next-context warning folds into ONE printerr line.
+                        if (contextWarnings == null) {
+                            contextWarnings = new ArrayList<>();
+                        }
+                        contextWarnings.add("previous:" + ex.getClass().getName() + ":" + ex.getMessage());
                     }
 
                     // Target instruction
@@ -150,10 +163,22 @@ public class ScalarOffsetSearcher extends GhidraScript {
                                 context.add(ctx);
                             }
                         }
+                    } catch (CancelledException ce) {
+                        // User cancellation must propagate (see prev-walk catch above).
+                        throw ce;
                     } catch (Exception ex) {
-                        // Surface (don't swallow) — log to stderr and continue.
-                        printerr("WARN: scalar-offset-search failed to walk next context near "
-                                + addr + ": " + ex.getClass().getName() + ": " + ex.getMessage());
+                        // Non-cancellation failure: accumulate into per-hit summary.
+                        if (contextWarnings == null) {
+                            contextWarnings = new ArrayList<>();
+                        }
+                        contextWarnings.add("next:" + ex.getClass().getName() + ":" + ex.getMessage());
+                    }
+
+                    // Single summary printerr line per hit (covers both walks).
+                    // Bounds per-offset noise regardless of hit count.
+                    if (contextWarnings != null) {
+                        printerr("WARN: scalar-offset-search partial context at "
+                                + addr + " (" + String.join("; ", contextWarnings) + ")");
                     }
 
                     hit.put("context", context);
