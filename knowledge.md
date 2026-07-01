@@ -8,6 +8,8 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 
 **Consumer app**: `C:\RIFT MODDING\RiftFlythrough` (sibling project, v1.35.0, Phase 21/50 of its own roadmap) consumes this Assets repo's output (merged.obj + PNG textures). The **Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`, FT-1..FT-8) is **COMPLETE** — all 7 phases delivered, FT-8 skipped (mod-injection contradicts read-only mandate).
 
+**New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. Phase 0 (feasibility) in progress — walkability classification complete (239 assets, 161 potentially walkable), pure-Python feasibility analyzer built, awaiting flythrough pipeline rebuild for full geometry input.
+
 ## Quickstart
 
 ### .NET (main dumper CLI)
@@ -90,6 +92,8 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/discovery_workbench.py` | Aggregated discovery workbench |
 | `python scripts/build_world_placed_merge.py` | Hierarchy-aware world-placed merged OBJ for RiftFlythrough — applies world.json Scale→Rotate→Translate transforms to 217 OBJs |
 | `python scripts/validate_meshsize_inference.py` | Cross-validation of vc_proximity mesh_size inferences against ground truth |
+| `python scripts/navmesh_phase0_feasibility.py --obj <path> [--cell-size 0.5] [--max-slope 45]` | Pure-Python navmesh feasibility analyzer: OBJ parse → slope filter → 2D grid → connected components → verdict |
+| `python scripts/classify_walkability.py` | Per-asset walkability classifier: cross-references zone attribution + semantic hints → label + confidence + needs_shape_analysis |
 
 ### Cycle 5 (Tier-1 archive provenance) scripts (Python, `scripts/`)
 
@@ -171,12 +175,34 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 | FT-7 | Zone boundaries, LOD variants | ✅ DONE (7→10 high-confidence LOD groups, 193/217 assets classified) |
 | FT-8 | Mod-replacement bridge (optional, safety-gated) | ⏭️ SKIPPED (contradicts read-only mandate) |
 
+### Navmesh Navigation roadmap (Phase 0 in progress)
+
+`docs/roadmap/navmesh-navigation-roadmap.md` — generative navmesh from NIF geometry using Recast/Detour.
+
+| Phase | Topic | Status |
+|-------|-------|:---:|
+| NM-0 | Recast feasibility, geometry audit, walkability classification | ⬜ IN PROGRESS (M0.1–M0.2 done; NM=NavMesh prefix) |
+| NM-1 | Single-zone navmesh pipeline (Recast build) | ⬜ |
+| NM-2 | Coordinate system alignment (OBJ↔memory) | ⬜ |
+| NM-3 | Pathfinding integration (Detour A*) | ⬜ |
+| NM-4 | Runtime bridge (live position → navmesh) | ⬜ |
+| NM-5 | Visualization (RiftFlythrough overlay) | ⬜ |
+| NM-6 | Scale-out & multi-zone navigation | ⬜ |
+| NM-7 | Navigation agent (optional, safety-gated) | ⬜ |
+
+**Phase 0 progress**: Walkability classification complete — 239 assets classified, 161 potentially walkable (43 walkable_structure + 118 potentially_walkable). Pure-Python feasibility analyzer confirms geometry can support navmesh on single-OBJ smoke test. Blocked on flythrough pipeline rebuild for full 217-asset geometry input.
+
+**Key scripts**: `scripts/navmesh_phase0_feasibility.py`, `scripts/classify_walkability.py`
+
+**Handoff**: `docs/handoffs/2026-06-30-navmesh-phase0-feasibility.md`
+
 ### Key directories (gitignored)
 
 | Path | Contents |
 |------|----------|
 | `Extracted/` | Decompressed payload dumps (NIF, DDS, etc.) and NIF texture bundles |
 | `Exports/` | JSON/JSONL reports, inventories, matrices, and OBJ exports |
+| `Exports/navmesh-phase0/` | Navmesh Phase 0 output: feasibility reports, walkability classification, debug OBJs |
 | `Assets/build/flythrough/` | FT pipeline output: `objs/`, `textures/converted/`, `flythrough-index.json`, `world-placed-merged.obj`, `lod-manifest.json`, `scene-graph-manifest.json`, `.state.json`, `evidence/ft{N}.{M}/`, `riftflythrough/transform_loader.js` |
 | `RecoveredNames/` | Generated filename matches (`recovered-names.jsonl`) |
 | `Candidates/` | Candidate filename lists for hash matching |
@@ -227,6 +253,7 @@ Four parallel jobs (3 on `windows-latest`, 1 on `ubuntu-latest`) + 1 final summa
 - Endian-analysis root-cause fix (Stage 9): `PairCompatibleMeshes` restored to **1,949**
 - Triangle fan fallback implemented: pos-only OBJs now get approximate faces via `--experimental-position-source --write-obj`
 - Discovery suite: 6/7 steps functional against live archive (position-source-gap-report needs inventory rebuild)
+- **Navmesh Phase 0 (2026-06-30)**: Walkability classification across 239 assets (161 potentially walkable, 43 walkable_structure). Pure-Python feasibility analyzer (`navmesh_phase0_feasibility.py`) confirms geometry produces large contiguous walkable regions (457 cells, 114 sq units on smoke test). Classifier (`classify_walkability.py`) labels assets by zone category, semantic hints, and archive provenance. 171/229 assets need bounding-box shape analysis — blocked on flythrough pipeline rebuild. Handoff: `docs/handoffs/2026-06-30-navmesh-phase0-feasibility.md`.
 - **Final delivery**: `flythrough-index.json` — single consumable file linking OBJs, world.json, LOD, MeshSize, **textures** (207/217 assets, 626 linked PNGs) for RiftFlythrough Phase 21
 - **Texture discovery pipeline**: `link-nif-textures` → 9,434 NIF→texture links → filtered to 650 flythrough links (222 unique DDS) → `extract-linked-textures` (222 DDS extracted, 0 failures) → `link_flythrough_textures.py` (DDS→PNG conversion, populates `linked_textures` in flythrough-index.json)
 - **RiftFlythrough bridge**: `build_world_placed_merge.py` → `world-placed-merged.obj` (2.5MB, 72,976 lines, 217 assets, 4 non-identity transforms) copied to `C:\RIFT MODDING\RiftFlythrough\merged.obj`; `transform_loader.js` (4KB) copied to `RiftFlythrough/js/` for runtime manifest-based transform application
@@ -375,9 +402,11 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
   asset showing source archive (`assets.NNN`) + entry index. 227 rows, 100%
   cohort coverage from 13 distinct archives. CLI flags: `--root`, `--out`,
   `--force`.
+
 - **C5-1 tests** — `tests/test_build_live_archive_index.py` (16 unit tests
   covering schema, idempotence, missing-input handling, end-to-end against
   the live install, missing-path branch).
+
 - **C5-2: ARCHIVE_TAXONOMY disjoint `assets.N` split** — Cycle 5's main
   feature: `scripts/synthesize_semantic_matrices.py::ARCHIVE_TAXONOMY`
   extended with 3 disjoint archive-range substring rules:
@@ -392,6 +421,7 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
   vertex-count heuristic. **Long-term replacement**: C# `build-asset-semantic-index`
   pipeline reading the manifest's real PAK listings (heuristic fail-safe
   documented in the `ARCHIVE_TAXONOMY` docstring).
+
 - **C5-3: TestArchiveTaxonomyInvariants** — 4 regression-catchers in
   `tests/test_synthesize_semantic_matrices.py`:
 
@@ -409,6 +439,7 @@ LZMA2 is real in the manifest/PAK layer but not in ordinary TWAD entry payloads 
   - `test_archive_derived_entries_match_live_archive_filename_shape` — locks
     `DetectedType=="archive-derived"` → `MagicLabel==V2` +
     `ArchiveName matches ^assets\.\d{3}$` + not-synthetic + `EntryIndex >= 0`.
+
   - `test_archive_derived_v2_label_consistent_with_provenance` — bidirectional
     `MagicLabel==V2 ↔ DetectedType=="archive-derived" ↔ ArchiveName!="synthetic.twad"`
     cross-check.
@@ -470,6 +501,7 @@ pytest 593/593, markdownlint clean.
   `riftflythrough-delivery.json`'s `first4` (prefix-flat API).
   Documented inline in the schema description; an unifier follow-up is
   explicitly deferred to avoid a public-API break in `riftflythrough-delivery.json`.
+
 - **Cohort count lockdown refactor** — `test_scene_manifest_validation.py`
   stage6-count assertion no longer hardcodes 227; derives from
   `len(fly["assets"])` with a ±2 drift guard and an `expected > 0`
