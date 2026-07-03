@@ -103,6 +103,12 @@ READ_ONLY_COMMANDS: frozenset[str] = frozenset(
         "nidatastream-parser-field-proof-guard",
         "nidatastream-parser-export-non-consumption-guard",
         "nidatastream-layout",
+        # probe-modrm-leads — bridges static ModRM analysis to live memory (13)
+        "probe-modrm-leads",
+        # scan-live-values — float32/int32/uint32 value-range live memory scanning
+        "scan-live-values",
+        # scan-live-diff — snapshot-diff value scanning for player coordinate discovery
+        "scan-live-diff",
     }
 )
 
@@ -234,6 +240,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "--ghidra-report",
         default="",
         help="Path to a FunctionSiteSurvey report JSON (for ghidra-summarize).",
+    )
+
+    # Live memory scanning (shared by scan-live-memory, probe-modrm-leads, scan-live-values)
+    parser.add_argument("--pid", type=int, default=0, help="Target process PID for live memory scans.")
+    parser.add_argument("--process-name", default="rift_x64.exe", help="Target process name.")
+    parser.add_argument("--execute-live-read", action="store_true", help="Actually open/read the target process.")
+    parser.add_argument("--experimental-live", action="store_true", help="Acknowledge experimental live mode.")
+    parser.add_argument("--confirm-live-read", action="store_true", help="Confirm intent to read live memory.")
+    parser.add_argument("--max-scan-bytes", type=int, default=16777216, help="Max bytes to scan.")
+    parser.add_argument("--max-scan-matches", type=int, default=32, help="Max matches per pattern/signature.")
+    parser.add_argument("--max-scan-regions", type=int, default=256, help="Max memory regions to scan.")
+    parser.add_argument("--live-timeout-seconds", type=int, default=10, help="Scan timeout in seconds.")
+    # Value-type scanning
+    parser.add_argument(
+        "--value-type", default="f32", choices=["f32", "i32", "u32"], help="Value type for scan-live-values."
+    )
+    parser.add_argument("--min-val", type=float, default=-500.0, help="Min value (inclusive) for value-type scan.")
+    parser.add_argument("--max-val", type=float, default=500.0, help="Max value (inclusive) for value-type scan.")
+    parser.add_argument(
+        "--snapshot-a-path", default=None, help="Path to snapshot-A JSON for second-pass diff scan (scan-live-diff)."
     )
 
     return parser

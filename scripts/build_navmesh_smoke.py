@@ -41,6 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RECAST_JAR = REPO_ROOT / "Exports" / "navmesh-phase1" / "lib" / "recast-1.5.7.jar"
 DETOUR_JAR = REPO_ROOT / "Exports" / "navmesh-phase1" / "lib" / "detour-1.5.7.jar"
 JDK_PATH = "C:/RIFT MODDING/Tools/jdk-21.0.11+10"
+RC_WALKABLE_AREA = 63  # 0x3F — Recast standard walkable area
 
 
 def _start_jvm() -> None:
@@ -244,7 +245,7 @@ def _build_navmesh_debug(
         int(verts_per_poly),
         float(detail_sample_dist),
         float(detail_sample_max_error),
-        AreaMod(0),
+        AreaMod(RC_WALKABLE_AREA),
     )
 
     # Step 2: Calculate grid size and create Heightfield
@@ -379,7 +380,7 @@ def _build_navmesh_debug(
     if detail_mesh is not None:
         dtris = detail_mesh.tris
         dverts = detail_mesh.verts
-        for i in range(dtris.size // 4):
+        for i in range(len(dtris) // 4):
             base = i * 4
             detail_tris.append(
                 [
@@ -389,7 +390,7 @@ def _build_navmesh_debug(
                     dtris[base + 3],
                 ]
             )
-        for i in range(dverts.size // 3):
+        for i in range(len(dverts) // 3):
             base = i * 3
             detail_verts.append(
                 [
@@ -501,7 +502,7 @@ def build_navmesh(
         int(verts_per_poly),
         float(detail_sample_dist),
         float(detail_sample_max_error),
-        AreaMod(0),
+        AreaMod(RC_WALKABLE_AREA),
     )
 
     builder_config = RecastBuilderConfig(cfg, min_bounds, max_bounds)
