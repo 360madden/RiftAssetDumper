@@ -473,6 +473,19 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "matrix-synth",
     },
+    # Binary-signature Phase 6 (M6.3) orchestration entry points.
+    # These dispatch to scripts/extract_binary_signatures.py and
+    # scripts/compare_signature_databases.py via subprocess.run, mirroring the
+    # batch-export-sibling pattern. Underlying scripts own their schema validation
+    # and exit-code mapping (0=success, 1=schema-violation, 2=missing-input).
+    "extract-binary-signatures": {
+        "dotnet": "",
+        "base": "",
+    },
+    "compare-binary-signatures": {
+        "dotnet": "",
+        "base": "",
+    },
 }
 
 
@@ -9125,6 +9138,69 @@ def _run_command(args: argparse.Namespace) -> None:
         _result = _sp.run(_cmd, cwd=str(REPO_ROOT))
         _sys.exit(_result.returncode)
 
+    # --- extract-binary-signatures: Phase 6 pipeline orchestrator ---
+
+    if command == "extract-binary-signatures":
+        import subprocess as _sp
+        import sys as _sys
+
+        _SCRIPT = SCRIPT_DIR / "extract_binary_signatures.py"
+        if not _SCRIPT.exists():
+            print(f"ERROR: extract_binary_signatures.py not found at {_SCRIPT}", file=_sys.stderr)
+            _sys.exit(1)
+
+        _cmd = [_sys.executable, str(_SCRIPT)]
+        if args.phase2_catalog:
+            _cmd += ["--phase2-catalog", str(args.phase2_catalog)]
+        if args.phase3_catalog:
+            _cmd += ["--phase3-catalog", str(args.phase3_catalog)]
+        if args.out:
+            _cmd += ["--out", str(args.out)]
+        if args.validate_only:
+            _cmd.append("--validate-only")
+
+        print("Running: " + " ".join(_cmd))
+        _result = _sp.run(_cmd, cwd=str(REPO_ROOT))
+        _sys.exit(_result.returncode)
+
+    # --- compare-binary-signatures: Phase 6 diff tool ---
+
+    if command == "compare-binary-signatures":
+        import subprocess as _sp
+        import sys as _sys
+
+        _SCRIPT = SCRIPT_DIR / "compare_signature_databases.py"
+        if not _SCRIPT.exists():
+            print(f"ERROR: compare_signature_databases.py not found at {_SCRIPT}", file=_sys.stderr)
+            _sys.exit(1)
+
+        # Pre-spawn guard: exit 1 (user input invalid) instead of letting the
+        # underlying script's argparse raise exit 2. batch-export-sibling does
+        # not pre-validate because its only flag (--skip-build) is optional.
+        if not args.old_db or not args.new_db:
+            print(
+                "ERROR: compare-binary-signatures requires --old-db and --new-db paths to existing unified DBs.",
+                file=_sys.stderr,
+            )
+            _sys.exit(1)
+
+        _cmd = [
+            _sys.executable,
+            str(_SCRIPT),
+            "--old-db",
+            str(args.old_db),
+            "--new-db",
+            str(args.new_db),
+        ]
+        if args.diff_out:
+            _cmd += ["--out", str(args.diff_out)]
+        if args.diff_markdown_out:
+            _cmd += ["--markdown-out", str(args.diff_markdown_out)]
+
+        print("Running: " + " ".join(_cmd))
+        _result = _sp.run(_cmd, cwd=str(REPO_ROOT))
+        _sys.exit(_result.returncode)
+
     # Validate required args
     if entry.get("needs_id") and not args.id:
         print(f"ERROR: '{command}' requires --id <16hex>", file=sys.stderr)
@@ -9231,6 +9307,8 @@ Examples:
   python scripts/rift_workflow.py ghidra-attribute-candidate-guard
   python scripts/rift_workflow.py ghidra-workflow-guard-suite
   python scripts/rift_workflow.py nidatastream-layout --root Extracted --full
+  python scripts/rift_workflow.py extract-binary-signatures --phase2-catalog Exports/binary-phase2/rift-x64-signature-catalog.json --phase3-catalog Exports/binary-phase3/struct-layout-catalog.json
+  python scripts/rift_workflow.py compare-binary-signatures --old-db Exports/binary-phase5/rift-x64-signature-database.v1.json --new-db Exports/binary-phase5/rift-x64-signature-database.json
         """,
     )
     parser.add_argument(
@@ -9646,6 +9724,50 @@ Examples:
         "--force-orphan-guard",
         action="store_true",
         help="Proceed even when orphan RiftAssetDumper processes are detected.",
+    )
+
+    # Binary-signature Phase 6 (M6.3 wiring) — extract-binary-signatures
+    parser.add_argument(
+        "--phase2-catalog",
+        type=Path,
+        default=None,
+        help="Path to Phase 2 signature catalog (extract-binary-signatures).",
+    )
+    parser.add_argument(
+        "--phase3-catalog",
+        type=Path,
+        default=None,
+        help="Path to Phase 3 struct-layout catalog (extract-binary-signatures; optional, omit to skip).",
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="extract-binary-signatures: validate only, do not write the output.",
+    )
+    # Binary-signature Phase 6 (M6.3 wiring) — compare-binary-signatures
+    parser.add_argument(
+        "--old-db",
+        type=Path,
+        default=None,
+        help="Path to old unified signature DB (compare-binary-signatures; required).",
+    )
+    parser.add_argument(
+        "--new-db",
+        type=Path,
+        default=None,
+        help="Path to new unified signature DB (compare-binary-signatures; required).",
+    )
+    parser.add_argument(
+        "--diff-out",
+        type=Path,
+        default=None,
+        help="Diff JSON output path (compare-binary-signatures; default binary-phase6/patch-diff-report.json).",
+    )
+    parser.add_argument(
+        "--diff-markdown-out",
+        type=Path,
+        default=None,
+        help="Optional Markdown report path (compare-binary-signatures).",
     )
 
     args = parser.parse_args()

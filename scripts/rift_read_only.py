@@ -32,6 +32,8 @@ Example:
     python scripts/rift_read_only.py tools-status
     python scripts/rift_read_only.py ghidra-summarize --ghidra-report Exports/ghidra-reports/site.json
     python scripts/rift_read_only.py discovery-workbench
+    python scripts/rift_read_only.py extract-binary-signatures --phase2-catalog Exports/binary-phase2/rift-x64-signature-catalog.json --validate-only
+    python scripts/rift_read_only.py compare-binary-signatures --old-db Exports/binary-phase5/rift-x64-signature-database.v1.json --new-db Exports/binary-phase5/rift-x64-signature-database.json
 """
 
 from __future__ import annotations
@@ -109,6 +111,9 @@ READ_ONLY_COMMANDS: frozenset[str] = frozenset(
         "scan-live-values",
         # scan-live-diff — snapshot-diff value scanning for player coordinate discovery
         "scan-live-diff",
+        # Binary-signature pipeline (M6.3) — Phase 6 automation entry points
+        "extract-binary-signatures",
+        "compare-binary-signatures",
     }
 )
 
@@ -260,6 +265,50 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-val", type=float, default=500.0, help="Max value (inclusive) for value-type scan.")
     parser.add_argument(
         "--snapshot-a-path", default=None, help="Path to snapshot-A JSON for second-pass diff scan (scan-live-diff)."
+    )
+
+    # Binary-signature Phase 6 (M6.3 wiring) — extract-binary-signatures
+    parser.add_argument(
+        "--phase2-catalog",
+        type=Path,
+        default=None,
+        help="Path to Phase 2 signature catalog (extract-binary-signatures; default: Exports/binary-phase2/... ).",
+    )
+    parser.add_argument(
+        "--phase3-catalog",
+        type=Path,
+        default=None,
+        help="Path to Phase 3 struct-layout catalog (extract-binary-signatures; optional, omit to skip).",
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="extract-binary-signatures: run validation only, do not write the unified DB output.",
+    )
+    # Binary-signature Phase 6 (M6.3 wiring) — compare-binary-signatures
+    parser.add_argument(
+        "--old-db",
+        type=Path,
+        default=None,
+        help="Path to old unified signature DB JSON (compare-binary-signatures; required).",
+    )
+    parser.add_argument(
+        "--new-db",
+        type=Path,
+        default=None,
+        help="Path to new unified signature DB JSON (compare-binary-signatures; required).",
+    )
+    parser.add_argument(
+        "--diff-out",
+        type=Path,
+        default=None,
+        help="Diff JSON output path (compare-binary-signatures; default: Exports/binary-phase6/patch-diff-report.json).",
+    )
+    parser.add_argument(
+        "--diff-markdown-out",
+        type=Path,
+        default=None,
+        help="Optional Markdown report path (compare-binary-signatures).",
     )
 
     return parser
