@@ -1,12 +1,12 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-06-28 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
+**Last Updated**: 2026-07-07 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
 
 > **1. `docs/roadmap/semantic-discovery-roadmap.md`** — Semantic Asset Discovery for Live-Memory Validation
 >
 > Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
 >
-> **Current phase**: Phase 0 — Infrastructure Readiness & Live-Archive Baseline
+> **Current phase**: Phase 0 ✅ COMPLETE → Phase 1 — Zone/Map Name Mining (next)
 >
 > **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
 >
