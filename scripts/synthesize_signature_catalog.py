@@ -110,6 +110,8 @@ def synthesize_catalog(
             if stability_tier == 1:
                 tier1_count += 1
 
+            entry_va = c.get("entry_va", "")
+            cluster_va = c.get("cluster_va", "")
             anchor: dict[str, Any] = {
                 "Name": name,
                 "StabilityTier": stability_tier,
@@ -118,14 +120,16 @@ def synthesize_catalog(
                 "SignatureLength": c.get("sig_len")
                 or max(len(sig_hex.replace(" ", "").replace("?", "")) // 2 + sig_hex.count("?") // 2, 1),
                 "WildcardCount": c.get("wildcard_count", 0),
-                "EntryVA": c.get("entry_va", ""),
-                "ClusterVA": c.get("cluster_va", ""),
                 "UniquenessVerified": is_unique,
                 "DiscoveryMethod": "modrm-cluster-heuristic",
                 "PointerResolution": _derive_pointer_resolution(name, sig_hex),
                 "HitCount": 0,
                 "PlayerCoordinateScore": 0.0,
             }
+            if entry_va:
+                anchor["EntryVA"] = entry_va
+            if cluster_va:
+                anchor["ClusterVA"] = cluster_va
 
             if not is_unique:
                 anchor["FallbackStrategy"] = c.get("fallback") or (
@@ -262,21 +266,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.validate:
         schema_path = REPO_ROOT / "docs" / "schemas" / "binary-signatures-v1.schema.json"
         if not schema_path.exists():
-            print(f"WARNING: Schema not found at {schema_path}", file=sys.stderr)
+            print(f"ERROR: Schema not found at {schema_path}", file=sys.stderr)
             return 1
         schema = _load_json(schema_path)
-        # Lightweight structural validation (no full JSON Schema validator)
-        if catalog.get("SchemaVersion") != schema.get("properties", {}).get("SchemaVersion", {}).get("const"):
-            print("ERROR: SchemaVersion mismatch", file=sys.stderr)
+        try:
+            import jsonschema
+
+            jsonschema.validate(catalog, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)
+        except ImportError:
+            print("WARNING: jsonschema not installed; falling back to lightweight checks", file=sys.stderr)
+            # Lightweight structural validation
+            if catalog.get("SchemaVersion") != schema.get("properties", {}).get("SchemaVersion", {}).get("const"):
+                print("ERROR: SchemaVersion mismatch", file=sys.stderr)
+                return 1
+            if not isinstance(catalog.get("Anchors"), list) or len(catalog["Anchors"]) == 0:
+                print("ERROR: Anchors must be a non-empty array", file=sys.stderr)
+                return 1
+            for i, anchor in enumerate(catalog["Anchors"]):
+                for req in ("Name", "StabilityTier", "SignatureHex", "SignatureLength", "UniquenessVerified"):
+                    if req not in anchor:
+                        print(f"ERROR: anchor[{i}] missing required field '{req}'", file=sys.stderr)
+                        return 1
+        except jsonschema.ValidationError as exc:
+            print(f"ERROR: Schema validation failed: {exc}", file=sys.stderr)
+            if exc.path:
+                print(f"    at: {'/'.join(str(p) for p in exc.path)}", file=sys.stderr)
             return 1
-        if not isinstance(catalog.get("Anchors"), list) or len(catalog["Anchors"]) == 0:
-            print("ERROR: Anchors must be a non-empty array", file=sys.stderr)
-            return 1
-        for i, anchor in enumerate(catalog["Anchors"]):
-            for req in ("Name", "StabilityTier", "SignatureHex", "SignatureLength", "UniquenessVerified"):
-                if req not in anchor:
-                    print(f"ERROR: anchor[{i}] missing required field '{req}'", file=sys.stderr)
-                    return 1
         print("==> Schema validation: PASS")
     return 0
 

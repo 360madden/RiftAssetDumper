@@ -108,8 +108,10 @@
       "properties": {
         "Name": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9_.-]{1,80}$",
-          "description": "Human-readable anchor name (e.g., vtable-dispatch, cluster-01-rbx)."
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[A-Za-z0-9_.#() -]{1,120}$",
+          "description": "Human-readable anchor name (e.g., vtable-dispatch, cluster-01-rbx, #1 (28h))."
         },
         "StabilityTier": {
           "type": "integer",
