@@ -128,7 +128,7 @@ def synthesize_catalog(
             }
 
             if not is_unique:
-                anchor["FallbackStrategy"] = (
+                anchor["FallbackStrategy"] = c.get("fallback") or (
                     "Non-unique signature — requires xref scanning or caller anchoring. "
                     "Do not use for direct scanning without additional context."
                 )
