@@ -71,7 +71,21 @@
           "enum": ["full-binary-uniqueness-scan", "cross-version-validation", "simulated-patch-resilience", "none"]
         },
         "ModRMScannerVersion": { "type": "string" },
-        "SignatureMatchVersion": { "type": "string" }
+        "SignatureMatchVersion": { "type": "string" },
+        "CrossCheckerVersion": { "type": "string" },
+        "Phase2CatalogPath": { "type": "string" },
+        "Phase3CatalogPath": { "type": "string" },
+        "GhidraFindings": {
+          "type": "object",
+          "description": "Enum-locked narrative findings from Ghidra decompilation (UI-callback mis-identification corrections, property-walker architecture notes). Optional; absent when no Phase 3 catalog was supplied. Bump to GhidraFindings/v2 when a 5th key surfaces.",
+          "properties": {
+            "PreviousCallback0x320": { "type": "string" },
+            "PreviousCallback0x328": { "type": "string" },
+            "PropertyWalkerArchitecture": { "type": "string" },
+            "ActualAccessPattern": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
@@ -88,7 +102,8 @@
         "NonUniqueSignatures": { "type": "integer", "minimum": 0 },
         "StabilityTier1Count": { "type": "integer", "minimum": 0 },
         "StabilityTier2Count": { "type": "integer", "minimum": 0 },
-        "StabilityTier3Count": { "type": "integer", "minimum": 0 }
+        "StabilityTier3Count": { "type": "integer", "minimum": 0 },
+        "AttachedStructCount": { "type": "integer", "minimum": 0, "description": "Number of struct layouts attached to anchors (LocalPlayer, etc.). Optional; absent in pre-Phase-3 catalogs." }
       },
       "additionalProperties": false
     }
@@ -169,6 +184,16 @@
             "Fields": {
               "type": "array",
               "items": { "$ref": "#/$defs/structField" }
+            },
+            "BaseRegisters": {
+              "type": "object",
+              "description": "Distribution of base registers (RBX, RCX, etc.) accessing fields of this struct. Optional; absent in pre-Phase-3 anchors.",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            },
+            "TotalModRMHits": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total ModRM [base+disp32] hits across all fields of this struct. Optional; absent in pre-Phase-3 anchors."
             }
           },
           "additionalProperties": false
@@ -210,7 +235,9 @@
         "Name": { "type": "string" },
         "Type": { "type": "string", "enum": ["float32", "int32", "uint32", "pointer64"] },
         "Confidence": { "type": "string", "enum": ["confirmed", "inferred", "tentative"] },
-        "RiftReaderField": { "type": "string", "description": "Corresponding RiftReader field name if known." }
+        "RiftReaderField": { "type": "string", "description": "Corresponding RiftReader field name if known." },
+        "ModRMHitCount": { "type": "integer", "minimum": 0, "description": "Number of ModRM [base+disp32] hits for this offset (Phase 3 evidence). Optional; absent when not measured." },
+        "Notes": { "type": "string", "description": "Free-form notes (e.g., why hit count is low, Y-is-derived hypothesis). Optional." }
       },
       "additionalProperties": false
     }
