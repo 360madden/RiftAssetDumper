@@ -34,9 +34,13 @@ Usage::
         --out Exports/binary-phase6/patch-diff-report.json
 
 Exit codes:
-    0 — diff computed (regardless of churn)
+    0 — diff computed (regardless of churn); with --strict, this means no
+         breaking category fired
     1 — schema validation failure on either input DB
     2 — IO / parse error
+    3 — --strict gate failed (one or more breaking categories fired); the
+         report is still emitted to --out for triage, and the report's
+         `BreakingCategoriesFired` field lists the offenders
 """
 
 from __future__ import annotations
@@ -54,6 +58,22 @@ sys.path.insert(0, str(REPO_ROOT))
 
 DIFF_REPORT_SCHEMA = "binary-signature-diff/v1"
 MODRM_SHAKE_THRESHOLD = 0.25  # 25% delta qualifies a hit-count change as a 'shake'
+
+# Breaking categories — when --strict is set, any of these > 0 forces exit 1.
+# These represent incompatible DB churn that blocks pipeline progression:
+#   sig-hex-changed         signature bytes differ (RiftReader pattern-scan will
+#                           find the old pattern; the new pattern needs a fresh
+#                           signature_match.py pass)
+#   binary-version-changed  game patch landed (PE timestamp / file size differ);
+#                           any code/struct layout in the new binary is suspect
+#   anchor-removed          an anchor the consumer relies on is gone;
+#                           consumers must drop or re-discover
+# Non-breaking categories (do NOT trigger strict exit): anchor-added,
+# signature-length-changed, wildcard-count-changed, stability-tier-regressed,
+# uniqueness-changed, struct-fields-added, struct-fields-removed,
+# modrm-shake, notes-changed, field-name-changed, confidence-promoted,
+# confidence-demoted, binary-fingerprint-moved, ghidra-findings-changed.
+BREAKING_CATEGORIES: frozenset[str] = frozenset({"sig-hex-changed", "binary-version-changed", "anchor-removed"})
 
 
 @dataclass
@@ -408,6 +428,20 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Optional path for a human-readable Markdown report.",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Return exit 3 when any breaking category fires "
+            f"({', '.join(sorted(BREAKING_CATEGORIES))}). "
+            "Exit 3 is distinct from exit 1 (schema-validation failure) "
+            "so CI scripts can branch on it. The report is still emitted "
+            "to --out with StrictMode=True and BreakingCategoriesFired=[...] "
+            "for triage. Useful for CI gates that block pipeline progression "
+            "on incompatible DB churn (sig bytes changed, game patch "
+            "landed, anchor vanished)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not args.old_db.exists():
@@ -433,6 +467,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     diff = compute_diff(old_db, new_db)
+    breaking_fired: list[str] = []
+    if args.strict:
+        breaking_fired = sorted(cat for cat in BREAKING_CATEGORIES if diff["category_counts"].get(cat, 0) > 0)
     report = {
         "SchemaVersion": DIFF_REPORT_SCHEMA,
         "DiffExtractedAt": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -440,9 +477,22 @@ def main(argv: list[str] | None = None) -> int:
         "NewPath": str(args.new_db),
         **diff,
     }
+    if args.strict:
+        # Annotate the report so downstream consumers can detect strict-fail
+        # programmatically (not just via exit code).
+        report["StrictMode"] = True
+        report["BreakingCategoriesFired"] = breaking_fired
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"==> Diff report: {args.out}")
+    if args.strict and breaking_fired:
+        print(
+            f"ERROR: --strict mode: {len(breaking_fired)} breaking "
+            f"categor{'y' if len(breaking_fired) == 1 else 'ies'} fired: "
+            f"{', '.join(breaking_fired)}",
+            file=sys.stderr,
+        )
+        return 3
     print(f"    Total changes: {report['total_changes']}")
     for cat, count in sorted(report["category_counts"].items()):
         print(f"      - {cat}: {count}")

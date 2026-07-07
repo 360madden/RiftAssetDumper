@@ -376,3 +376,177 @@ def test_cli_smoke(tmp_path: Path) -> None:
     assert report["SchemaVersion"] == "binary-signature-diff/v1"
     assert "sig-hex-changed" in report["diff_categories"]
     assert md_out.exists()
+
+
+# ---------------------------------------------------------------------------
+# Strict mode (--strict) — CI gate for breaking category churn
+# ---------------------------------------------------------------------------
+
+
+def test_breaking_categories_constant_pinned() -> None:
+    """BREAKING_CATEGORIES must be the user-specified trio (no drift)."""
+    assert compare_mod.BREAKING_CATEGORIES == frozenset({"sig-hex-changed", "binary-version-changed", "anchor-removed"})
+
+
+def test_strict_mode_off_by_default(tmp_path: Path) -> None:
+    """Without --strict, the CLI returns 0 even when breaking categories fire.
+
+    Backward-compat lock: existing CI consumers relying on the prior
+    "always exit 0 on successful diff" behavior must not be broken.
+    """
+    db_a = _build_db(anchors=[_anchor("vt", sig="48 85 D2", tier=1)])
+    db_b = _build_db(anchors=[_anchor("vt", sig="48 85 D3", tier=1)])
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(db_a), encoding="utf-8")
+    new_path.write_text(json.dumps(db_b), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out)])
+    assert code == 0
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert "sig-hex-changed" in report["diff_categories"]
+    assert "StrictMode" not in report
+
+
+def test_strict_mode_passes_on_identity_diff(tmp_path: Path) -> None:
+    """--strict + identical DBs -> exit 0 (no breaking categories fired)."""
+    db = _build_db(anchors=[_anchor("vt", sig="48 85 D2", tier=1)])
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(db), encoding="utf-8")
+    new_path.write_text(json.dumps(deepcopy(db)), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 0
+    # Pin the report metadata: strict-mode-active + no offenders.
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report.get("StrictMode") is True
+    assert report.get("BreakingCategoriesFired") == []
+
+
+def test_strict_mode_passes_on_non_breaking_changes(tmp_path: Path) -> None:
+    """--strict + only non-breaking categories fired -> exit 0.
+
+    confidence-promoted and anchor-added are NOT in BREAKING_CATEGORIES
+    so the strict gate should pass.
+    """
+    old_layout = _struct(fields=[_field("pos_x", "0x320", confidence="inferred")])
+    new_layout = _struct(fields=[_field("pos_x", "0x320", confidence="confirmed")])
+    old = _build_db(anchors=[_anchor("vt", sig="48 85 D2", tier=1, struct_layout=old_layout)])
+    new = _build_db(
+        anchors=[
+            _anchor("vt", sig="48 85 D2", tier=1, struct_layout=new_layout),
+            _anchor("added-anchor", sig="55 4C 39", tier=2),  # anchor-added (non-breaking)
+        ]
+    )
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(old), encoding="utf-8")
+    new_path.write_text(json.dumps(new), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 0, "confidence-promoted + anchor-added are not breaking; strict must pass"
+
+
+def test_strict_mode_fails_on_sig_hex_changed(tmp_path: Path) -> None:
+    """--strict + sig-hex-changed -> exit 1 + report includes breaking metadata."""
+    old = _build_db(anchors=[_anchor("vt", sig="48 85 D2", tier=1)])
+    new = _build_db(anchors=[_anchor("vt", sig="48 85 D3", tier=1)])
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(old), encoding="utf-8")
+    new_path.write_text(json.dumps(new), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 3
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report.get("StrictMode") is True
+    assert report.get("BreakingCategoriesFired") == ["sig-hex-changed"]
+
+
+def test_strict_mode_fails_on_binary_version_changed(tmp_path: Path) -> None:
+    """--strict + binary-version-changed -> exit 3 (distinct from schema-validation exit 1)."""
+    old = _build_db(
+        anchors=[_anchor("vt", sig="48 85 D2", tier=1)],
+        binary_version={
+            "PEFileVersion": "1.0.0",
+            "PETimestamp": 100,
+            "PETimestampUTC": "2024-01-01T00:00:00Z",
+            "FileSizeBytes": 100,
+        },
+    )
+    new = _build_db(
+        anchors=[_anchor("vt", sig="48 85 D2", tier=1)],
+        binary_version={
+            "PEFileVersion": "2.0.0",  # patch
+            "PETimestamp": 200,
+            "PETimestampUTC": "2024-06-01T00:00:00Z",
+            "FileSizeBytes": 200,
+        },
+    )
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(old), encoding="utf-8")
+    new_path.write_text(json.dumps(new), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 3
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert "binary-version-changed" in report.get("BreakingCategoriesFired", [])
+
+
+def test_strict_mode_fails_on_anchor_removed(tmp_path: Path) -> None:
+    """--strict + anchor-removed -> exit 3."""
+    old = _build_db(
+        anchors=[
+            _anchor("vt", sig="48 85 D2", tier=1),
+            _anchor("going-away", sig="55 4C 39", tier=2),
+        ]
+    )
+    new = _build_db(anchors=[_anchor("vt", sig="48 85 D2", tier=1)])
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(old), encoding="utf-8")
+    new_path.write_text(json.dumps(new), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 3
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert "anchor-removed" in report.get("BreakingCategoriesFired", [])
+
+
+def test_strict_mode_lists_all_breaking_categories_fired(tmp_path: Path) -> None:
+    """--strict + all 3 breaking categories fire -> exit 3 + report lists all 3."""
+    old_layout = _struct(fields=[_field("pos_x", "0x320", confidence="inferred")])
+    new_layout = _struct(fields=[_field("pos_x", "0x320", confidence="confirmed")])
+    old = _build_db(
+        anchors=[
+            _anchor("vt", sig="48 85 D2", tier=1, struct_layout=old_layout),
+            _anchor("going-away", sig="55 4C 39", tier=2),
+        ],
+        binary_version={
+            "PEFileVersion": "1.0.0",
+            "PETimestamp": 100,
+            "PETimestampUTC": "2024-01-01T00:00:00Z",
+            "FileSizeBytes": 100,
+        },
+    )
+    new = _build_db(
+        anchors=[_anchor("vt", sig="48 85 D3", tier=1, struct_layout=new_layout)],
+        binary_version={
+            "PEFileVersion": "2.0.0",
+            "PETimestamp": 200,
+            "PETimestampUTC": "2024-06-01T00:00:00Z",
+            "FileSizeBytes": 200,
+        },
+    )
+    old_path = tmp_path / "old.json"
+    new_path = tmp_path / "new.json"
+    old_path.write_text(json.dumps(old), encoding="utf-8")
+    new_path.write_text(json.dumps(new), encoding="utf-8")
+    out = tmp_path / "diff.json"
+    code = compare_mod.main(["--old-db", str(old_path), "--new-db", str(new_path), "--out", str(out), "--strict"])
+    assert code == 3
+    report = json.loads(out.read_text(encoding="utf-8"))
+    fired = set(report.get("BreakingCategoriesFired", []))
+    assert fired == {"sig-hex-changed", "binary-version-changed", "anchor-removed"}

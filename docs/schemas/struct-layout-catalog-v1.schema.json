@@ -115,10 +115,17 @@
           "items": { "type": "string" },
           "description": "Phase 2 signature anchor names that resolve to this struct."
         },
+        "Status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "shipped"],
+          "default": "shipped",
+          "description": "Struct definition status. 'pending' = TODO, awaiting Ghidra FunctionSiteSurvey (Fields[] may be empty). 'in_progress' = Ghidra survey actively running (~30 min). 'shipped' = fields verified by ModRM/Ghidra/RiftReader evidence."
+        },
         "Fields": {
           "type": "array",
           "items": { "$ref": "#/$defs/field" },
-          "minItems": 1
+          "minItems": 0,
+          "description": "Field definitions. Empty array is permitted for TODO structs whose field mapping is pending a Ghidra FunctionSiteSurvey (EvidenceSource: ghidra-function-site-survey/v1)."
         }
       },
       "additionalProperties": false

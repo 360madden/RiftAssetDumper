@@ -13,7 +13,11 @@
       "Address": "0x1406e905f",
       "ReportPath": "Exports/ghidra-reports/twad_site_survey.json",
       "SummaryPath": "Exports/ghidra-reports/twad_site_survey.md",
-      "SummaryTerms": ["TWAD", "MapViewOfFile", "0x44415754"],
+      "SummaryTerms": [
+        "TWAD",
+        "MapViewOfFile",
+        "0x44415754"
+      ],
       "Description": "Archive-header magic compare site that proved TWAD as file/header magic."
     },
     {
@@ -21,7 +25,11 @@
       "Address": "0x141186980",
       "ReportPath": "Exports/ghidra-reports/nidatastream_loadbinary_141186980.json",
       "SummaryPath": "Exports/ghidra-reports/nidatastream_loadbinary_141186980.md",
-      "SummaryTerms": ["NiDataStream::LoadBinary", "alignment", "lock"],
+      "SummaryTerms": [
+        "NiDataStream::LoadBinary",
+        "alignment",
+        "lock"
+      ],
       "Description": "NiDataStream binary load routine anchor."
     },
     {
@@ -29,7 +37,11 @@
       "Address": "0x14111e910",
       "ReportPath": "Exports/ghidra-reports/nidatastream_semantic_adapter_14111e910.json",
       "SummaryPath": "Exports/ghidra-reports/nidatastream_semantic_adapter_14111e910.md",
-      "SummaryTerms": ["semantic adapter", "NiDataStream", "renderer semantic"],
+      "SummaryTerms": [
+        "semantic adapter",
+        "NiDataStream",
+        "renderer semantic"
+      ],
       "Description": "Mesh semantic-adapter validation path called from material binding."
     },
     {
@@ -37,7 +49,11 @@
       "Address": "0x14111f570",
       "ReportPath": "Exports/ghidra-reports/nimesh_material_binding_caller_14111f570.json",
       "SummaryPath": "Exports/ghidra-reports/nimesh_material_binding_caller_14111f570.md",
-      "SummaryTerms": ["NiDX9MeshMaterialBinding::Create", "semantic adapter", "NiDataStream"],
+      "SummaryTerms": [
+        "NiDX9MeshMaterialBinding::Create",
+        "semantic adapter",
+        "NiDataStream"
+      ],
       "Description": "DX9 mesh material-binding caller that invokes semantic-adapter validation."
     },
     {
@@ -45,7 +61,13 @@
       "Address": "0x1411821f0",
       "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_1411821f0.json",
       "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_1411821f0.summary.md",
-      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "SummaryTerms": [
+        "NiDataStream",
+        "Element",
+        "Format",
+        "Component",
+        "Align"
+      ],
       "Description": "Descriptor/component helper called by the NiDataStream load path and related stream consumers."
     },
     {
@@ -53,7 +75,13 @@
       "Address": "0x141181770",
       "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_141181770.json",
       "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_141181770.summary.md",
-      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "SummaryTerms": [
+        "NiDataStream",
+        "Element",
+        "Format",
+        "Component",
+        "Align"
+      ],
       "Description": "Small descriptor-builder helper called by NiDataStream LoadBinary and semantic-adapter validation."
     },
     {
@@ -61,8 +89,27 @@
       "Address": "0x1411817c0",
       "ReportPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_1411817c0.json",
       "SummaryPath": "Exports/ghidra-reports/nidatastream_descriptor_builder_1411817c0.summary.md",
-      "SummaryTerms": ["NiDataStream", "Element", "Format", "Component", "Align"],
+      "SummaryTerms": [
+        "NiDataStream",
+        "Element",
+        "Format",
+        "Component",
+        "Align"
+      ],
       "Description": "Small descriptor-builder helper called from NiDataStream LoadBinary and adjacent stream routines."
+    },
+    {
+      "Key": "phase3-zoneinfo",
+      "Address": "0x14264da02",
+      "ReportPath": "Exports/ghidra-reports/phase3_zoneinfo.json",
+      "SummaryPath": "Exports/ghidra-reports/phase3_zoneinfo.md",
+      "SummaryTerms": [
+        "ZoneInfo",
+        "zone",
+        "vtable",
+        "destructor"
+      ],
+      "Description": "ZoneInfo vtable candidate discovered by scripts/discover_secondary_structs.py at 0x14264da02 (10 class-name string matches in .rdata; medium confidence). FunctionSiteSurvey run will confirm or refute; populates STRUCT_DEFINITIONS[ZoneInfo].Fields[] on success."
     }
   ]
 }

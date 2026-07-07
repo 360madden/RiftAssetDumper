@@ -7,6 +7,16 @@ and Ghidra FunctionSiteSurvey reports to produce a schema-validated
 
 Output conforms to ``docs/schemas/struct-layout-catalog-v1.schema.json``.
 
+Phase 3 M3.2 generalization
+---------------------------
+The synth now emits multiple structs from a single ``STRUCT_DEFINITIONS``
+declaration. Each struct has a static spec (name, description,
+evidence source, field offsets + names + types + notes) and runtime
+ModRM hit counts derived from the scan. LocalPlayer's 8 fields are
+preserved verbatim from the M3.1 ship; ZoneInfo + EntityList ship with
+TODO field arrays (empty + documented in the description) that the
+M3.2 Ghidra follow-up commit will populate.
+
 Usage::
 
     python scripts/synthesize_struct_layout.py
@@ -24,6 +34,162 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+
+# ============================================================================
+# Struct definitions — the single source of truth for M3.x outputs
+# ============================================================================
+#
+# Schema:
+#   Name:            human-readable struct name (e.g. LocalPlayer)
+#   Description:     what this struct represents + evidence basis
+#   EvidenceSource:  one of {modrm-memory-access-scan/v1,
+#                            ghidra-function-site-survey/v1,
+#                            riftreader-known-offsets,
+#                            manual-static-analysis}
+#   BaseRegisters:   optional static-known distribution (overridable from
+#                    ModRM scan if EvidenceSource is modrm-...)
+#   Fields:          list of static field specs; ModRM hit counts +
+#                    confidence are derived at synthesis time
+#
+# Field schema:
+#   Offset, OffsetHex, Name, Type, RiftReaderField (optional), Notes (optional)
+#
+# Confidence logic (at synthesis time):
+#   - hit_count > 100 AND has RiftReaderField       -> "confirmed"
+#   - hit_count > 0                                 -> "inferred"
+#   - hit_count == 0 OR no ModRM scan data          -> "tentative"
+#
+# When the ModRM scan does not contain a target offset, hit_count defaults
+# to 0 and confidence drops to "tentative". This is the expected state for
+# ZoneInfo + EntityList until the M3.2 Ghidra runs populate the spec.
+
+STRUCT_DEFINITIONS: list[dict[str, Any]] = [
+    {
+        "Name": "LocalPlayer",
+        "Status": "shipped",
+        "Description": (
+            "Player coordinate, facing, and turn-rate struct. Accessed via "
+            "ModRM [base+disp32] with RBX/RCX base registers. Fields at "
+            "0x304-0x328 represent the known RiftReader offset range."
+        ),
+        "EvidenceSource": "modrm-memory-access-scan/v1",
+        "Fields": [
+            {
+                "Offset": 772,
+                "OffsetHex": "0x304",
+                "Name": "turn_rate",
+                "Type": "float32",
+                "RiftReaderField": "turn_rate",
+                "Notes": "Low hit count — may be read less frequently or use a different access pattern.",
+            },
+            {
+                "Offset": 780,
+                "OffsetHex": "0x30C",
+                "Name": "facing_x",
+                "Type": "float32",
+                "RiftReaderField": "facing_x",
+                "Notes": "Facing fields use a cos/sin pair; low hit count expected for individual components.",
+            },
+            {
+                "Offset": 784,
+                "OffsetHex": "0x310",
+                "Name": "facing_y",
+                "Type": "float32",
+                "RiftReaderField": "facing_y",
+                "Notes": "High hit count — frequently accessed alongside pos_x/pos_z.",
+            },
+            {
+                "Offset": 788,
+                "OffsetHex": "0x314",
+                "Name": "facing_z",
+                "Type": "float32",
+                "RiftReaderField": "facing_z",
+                "Notes": "No ModRM hits in current scan set — may share a displacement or be computed.",
+            },
+            {
+                "Offset": 796,
+                "OffsetHex": "0x31C",
+                "Name": "unknown_float_31c",
+                "Type": "float32",
+                "Notes": "Reserved for potential discovery; not yet observed in ModRM scan.",
+            },
+            {
+                "Offset": 800,
+                "OffsetHex": "0x320",
+                "Name": "pos_x",
+                "Type": "float32",
+                "RiftReaderField": "pos_x",
+                "Notes": "Primary X-axis coordinate. Highest-confirmation field alongside pos_z.",
+            },
+            {
+                "Offset": 804,
+                "OffsetHex": "0x324",
+                "Name": "pos_y",
+                "Type": "float32",
+                "RiftReaderField": "pos_y",
+                "Notes": "Low hit count (vs 410/517 for X/Z) — Y (elevation) likely derived from terrain/height-map lookup rather than stored directly in struct.",
+            },
+            {
+                "Offset": 808,
+                "OffsetHex": "0x328",
+                "Name": "pos_z",
+                "Type": "float32",
+                "RiftReaderField": "pos_z",
+                "Notes": "Primary Z-axis coordinate. Highest ModRM hit count of any field.",
+            },
+        ],
+    },
+    {
+        "Name": "ZoneInfo",
+        "Status": "pending",
+        "Description": (
+            "Per-zone data structure (zone id, name, weather, level range). "
+            "TODO: M3.2 Ghidra follow-up will populate the Fields list. "
+            "Currently emits with empty Fields[] so the catalog round-trips "
+            "through jsonschema validation and downstream consumers see the "
+            "struct slot. Discover candidate addresses via "
+            "`scripts/discover_secondary_structs.py` (Camera intentionally "
+            "omitted per May 2026 handoff guard)."
+        ),
+        "EvidenceSource": "ghidra-function-site-survey/v1",
+        "Fields": [],
+    },
+    {
+        "Name": "EntityList",
+        "Status": "pending",
+        "Description": (
+            "Live entity / actor enumeration (id, refcount, type). "
+            "TODO: M3.2 Ghidra follow-up will populate the Fields list. "
+            "Same shipping posture as ZoneInfo (empty Fields[] to keep the "
+            "catalog schema-valid while the Ghidra survey is in flight)."
+        ),
+        "EvidenceSource": "ghidra-function-site-survey/v1",
+        "Fields": [],
+    },
+]
+
+
+# LocalPlayer anchor list — the only struct that has Phase 2 anchor bindings.
+# Kept separate because only LocalPlayer currently has signature anchors in
+# Phase 2 catalog; ZoneInfo/EntityList will get their own anchor lists when
+# the M3.2 Ghidra runs surface them.
+DEFAULT_LOCALPLAYER_ANCHORS: list[str] = [
+    "vtable-dispatch",
+    "#1 (28h)",
+    "#2 (17h)",
+    "#3 (17h)",
+    "#4 (15h)",
+    "#5 (14h)",
+    "#6 (13h)",
+    "#7 (11h)",
+    "#8 (9h)",
+]
+
+
+# ============================================================================
+# Synthesizer
+# ============================================================================
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -69,98 +235,38 @@ def _derive_field_modrm_hits(by_offset: dict[str, int], offset_hex: str) -> int:
     return by_offset.get(offset_hex, 0)
 
 
-def _build_localplayer_fields(by_offset: dict[str, int]) -> list[dict[str, Any]]:
-    """Build LocalPlayer field definitions with ModRM hit counts derived from scan data.
+def _classify_confidence(hit_count: int, has_riftreader_field: bool) -> str:
+    """Apply the documented confidence model."""
+    if hit_count > 100 and has_riftreader_field:
+        return "confirmed"
+    if hit_count > 0:
+        return "inferred"
+    return "tentative"
 
-    Field names, types, RiftReader mappings, and notes are semantic annotations
-    (hardcoded). Hit counts are derived live from the ModRM scan at synthesis time
-    so they always match the scan data version.
+
+def _build_struct_fields(spec: dict[str, Any], by_offset: dict[str, int]) -> list[dict[str, Any]]:
+    """Build a struct's Fields[] from its static spec + live ModRM scan data.
+
+    Applies the confidence model consistently across all structs. For
+    ZoneInfo/EntityList with empty Fields[], this returns []. Downstream
+    consumers can detect TODO structs by `len(Fields) == 0` and EvidenceSource
+    being ghidra-function-site-survey/v1.
     """
-    _field_specs: list[dict[str, Any]] = [
-        {
-            "Offset": 772,
-            "OffsetHex": "0x304",
-            "Name": "turn_rate",
-            "Type": "float32",
-            "RiftReaderField": "turn_rate",
-            "Notes": "Low hit count — may be read less frequently or use a different access pattern.",
-        },
-        {
-            "Offset": 780,
-            "OffsetHex": "0x30C",
-            "Name": "facing_x",
-            "Type": "float32",
-            "RiftReaderField": "facing_x",
-            "Notes": "Facing fields use a cos/sin pair; low hit count expected for individual components.",
-        },
-        {
-            "Offset": 784,
-            "OffsetHex": "0x310",
-            "Name": "facing_y",
-            "Type": "float32",
-            "RiftReaderField": "facing_y",
-            "Notes": "High hit count — frequently accessed alongside pos_x/pos_z.",
-        },
-        {
-            "Offset": 788,
-            "OffsetHex": "0x314",
-            "Name": "facing_z",
-            "Type": "float32",
-            "RiftReaderField": "facing_z",
-            "Notes": "No ModRM hits in current scan set — may share a displacement or be computed.",
-        },
-        {
-            "Offset": 796,
-            "OffsetHex": "0x31C",
-            "Name": "unknown_float_31c",
-            "Type": "float32",
-            "Notes": "Reserved for potential discovery; not yet observed in ModRM scan.",
-        },
-        {
-            "Offset": 800,
-            "OffsetHex": "0x320",
-            "Name": "pos_x",
-            "Type": "float32",
-            "RiftReaderField": "pos_x",
-            "Notes": "Primary X-axis coordinate. Highest-confirmation field alongside pos_z.",
-        },
-        {
-            "Offset": 804,
-            "OffsetHex": "0x324",
-            "Name": "pos_y",
-            "Type": "float32",
-            "RiftReaderField": "pos_y",
-            "Notes": "Low hit count (vs 410/517 for X/Z) — Y (elevation) likely derived from terrain/height-map lookup rather than stored directly in struct.",
-        },
-        {
-            "Offset": 808,
-            "OffsetHex": "0x328",
-            "Name": "pos_z",
-            "Type": "float32",
-            "RiftReaderField": "pos_z",
-            "Notes": "Primary Z-axis coordinate. Highest ModRM hit count of any field.",
-        },
-    ]
     fields: list[dict[str, Any]] = []
-    for spec in _field_specs:
-        hit_count = _derive_field_modrm_hits(by_offset, spec["OffsetHex"])
-        # Confidence: confirmed if >100 hits and has RiftReader mapping
-        if hit_count > 100 and spec.get("RiftReaderField"):
-            confidence = "confirmed"
-        elif hit_count > 0:
-            confidence = "inferred"
-        else:
-            confidence = "tentative"
+    for fspec in spec.get("Fields", []):
+        hit_count = _derive_field_modrm_hits(by_offset, fspec["OffsetHex"])
+        has_rr = bool(fspec.get("RiftReaderField"))
+        confidence = _classify_confidence(hit_count, has_rr)
         fields.append(
             {
-                "Offset": spec["Offset"],
-                "OffsetHex": spec["OffsetHex"],
-                "Name": spec["Name"],
-                "Type": spec["Type"],
+                "Offset": fspec["Offset"],
+                "OffsetHex": fspec["OffsetHex"],
+                "Name": fspec["Name"],
+                "Type": fspec["Type"],
                 "Confidence": confidence,
                 "ModRMHitCount": hit_count,
-                "RiftReaderField": spec.get("RiftReaderField", ""),
-                "Notes": spec.get("Notes", ""),
+                "RiftReaderField": fspec.get("RiftReaderField", ""),
+                "Notes": fspec.get("Notes", ""),
             }
         )
     return fields
@@ -172,8 +278,11 @@ def synthesize_catalog(
     signature_catalog_path: Path | None = None,
     ghidra_report_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Synthesize the struct-layout catalog from Phase 2 + ModRM + Ghidra evidence."""
+    """Synthesize the struct-layout catalog from Phase 2 + ModRM + Ghidra evidence.
 
+    Emits one struct per entry in ``STRUCT_DEFINITIONS`` with field-level
+    ModRM hit counts derived live from the scan.
+    """
     modrm_scan_path = modrm_scan_path or (REPO_ROOT / "Exports" / "binary-phase1" / "modrm-memory-access-scan.json")
     signature_catalog_path = signature_catalog_path or (
         REPO_ROOT / "Exports" / "binary-phase2" / "rift-x64-signature-catalog.json"
@@ -202,6 +311,30 @@ def synthesize_catalog(
     ghidra_files = sorted(ghidra_report_dir.glob("function-site-*.json"))
     ghidra_findings = _collect_ghidra_findings(ghidra_files)
 
+    # Build each struct from STRUCT_DEFINITIONS
+    structs: list[dict[str, Any]] = []
+    for spec in STRUCT_DEFINITIONS:
+        struct_name = spec["Name"]
+        # For LocalPlayer, use the live Phase 2 anchors; for others, ship empty.
+        sig_anchors: list[str] = (
+            (anchor_names if struct_name == "LocalPlayer" and anchor_names else DEFAULT_LOCALPLAYER_ANCHORS)
+            if struct_name == "LocalPlayer"
+            else []
+        )
+
+        structs.append(
+            {
+                "Name": struct_name,
+                "Status": spec.get("Status", "shipped"),
+                "Description": spec["Description"],
+                "EvidenceSource": spec["EvidenceSource"],
+                "BaseRegisters": base_registers if struct_name == "LocalPlayer" else {},
+                "TotalModRMHits": modrm_hits_total if struct_name == "LocalPlayer" else 0,
+                "SignatureAnchors": sig_anchors,
+                "Fields": _build_struct_fields(spec, by_offset),
+            }
+        )
+
     return {
         "SchemaVersion": "struct-layout-catalog/v1",
         "BinaryTarget": "rift_x64.exe",
@@ -225,29 +358,7 @@ def synthesize_catalog(
             "PropertyWalkerArchitecture": "FUN_14078a0d0 is a 5,784-instruction property dispatch/initialization function that repeatedly calls FUN_14077d750 (factory/lookup helper) with varying property IDs and stores results at struct offsets (0x128, 0x120, 0x568, etc.). These are NOT the player coordinate offsets (0x304-0x328). The actual player coordinate access functions are distributed across the .text section as identified by the ModRM byte-scanner.",
             "ActualAccessPattern": "ModRM byte-scan found 1,337 [base+disp32] memory access instructions using player offsets (0x304-0x328). RBX (727) and RCX (508) are the dominant base registers — confirming heap-allocated object traversal. The offsets ARE used as memory displacements, but NOT in the simple 'one callback per offset' pattern described in the earlier handoff. Instead, they're distributed across many functions that operate on concrete game-object structs.",
         },
-        "Structs": [
-            {
-                "Name": "LocalPlayer",
-                "Description": "Player coordinate, facing, and turn-rate struct. Accessed via ModRM [base+disp32] with RBX/RCX base registers. Fields at 0x304-0x328 represent the known RiftReader offset range.",
-                "EvidenceSource": "modrm-memory-access-scan/v1",
-                "BaseRegisters": base_registers,
-                "TotalModRMHits": modrm_hits_total,
-                "SignatureAnchors": anchor_names
-                if anchor_names
-                else [
-                    "vtable-dispatch",
-                    "#1 (28h)",
-                    "#2 (17h)",
-                    "#3 (17h)",
-                    "#4 (15h)",
-                    "#5 (14h)",
-                    "#6 (13h)",
-                    "#7 (11h)",
-                    "#8 (9h)",
-                ],
-                "Fields": _build_localplayer_fields(by_offset),
-            }
-        ],
+        "Structs": structs,
     }
 
 
@@ -290,7 +401,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"    {struct['Name']}: {len(struct['Fields'])} fields, {struct['TotalModRMHits']} ModRM hits")
         for field in struct["Fields"]:
             print(
-                f"      {field['OffsetHex']} {field['Name']}: {field['Type']} ({field['Confidence']}, {field['ModRMHitCount']} hits)"
+                f"      {field['OffsetHex']} {field['Name']}: {field['Type']} "
+                f"({field['Confidence']}, {field['ModRMHitCount']} hits)"
             )
 
     if args.validate:

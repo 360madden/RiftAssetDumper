@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/secondary-struct-discovery-v1.schema.json",
+  "title": "RIFT Secondary-Struct Discovery v1",
+  "description": "Phase 3 M3.2 secondary-struct (ZoneInfo, EntityList, Camera-deferred) candidate address discovery report. Emitted by scripts/discover_secondary_structs.py via pefile-based .rdata/.data class-name string scan + RTTI vtable pattern detection.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "BinaryTarget",
+    "ImageBase",
+    "ExtractedAt",
+    "Structs"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "secondary-struct-discovery/v1" },
+    "BinaryTarget": {
+      "type": "string",
+      "description": "Filename of the scanned PE binary."
+    },
+    "ImageBase": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]+$",
+      "description": "PE image base address (from OptionalHeader.ImageBase)."
+    },
+    "ExtractedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of discovery run."
+    },
+    "Structs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/struct" },
+      "minItems": 0
+    }
+  },
+  "$defs": {
+    "struct": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Description",
+        "EvidenceBasis",
+        "ClassNameCandidates",
+        "RTTITypeNameCandidates",
+        "VTableCandidates",
+        "Confidence"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Struct name (e.g., ZoneInfo, EntityList)."
+        },
+        "Description": {
+          "type": "string",
+          "description": "What this struct represents and how it was discovered."
+        },
+        "EvidenceBasis": {
+          "type": "string",
+          "description": "Free-form evidence basis annotation (e.g., 'modrm-memory-access-scan/v1 + string-table scan')."
+        },
+        "ClassNameCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stringCandidate" },
+          "description": "Class-name string matches in .rdata/.data sections (case-insensitive)."
+        },
+        "RTTITypeNameCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rttiCandidate" },
+          "description": "RTTI TypeDescriptor name prefix matches (e.g., .?AVZoneInfo@@)."
+        },
+        "VTableCandidates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/vtableCandidate" },
+          "description": "Vtable-shaped patterns (8-byte aligned pointers to .text) near RTTI references."
+        },
+        "BestCandidateAddress": {
+          "type": ["string", "null"],
+          "pattern": "^0x[0-9a-fA-F]+$",
+          "description": "Best candidate address for the Ghidra FunctionSiteSurvey target. null if no candidates found."
+        },
+        "Confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "none"],
+          "description": "high = class-name string AND vtable-shaped pattern; medium = class-name string OR RTTI typename; none = no evidence."
+        }
+      },
+      "additionalProperties": false
+    },
+    "stringCandidate": {
+      "type": "object",
+      "required": ["rva", "va", "section", "match_kind", "matched_hint"],
+      "properties": {
+        "rva": { "type": "integer", "minimum": 0 },
+        "va": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "section": { "type": "string" },
+        "match_kind": { "type": "string", "enum": ["ascii", "utf-16le"] },
+        "matched_hint": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "rttiCandidate": {
+      "type": "object",
+      "required": ["rva", "va", "section", "match_kind", "matched_hint"],
+      "properties": {
+        "rva": { "type": "integer", "minimum": 0 },
+        "va": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "section": { "type": "string" },
+        "match_kind": { "type": "string", "enum": ["rtti-typename"] },
+        "matched_hint": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "vtableCandidate": {
+      "type": "object",
+      "required": ["vtable_va", "first_slot_va", "ref_distance_bytes"],
+      "properties": {
+        "vtable_va": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "first_slot_va": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "ref_distance_bytes": { "type": "integer" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
