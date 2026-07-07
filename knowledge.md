@@ -10,7 +10,7 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 
 **New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. Phase 0 (feasibility) in progress — walkability classification complete (239 assets, 161 potentially walkable), pure-Python feasibility analyzer built, awaiting flythrough pipeline rebuild for full geometry input.
 
-**New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phase 2 COMPLETE** — 9 anchors (all 9 unique; #7+#8 recovered via binary byte-dump analysis, Session 5), schema-validated catalog, consumer contract documented. Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`. Handoff: `docs/handoffs/2026-07-07-binary-phase2-exit.md`.
+**New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phase 2 COMPLETE** — 9 anchors (all 9 unique; #7+#8 recovered via binary byte-dump analysis, Session 5), schema-validated catalog, consumer contract documented. **Phase 3 IN PROGRESS** — struct layout mapping: 1 struct (LocalPlayer, 8 fields), Ghidra decompilation corrected earlier handoff (0x320/0x328 "callbacks" are UI handlers, not coordinate readers). Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`, `synthesize_struct_layout.py`. Handoffs: `docs/handoffs/2026-07-07-binary-phase2-exit.md`, `docs/handoffs/2026-07-07-binary-phase3-struct-layout.md`.
 
 ## Quickstart
 
@@ -107,6 +107,7 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `pytest tests/test_signature_match.py` | Signature match unit tests |
 | `pytest tests/test_modrm_scanner.py` | ModRM scanner unit tests |
 | `pytest tests/test_probe_modrm_leads.py` | ModRM probe leads unit tests |
+| `python scripts/synthesize_struct_layout.py [--validate]` | Synthesize `struct-layout-catalog.json` from ModRM + Phase 2 + Ghidra evidence |
 | `pytest tests/test_synthesize_signature_catalog.py` | Schema conformance + anchor structure tests (13) |
 
 ### Cycle 5 (Tier-1 archive provenance) scripts (Python, `scripts/`)
