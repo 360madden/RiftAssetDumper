@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/zone-vocabulary-v1.schema.json",
+  "title": "Zone Vocabulary v1",
+  "description": "Schema for the zone vocabulary artifact describing groupings of zone-related strings extracted from game assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "source_inventory",
+    "total_zone_entries",
+    "total_inspected_payloads",
+    "groups",
+    "all_unique_strings",
+    "classification_counts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "zone-vocabulary-v1",
+      "description": "Schema identifier for this artifact"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "ISO 8601 date when this vocabulary was generated"
+    },
+    "source_inventory": {
+      "type": "string",
+      "description": "Filename of the source inventory JSON used to produce this vocabulary"
+    },
+    "total_zone_entries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of zone entries across all groups"
+    },
+    "total_inspected_payloads": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of asset payloads inspected during vocabulary generation"
+    },
+    "groups": {
+      "type": "array",
+      "description": "Grouped vocabulary entries, each keyed by a common string that ties the entries together",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "group_key",
+          "entry_count",
+          "zone_names",
+          "map_keys",
+          "file_paths",
+          "shader_references",
+          "other_strings",
+          "entries"
+        ],
+        "properties": {
+          "group_key": {
+            "type": "string",
+            "description": "Primary string that groups these entries together"
+          },
+          "entry_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this group"
+          },
+          "zone_names": {
+            "type": "array",
+            "description": "Zone names associated with this group (e.g. Freemarch, Stillmoor)",
+            "items": {
+              "type": "string"
+            }
+          },
+          "map_keys": {
+            "type": "array",
+            "description": "Map key identifiers referenced in this group",
+            "items": {
+              "type": "string"
+            }
+          },
+          "file_paths": {
+            "type": "array",
+            "description": "File paths within game assets related to this group",
+            "items": {
+              "type": "string"
+            }
+          },
+          "shader_references": {
+            "type": "array",
+            "description": "Shader variable or parameter names referenced by this group",
+            "items": {
+              "type": "string"
+            }
+          },
+          "other_strings": {
+            "type": "array",
+            "description": "Miscellaneous strings that did not fit other categories",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "description": "Raw asset entries belonging to this group",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "asset_id",
+                "archive",
+                "entry_index",
+                "type"
+              ],
+              "properties": {
+                "asset_id": {
+                  "type": "string",
+                  "description": "Unique identifier for the asset"
+                },
+                "archive": {
+                  "type": "string",
+                  "description": "Archive file the entry originates from"
+                },
+                "entry_index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Index of the entry within its archive"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Binary type of the entry (e.g. bin, txt, png)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "all_unique_strings": {
+      "type": "array",
+      "description": "Deduplicated list of every unique string collected across all groups",
+      "items": {
+        "type": "string"
+      }
+    },
+    "classification_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Count of unique strings per classification category",
+      "required": [
+        "zone_names",
+        "map_keys",
+        "file_paths",
+        "shader_references",
+        "other"
+      ],
+      "properties": {
+        "zone_names": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of unique zone name strings"
+        },
+        "map_keys": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of unique map key strings"
+        },
+        "file_paths": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of unique file path strings"
+        },
+        "shader_references": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of unique shader reference strings"
+        },
+        "other": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of unique strings classified as other"
+        }
+      }
+    }
+  }
+}

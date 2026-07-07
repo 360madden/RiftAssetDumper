@@ -6,7 +6,7 @@
 >
 > Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
 >
-> **Current phase**: Phase 0 ✅ COMPLETE → Phase 1 — Zone/Map Name Mining (next)
+> **Current phase**: Phase 1 ✅ COMPLETE → Phase 2 — Waypoints/POI Mining (next)
 >
 > **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
 >
