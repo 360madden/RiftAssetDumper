@@ -10,7 +10,7 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 
 **New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. Phase 0 (feasibility) in progress — walkability classification complete (239 assets, 161 potentially walkable), pure-Python feasibility analyzer built, awaiting flythrough pipeline rebuild for full geometry input.
 
-**New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phase 2 COMPLETE** — 9 anchors (7 unique + 2 NOT_FOUND), schema-validated catalog, consumer contract documented. Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`. Handoff: `docs/handoffs/2026-07-07-binary-phase2-exit.md`.
+**New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phase 2 COMPLETE** — 9 anchors (all 9 unique; #7+#8 recovered via binary byte-dump analysis, Session 5), schema-validated catalog, consumer contract documented. Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`. Handoff: `docs/handoffs/2026-07-07-binary-phase2-exit.md`.
 
 ## Quickstart
 
