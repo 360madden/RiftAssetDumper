@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.riftassetdumper/schemas/binary-signatures-v1.schema.json",
+  "title": "RIFT Binary Signature Catalog v1",
+  "description": "Stable byte-signature catalog for rift_x64.exe. Each anchor maps a wildcarded byte pattern to a concrete pointer resolution strategy. Consumers (RiftReader) pattern-scan the binary at runtime and resolve the pointer chain without hardcoded offsets. This is a Scanning Rule Object — abstract byte patterns with relative local offsets, no decompiled code or absolute addresses.",
+  "type": "object",
+  "required": [
+    "SchemaVersion",
+    "BinaryTarget",
+    "BinaryVersion",
+    "ImageBase",
+    "ExtractedAt",
+    "WildcardPolicy",
+    "CandidateOnly",
+    "Anchors"
+  ],
+  "properties": {
+    "SchemaVersion": { "const": "binary-signatures/v1" },
+    "BinaryTarget": {
+      "type": "string",
+      "description": "Filename of the target PE binary (e.g., rift_x64.exe)."
+    },
+    "BinaryVersion": {
+      "type": "object",
+      "required": ["PEFileVersion", "PETimestamp", "PETimestampUTC", "FileSizeBytes"],
+      "properties": {
+        "PEFileVersion": { "type": "string" },
+        "PETimestamp": { "type": "integer", "minimum": 0 },
+        "PETimestampUTC": { "type": "string", "format": "date-time" },
+        "FileSizeBytes": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ImageBase": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]+$",
+      "description": "Image base address used for RVA-to-VA translation."
+    },
+    "TextSection": {
+      "type": "object",
+      "required": ["VirtualAddress", "RawSize"],
+      "properties": {
+        "VirtualAddress": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "RawSize": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "ExtractedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when this catalog was extracted or last regenerated."
+    },
+    "WildcardPolicy": {
+      "type": "string",
+      "description": "Human-readable description of which byte positions are wildcarded and why. E.g., 'Relative addresses (E8/E9/8B 05), jump offsets, and RIP-relative displacements are masked as ??. Opcode bytes and register encodings are preserved.'"
+    },
+    "CandidateOnly": {
+      "type": "boolean",
+      "const": true,
+      "description": "All signatures in this catalog are candidate-only. They are scanning rules, not parser-proven truth. Consumer must validate uniqueness at scan time."
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "DiscoveryMethod": {
+          "type": "string",
+          "enum": ["modrm-cluster-heuristic", "ghidra-function-survey", "manual-static-analysis"]
+        },
+        "ValidationMethod": {
+          "type": "string",
+          "enum": ["full-binary-uniqueness-scan", "cross-version-validation", "simulated-patch-resilience", "none"]
+        },
+        "ModRMScannerVersion": { "type": "string" },
+        "SignatureMatchVersion": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Anchors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/anchor" },
+      "minItems": 1
+    },
+    "Summary": {
+      "type": "object",
+      "properties": {
+        "TotalAnchors": { "type": "integer", "minimum": 0 },
+        "UniqueSignatures": { "type": "integer", "minimum": 0 },
+        "NonUniqueSignatures": { "type": "integer", "minimum": 0 },
+        "StabilityTier1Count": { "type": "integer", "minimum": 0 },
+        "StabilityTier2Count": { "type": "integer", "minimum": 0 },
+        "StabilityTier3Count": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "anchor": {
+      "type": "object",
+      "required": [
+        "Name",
+        "StabilityTier",
+        "SignatureHex",
+        "SignatureLength",
+        "WildcardCount",
+        "UniquenessVerified",
+        "DiscoveryMethod"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,80}$",
+          "description": "Human-readable anchor name (e.g., vtable-dispatch, cluster-01-rbx)."
+        },
+        "StabilityTier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "1 = engine core (most stable), 2 = game logic (moderately stable), 3 = UI/rendering (least stable)."
+        },
+        "Description": {
+          "type": "string",
+          "description": "What this anchor targets and why it matters for live-memory reading."
+        },
+        "SignatureHex": {
+          "type": "string",
+          "pattern": "^([0-9A-Fa-f]{2}|\\?\\?)( ([0-9A-Fa-f]{2}|\\?\\?))*$",
+          "description": "Wildcarded byte signature as space-separated hex with ?? for wildcard bytes."
+        },
+        "SignatureLength": {
+          "type": "integer",
+          "minimum": 4,
+          "description": "Number of bytes in the signature (including wildcards)."
+        },
+        "WildcardCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ?? wildcard positions."
+        },
+        "EntryVA": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "ClusterVA": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "UniquenessVerified": {
+          "type": "boolean",
+          "description": "True if this signature matches exactly 1 location in the full .text section."
+        },
+        "DiscoveryMethod": {
+          "type": "string",
+          "enum": ["modrm-cluster-heuristic", "ghidra-function-survey", "manual-static-analysis"],
+          "description": "How this signature was discovered."
+        },
+        "PointerResolution": {
+          "type": "object",
+          "properties": {
+            "Method": {
+              "type": "string",
+              "enum": ["rip_relative", "direct_register_offset", "call_relative", "vtable_dispatch", "none"]
+            },
+            "InstructionOffsetToPointer": { "type": "integer", "minimum": 0 },
+            "PointerByteCount": { "type": "integer", "minimum": 0 },
+            "Notes": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "StructLayout": {
+          "type": "object",
+          "properties": {
+            "Description": { "type": "string" },
+            "Fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/structField" }
+            }
+          },
+          "additionalProperties": false
+        },
+        "TargetOffsets": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+          "description": "Player-coordinate offsets (0x304-0x328) accessed by this code cluster."
+        },
+        "BaseRegisterCounts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 },
+          "description": "Distribution of base registers (RBX, RCX, etc.) in this cluster."
+        },
+        "HitCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of ModRM hits in the cluster."
+        },
+        "PlayerCoordinateScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Likelihood score (0-1) that this cluster accesses player coordinate data."
+        },
+        "FallbackStrategy": {
+          "type": "string",
+          "description": "If not unique, what fallback was used (xref scanning, caller anchoring, multi-pattern chaining)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "structField": {
+      "type": "object",
+      "required": ["Offset", "OffsetHex", "Name", "Type", "Confidence"],
+      "properties": {
+        "Offset": { "type": "integer", "minimum": 0 },
+        "OffsetHex": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+        "Name": { "type": "string" },
+        "Type": { "type": "string", "enum": ["float32", "int32", "uint32", "pointer64"] },
+        "Confidence": { "type": "string", "enum": ["confirmed", "inferred", "tentative"] },
+        "RiftReaderField": { "type": "string", "description": "Corresponding RiftReader field name if known." }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
