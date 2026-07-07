@@ -10,6 +10,8 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 
 **New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. Phase 0 (feasibility) in progress — walkability classification complete (239 assets, 161 potentially walkable), pure-Python feasibility analyzer built, awaiting flythrough pipeline rebuild for full geometry input.
 
+**New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phase 2 COMPLETE** — 9 anchors (7 unique + 2 NOT_FOUND), schema-validated catalog, consumer contract documented. Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`. Handoff: `docs/handoffs/2026-07-07-binary-phase2-exit.md`.
+
 ## Quickstart
 
 ### .NET (main dumper CLI)
@@ -94,6 +96,18 @@ All complex modes have been ported to Python. **No new PowerShell or CMD scripti
 | `python scripts/validate_meshsize_inference.py` | Cross-validation of vc_proximity mesh_size inferences against ground truth |
 | `python scripts/navmesh_phase0_feasibility.py --obj <path> [--cell-size 0.5] [--max-slope 45]` | Pure-Python navmesh feasibility analyzer: OBJ parse → slope filter → 2D grid → connected components → verdict |
 | `python scripts/classify_walkability.py` | Per-asset walkability classifier: cross-references zone attribution + semantic hints → label + confidence + needs_shape_analysis |
+
+### Binary Signature Discovery scripts (Python, `scripts/`)
+
+| Command | Purpose |
+|---------|---------|
+| `python scripts/signature_match.py` | Validate byte signatures from catalog against `.text` section; report uniqueness |
+| `python scripts/synthesize_signature_catalog.py [--validate]` | Synthesize `rift-x64-signature-catalog.json` from Phase 1 + Phase 2 data; validates against schema |
+| `python scripts/cross_validate_signatures.py` | Compare expected entry VAs vs actual match RVAs; RVA delta report |
+| `pytest tests/test_signature_match.py` | Signature match unit tests |
+| `pytest tests/test_modrm_scanner.py` | ModRM scanner unit tests |
+| `pytest tests/test_probe_modrm_leads.py` | ModRM probe leads unit tests |
+| `pytest tests/test_synthesize_signature_catalog.py` | Schema conformance + anchor structure tests (13) |
 
 ### Cycle 5 (Tier-1 archive provenance) scripts (Python, `scripts/`)
 
