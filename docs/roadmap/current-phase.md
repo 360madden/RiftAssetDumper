@@ -12,7 +12,7 @@
 >
 > Uses Ghidra static analysis on `rift_x64.exe` to extract stable byte signatures and struct layout maps so RiftReader can pattern-scan for memory anchors instead of hardcoding offsets that break on game patches. Output is `rift-x64-signature-database.json` in `Exports/binary-phaseN/`.
 >
-> **Current phase**: Phase 0 — Ghidra Tooling Audit & Binary Baseline
+> **Current phase**: Phase 0 ✅ COMPLETE → Phase 1 — RiftReader Target Mapping (next)
 >
 > These roadmaps are **independent** — work on one does not block the other. They use different tooling (C# semantic indexer vs. Ghidra headless), different inputs (TWAD archive entries vs. rift_x64.exe), and produce different outputs (vocabulary artifacts vs. byte signature database).
 

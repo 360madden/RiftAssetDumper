@@ -118,7 +118,13 @@ def run_ghidra_headless(
         raise ValueError("Use either import_path or process_path, not both.")
 
     if import_path:
-        cmd += ["-import", str(import_path)]
+        import_resolved = Path(str(import_path)).resolve()
+        if not import_resolved.exists():
+            raise FileNotFoundError(
+                f"Import file does not exist: {import_resolved}\n"
+                f"Hint: The built exe is typically at Exports/rift_x64.exe, not src/RiftAssetDumper/"
+            )
+        cmd += ["-import", str(import_resolved)]
     elif process_path:
         cmd += ["-process", str(process_path)]
 
