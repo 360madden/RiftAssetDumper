@@ -6,13 +6,13 @@
 >
 > Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
 >
-> **Current phase**: Phase 2 ✅ COMPLETE → Phase 3 ✅ COMPLETE → Phase 4 ✅ COMPLETE → Phase 5 ✅ COMPLETE → Phase 6 — Cross-Repo Artifact Packaging (next)
+> **Current phase**: ✅ **COMPLETE** — All 6 phases delivered (zone, POI, actor, UI, audio vocabularies + unified index)
 >
 > **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
 >
 > Uses Ghidra static analysis on `rift_x64.exe` to extract stable byte signatures and struct layout maps so RiftReader can pattern-scan for memory anchors instead of hardcoding offsets that break on game patches. Output is `rift-x64-signature-database.json` in `Exports/binary-phaseN/`.
 >
-> **Current phase**: Phase 2 ✅ COMPLETE → Phase 3 ✅ COMPLETE → Phase 4 ✅ COMPLETE → Phase 5 ✅ COMPLETE (Lua API Tracing) → Phase 6 — Unit Registry Mapping (next)
+> **Current phase**: Phase 5 ✅ COMPLETE (Lua API Tracing) → Phase 6 ✅ COMPLETE (Unit Registry) → Phase 7 ✅ COMPLETE (Integration Contract) → Phase 8 — Signature Database & Consumer Contract (next)
 >
 > These roadmaps are **independent** — work on one does not block the other. They use different tooling (C# semantic indexer vs. Ghidra headless), different inputs (TWAD archive entries vs. rift_x64.exe), and produce different outputs (vocabulary artifacts vs. byte signature database).
 
