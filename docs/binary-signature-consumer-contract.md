@@ -1,9 +1,11 @@
 # Binary Signature Consumer Contract
 
-**Version**: 7.0  
+**Version**: 8.0  
 **Date**: 2026-07-09  
 **Target**: `rift_x64.exe`  
-**ImageBase**: `0x140000000`
+**ImageBase**: `0x140000000`  
+**Schema**: `binary-signatures/v2`  
+**Schema File**: `docs/schemas/binary-signatures-v1.schema.json`
 
 ---
 
@@ -209,14 +211,115 @@ long handlerVA = 0x140989570 + delta;  // runtime address of handler
 
 ## Signature Database
 
-Full signature database with all anchors, struct layouts, and registry map:
+Full signature database (Phase 8 final):
+
+```
+Exports/binary-phase8/rift-x64-signature-database.json
+```
+
+JSON Schema for validation:
+
+```
+docs/schemas/binary-signatures-v1.schema.json
+```
+
+Previous phase outputs (reference only):
 
 ```
 Exports/binary-phase5/rift-x64-signature-database.json
-```
-
-Integration contract with detailed scan strategies:
-
-```
 Exports/binary-phase7/integration-contract.json
 ```
+
+---
+
+## Schema Validation
+
+Validate the signature database against the JSON schema before importing:
+
+```csharp
+// Using NJsonSchema or similar library
+var schema = await JsonSchema.FromFileAsync("docs/schemas/binary-signatures-v1.schema.json");
+var database = await File.ReadAllTextAsync("Exports/binary-phase8/rift-x64-signature-database.json");
+var validationErrors = schema.Validate(database);
+
+if (validationErrors.Any())
+{
+    foreach (var error in validationErrors)
+        Console.WriteLine($"Schema error: {error.Kind} - {error.Path}");
+    throw new InvalidOperationException("Signature database failed schema validation");
+}
+```
+
+**Key constraints enforced by the schema**:
+
+| Constraint | Value | Purpose |
+|------------|-------|---------|
+| `SchemaVersion` | `const "binary-signatures/v2"` | Prevents version drift |
+| `additionalProperties` | `false` at all levels | No uncontrolled fields |
+| `StabilityTier` | `enum [1, 2, 3]` | Tier classification |
+| `Confidence` | `enum [high, medium, low, inferred, confirmed]` | Field confidence levels |
+| `SignatureHex` | Pattern `^[0-9A-Fa-f ?]+$` | Valid hex with wildcards |
+| Anchor `UniquenessVerified` | Required boolean | Ensures uniqueness was checked |
+
+**If validation fails**: The database may be from an incompatible version or may have been corrupted during transfer. Re-run the Phase 8 extraction pipeline.
+
+---
+
+## Versioning and Updates
+
+### Version Format
+
+The database uses `SchemaVersion: "binary-signatures/v2"`. The schema file is versioned independently as `binary-signatures-v1.schema.json` (schema version 1, data format version 2).
+
+### When to Re-extract
+
+After a game patch, re-extract the database in this order:
+
+1. **Binary metadata** — PE timestamp, file size will change
+2. **String anchors** — Check if `Inspect.Unit.Detail` moved in `.rdata`
+3. **Handler chain** — Registration → handler → registry accessor VAs
+4. **ModRM scan** — Confirm offsets 0x304-0x328 still active
+5. **Anchor uniqueness** — Re-verify all 11 anchors against the new binary
+6. **Struct layouts** — Confirm field offsets are unchanged
+
+### Breaking vs Non-Breaking Changes
+
+**Breaking** (require schema version bump and consumer update):
+
+- Anchor signature bytes change (not just addresses)
+- Struct layout offsets shift
+- Registry table offset (0x810) changes
+- Calling convention or register usage changes
+- New `SchemaVersion` value
+
+**Non-breaking** (require only data update, consumers auto-adapt):
+
+- VAs shift due to recompilation (ASLR handles this)
+- New anchors added to the database
+- New fields discovered in existing structs
+- Updated confidence levels
+- Updated `ExtractedAt` timestamp
+
+### Consumer Migration
+
+When `SchemaVersion` changes:
+
+1. Update the schema file (`binary-signatures-v1.schema.json`)
+2. Update consumer code to handle the new schema
+3. Re-extract the database against the new schema
+4. Validate the new database passes the updated schema
+5. Deploy updated consumer with new database
+
+---
+
+## Ghidra Corrections (Phase 3-5)
+
+Previous analysis incorrectly attributed player coordinate reads to:
+
+| Function | Actual Role | Why It Was Wrong |
+|----------|-------------|------------------|
+| `FUN_1408b39d0` | AATree UI dialog handler | 0x320 displacement is a UI struct offset, not pos_x |
+| `FUN_140da8870` | PetBar UI handler | 0x328 displacement is a texture path offset, not pos_z |
+| `FUN_14078a0d0` | 5,784-instruction property dispatch | Repeatedly calls factory/lookup helpers — NOT coordinate access |
+
+The actual player coordinate access is distributed across 1,337 ModRM `[base+disp32]` instructions found by the byte-scanner, concentrated in functions using RBX/RCX base registers.
