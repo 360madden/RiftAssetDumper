@@ -34,6 +34,13 @@ coverage/
 *.log
 *.tmp
 *.bak
+temp_analyze.py
+
+# game binaries (not for repo)
+rift_x64.exe
+
+# screenshots/captures
+*.bmp
 
 # compressed/manual dumps should be intentionally added, not swept in
 *.zip

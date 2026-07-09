@@ -1,0 +1,17 @@
+Identifier = "MemoryScannerHelper"
+Name = "Memory Scanner Helper"
+NameShort = "MemScanHelper"
+Description = "Helps locate API functions and game memory structures"
+Author = "RIFT Modding"
+Email = "placeholder@example.invalid"
+Website = ""
+Version = "1.0.0"
+Environment = "4.4"
+
+RunOnStartup = {
+  "Core.lua"
+}
+
+SavedVariables = {
+  _mscExported = "account"
+}
