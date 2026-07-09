@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rift-modding.local/schemas/actor-vocabulary-v1.schema.json",
+  "title": "Actor Vocabulary v1",
+  "description": "Schema for the actor vocabulary artifact describing game objects, characters, props, and environmental actors extracted from game assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "total_actor_entries",
+    "total_unique_names",
+    "names",
+    "entries"
+  ],
+  "properties": {
+    "schema": {
+      "const": "actor-vocabulary-v1",
+      "description": "Schema identifier for this artifact"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "ISO 8601 date when this vocabulary was generated"
+    },
+    "total_actor_entries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of actor entries"
+    },
+    "total_unique_names": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of unique actor names identified"
+    },
+    "names": {
+      "type": "array",
+      "description": "Deduplicated list of all unique actor-related names",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entries": {
+      "type": "array",
+      "description": "Individual actor entries with archive references and semantic categories",
+      "items": {
+        "$ref": "#/$defs/ActorEntry"
+      }
+    }
+  },
+  "$defs": {
+    "ActorEntry": {
+      "type": "object",
+      "description": "A single actor entry",
+      "additionalProperties": false,
+      "required": [
+        "archive",
+        "entry_index",
+        "type",
+        "name_candidates",
+        "text_snippets",
+        "semantic_categories"
+      ],
+      "properties": {
+        "archive": {
+          "type": "string",
+          "description": "Archive file the entry originates from"
+        },
+        "entry_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Index of the entry within its archive"
+        },
+        "type": {
+          "type": "string",
+          "description": "Binary type of the entry"
+        },
+        "name_candidates": {
+          "type": "array",
+          "description": "Possible name identifiers for this entry",
+          "items": {
+            "type": "string"
+          }
+        },
+        "text_snippets": {
+          "type": "array",
+          "description": "Text snippets extracted from the entry",
+          "items": {
+            "type": "string"
+          }
+        },
+        "semantic_categories": {
+          "type": "array",
+          "description": "Semantic category tags assigned to this entry (hint:* for heuristic, ref:* for parser-backed, type:* for format, asset:* for classification)",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

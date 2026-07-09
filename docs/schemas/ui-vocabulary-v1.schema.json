@@ -1,0 +1,217 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rift-modding.local/schemas/ui-vocabulary-v1.schema.json",
+  "title": "UI Vocabulary Artifact",
+  "description": "Validates the UI vocabulary artifact produced by synthesize_ui_vocabulary.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "source_files",
+    "summary",
+    "xml_tags",
+    "xml_attributes",
+    "lua_functions",
+    "lua_comments",
+    "cross_references"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ui-vocabulary-v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xml_catalog", "lua_catalog"],
+      "properties": {
+        "xml_catalog": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lua_catalog": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/Summary"
+    },
+    "xml_tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/TagCount"
+        }
+      }
+    },
+    "xml_attributes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/AttributeCount"
+        }
+      }
+    },
+    "lua_functions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/FunctionEntry"
+        }
+      }
+    },
+    "lua_comments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CommentEntry"
+      }
+    },
+    "cross_references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xml_to_lua"],
+      "properties": {
+        "xml_to_lua": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CrossReference"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "Summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_xml_entries",
+        "total_lua_entries",
+        "total_unique_tags",
+        "total_unique_attributes",
+        "total_unique_functions",
+        "total_unique_comments"
+      ],
+      "properties": {
+        "total_xml_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_lua_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unique_tags": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unique_attributes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unique_functions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unique_comments": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "TagCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "count"],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "AttributeCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "count"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "FunctionEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "entries"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CommentEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "entries"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "CrossReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["xml_tag", "lua_functions", "co_occurrence_count"],
+      "properties": {
+        "xml_tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lua_functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "co_occurrence_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

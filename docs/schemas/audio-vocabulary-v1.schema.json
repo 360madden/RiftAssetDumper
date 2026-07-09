@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/audio-vocabulary-v1.schema.json",
+  "title": "Audio Vocabulary v1",
+  "description": "Schema for the audio vocabulary artifact describing audio assets, sound tags, and audio-to-zone/actor cross-references extracted from game assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "source_inventories",
+    "summary",
+    "categories",
+    "riff_audio_assets",
+    "zone_cross_references",
+    "all_unique_audio_strings"
+  ],
+  "properties": {
+    "schema": {
+      "const": "audio-vocabulary-v1",
+      "description": "Schema identifier for this artifact"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "ISO 8601 date when this vocabulary was generated"
+    },
+    "source_inventories": {
+      "type": "array",
+      "description": "List of source inventory files used to generate this vocabulary",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Summary statistics for the audio vocabulary",
+      "additionalProperties": false,
+      "required": [
+        "total_riff_assets",
+        "total_audio_locator_references",
+        "total_sound_tag_references",
+        "total_unique_audio_categories",
+        "audio_archive"
+      ],
+      "properties": {
+        "total_riff_assets": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of RIFF audio assets found"
+        },
+        "total_audio_locator_references": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of AUDIO - Locator references"
+        },
+        "total_sound_tag_references": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of sound tag references"
+        },
+        "total_unique_audio_categories": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of unique audio categories"
+        },
+        "audio_archive": {
+          "type": "string",
+          "description": "Archive file containing the RIFF audio assets"
+        }
+      }
+    },
+    "categories": {
+      "type": "object",
+      "description": "Audio entries grouped by category",
+      "additionalProperties": false,
+      "required": [
+        "ambient",
+        "sfx",
+        "footstep",
+        "voice"
+      ],
+      "properties": {
+        "ambient": {
+          "$ref": "#/$defs/audioCategory"
+        },
+        "sfx": {
+          "$ref": "#/$defs/audioCategory"
+        },
+        "footstep": {
+          "$ref": "#/$defs/audioCategory"
+        },
+        "voice": {
+          "$ref": "#/$defs/audioCategory"
+        }
+      }
+    },
+    "riff_audio_assets": {
+      "type": "object",
+      "description": "Information about RIFF audio assets in the game archives",
+      "additionalProperties": false,
+      "required": [
+        "archive",
+        "total_count",
+        "size_distribution",
+        "samples"
+      ],
+      "properties": {
+        "archive": {
+          "type": "string",
+          "description": "Archive file containing RIFF audio assets"
+        },
+        "total_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of RIFF audio assets"
+        },
+        "size_distribution": {
+          "type": "object",
+          "description": "Size distribution of RIFF audio assets",
+          "additionalProperties": false,
+          "required": [
+            "min_size_bytes",
+            "max_size_bytes",
+            "average_size_bytes"
+          ],
+          "properties": {
+            "min_size_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum size in bytes"
+            },
+            "max_size_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Maximum size in bytes"
+            },
+            "average_size_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Average size in bytes"
+            }
+          }
+        },
+        "samples": {
+          "type": "array",
+          "description": "Sample RIFF audio asset entries",
+          "items": {
+            "$ref": "#/$defs/riffSample"
+          }
+        }
+      }
+    },
+    "zone_cross_references": {
+      "type": "object",
+      "description": "Cross-references between zones and audio assets",
+      "additionalProperties": false
+    },
+    "actor_cross_references": {
+      "type": "array",
+      "description": "Cross-references between actors and audio assets",
+      "items": {
+        "type": "string"
+      }
+    },
+    "path_patterns": {
+      "type": "object",
+      "description": "Common path patterns for audio assets",
+      "additionalProperties": false
+    },
+    "all_unique_audio_strings": {
+      "type": "array",
+      "description": "Deduplicated list of every unique audio-related string",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "audioCategory": {
+      "type": "object",
+      "description": "A category of audio assets",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "count",
+        "entries"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Description of this audio category"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of entries in this category"
+        },
+        "entries": {
+          "type": "array",
+          "description": "Audio entries in this category",
+          "items": {
+            "$ref": "#/$defs/audioEntry"
+          }
+        }
+      }
+    },
+    "audioEntry": {
+      "type": "object",
+      "description": "An individual audio entry",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "type",
+        "zone_associations",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name or identifier of the audio asset"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ambient", "sfx", "footstep", "voice", "music"],
+          "description": "Type of audio asset"
+        },
+        "zone_associations": {
+          "type": "array",
+          "description": "Zones associated with this audio asset",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the audio asset"
+        }
+      }
+    },
+    "riffSample": {
+      "type": "object",
+      "description": "A sample RIFF audio asset entry",
+      "additionalProperties": false,
+      "required": [
+        "archive",
+        "entry_index",
+        "id_prefix",
+        "size",
+        "semantic_categories"
+      ],
+      "properties": {
+        "archive": {
+          "type": "string",
+          "description": "Archive file containing the asset"
+        },
+        "entry_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Index of the entry within the archive"
+        },
+        "id_prefix": {
+          "type": "string",
+          "description": "ID prefix for the asset"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the asset in bytes"
+        },
+        "semantic_categories": {
+          "type": "array",
+          "description": "Semantic categories assigned to this asset",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

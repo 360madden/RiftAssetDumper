@@ -1,18 +1,18 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-07-07 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
+**Last Updated**: 2026-07-09 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
 
 > **1. `docs/roadmap/semantic-discovery-roadmap.md`** — Semantic Asset Discovery for Live-Memory Validation
 >
 > Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
 >
-> **Current phase**: Phase 1 ✅ COMPLETE → Phase 2 — Waypoints/POI Mining (next)
+> **Current phase**: Phase 2 ✅ COMPLETE → Phase 3 ✅ COMPLETE → Phase 4 ✅ COMPLETE → Phase 5 ✅ COMPLETE → Phase 6 — Cross-Repo Artifact Packaging (next)
 >
 > **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
 >
 > Uses Ghidra static analysis on `rift_x64.exe` to extract stable byte signatures and struct layout maps so RiftReader can pattern-scan for memory anchors instead of hardcoding offsets that break on game patches. Output is `rift-x64-signature-database.json` in `Exports/binary-phaseN/`.
 >
-> **Current phase**: Phase 0 ✅ COMPLETE → Phase 1 — RiftReader Target Mapping (next)
+> **Current phase**: Phase 2 ✅ COMPLETE → Phase 3 ✅ COMPLETE → Phase 4 ✅ COMPLETE → Phase 5 ✅ COMPLETE (Lua API Tracing) → Phase 6 — Unit Registry Mapping (next)
 >
 > These roadmaps are **independent** — work on one does not block the other. They use different tooling (C# semantic indexer vs. Ghidra headless), different inputs (TWAD archive entries vs. rift_x64.exe), and produce different outputs (vocabulary artifacts vs. byte signature database).
 

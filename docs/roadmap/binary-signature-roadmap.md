@@ -1,10 +1,59 @@
 ﻿# Binary Signature Discovery Roadmap — Stable Offset Anchors for Live-Memory Reading
 
 **Created**: 2026-06-28
+**Pivoted**: 2026-07-07 — Strategy shifted from "find code that reads data" to "find code that DISCOVERS the player object"
 **Repo**: `RiftAssetDumper` (Assets repo only — no cross-repo edits)
-**Status** *(as of 2026-06-28; not yet validated by Ghidra execution)*: Phase 0 self-reported exit complete, Phase 1 self-reported nearly complete, Phase 2 smoke-probe self-reported started. External verification (re-running the committed Ghidra scripts against a live `rift_x64.exe` and matching hits to the 1,337-site map) is required before promoting any Phase-N exit to "officially complete".
-**Parallel to**: `docs/roadmap/semantic-discovery-roadmap.md` (independent lane, different tools and inputs)
-**Critical finding (2026-06-28)**: The RiftReader LocalPlayerBase offset `0x32EBC80` is a **runtime address** — not a static global in `rift_x64.exe`. Ghidra reports the address as non-memory-backed, uninitialized, with 0 static references. The binary signature strategy must target the CODE that accesses player data, not the data address itself. See `Phase 1 → M1.2` for the revised Ghidra back-trace approach.
+
+---
+
+## STRATEGY PIVOT (2026-07-07)
+
+### Problem with Original Strategy
+
+The original approach found 1,337 instruction sites that READ player coordinates. But this doesn't solve RiftReader's core problem: **where does the player object pointer come from?**
+
+- `0x32EBC80` is a runtime heap address — no static global exists
+- The game object is passed as a parameter (RDX) through the call chain
+- There's no singleton or global that provides the player object directly
+
+### New Strategy: Lua API Layer → Object Discovery
+
+The game has a **Lua scripting layer** that exposes `Inspect.Unit.Detail(unit)` — a C function that bridges Lua to game objects. This is the entry point.
+
+**Discovery path:**
+
+```
+Lua: Inspect.Unit.Detail("player")
+  → C implementation (finds unit in registry)
+    → Returns game object pointer
+      → Property-chain walker accesses fields via vtable dispatch
+```
+
+**The stable anchor is the C implementation of `Inspect.Unit.Detail`** — it's the code that FINDS the player object. Once we signature this function, RiftReader can:
+
+1. Pattern-scan to find the implementation
+2. Call it (or trace its logic) to get the player object pointer
+3. Then read fields at known offsets
+
+### Key Findings from Agent Investigation
+
+| Finding | Value | Significance |
+|---------|-------|--------------|
+| Getter thunk signature | `45 33 C0 BA 10 00 00 00 E9` (9 bytes) | Entry point to property-chain system |
+| Game object structure | vtable at [obj+0x00], sub-object at [obj+0x40] | Type identification |
+| Lua API namespace | 92 `Inspect.*` methods defined in .data section | Full API surface |
+| Unit detail fields | `id, name, health, mana, calling, level, player, ...` | Player identification field |
+| Vtable slot for getter | `[rax+0x38]` (353 call sites) | Primary dispatch mechanism |
+
+### New Phase Structure
+
+The roadmap phases are restructured to focus on object discovery:
+
+- **Phase 0-4**: ✅ COMPLETE (original strategy — still valuable for struct layout and signatures)
+- **Phase 5**: ✅ NEW — Trace `Inspect.Unit.Detail` implementation
+- **Phase 6**: Extract stable signature from Lua API implementation
+- **Phase 7**: Map unit registry (how the game stores unit objects)
+- **Phase 8**: Integration contract for RiftReader
 
 **Architecture discovery (2026-06-28)**: FUN_14078a0d0 is a **massive C++ property chain walker** — it iterates through dozens of game-object property offsets using two-tier dispatch. The generic getter thunk at `0x14077d750` chains through `0x14136a2d0` → `0x14129c088` → tail-call to `0x14128aaec` (hash-table/sorted-array lookup; function body starts at `0x14128AB0C`). The returned property descriptor + game object are then passed to **offset-specific callbacks** (e.g., 0x320→`0x1408b39d0`, 0x328→`0x140da8870`) that contain the actual float32 coordinate reads.
 
@@ -380,7 +429,148 @@ They are **independent** — work on one does not block or require the other. Ei
 
 ---
 
-## Phase 5: Signature Database & Consumer Contract
+## Phase 5: Lua API Object-Discovery Tracing
+
+**Objective**: Trace the C implementation of `Inspect.Unit.Detail` to find how the game locates player objects at runtime. This is the critical path from static code → runtime game object pointer.
+
+**Entry Criteria**:
+
+- Phase 4 exit complete
+- Getter thunk signature identified (`45 33 C0 BA 10 00 00 00 E9`)
+- Lua API namespace mapped (92 `Inspect.*` methods)
+
+**Key Milestones**:
+
+1. **M5.1**: Find `Inspect.Unit.Detail` implementation
+   - Search for string references to "Inspect.Unit.Detail" or "Detail" in .rdata
+   - Trace LEA instructions that load these strings to find the C function
+   - Alternatively: search for the function that handles the "Detail" method dispatch
+
+2. **M5.2**: Trace unit registry lookup
+   - From the implementation, trace how it finds the unit object
+   - Look for hash table lookups, array indexing, or pointer chain resolution
+   - Identify the data structure that stores unit objects
+
+3. **M5.3**: Map the "player" field identification
+   - The `Inspect.Unit.Detail` result includes a `player` field
+   - Trace how this field is populated — is it a flag on the game object? A lookup?
+   - Determine if we can identify the player object by this field
+
+4. **M5.4**: Extract signature from implementation
+   - The C implementation of `Inspect.Unit.Detail` is a stable target
+   - Extract byte signature from its entry point
+   - Verify uniqueness against full binary
+
+**Exit Criteria**:
+
+- `Inspect.Unit.Detail` implementation located and signatured
+- Unit registry structure documented
+- Player identification method confirmed
+- Handoff committed
+
+**Required Artifacts**:
+
+- `Exports/binary-phase5/lua-api-trace.json` (gitignored)
+- `docs/handoffs/2026-07-07-binary-phase5-lua-api.md` (committed)
+
+---
+
+## Phase 6: Unit Registry Mapping
+
+**Objective**: Map the data structure that stores unit objects (including the player). This is the runtime pointer source that RiftReader needs.
+
+**Entry Criteria**:
+
+- Phase 5 exit complete
+- `Inspect.Unit.Detail` implementation traced
+- Unit registry location identified
+
+**Key Milestones**:
+
+1. **M6.1**: Dump unit registry structure
+   - From the Phase 5 trace, identify the registry's memory layout
+   - Is it a hash table? Array? Linked list?
+   - What's the key? (unit ID, name, pointer?)
+
+2. **M6.2**: Identify player entry
+   - Find how the player unit is stored in the registry
+   - Is it a special entry? First entry? Marked with a flag?
+   - Can we locate it by the `player` field from `Inspect.Unit.Detail`?
+
+3. **M6.3**: Extract registry accessor signature
+   - Find the function that provides access to the unit registry
+   - Extract byte signature
+   - Verify uniqueness
+
+4. **M6.4**: Map field offsets within unit objects
+   - From the registry, trace to individual unit objects
+   - Confirm the field offsets (0x320, 0x324, 0x328, etc.) match our Phase 3 findings
+   - Document the full pointer chain: registry → unit object → fields
+
+**Exit Criteria**:
+
+- Unit registry structure documented
+- Player entry identification method confirmed
+- Registry accessor signature extracted
+- Full pointer chain from registry to player fields mapped
+- Handoff committed
+
+**Required Artifacts**:
+
+- `Exports/binary-phase6/unit-registry-map.json` (gitignored)
+- `docs/handoffs/2026-07-07-binary-phase6-registry.md` (committed)
+
+---
+
+## Phase 7: RiftReader Integration Contract
+
+**Objective**: Define the exact integration path for RiftReader — from byte signature scan to runtime player data access.
+
+**Entry Criteria**:
+
+- Phase 6 exit complete
+- Full pointer chain documented
+- All signatures verified
+
+**Key Milestones**:
+
+1. **M7.1**: Define the integration sequence
+   - Step 1: Scan for `Inspect.Unit.Detail` signature → get function address
+   - Step 2: From function, locate unit registry
+   - Step 3: From registry, find player entry
+   - Step 4: From player entry, read fields at known offsets
+
+2. **M7.2**: Document the ABI contract
+   - Calling convention for `Inspect.Unit.Detail`
+   - Register usage (RCX, RDX, R8, R9, XMM0-3)
+   - Return value format
+   - Error handling
+
+3. **M7.3**: Write integration guide
+   - How to implement the scan in Reloaded.Memory.Sigscan
+   - How to resolve pointers at runtime
+   - How to handle ASLR and rebasing
+   - Fallback strategies if signature breaks
+
+4. **M7.4**: Produce final signature database
+   - Merge all findings into `rift-x64-signature-database.json`
+   - Include: signatures, struct layouts, registry map, integration guide
+
+**Exit Criteria**:
+
+- Integration sequence documented
+- ABI contract defined
+- Final signature database produced
+- Handoff committed
+
+**Required Artifacts**:
+
+- `Exports/binary-phase7/integration-contract.json` (gitignored)
+- `docs/handoffs/2026-07-07-binary-phase7-integration.md` (committed)
+
+---
+
+## Phase 8: Signature Database & Consumer Contract
 
 **Objective**: Publish the final signature database as a compact, schematized JSON artifact with clear consumer-facing documentation. This is the deliverable that RiftReader imports.
 
