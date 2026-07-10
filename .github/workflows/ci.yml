@@ -82,6 +82,42 @@ jobs:
             *.md
           config: .markdownlint.json
 
+  pre-commit:
+    name: Pre-commit Checks
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit ruff mypy pytest ijson jsonschema Pillow
+
+      - name: Run pre-commit
+        env:
+          SKIP: gitleaks
+        run: pre-commit run --all-files
+
   orphan-guard:
     name: Orphan Guard Regression
     runs-on: windows-latest
@@ -108,13 +144,13 @@ jobs:
 
   final:
     name: Summary
-    needs: [dotnet, python, lint-docs, orphan-guard]
+    needs: [dotnet, python, lint-docs, orphan-guard, pre-commit]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check status
         run: |
-          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ] && [ "${{ needs.lint-docs.result }}" = "success" ] && [ "${{ needs.orphan-guard.result }}" = "success" ]; then
+          if [ "${{ needs.dotnet.result }}" = "success" ] && [ "${{ needs.python.result }}" = "success" ] && [ "${{ needs.lint-docs.result }}" = "success" ] && [ "${{ needs.orphan-guard.result }}" = "success" ] && [ "${{ needs.pre-commit.result }}" = "success" ]; then
             echo "✅ All CI checks passed"
           else
             echo "❌ Some CI checks failed"
@@ -122,5 +158,6 @@ jobs:
             echo "  python: ${{ needs.python.result }}"
             echo "  lint-docs: ${{ needs.lint-docs.result }}"
             echo "  orphan-guard: ${{ needs.orphan-guard.result }}"
+            echo "  pre-commit: ${{ needs.pre-commit.result }}"
             exit 1
           fi
