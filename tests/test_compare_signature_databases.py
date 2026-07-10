@@ -46,6 +46,7 @@ def _anchor(
     a = {
         "Name": name,
         "StabilityTier": tier,
+        "Description": f"Test anchor {name}",
         "SignatureHex": sig,
         "SignatureLength": len(sig.split()),
         "WildcardCount": sig.count("??"),

@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 # Runtime dependencies
 # --------------------
@@ -86,6 +86,16 @@ disable_error_code = [
 module = "src.*"
 strict = true
 disallow_untyped_defs = true
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "ijson",
+    "jsonschema",
+    "Pillow",
+]
 
 [tool.pytest.ini_options]
 python_files = ["test_*.py", "*_test.py"]

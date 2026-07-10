@@ -20,6 +20,7 @@ import ctypes
 import ctypes.wintypes as wt
 import sys
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 WM_KEYDOWN = 0x0100
@@ -240,7 +241,7 @@ def resolve_window(
     else:
         raise ValueError("Provide --process, --pid, or --hwnd")
 
-    if target_hwnd is None or target_hwnd == 0:
+    if target_hwnd is None or int(target_hwnd) == 0:
         raise ValueError("Resolved process has no main window handle")
 
     if owner_pid(target_hwnd) != target_pid:
@@ -298,7 +299,7 @@ def focus_window(hwnd: wt.HWND) -> wt.HWND:
 
 
 def restore_foreground(hwnd: wt.HWND) -> None:
-    if not hwnd or hwnd == 0:
+    if not hwnd or int(hwnd) == 0:
         return
     current = kernel32.GetCurrentThreadId()
     fg_thread = user32.GetWindowThreadProcessId(hwnd, None)
@@ -313,7 +314,7 @@ def restore_foreground(hwnd: wt.HWND) -> None:
 
 def is_foreground(pid: int) -> bool:
     fg = user32.GetForegroundWindow()
-    if fg == 0:
+    if int(fg) == 0:
         return False
     return owner_pid(fg) == pid
 
@@ -347,7 +348,7 @@ def send_input_unicode(char: str, keyup: bool = False) -> None:
 
 
 @contextmanager
-def _attached(hwnd: wt.HWND):
+def _attached(hwnd: wt.HWND) -> Iterator[None]:
     current = kernel32.GetCurrentThreadId()
     fg = user32.GetForegroundWindow()
     fg_thread = user32.GetWindowThreadProcessId(fg, None) if fg else 0
@@ -560,7 +561,7 @@ def send_command(
 
 
 @contextmanager
-def held_focus(hwnd: wt.HWND, restore: bool = True):
+def held_focus(hwnd: wt.HWND, restore: bool = True) -> Iterator[wt.HWND]:
     previous = focus_window(hwnd)
     try:
         yield hwnd

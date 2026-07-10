@@ -6,6 +6,7 @@ For each signature, progressively wildcard bytes to find the stability margin.
 
 import json
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INPUT = REPO_ROOT / "Exports" / "binary-phase2" / "signature-candidates.json"
@@ -44,18 +45,19 @@ def find_matches(binary: bytes, sig_bytes: list[int | None]) -> list[int]:
     return matches
 
 
-def test_stability_margin(binary: bytes, sig_hex: str, max_wildcard_additions: int = 10) -> dict:
+def test_stability_margin(binary: bytes, sig_hex: str, max_wildcard_additions: int = 10) -> dict[str, Any]:
     """Test how many additional wildcards can be added before losing uniqueness."""
     base_sig = parse_sig_hex(sig_hex)
     base_matches = find_matches(binary, base_sig)
 
-    result = {
+    margin_test_results: list[dict[str, Any]] = []
+    result: dict[str, Any] = {
         "base_sig_hex": sig_hex,
         "base_wildcard_count": sum(1 for b in base_sig if b is None),
         "base_match_count": len(base_matches),
         "base_unique": len(base_matches) == 1,
         "stability_margin": 0,
-        "margin_test_results": [],
+        "margin_test_results": margin_test_results,
     }
 
     if len(base_matches) != 1:
@@ -73,7 +75,7 @@ def test_stability_margin(binary: bytes, sig_hex: str, max_wildcard_additions: i
                 added += 1
 
         matches = find_matches(binary, test_sig)
-        result["margin_test_results"].append(
+        margin_test_results.append(
             {
                 "additional_wildcards": num_added,
                 "total_wildcards": sum(1 for b in test_sig if b is None),
@@ -101,13 +103,14 @@ def main():
     print(f"Loaded binary: {len(binary)} bytes")
     print(f"Testing {len(candidates['candidates'])} signatures\n")
 
-    report = {
+    signatures: list[dict[str, Any]] = []
+    report: dict[str, Any] = {
         "SchemaVersion": "signature-stability-report/v1",
         "Generated": "2026-07-07",
         "Binary": "rift_x64.exe",
         "BinarySize": len(binary),
         "Methodology": "Progressive wildcard addition — add wildcards one at a time until uniqueness is lost",
-        "Signatures": [],
+        "Signatures": signatures,
     }
 
     for cand in candidates["candidates"]:
@@ -120,7 +123,7 @@ def main():
         result["stability_tier"] = cand.get("stability_tier", "unknown")
         result["entry_va"] = cand.get("entry_va")
 
-        report["Signatures"].append(result)
+        signatures.append(result)
 
         print(
             f"  Base wildcards: {result['base_wildcard_count']}, "
@@ -129,14 +132,14 @@ def main():
         )
 
     # Summary
-    unique_count = sum(1 for s in report["Signatures"] if s["base_unique"])
-    avg_margin = sum(s["stability_margin"] for s in report["Signatures"]) / len(report["Signatures"])
+    unique_count = sum(1 for s in signatures if s["base_unique"])
+    avg_margin = sum(s["stability_margin"] for s in signatures) / len(signatures)
 
     report["Summary"] = {
-        "total_signatures": len(report["Signatures"]),
+        "total_signatures": len(signatures),
         "unique_at_base": unique_count,
         "average_stability_margin": round(avg_margin, 1),
-        "all_unique": unique_count == len(report["Signatures"]),
+        "all_unique": unique_count == len(signatures),
     }
 
     with open(OUTPUT, "w") as f:

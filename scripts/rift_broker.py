@@ -91,7 +91,8 @@ _rift_pid: int | None = None
 _previous_foreground: wt.HWND | None = None
 _lock = threading.Lock()
 _method: str = "post"
-_log_file = None
+_log_file: str | None = None
+_args: argparse.Namespace | None = None
 
 
 def _log(entry: dict) -> None:
@@ -139,6 +140,8 @@ def _capture_window(hwnd: wt.HWND) -> bytes | None:
 
 def _resolve() -> dict:
     global _rift_hwnd, _rift_pid
+    if _args is None:
+        raise RuntimeError("_resolve() called before _args was initialized")
     try:
         _rift_hwnd, _rift_pid = resolve_window(process_name=_args.process, pid=_args.pid)
         return {
@@ -407,7 +410,7 @@ class BrokerHandler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             return {}
 
-    def _respond(self, data: dict, status: int = 200):
+    def _respond(self, data: dict, status: int = 200) -> None:
         payload = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")

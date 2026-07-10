@@ -14,15 +14,12 @@
     "CandidateOnly",
     "Provenance",
     "Anchors",
-    "LuaApiTracing",
-    "UnitRegistry",
-    "IntegrationSequence",
-    "FallbackStrategies",
+
     "Summary"
   ],
   "properties": {
     "SchemaVersion": {
-      "const": "binary-signatures/v2",
+      "const": "binary-signatures/v1",
       "description": "Schema identifier and version"
     },
     "BinaryTarget": {
@@ -59,7 +56,20 @@
     "Provenance": {
       "type": "object",
       "description": "Discovery and validation metadata for the entire database",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "GhidraFindings": {
+          "type": "object",
+          "description": "Narrative corrections from Ghidra decompilation",
+          "additionalProperties": false,
+          "properties": {
+            "PreviousCallback0x320": {"type": "string"},
+            "PreviousCallback0x328": {"type": "string"},
+            "PropertyWalkerArchitecture": {"type": "string"},
+            "ActualAccessPattern": {"type": "string"}
+          }
+        }
+      }
     },
     "Anchors": {
       "type": "array",
@@ -139,8 +149,54 @@
             "additionalProperties": true
           },
           "StructLayout": {
-            "type": ["string", "null"],
-            "description": "Reference to a named struct layout in UnitRegistry"
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "Embedded struct layout with field definitions",
+                "additionalProperties": false,
+                "required": ["Description", "Fields"],
+                "properties": {
+                  "Description": {"type": "string"},
+                  "Fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["Offset", "OffsetHex", "Name", "Type", "Confidence"],
+                      "properties": {
+                        "Offset": {"type": "integer"},
+                        "OffsetHex": {"type": "string"},
+                        "Name": {"type": "string"},
+                        "Type": {"type": "string"},
+                        "Confidence": {"type": "string"},
+                        "RiftReaderField": {"type": "string"},
+                        "ModRMHitCount": {"type": "integer", "minimum": 0},
+                        "Notes": {"type": "string"}
+                      }
+                    }
+                  },
+                  "BaseRegisters": {"type": "object"},
+                  "TotalModRMHits": {"type": "integer", "minimum": 0}
+                }
+              },
+              {
+                "type": "string",
+                "description": "Reference to a named struct layout in UnitRegistry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "HitCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of ModRM hits observed for this signature cluster"
+          },
+          "PlayerCoordinateScore": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Heuristic score indicating likelihood this anchor relates to player coordinates"
           }
         }
       }

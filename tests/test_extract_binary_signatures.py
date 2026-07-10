@@ -48,6 +48,7 @@ def _minimal_phase2(path: Path) -> Path:
             {
                 "Name": "vtable-dispatch",
                 "StabilityTier": 1,
+                "Description": "Test vtable-dispatch anchor",
                 "SignatureHex": "48 85 D2 74 0A",
                 "SignatureLength": 4,
                 "WildcardCount": 0,

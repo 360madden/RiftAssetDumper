@@ -5968,7 +5968,6 @@ def _run_probe_modrm_leads(args: argparse.Namespace) -> None:
     """Bridge static ModRM analysis to live memory scanning."""
     from scripts.live_memory_scanner import (
         build_probe_modrm_leads_plan,
-        load_modrm_scan,
         run_probe_modrm_leads,
         write_probe_modrm_leads_reports,
     )
@@ -5982,12 +5981,10 @@ def _run_probe_modrm_leads(args: argparse.Namespace) -> None:
         print(f"ERROR: ModRM scan not found at {modrm_path}", file=sys.stderr)
         sys.exit(1)
 
-    modrm_data = load_modrm_scan(modrm_path)
     try:
         plan = build_probe_modrm_leads_plan(
             repo_root=REPO_ROOT,
-            out=args.out,
-            modrm_data=modrm_data,
+            modrm_scan_path=str(modrm_path),
             process_name=args.process_name,
             pid=args.pid,
             execute_live_read=args.execute_live_read,
@@ -5997,6 +5994,7 @@ def _run_probe_modrm_leads(args: argparse.Namespace) -> None:
             max_matches=args.max_scan_matches,
             max_regions=args.max_scan_regions,
             timeout_seconds=args.live_timeout_seconds,
+            top_clusters=getattr(args, "top_clusters", 8),
         )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -6015,7 +6013,20 @@ def _run_probe_modrm_leads(args: argparse.Namespace) -> None:
 
     generated_output_guard()
     try:
-        result = run_probe_modrm_leads(plan)
+        from scripts.live_memory_scanner import (
+            WildcardSignature,
+            WindowsReadOnlyProcessReader,
+            parse_wildcard_hex,
+        )
+
+        reader = WindowsReadOnlyProcessReader(plan["Pid"])
+        signatures: list[WildcardSignature] = []
+        for cluster in plan.get("CandidateClusters", []):
+            sig_hex = cluster.get("SigHex", "")
+            if sig_hex:
+                signatures.append(parse_wildcard_hex(cluster["Label"], sig_hex))
+        with reader:
+            result = run_probe_modrm_leads(plan, reader, signatures)
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: probe-modrm-leads live scan failed: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -6035,7 +6046,6 @@ def _run_scan_live_values(args: argparse.Namespace) -> None:
     try:
         plan = build_value_scan_plan(
             repo_root=REPO_ROOT,
-            out=args.out,
             process_name=args.process_name,
             pid=args.pid,
             value_type=args.value_type,
@@ -6086,9 +6096,11 @@ def _run_scan_live_diff(args: argparse.Namespace) -> None:
     try:
         plan = build_diff_scan_plan(
             repo_root=REPO_ROOT,
-            out=args.out,
             process_name=args.process_name,
             pid=args.pid,
+            value_type=args.value_type,
+            min_val=args.min_val,
+            max_val=args.max_val,
             snapshot_a_path=args.snapshot_a_path,
             execute_live_read=args.execute_live_read,
             experimental_live=args.experimental_live,

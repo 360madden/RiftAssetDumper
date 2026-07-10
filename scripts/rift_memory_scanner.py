@@ -21,6 +21,7 @@ import ctypes.wintypes
 import struct
 import sys
 from pathlib import Path
+from typing import Any
 
 # Windows API constants
 PROCESS_VM_READ = 0x0010
@@ -353,7 +354,7 @@ class RIFTMemoryScanner:
             for name, sig in signatures:
                 self.validate_signature(sig, name)
 
-    def find_code_references(self, target_rva: int, name: str = ""):
+    def find_code_references(self, target_rva: int, name: str = "") -> list[dict[str, Any]]:
         """Find code that references a specific RVA (LEA instructions)."""
         print(f"\nFinding code references to RVA 0x{target_rva:X} ({name})...")
 
@@ -516,7 +517,7 @@ class RIFTMemoryScanner:
                             if 0x10000 < val < 0x7FFFFFFFFFFFF:
                                 print(f"    Potential pointer at offset {i - 0x10}: 0x{val:X}")
 
-    def trace_lua_method(self, method_name: str):
+    def trace_lua_method(self, method_name: str) -> None:
         """Trace the implementation of a Lua method."""
         print("\n" + "=" * 60)
         print(f"TRACING LUA METHOD: {method_name}")

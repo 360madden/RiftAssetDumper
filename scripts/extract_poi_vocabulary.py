@@ -10,6 +10,7 @@ the limitation.
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INPUT = REPO_ROOT / "Exports" / "semantic-phase1" / "zone-50k.json"
@@ -129,7 +130,7 @@ for name in unique_names[:30]:
     print(f"  {name}")
 
 # Create vocabulary
-vocabulary = {
+vocabulary: dict[str, Any] = {
     "schema": "poi-vocabulary-v1",
     "generated_at": "2026-07-07",
     "source_file": "zone-50k.json",

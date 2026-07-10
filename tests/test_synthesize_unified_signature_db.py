@@ -173,6 +173,73 @@ class TestPhase3Enrichment:
         assert "TotalModRMHits" in sl
         assert sl["TotalModRMHits"] > 0
 
+    def test_signature_anchors_maps_struct_to_non_vtable_anchor(
+        self, tmp_path: Path, phase2_catalog: dict
+    ) -> None:
+        """Phase 3 SignatureAnchors field drives struct attachment, not hardcoded names."""
+        # Create a minimal Phase 2 catalog with a custom anchor.
+        custom_p2 = deepcopy(phase2_catalog)
+        custom_p2["Anchors"] = [
+            {
+                "Name": "custom-anchor",
+                "StabilityTier": 2,
+                "Description": "A custom anchor for testing SignatureAnchors",
+                "SignatureHex": "48 85 D2 74 0A",
+                "SignatureLength": 4,
+                "WildcardCount": 0,
+                "UniquenessVerified": True,
+                "DiscoveryMethod": "modrm-cluster-heuristic",
+            }
+        ]
+        custom_p2["Summary"] = {
+            "TotalAnchors": 1,
+            "UniqueSignatures": 1,
+            "NonUniqueSignatures": 0,
+            "StabilityTier1Count": 0,
+            "StabilityTier2Count": 1,
+            "StabilityTier3Count": 0,
+        }
+
+        # Create a Phase 3 catalog whose struct claims custom-anchor.
+        custom_p3 = {
+            "SchemaVersion": "struct-layout-catalog/v1",
+            "BinaryTarget": "rift_x64.exe",
+            "ImageBase": "0x140000000",
+            "ExtractedAt": "2026-07-07T00:00:00Z",
+            "EvidenceSources": {},
+            "GhidraFindings": {},
+            "Structs": [
+                {
+                    "Name": "CustomStruct",
+                    "Description": "Test struct attached via SignatureAnchors",
+                    "EvidenceSource": "modrm-memory-access-scan/v1",
+                    "BaseRegisters": {"RBX": 10},
+                    "TotalModRMHits": 10,
+                    "SignatureAnchors": ["custom-anchor"],
+                    "Fields": [
+                        {
+                            "Offset": 0,
+                            "OffsetHex": "0x0",
+                            "Name": "custom_field",
+                            "Type": "float32",
+                            "Confidence": "confirmed",
+                            "ModRMHitCount": 5,
+                            "RiftReaderField": "custom_field",
+                            "Notes": "attached via SignatureAnchors",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        p2, p3 = _write_catalog(tmp_path, custom_p2, custom_p3)
+        db = synth.synthesize_database(phase2_catalog_path=p2, phase3_catalog_path=p3)
+        anchor = next(a for a in db["Anchors"] if a["Name"] == "custom-anchor")
+        assert anchor.get("StructLayout") is not None, "custom-anchor should get StructLayout from SignatureAnchors"
+        field_names = [f["Name"] for f in anchor["StructLayout"]["Fields"]]
+        assert "custom_field" in field_names
+        assert anchor["StructLayout"]["TotalModRMHits"] == 10
+
 
 # ---------------------------------------------------------------------------
 # Missing-input resilience

@@ -34,6 +34,35 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+# Canonical PascalCase mapping for Phase 3 catalog keys. Older catalogs may
+# emit lowercase/camelCase keys; normalize once on load so downstream code
+# only has to handle one shape.
+_PHASE3_KEY_MAP: dict[str, str] = {
+    "name": "Name",
+    "description": "Description",
+    "fields": "Fields",
+    "baseregisters": "BaseRegisters",
+    "totalmodrmhits": "TotalModRMHits",
+    "signatureanchors": "SignatureAnchors",
+    "offset": "Offset",
+    "offsethex": "OffsetHex",
+    "type": "Type",
+    "confidence": "Confidence",
+    "modrmhitcount": "ModRMHitCount",
+    "riftreaderfield": "RiftReaderField",
+    "notes": "Notes",
+}
+
+
+def _normalize_phase3_keys(obj: Any) -> Any:
+    """Recursively normalize Phase 3 catalog dict keys to canonical PascalCase."""
+    if isinstance(obj, dict):
+        return {_PHASE3_KEY_MAP.get(k.lower(), k): _normalize_phase3_keys(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_phase3_keys(item) for item in obj]
+    return obj
+
+
 def _build_enriched_struct_layout(
     *,
     struct_record: dict[str, Any],
@@ -52,31 +81,26 @@ def _build_enriched_struct_layout(
     embedded StructLayout in a single anchor pass.
     """
     enriched_fields: list[dict[str, Any]] = []
-    src_fields = struct_record.get("fields", []) if isinstance(struct_record, dict) else []
-    # Phase 3 uses lowercase keys; Phase 2 schema uses PascalCase. Accept both.
+    src_fields = struct_record.get("Fields", []) if isinstance(struct_record, dict) else []
     for f in src_fields:
         enriched_fields.append(
             {
-                "Offset": int(f.get("offset", f.get("Offset", 0))),
-                "OffsetHex": f.get("offset_hex", f.get("OffsetHex", "0x0")),
-                "Name": str(f.get("name", f.get("Name", ""))),
-                "Type": str(f.get("type", f.get("Type", "float32"))),
-                "Confidence": str(f.get("confidence", f.get("Confidence", "inferred"))),
-                "RiftReaderField": str(f.get("riftreader_field", f.get("RiftReaderField", ""))),
-                "ModRMHitCount": int(f.get("modrm_hit_count", f.get("ModRMHitCount", 0))),
-                "Notes": str(f.get("notes", f.get("Notes", ""))),
+                "Offset": int(f.get("Offset", 0)),
+                "OffsetHex": f.get("OffsetHex", "0x0"),
+                "Name": str(f.get("Name", "")),
+                "Type": str(f.get("Type", "float32")),
+                "Confidence": str(f.get("Confidence", "inferred")),
+                "RiftReaderField": str(f.get("RiftReaderField", "")),
+                "ModRMHitCount": int(f.get("ModRMHitCount", 0)),
+                "Notes": str(f.get("Notes", "")),
             }
         )
-    # Description: prefer struct_record.description (camelCase) or Description (PascalCase),
-    # then fall back to the first field's notes/title so a struct with no
-    # top-level description still produces a human-readable label.
+    # Description: prefer struct_record.Description, then fall back to the first
+    # field's Name so a struct with no top-level description still produces a
+    # human-readable label.
     desc = ""
     if isinstance(struct_record, dict):
-        desc = str(
-            struct_record.get("description")
-            or struct_record.get("Description")
-            or (enriched_fields[0].get("Name", "") if enriched_fields else "")
-        )
+        desc = str(struct_record.get("Description") or (enriched_fields[0].get("Name", "") if enriched_fields else ""))
     return {
         "Description": desc,
         "Fields": enriched_fields,
@@ -109,7 +133,7 @@ def synthesize_database(
     phase3_structs: list[dict[str, Any]] = []
     if phase3_catalog_path.exists():
         try:
-            phase3 = _load_json(phase3_catalog_path)
+            phase3 = _normalize_phase3_keys(_load_json(phase3_catalog_path))
             phase3_structs = list(phase3.get("Structs", []))
         except Exception as exc:
             print(
@@ -129,19 +153,28 @@ def synthesize_database(
 
     # Build a struct-name -> struct-record index. Phase 3 keeps a flat list.
     struct_index: dict[str, dict[str, Any]] = {}
+    # Map anchor name -> first struct name that claims it via SignatureAnchors.
+    anchor_to_struct_name: dict[str, str] = {}
     for s in phase3_structs:
         if isinstance(s, dict):
             name = str(s.get("Name", ""))
             if name:
                 struct_index[name] = s
+                for anchor_name in s.get("SignatureAnchors", []):
+                    if anchor_name not in anchor_to_struct_name:
+                        anchor_to_struct_name[anchor_name] = name
 
     # Iterate anchors and enrich those that match a Phase 3 struct name.
     enriched_anchors: list[dict[str, Any]] = []
     attached_struct_names: set[str] = set()
     for anchor in copy.deepcopy(phase2.get("Anchors", [])):
-        # The Tier-1 anchor (vtable-dispatch) has the canonical LocalPlayer struct.
-        candidate_struct_name = ""
-        if isinstance(anchor.get("StructLayout"), dict):
+        anchor_name = anchor.get("Name", "")
+        # Prefer the explicit Phase 3 SignatureAnchors mapping.
+        candidate_struct_name = anchor_to_struct_name.get(anchor_name, "")
+        # Fallback for backwards compatibility with older catalogs/tests.
+        if not candidate_struct_name and (
+            anchor_name == "vtable-dispatch" or isinstance(anchor.get("StructLayout"), dict)
+        ):
             candidate_struct_name = "LocalPlayer"
         # If we have a richer struct in Phase 3, replace the embedded layout.
         if candidate_struct_name and candidate_struct_name in struct_index:

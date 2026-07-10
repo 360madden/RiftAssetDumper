@@ -82,7 +82,7 @@ def main():
     print("\n--- Save Result ---")
     print(f"Path          : {SAVE_PATH}")
     print(f"File size     : {size:,} bytes")
-    print(f"BMP sig       : {sig} ({'BM' if sig == b'BM' else 'INVALID'})")
+    print(f"BMP sig       : {sig.decode('ascii', errors='replace')} ({'BM' if sig == b'BM' else 'INVALID'})")
     print(f"File size hdr : {file_size_hdr:,}")
     print(f"Pixel offset  : {pix_off}")
     print(f"DIB header sz : {dib_size}")

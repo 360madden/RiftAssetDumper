@@ -541,7 +541,7 @@ def main():
             threat_hits[kw.decode()] = hits
 
     for kw, hits in sorted(threat_hits.items()):
-        print(f"  [{len(hits):2d}] {kw:<20}  first at 0x{hits[0][0]:08X}")
+        print(f"  [{len(hits):2d}] {kw.decode():<20}  first at 0x{hits[0][0]:08X}")
 
     if not threat_hits:
         print("  [-] No threat-keyword strings found.")
