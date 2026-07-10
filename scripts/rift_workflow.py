@@ -381,6 +381,18 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "probe-modrm-leads": {
+        "dotnet": "",
+        "base": "",
+    },
+    "scan-live-diff": {
+        "dotnet": "",
+        "base": "",
+    },
+    "scan-live-values": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-dry-run": {
         "dotnet": "",
         "base": "",
@@ -5940,6 +5952,166 @@ def _run_scan_live_memory(args: argparse.Namespace) -> None:
     print(f"scan-live-memory wrote Markdown: {markdown_path}")
 
 
+def _run_probe_modrm_leads(args: argparse.Namespace) -> None:
+    """Bridge static ModRM analysis to live memory scanning."""
+    from scripts.live_memory_scanner import (
+        build_probe_modrm_leads_plan,
+        load_modrm_scan,
+        run_probe_modrm_leads,
+        write_probe_modrm_leads_reports,
+    )
+
+    modrm_path = (
+        Path(args.out) / "modrm-memory-access-scan.json"
+        if args.out
+        else REPO_ROOT / "Exports" / "binary-phase1" / "modrm-memory-access-scan.json"
+    )
+    if not modrm_path.exists():
+        print(f"ERROR: ModRM scan not found at {modrm_path}", file=sys.stderr)
+        sys.exit(1)
+
+    modrm_data = load_modrm_scan(modrm_path)
+    try:
+        plan = build_probe_modrm_leads_plan(
+            repo_root=REPO_ROOT,
+            out=args.out,
+            modrm_data=modrm_data,
+            process_name=args.process_name,
+            pid=args.pid,
+            execute_live_read=args.execute_live_read,
+            experimental_live=args.experimental_live,
+            confirm_live_read=args.confirm_live_read,
+            max_scan_bytes=args.max_scan_bytes,
+            max_matches=args.max_scan_matches,
+            max_regions=args.max_scan_regions,
+            timeout_seconds=args.live_timeout_seconds,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    if not args.execute_live_read:
+        print("probe-modrm-leads dry-run passed: no process was opened.")
+        return
+    if not plan.get("ExecutionAllowed"):
+        print("ERROR: live memory read refused by safety gates.", file=sys.stderr)
+        sys.exit(1)
+
+    generated_output_guard()
+    try:
+        result = run_probe_modrm_leads(plan)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: probe-modrm-leads live scan failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    json_path, md_path = write_probe_modrm_leads_reports(result, REPO_ROOT)
+    print(f"probe-modrm-leads wrote JSON: {json_path}")
+    print(f"probe-modrm-leads wrote Markdown: {md_path}")
+
+
+def _run_scan_live_values(args: argparse.Namespace) -> None:
+    """Float32/int32/uint32 value-range live memory scanning."""
+    from scripts.live_memory_scanner import (
+        build_value_scan_plan,
+        run_live_value_scan,
+        write_value_scan_reports,
+    )
+
+    try:
+        plan = build_value_scan_plan(
+            repo_root=REPO_ROOT,
+            out=args.out,
+            process_name=args.process_name,
+            pid=args.pid,
+            value_type=args.value_type,
+            min_val=args.min_val,
+            max_val=args.max_val,
+            execute_live_read=args.execute_live_read,
+            experimental_live=args.experimental_live,
+            confirm_live_read=args.confirm_live_read,
+            max_scan_bytes=args.max_scan_bytes,
+            max_matches=args.max_scan_matches,
+            max_regions=args.max_scan_regions,
+            timeout_seconds=args.live_timeout_seconds,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    if not args.execute_live_read:
+        print("scan-live-values dry-run passed: no process was opened.")
+        return
+    if not plan.get("ExecutionAllowed"):
+        print("ERROR: live memory read refused by safety gates.", file=sys.stderr)
+        sys.exit(1)
+
+    generated_output_guard()
+    try:
+        result = run_live_value_scan(plan)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: scan-live-values failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    json_path, md_path = write_value_scan_reports(result, REPO_ROOT)
+    print(f"scan-live-values wrote JSON: {json_path}")
+    print(f"scan-live-values wrote Markdown: {md_path}")
+
+
+def _run_scan_live_diff(args: argparse.Namespace) -> None:
+    """Snapshot-diff value scanning for player coordinate discovery."""
+    from scripts.live_memory_scanner import (
+        build_diff_scan_plan,
+        run_live_diff,
+        write_diff_reports,
+    )
+
+    try:
+        plan = build_diff_scan_plan(
+            repo_root=REPO_ROOT,
+            out=args.out,
+            process_name=args.process_name,
+            pid=args.pid,
+            snapshot_a_path=args.snapshot_a_path,
+            execute_live_read=args.execute_live_read,
+            experimental_live=args.experimental_live,
+            confirm_live_read=args.confirm_live_read,
+            max_scan_bytes=args.max_scan_bytes,
+            max_matches=args.max_scan_matches,
+            max_regions=args.max_scan_regions,
+            timeout_seconds=args.live_timeout_seconds,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.list_json:
+        print(json.dumps(plan, indent=2))
+        return
+
+    if not args.execute_live_read:
+        print("scan-live-diff dry-run passed: no process was opened.")
+        return
+    if not plan.get("ExecutionAllowed"):
+        print("ERROR: live memory read refused by safety gates.", file=sys.stderr)
+        sys.exit(1)
+
+    generated_output_guard()
+    try:
+        result = run_live_diff(plan)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: scan-live-diff failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+    json_path, md_path = write_diff_reports(result, REPO_ROOT)
+    print(f"scan-live-diff wrote JSON: {json_path}")
+    print(f"scan-live-diff wrote Markdown: {md_path}")
+
+
 def _fifty_step_plan_status_payload() -> dict[str, Any]:
     """Return the current repo position in the original 50-step discovery plan."""
     plan_path = REPO_ROOT / "docs" / "discovery-plan-50.md"
@@ -7416,6 +7588,18 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "scan-live-memory":
         _run_scan_live_memory(args)
+        return
+
+    if command == "probe-modrm-leads":
+        _run_probe_modrm_leads(args)
+        return
+
+    if command == "scan-live-values":
+        _run_scan_live_values(args)
+        return
+
+    if command == "scan-live-diff":
+        _run_scan_live_diff(args)
         return
 
     if command == "ghidra-dry-run":
