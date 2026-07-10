@@ -3,6 +3,20 @@
 Date: 2026-05-07
 Repo: `RiftAssetDumper`
 
+## Status (2026-07-10)
+
+**P6 Evidence Lane: Implementation started.** Three core scripts built and wired:
+
+| Script | Purpose | Status |
+|--------|---------|--------|
+| `scripts/rift_candidate_scorer.py` | Score live memory candidates against semantic index | ✅ Built + tested |
+| `scripts/rift_proof_packets.py` | Capture proof packets (address + labels + PID + session) | ✅ Built + tested |
+| `scripts/rift_restart_gate.py` | Validate two-restart rediscovery gate | ✅ Built + tested |
+
+Workflow commands wired: `score-candidates`, `capture-proof-packets`, `evaluate-restart-gate` (all read-only, in `rift_workflow.py` + `rift_read_only.py`).
+
+**Remaining**: Live game validation (requires running RIFT client + admin access for memory reads).
+
 ## TL;DR
 
 Local asset evidence should guide RiftScan/RiftReader reacquisition by providing **stable labels, identifiers, file signatures, model/texture references, map/zone hints, and candidate data families**. It must **not** promote exact runtime addresses, offsets, or process-local structures as durable truth.

@@ -111,6 +111,10 @@ READ_ONLY_COMMANDS: frozenset[str] = frozenset(
         "scan-live-values",
         # scan-live-diff — snapshot-diff value scanning for player coordinate discovery
         "scan-live-diff",
+        # P6: Asset-guided runtime reacquisition evidence lane
+        "score-candidates",
+        "capture-proof-packets",
+        "evaluate-restart-gate",
         # Binary-signature pipeline (M6.3) — Phase 6 automation entry points
         "extract-binary-signatures",
         "compare-binary-signatures",
@@ -309,6 +313,43 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Optional Markdown report path (compare-binary-signatures).",
+    )
+    # P6: Asset-guided runtime reacquisition evidence lane
+    parser.add_argument(
+        "--scan-result",
+        type=Path,
+        default=None,
+        help="Path to live scan result JSON (score-candidates, capture-proof-packets).",
+    )
+    parser.add_argument(
+        "--semantic-index",
+        type=Path,
+        default=None,
+        help="Path to asset-semantic-index.json (score-candidates).",
+    )
+    parser.add_argument(
+        "--session-label",
+        type=str,
+        default="",
+        help="Session label for proof packets (capture-proof-packets).",
+    )
+    parser.add_argument(
+        "--scored",
+        type=Path,
+        default=None,
+        help="Path to scored-candidates.json (capture-proof-packets, optional enrichment).",
+    )
+    parser.add_argument(
+        "--existing",
+        type=Path,
+        default=None,
+        help="Existing proof-packets.json to merge into (capture-proof-packets).",
+    )
+    parser.add_argument(
+        "--proof-packets",
+        type=Path,
+        default=None,
+        help="Path to proof-packets.json (evaluate-restart-gate).",
     )
 
     return parser

@@ -393,6 +393,18 @@ COMMAND_MAP: dict[str, dict[str, Any]] = {
         "dotnet": "",
         "base": "",
     },
+    "score-candidates": {
+        "dotnet": "",
+        "base": "",
+    },
+    "capture-proof-packets": {
+        "dotnet": "",
+        "base": "",
+    },
+    "evaluate-restart-gate": {
+        "dotnet": "",
+        "base": "",
+    },
     "ghidra-dry-run": {
         "dotnet": "",
         "base": "",
@@ -6112,6 +6124,118 @@ def _run_scan_live_diff(args: argparse.Namespace) -> None:
     print(f"scan-live-diff wrote Markdown: {md_path}")
 
 
+def _run_score_candidates(args: argparse.Namespace) -> None:
+    """Score live memory scan candidates against the asset semantic index."""
+    from scripts.rift_candidate_scorer import (
+        score_candidates,
+        write_scored_reports,
+    )
+
+    scan_result_path = getattr(args, "scan_result", None)
+    semantic_index_path = getattr(args, "semantic_index", None)
+
+    if not scan_result_path or not semantic_index_path:
+        print("ERROR: --scan-result and --semantic-index are required.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        scan_result = json.loads(Path(scan_result_path).read_text(encoding="utf-8-sig"))
+        semantic_index = json.loads(Path(semantic_index_path).read_text(encoding="utf-8-sig"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: failed to load input files: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    scored = score_candidates(scan_result, semantic_index)
+
+    if getattr(args, "list_json", False):
+        print(json.dumps(scored, indent=2))
+        return
+
+    json_path, md_path = write_scored_reports(scored, REPO_ROOT, getattr(args, "out", None))
+    print(f"Scored {scored['TotalCandidates']} candidates.")
+    print(f"score-candidates wrote JSON: {json_path}")
+    print(f"score-candidates wrote Markdown: {md_path}")
+
+
+def _run_capture_proof_packets(args: argparse.Namespace) -> None:
+    """Capture proof packets from live scan results."""
+    from scripts.rift_proof_packets import (
+        build_packets_from_scan,
+        merge_packets,
+        write_proof_packets,
+    )
+
+    scan_result_path = getattr(args, "scan_result", None)
+    pid = getattr(args, "pid", 0)
+    session_label = getattr(args, "session_label", "")
+
+    if not scan_result_path or not pid or not session_label:
+        print("ERROR: --scan-result, --pid, and --session-label are required.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        scan_result = json.loads(Path(scan_result_path).read_text(encoding="utf-8-sig"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: failed to load scan result: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    scored = None
+    scored_path = getattr(args, "scored", None)
+    if scored_path and Path(scored_path).exists():
+        scored = json.loads(Path(scored_path).read_text(encoding="utf-8-sig"))
+
+    new_packets = build_packets_from_scan(scan_result, pid, session_label, scored)
+
+    existing_path = getattr(args, "existing", None)
+    if existing_path and Path(existing_path).exists():
+        existing = json.loads(Path(existing_path).read_text(encoding="utf-8-sig"))
+        new_packets = merge_packets(existing, new_packets)
+
+    if getattr(args, "list_json", False):
+        print(json.dumps(new_packets, indent=2))
+        return
+
+    json_path = write_proof_packets(new_packets, REPO_ROOT, getattr(args, "out", None))
+    print(f"capture-proof-packets wrote {new_packets['PacketCount']} packets to {json_path}")
+
+
+def _run_evaluate_restart_gate(args: argparse.Namespace) -> None:
+    """Evaluate the two-restart rediscovery gate for proof packets."""
+    from scripts.rift_restart_gate import (
+        _build_candidate_history,
+        evaluate_gate,
+        write_gate_report,
+    )
+
+    proof_packets_path = getattr(args, "proof_packets", None)
+
+    if not proof_packets_path:
+        print("ERROR: --proof-packets is required.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        packets = json.loads(Path(proof_packets_path).read_text(encoding="utf-8-sig"))
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: failed to load proof packets: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    history = _build_candidate_history(packets)
+    report = evaluate_gate(history)
+
+    if getattr(args, "list_json", False):
+        print(json.dumps(report, indent=2))
+        return
+
+    json_path, md_path = write_gate_report(report, REPO_ROOT, getattr(args, "out", None))
+    print(
+        f"evaluate-restart-gate: {report['DurableCount']} durable, "
+        f"{report['NeedsReviewCount']} needs-review, "
+        f"{report['CandidateCount']} candidates."
+    )
+    print(f"JSON: {json_path}")
+    print(f"Markdown: {md_path}")
+
+
 def _fifty_step_plan_status_payload() -> dict[str, Any]:
     """Return the current repo position in the original 50-step discovery plan."""
     plan_path = REPO_ROOT / "docs" / "discovery-plan-50.md"
@@ -7600,6 +7724,18 @@ def _run_command(args: argparse.Namespace) -> None:
 
     if command == "scan-live-diff":
         _run_scan_live_diff(args)
+        return
+
+    if command == "score-candidates":
+        _run_score_candidates(args)
+        return
+
+    if command == "capture-proof-packets":
+        _run_capture_proof_packets(args)
+        return
+
+    if command == "evaluate-restart-gate":
+        _run_evaluate_restart_gate(args)
         return
 
     if command == "ghidra-dry-run":
