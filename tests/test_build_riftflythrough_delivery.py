@@ -1,4 +1,4 @@
-﻿"""Tests for `scripts/build_riftflythrough_delivery.py` (delivery-authoritative textures, v0.2).
+"""Tests for `scripts/build_riftflythrough_delivery.py` (delivery-authoritative textures, v0.2).
 
 Covers the v0.2 contract:
   * No absolute Windows paths leak into the emitted JSON (privacy + browser-portable).
@@ -175,10 +175,7 @@ class TestNoLegacyZoneKeysInDelivery:
         repo_root = REPO_ROOT
         delivery_path = DELIVERY_JSON
         if not delivery_path.exists():
-            pytest.skip(
-                f"riftflythrough-delivery.json not built yet "
-                f"({delivery_path.relative_to(repo_root)} missing)."
-            )
+            pytest.skip(f"riftflythrough-delivery.json not built yet ({delivery_path.relative_to(repo_root)} missing).")
         d = json.loads(delivery_path.read_text(encoding="utf-8-sig"))
         entries = d.get("entries") or []
         tagged = [e for e in entries if (e.get("zone_method") or "unmatched") != "unmatched"]
@@ -196,14 +193,8 @@ class TestNoLegacyZoneKeysInDelivery:
         # Allowed values — f-string-friendly naming (no escaped curly braces).
         allowed_first4_values = {"", "47616d65"}
         allowed_confidence_values = ("high", "medium", "low")
-        bad_first4 = [
-            e["asset_id"] for e in tagged
-            if e.get("first4") not in allowed_first4_values
-        ]
-        bad_confidence = [
-            e["asset_id"] for e in tagged
-            if e.get("confidence") not in allowed_confidence_values
-        ]
+        bad_first4 = [e["asset_id"] for e in tagged if e.get("first4") not in allowed_first4_values]
+        bad_confidence = [e["asset_id"] for e in tagged if e.get("confidence") not in allowed_confidence_values]
         assert not bad_first4, (
             f"v0.6 unifier regression: {len(bad_first4)} tagged entries carry "
             f"first4 outside the allowed set [empty, 47616d65]; first 3: {bad_first4[:3]}"

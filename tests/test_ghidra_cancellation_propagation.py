@@ -38,26 +38,22 @@ from pathlib import Path
 
 import pytest
 
-JAVA_FILE = (
-    Path(__file__).resolve().parents[1] / "scripts" / "ghidra" / "ScalarOffsetSearcher.java"
-)
+JAVA_FILE = Path(__file__).resolve().parents[1] / "scripts" / "ghidra" / "ScalarOffsetSearcher.java"
 
 # Cached source — read once at module import. Empty if file is missing so the
 # fixture can still report a clear assertion failure below.
-JAVA_SOURCE_CACHE: str = (
-    JAVA_FILE.read_text(encoding="utf-8") if JAVA_FILE.exists() else ""
-)
+JAVA_SOURCE_CACHE: str = JAVA_FILE.read_text(encoding="utf-8") if JAVA_FILE.exists() else ""
 
 # Match a CancelledException catch+rethrow pair regardless of variable name.
 # Captures the bound variable so we can assert `throw <var>;` re-throws the
 # SAME variable the catch bound. Allows one level of nested braces so a
 # `try { ... } finally { throw ce; }` refactor still matches.
 _CANCEL_RETHROW_PATTERN = re.compile(
-    r"catch\s*\(\s*CancelledException\s+(\w+)\s*\)"   # catch (CancelledException VAR)
-    r"\s*\{(?:[^{}]|\{[^{}]*\})*?"                    # { ... one-level-nested ok ...
-    r"throw\s+"                                       # throw
-    r"\1"                                            # ... VAR (same var the catch bound)
-    r"\s*;"                                           # ...;
+    r"catch\s*\(\s*CancelledException\s+(\w+)\s*\)"  # catch (CancelledException VAR)
+    r"\s*\{(?:[^{}]|\{[^{}]*\})*?"  # { ... one-level-nested ok ...
+    r"throw\s+"  # throw
+    r"\1"  # ... VAR (same var the catch bound)
+    r"\s*;"  # ...;
 )
 
 # Match the String.join summary call with the contextWarnings accumulator.
@@ -135,9 +131,7 @@ def test_cancellation_rethrown_in_prev_context_walk(java_source: str) -> None:
 def test_cancellation_rethrown_in_next_context_walk(java_source: str) -> None:
     """The cancel-narrowing catch must appear AFTER the next-walk loop entry."""
     next_loop_idx = java_source.find(ANCHOR_NEXT_WALK_LOOP_ENTRY)
-    assert next_loop_idx >= 0, (
-        f"Next-context-walk anchor `{ANCHOR_NEXT_WALK_LOOP_ENTRY}` not found."
-    )
+    assert next_loop_idx >= 0, f"Next-context-walk anchor `{ANCHOR_NEXT_WALK_LOOP_ENTRY}` not found."
     rethrow = _first_catch_rethrow_after(java_source, next_loop_idx)
     assert rethrow is not None, (
         f"F4 nit #1: next-context walk missing `catch (CancelledException <var>) "
@@ -186,13 +180,9 @@ def test_cancellation_narrowings_appear_in_source_order(java_source: str) -> Non
     bf_call = java_source.find(ANCHOR_BYTES_FETCH_CALL)
     bf_catch = java_source.find("catch (CancelledException", bf_call) if bf_call >= 0 else -1
     prev_loop = java_source.find(ANCHOR_PREV_WALK_LOOP_ENTRY)
-    prev_catch = (
-        java_source.find("catch (CancelledException", prev_loop) if prev_loop >= 0 else -1
-    )
+    prev_catch = java_source.find("catch (CancelledException", prev_loop) if prev_loop >= 0 else -1
     next_loop = java_source.find(ANCHOR_NEXT_WALK_LOOP_ENTRY)
-    next_catch = (
-        java_source.find("catch (CancelledException", next_loop) if next_loop >= 0 else -1
-    )
+    next_catch = java_source.find("catch (CancelledException", next_loop) if next_loop >= 0 else -1
 
     assert bf_call >= 0 and bf_catch >= bf_call, "bytes-fetch call/anchor missing"
     assert prev_loop >= 0 and prev_catch >= prev_loop, "prev-walk loop/catch missing"
@@ -200,9 +190,7 @@ def test_cancellation_narrowings_appear_in_source_order(java_source: str) -> Non
 
     # All three catches must be distinct positions, in source order
     # (bytes-fetch first because it's earlier in the file than the per-hit walks).
-    assert (
-        bf_catch < prev_catch < next_catch
-    ), (
+    assert bf_catch < prev_catch < next_catch, (
         f"F4 nit #1: catch ordering invariant violated. Expected "
         f"bytes-fetch catch < prev-walk catch < next-walk catch. "
         f"Got offsets bytes_fetch_catch={bf_catch}, "
@@ -228,7 +216,7 @@ def test_context_warnings_accumulator_present(java_source: str) -> None:
 def test_summary_line_uses_string_join(java_source: str) -> None:
     """The per-hit summary must `String.join` the accumulated fragments."""
     assert _SUMMARY_JOIN_PATTERN.search(java_source) is not None, (
-        "F4 nit #2: the per-hit summary printerr must use `String.join(\"...\", contextWarnings)` "
+        'F4 nit #2: the per-hit summary printerr must use `String.join("...", contextWarnings)` '
         "to merge prev+next failure messages into one line. Pattern not found."
     )
 

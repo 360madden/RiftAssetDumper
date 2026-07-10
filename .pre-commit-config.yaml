@@ -9,16 +9,25 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        files: ^scripts/.*\.py$
+        files: ^(scripts|tests)/.*\.py$
       - id: ruff-format
-        files: ^scripts/.*\.py$
+        files: ^(scripts|tests)/.*\.py$
 
   # ── Python: mypy type check ─────────────────────────────────────
-  # NOTE: mypy hook intentionally omitted — pre-commit runs mypy in a
-  # separate venv that doesn't have our project dependencies installed.
-  # mypy is enforced via CI and manual `mypy scripts/ --no-error-summary`.
-  # To re-add: use a local hook (repo: local) which runs system mypy
-  # with the correct config auto-discovered from pyproject.toml.
+  # Local system hook: pre-commit's isolated venv cannot see project
+  # dependencies or the `scripts.*` package layout. Run the activated
+  # venv's mypy so pyproject.toml config and pythonpath are respected.
+  # Only checks `scripts/` to match CI (`mypy scripts/ --no-error-summary`).
+  # `pass_filenames: true` limits checks to staged files for speed; full
+  # project coverage remains enforced in CI.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (scripts/)
+        entry: python -m mypy --no-error-summary
+        language: system
+        files: ^scripts/.*\.py$
+        pass_filenames: true
 
   # ── Secrets & path leak scanning ────────────────────────────────
   - repo: local

@@ -10,13 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "validate_scene_manifest_schema.py"
 SCHEMA = (
-    REPO_ROOT
-    / "Assets"
-    / "Exports"
-    / "discovery-plan"
-    / "cycle-2"
-    / "stage2"
-    / "scene-manifest-v1.draft.schema.json"
+    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "scene-manifest-v1.draft.schema.json"
 )
 
 

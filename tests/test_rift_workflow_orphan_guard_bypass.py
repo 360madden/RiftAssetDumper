@@ -36,8 +36,7 @@ from scripts.rift_workflow import _ORPHAN_GUARD_BYPASS_COMMANDS  # noqa: E402
 # re-introduction of the bypass (e.g. if someone adds a new read-only
 # command to rift_workflow.py without also updating rift_read_only.py).
 assert isinstance(_ORPHAN_GUARD_BYPASS_COMMANDS, frozenset), (
-    f"_ORPHAN_GUARD_BYPASS_COMMANDS must be a frozenset, got "
-    f"{type(_ORPHAN_GUARD_BYPASS_COMMANDS).__name__}"
+    f"_ORPHAN_GUARD_BYPASS_COMMANDS must be a frozenset, got {type(_ORPHAN_GUARD_BYPASS_COMMANDS).__name__}"
 )
 assert _ORPHAN_GUARD_BYPASS_COMMANDS == frozenset(), (
     f"Bypass set must be empty after rift_read_only split, got "

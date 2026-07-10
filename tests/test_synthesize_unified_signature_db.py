@@ -30,11 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(scope="module")
 def schema() -> dict:
-    return json.loads(
-        (REPO_ROOT / "docs" / "schemas" / "binary-signatures-v1.schema.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    return json.loads((REPO_ROOT / "docs" / "schemas" / "binary-signatures-v1.schema.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(scope="module")
@@ -72,9 +68,7 @@ class TestSchemaConformance:
     def test_unified_db_validates_against_schema(self, schema: dict) -> None:
         jsonschema = pytest.importorskip("jsonschema")
         db = synth.synthesize_database()
-        jsonschema.validate(
-            db, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER
-        )
+        jsonschema.validate(db, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)
 
     def test_schema_version_matches_binary_signatures_v1(self) -> None:
         db = synth.synthesize_database()
@@ -96,9 +90,7 @@ class TestSchemaConformance:
 
 
 class TestMergeInvariants:
-    def test_phase2_anchors_preserved(
-        self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict
-    ) -> None:
+    def test_phase2_anchors_preserved(self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict) -> None:
         p2, p3 = _write_catalog(tmp_path, phase2_catalog, phase3_catalog)
         db = synth.synthesize_database(phase2_catalog_path=p2, phase3_catalog_path=p3)
         original_names = {a["Name"] for a in phase2_catalog["Anchors"]}
@@ -173,9 +165,7 @@ class TestPhase3Enrichment:
         assert "TotalModRMHits" in sl
         assert sl["TotalModRMHits"] > 0
 
-    def test_signature_anchors_maps_struct_to_non_vtable_anchor(
-        self, tmp_path: Path, phase2_catalog: dict
-    ) -> None:
+    def test_signature_anchors_maps_struct_to_non_vtable_anchor(self, tmp_path: Path, phase2_catalog: dict) -> None:
         """Phase 3 SignatureAnchors field drives struct attachment, not hardcoded names."""
         # Create a minimal Phase 2 catalog with a custom anchor.
         custom_p2 = deepcopy(phase2_catalog)
@@ -247,22 +237,16 @@ class TestPhase3Enrichment:
 
 
 class TestMissingPhase3:
-    def test_missing_phase3_emits_schema_valid_db(
-        self, tmp_path: Path, phase2_catalog: dict, schema: dict
-    ) -> None:
+    def test_missing_phase3_emits_schema_valid_db(self, tmp_path: Path, phase2_catalog: dict, schema: dict) -> None:
         p2, _ = _write_catalog(tmp_path, phase2_catalog, phase3=None)
         db = synth.synthesize_database(
             phase2_catalog_path=p2,
             phase3_catalog_path=tmp_path / "missing.json",
         )
         jsonschema = pytest.importorskip("jsonschema")
-        jsonschema.validate(
-            db, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER
-        )
+        jsonschema.validate(db, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)
 
-    def test_missing_phase3_keeps_phase2_struct_layout(
-        self, tmp_path: Path, phase2_catalog: dict
-    ) -> None:
+    def test_missing_phase3_keeps_phase2_struct_layout(self, tmp_path: Path, phase2_catalog: dict) -> None:
         p2, _ = _write_catalog(tmp_path, phase2_catalog, phase3=None)
         db = synth.synthesize_database(
             phase2_catalog_path=p2,
@@ -280,9 +264,7 @@ class TestMissingPhase3:
 
 
 class TestProvenanceMetadata:
-    def test_phase2_path_recorded(
-        self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict
-    ) -> None:
+    def test_phase2_path_recorded(self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict) -> None:
         p2, p3 = _write_catalog(tmp_path, phase2_catalog, phase3_catalog)
         db = synth.synthesize_database(phase2_catalog_path=p2, phase3_catalog_path=p3)
         prov = db["Provenance"]
@@ -311,9 +293,7 @@ class TestProvenanceMetadata:
         # surface is a documented upgrade path. The phase 3 fixtures we use here
         # carry exactly the 4 known enum-locked keys.
         schema = json.loads(
-            (REPO_ROOT / "docs" / "schemas" / "binary-signatures-v1.schema.json").read_text(
-                encoding="utf-8"
-            )
+            (REPO_ROOT / "docs" / "schemas" / "binary-signatures-v1.schema.json").read_text(encoding="utf-8")
         )
         enum_keys = set(schema["properties"]["Provenance"]["properties"]["GhidraFindings"]["properties"].keys())
         # Sanity: the schema locks to the 4 known keys.
@@ -328,9 +308,7 @@ class TestProvenanceMetadata:
         # GhidraFindings, which is the common case for older test fixtures).
         assert set(gf.keys()) <= enum_keys
 
-    def test_ghidra_findings_absent_when_phase3_missing(
-        self, tmp_path: Path, phase2_catalog: dict
-    ) -> None:
+    def test_ghidra_findings_absent_when_phase3_missing(self, tmp_path: Path, phase2_catalog: dict) -> None:
         """Without a Phase 3 catalog, Provenance.GhidraFindings must be an
         empty dict (or absent) and must still pass schema validation
         (the field is optional in the schema)."""
@@ -392,9 +370,7 @@ class TestDefensiveGuards:
 
 
 class TestInputIsolation:
-    def test_phase2_catalog_not_mutated(
-        self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict
-    ) -> None:
+    def test_phase2_catalog_not_mutated(self, tmp_path: Path, phase2_catalog: dict, phase3_catalog: dict) -> None:
         p2, p3 = _write_catalog(tmp_path, phase2_catalog, phase3_catalog)
         snapshot = deepcopy(phase2_catalog)
         synth.synthesize_database(phase2_catalog_path=p2, phase3_catalog_path=p3)

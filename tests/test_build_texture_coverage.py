@@ -149,11 +149,13 @@ def test_flythrough_index_assets_returns_none_when_file_missing(
     bogus = FLYTHROUGH_INDEX.parent / "definitely-not-a-real-file.json"
     assert not bogus.exists(), "test fixture invalidation: file exists?"
     monkeypatch.setattr(
-        "build_texture_coverage.FLYTHROUGH_INDEX", bogus,
+        "build_texture_coverage.FLYTHROUGH_INDEX",
+        bogus,
         raising=False,
     )
     # Re-import the module-level constant from the patched binding.
     import build_texture_coverage as m
+
     assert m._flythrough_index_assets() is None
 
 
@@ -165,8 +167,7 @@ def test_flythrough_index_textures_handles_missing_key() -> None:
 
 
 def test_flythrough_index_textures_handles_none_assets() -> None:
-    """Defensive: passes None through to _flythrough_index_textures directly.
-    """
+    """Defensive: passes None through to _flythrough_index_textures directly."""
     fly = _flythrough_index_textures("000b6b5d431aea29", None)
     assert fly["asset_in_index"] is False
     assert fly["linked_texture_count"] == 0
@@ -176,8 +177,7 @@ def test_flythrough_index_textures_handles_none_assets() -> None:
 
 
 @pytest.mark.skipif(
-    not (STAGE2 / "transform-examples.json").exists()
-    or not FLYTHROUGH_INDEX.exists(),
+    not (STAGE2 / "transform-examples.json").exists() or not FLYTHROUGH_INDEX.exists(),
     reason="cohort source or flythrough-index missing",
 )
 def test_build_report_end_to_end(tmp_path: Path) -> None:
@@ -197,11 +197,10 @@ def test_build_report_end_to_end(tmp_path: Path) -> None:
         assert e["asset_id"] and e["cohort_kind"] in ("identity", "non_identity")
         assert "scene_manifest_textures" in e
         assert "flythrough_index_textures" in e
-        assert e["coverage_status"] in (
-            "covered", "partial", "textureless", "missing-flythrough", "missing-manifest"
-        )
+        assert e["coverage_status"] in ("covered", "partial", "textureless", "missing-flythrough", "missing-manifest")
     # Roundtrip write to a temp dir, then re-read
     from build_texture_coverage import write_outputs
+
     json_path, md_path = write_outputs(report, tmp_path)
     assert json_path.exists() and md_path.exists()
     rt = json.loads(json_path.read_text(encoding="utf-8-sig"))
@@ -214,7 +213,10 @@ def test_build_report_end_to_end(tmp_path: Path) -> None:
 def test_main_dry_run_exits_0() -> None:
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / "build_texture_coverage.py"), "--dry-run"],
-        capture_output=True, text=True, check=False, cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=str(REPO_ROOT),
     )
     assert r.returncode == 0, f"dry-run exited {r.returncode}: {r.stderr}"
     assert "cohort_size=" in r.stdout

@@ -97,11 +97,7 @@ class TestWildcardSignature(unittest.TestCase):
 
 class TestScanWildcardSignatures(unittest.TestCase):
     def test_wildcard_fixture_scan(self):
-        fixture_data = (
-            b"\x00" * 100
-            + bytes([0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xFF, 0xAA])
-            + b"\x00" * 100
-        )
+        fixture_data = b"\x00" * 100 + bytes([0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0xD9, 0xFF, 0xAA]) + b"\x00" * 100
         fixture = FixtureProcessReader([(0x1000, fixture_data, "fixture")])
         wc_sig = parse_wildcard_hex("test_sig", "48 83 EC 20 48 8B D9 ?? ??")
         scan_result = scan_wildcard_signatures(
@@ -291,6 +287,7 @@ class TestBuildProbeModrmLeadsPlan(unittest.TestCase):
 # ============================================================================
 # CLI integration
 # ============================================================================
+
 
 class TestCLIIntegration(unittest.TestCase):
     def setUp(self):

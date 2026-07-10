@@ -17,9 +17,7 @@ class TestParseObjBounds:
     """Bounding box extraction from OBJ content."""
 
     def test_simple_triangle(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("v 0.0 0.0 0.0\nv 10.0 0.0 0.0\nv 0.0 0.0 5.0\n")
             f.write("f 1 2 3\n")
             f.flush()
@@ -35,9 +33,7 @@ class TestParseObjBounds:
         assert b["max"] == [10.0, 0.0, 5.0]
 
     def test_extended_bbox(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("v -5.0 2.0 -10.0\nv 15.0 20.0 30.0\n")
             f.write("f 1 2\n")
             f.flush()
@@ -51,27 +47,21 @@ class TestParseObjBounds:
         assert b["max"] == [15.0, 20.0, 30.0]
 
     def test_empty_file(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("# Just a comment\n")
             f.flush()
             result = parse_obj_bounds(Path(f.name))
         assert result is None
 
     def test_no_vertices(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("f 1 2 3\n")
             f.flush()
             result = parse_obj_bounds(Path(f.name))
         assert result is None
 
     def test_skips_normals_and_uvs(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("v 0.0 0.0 0.0\nv 1.0 0.0 0.0\nv 0.0 1.0 0.0\n")
             f.write("vn 0.0 0.0 1.0\nvt 0.5 0.5\n")
             f.write("f 1/1/1 2/1/1 3/1/1\n")
@@ -81,9 +71,7 @@ class TestParseObjBounds:
         assert result["vertex_count"] == 3  # Only v lines counted
 
     def test_malformed_v_line(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("v 0.0 0.0 0.0\nv 1.0\nv 2.0 2.0 2.0\n")
             f.write("f 1 3\n")
             f.flush()
@@ -96,9 +84,7 @@ class TestParseObjBounds:
         assert b["dz"] == 2.0
 
     def test_includes_path_and_filename(self) -> None:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".obj", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write("v 0.0 0.0 0.0\nv 1.0 1.0 1.0\nf 1 2\n")
             f.flush()
             result = parse_obj_bounds(Path(f.name))
@@ -228,9 +214,7 @@ class TestClassifyShape:
             "face_count": 0,
         }
         result = classify_shape(bounds)
-        assert result["shape_label"] in (
-            "floor", "platform", "structure", "wall_pillar"
-        )
+        assert result["shape_label"] in ("floor", "platform", "structure", "wall_pillar")
         # 0.0 does not match 1.0 or 2.0 unit-cube patterns
         assert result["is_unit_cube"] is False
 

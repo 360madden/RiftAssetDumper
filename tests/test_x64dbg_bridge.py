@@ -151,9 +151,7 @@ class TestBreakpointSpec:
         # x64dbg expression format: {dword(reg+off)}
         for offset in COORDINATE_OFFSETS:
             expected = f"{{dword(rbx+{offset:#x})}}"
-            assert expected in script, (
-                f"Missing offset 0x{offset:X} in generated script (expected {expected})"
-            )
+            assert expected in script, f"Missing offset 0x{offset:X} in generated script (expected {expected})"
 
     def test_generate_script_writes_to_disk(self) -> None:
         spec = BreakpointSpec(
@@ -248,24 +246,16 @@ class TestFullRoundTrip:
 
         # Render the template by substituting x64dbg expressions
         rendered = bplog_format.replace("{rbx}", f"0x{sim_rbx:X}")
-        rendered = rendered.replace(
-            "{dword(rbx+0x310)}", sim_310_hex
-        )
-        rendered = rendered.replace(
-            "{dword(rbx+0x318)}", sim_318_hex
-        )
+        rendered = rendered.replace("{dword(rbx+0x310)}", sim_310_hex)
+        rendered = rendered.replace("{dword(rbx+0x318)}", sim_318_hex)
         # Also substitute all other coordinate offsets with zero
         for off in COORDINATE_OFFSETS:
             if off in (0x310, 0x318):
                 continue
-            rendered = rendered.replace(
-                f"{{dword(rbx+{off:#x})}}", "00000000"
-            )
+            rendered = rendered.replace(f"{{dword(rbx+{off:#x})}}", "00000000")
 
         # Write rendered log to temp file
-        f = tempfile.NamedTemporaryFile(
-            suffix=".txt", delete=False, mode="w", encoding="utf-8"
-        )
+        f = tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w", encoding="utf-8")
         log_path = Path(f.name)
         f.write(rendered + "\n")
         f.close()
@@ -360,17 +350,17 @@ class TestParseX64dbgLog:
 
     def _write_log(self, lines: list[str]) -> Path:
         """Write a temporary log file, return its Path."""
-        f = tempfile.NamedTemporaryFile(
-            suffix=".txt", delete=False, mode="w", encoding="utf-8"
-        )
+        f = tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w", encoding="utf-8")
         f.write("\n".join(lines) + "\n")
         f.close()
         return Path(f.name)
 
     def test_parses_single_hit(self) -> None:
-        log = self._write_log([
-            "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x7FF6A1B2C3D0 0x310=43FA0000 0x318=C3FA0000 0x320=41200000",
-        ])
+        log = self._write_log(
+            [
+                "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x7FF6A1B2C3D0 0x310=43FA0000 0x318=C3FA0000 0x320=41200000",
+            ]
+        )
         try:
             entries = parse_x64dbg_log(log)
             assert len(entries) == 1
@@ -385,11 +375,13 @@ class TestParseX64dbgLog:
             log.unlink(missing_ok=True)
 
     def test_parses_multiple_hits_different_clusters(self) -> None:
-        log = self._write_log([
-            "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x1000 0x310=00000001",
-            "[RIFT_BRIDGE] hit=cluster_05 reg=rcx base=0x2000 0x320=00000002",
-            "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x3000 0x310=00000003",
-        ])
+        log = self._write_log(
+            [
+                "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x1000 0x310=00000001",
+                "[RIFT_BRIDGE] hit=cluster_05 reg=rcx base=0x2000 0x320=00000002",
+                "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x3000 0x310=00000003",
+            ]
+        )
         try:
             entries = parse_x64dbg_log(log)
             assert len(entries) == 3
@@ -402,12 +394,14 @@ class TestParseX64dbgLog:
             log.unlink(missing_ok=True)
 
     def test_ignores_non_bridge_lines(self) -> None:
-        log = self._write_log([
-            'log "Setting breakpoint cluster_04 at rift_x64.exe+13AD2EA"',
-            "some random log output",
-            "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x1000 0x310=00000001",
-            "bp rift_x64.exe+13AD2EA",
-        ])
+        log = self._write_log(
+            [
+                'log "Setting breakpoint cluster_04 at rift_x64.exe+13AD2EA"',
+                "some random log output",
+                "[RIFT_BRIDGE] hit=cluster_04 reg=rbx base=0x1000 0x310=00000001",
+                "bp rift_x64.exe+13AD2EA",
+            ]
+        )
         try:
             entries = parse_x64dbg_log(log)
             assert len(entries) == 1
@@ -423,9 +417,11 @@ class TestParseX64dbgLog:
             log.unlink(missing_ok=True)
 
     def test_parses_base_without_0x_prefix(self) -> None:
-        log = self._write_log([
-            "[RIFT_BRIDGE] hit=test reg=rbx base=ABCDEF 0x310=00000001",
-        ])
+        log = self._write_log(
+            [
+                "[RIFT_BRIDGE] hit=test reg=rbx base=ABCDEF 0x310=00000001",
+            ]
+        )
         try:
             entries = parse_x64dbg_log(log)
             assert len(entries) == 1
@@ -434,9 +430,11 @@ class TestParseX64dbgLog:
             log.unlink(missing_ok=True)
 
     def test_skips_malformed_base_address(self) -> None:
-        log = self._write_log([
-            "[RIFT_BRIDGE] hit=test reg=rbx base=NOT_HEX 0x310=00000001",
-        ])
+        log = self._write_log(
+            [
+                "[RIFT_BRIDGE] hit=test reg=rbx base=NOT_HEX 0x310=00000001",
+            ]
+        )
         try:
             entries = parse_x64dbg_log(log)
             assert entries == []  # int(..., 16) raises ValueError → skipped
@@ -562,11 +560,13 @@ class TestToCoordCandidates:
         return raw
 
     def test_detects_valid_coordinate_triple(self) -> None:
-        entry = self._make_entry({
-            0x304: self._float_to_hex(100.0),
-            0x308: self._float_to_hex(50.0),
-            0x30C: self._float_to_hex(-200.0),
-        })
+        entry = self._make_entry(
+            {
+                0x304: self._float_to_hex(100.0),
+                0x308: self._float_to_hex(50.0),
+                0x30C: self._float_to_hex(-200.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert 0x304 in candidates
         triple = candidates[0x304]
@@ -578,63 +578,75 @@ class TestToCoordCandidates:
 
     def test_rejects_nan_triple(self) -> None:
         nan_hex = self._float_to_hex(float("nan"))
-        entry = self._make_entry({
-            0x304: self._float_to_hex(100.0),
-            0x308: nan_hex,
-            0x30C: self._float_to_hex(-200.0),
-        })
+        entry = self._make_entry(
+            {
+                0x304: self._float_to_hex(100.0),
+                0x308: nan_hex,
+                0x30C: self._float_to_hex(-200.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert 0x304 not in candidates
 
     def test_rejects_all_zero_triple(self) -> None:
-        entry = self._make_entry({
-            0x304: 0x00000000,
-            0x308: 0x00000000,
-            0x30C: 0x00000000,
-        })
+        entry = self._make_entry(
+            {
+                0x304: 0x00000000,
+                0x308: 0x00000000,
+                0x30C: 0x00000000,
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert 0x304 not in candidates
 
     def test_rejects_degenerate_identical_triple(self) -> None:
         val = self._float_to_hex(4242.0)
-        entry = self._make_entry({
-            0x304: val,
-            0x308: val,
-            0x30C: val,
-        })
+        entry = self._make_entry(
+            {
+                0x304: val,
+                0x308: val,
+                0x30C: val,
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert 0x304 not in candidates
 
     def test_rejects_out_of_bounds_triple(self) -> None:
-        entry = self._make_entry({
-            0x304: self._float_to_hex(99999.0),
-            0x308: self._float_to_hex(50.0),
-            0x30C: self._float_to_hex(-200.0),
-        })
+        entry = self._make_entry(
+            {
+                0x304: self._float_to_hex(99999.0),
+                0x308: self._float_to_hex(50.0),
+                0x30C: self._float_to_hex(-200.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert 0x304 not in candidates
 
     def test_returns_empty_for_no_consecutive_offsets(self) -> None:
-        entry = self._make_entry({
-            0x310: self._float_to_hex(100.0),
-            # missing 0x314 and 0x318 — so only one value, not a triple
-            0x31C: self._float_to_hex(50.0),
-        })
+        entry = self._make_entry(
+            {
+                0x310: self._float_to_hex(100.0),
+                # missing 0x314 and 0x318 — so only one value, not a triple
+                0x31C: self._float_to_hex(50.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         assert len(candidates) == 0
 
     def test_detects_multiple_offset_slots(self) -> None:
         """If data exists at multiple consecutive triple positions, returns all valid ones."""
-        entry = self._make_entry({
-            # First triple at 0x304, 0x308, 0x30C
-            0x304: self._float_to_hex(100.0),
-            0x308: self._float_to_hex(50.0),
-            0x30C: self._float_to_hex(-200.0),
-            # Second triple at 0x310, 0x314, 0x318
-            0x310: self._float_to_hex(300.0),
-            0x314: self._float_to_hex(20.0),
-            0x318: self._float_to_hex(-100.0),
-        })
+        entry = self._make_entry(
+            {
+                # First triple at 0x304, 0x308, 0x30C
+                0x304: self._float_to_hex(100.0),
+                0x308: self._float_to_hex(50.0),
+                0x30C: self._float_to_hex(-200.0),
+                # Second triple at 0x310, 0x314, 0x318
+                0x310: self._float_to_hex(300.0),
+                0x314: self._float_to_hex(20.0),
+                0x318: self._float_to_hex(-100.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         # Both triples should be detected
         assert 0x304 in candidates
@@ -643,10 +655,12 @@ class TestToCoordCandidates:
     def test_skips_offsets_near_end_of_range(self) -> None:
         """Offsets near the end of COORDINATE_OFFSETS (0x324, 0x328) can't form triples
         because 0x328+4 and 0x328+8 aren't in COORDINATE_OFFSETS."""
-        entry = self._make_entry({
-            0x324: self._float_to_hex(100.0),
-            0x328: self._float_to_hex(50.0),
-        })
+        entry = self._make_entry(
+            {
+                0x324: self._float_to_hex(100.0),
+                0x328: self._float_to_hex(50.0),
+            }
+        )
         candidates = entry.to_coord_candidates()
         # 0x324+8=0x32C not in COORDINATE_OFFSETS, 0x328+8=0x330 not in set
         assert 0x324 not in candidates

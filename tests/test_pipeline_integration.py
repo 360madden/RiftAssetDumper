@@ -90,9 +90,7 @@ def _make_probe_json(entries: list[dict]) -> Path:
         "Pid": 0,
         "ConfirmedClusters": entries,
     }
-    f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    )
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
     json.dump(data, f)
     f.close()
     return Path(f.name)
@@ -100,9 +98,7 @@ def _make_probe_json(entries: list[dict]) -> Path:
 
 def _make_verified_json(entries: list[dict]) -> Path:
     """Write a verified.json list to a temp file and return its Path."""
-    f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".verified.json", delete=False, encoding="utf-8"
-    )
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".verified.json", delete=False, encoding="utf-8")
     json.dump(entries, f)
     f.close()
     return Path(f.name)
@@ -110,9 +106,7 @@ def _make_verified_json(entries: list[dict]) -> Path:
 
 def _make_log_file(lines: list[str]) -> Path:
     """Write log lines to a temp file and return its Path."""
-    f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False, encoding="utf-8"
-    )
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
     f.write("\n".join(lines) + "\n")
     f.close()
     return Path(f.name)
@@ -433,28 +427,35 @@ class TestSimulateLogAndParse:
         offset_values: dict[int, float],
     ) -> str:
         """Build a synthetic [RIFT_BRIDGE] log line matching x64dbg output."""
-        parts = [
-            f"[RIFT_BRIDGE] hit={cluster} reg={reg} base={base:#x}"
-        ]
+        parts = [f"[RIFT_BRIDGE] hit={cluster} reg={reg} base={base:#x}"]
         for off, val in offset_values.items():
             parts.append(f"{off:#x}={_f32_to_hex(val)}")
         return " ".join(parts)
 
     def _encode_coord_triple(
-        self, cluster: str, reg: str, base: int, start_off: int,
+        self,
+        cluster: str,
+        reg: str,
+        base: int,
+        start_off: int,
     ) -> str:
         """Encode an (x,y,z) triple at consecutive offsets."""
         x = self.COORD_X + (start_off * 10)
         y = self.COORD_Y + (start_off * 2)
         z = self.COORD_Z - (start_off * 10)
         return self._encode_log_line(
-            cluster, reg, base,
+            cluster,
+            reg,
+            base,
             {start_off: x, start_off + 4: y, start_off + 8: z},
         )
 
     def test_parse_single_rifp_bridge_line(self) -> None:
         line = self._encode_coord_triple(
-            "cluster_04", "rbx", self.BASE_PTR, 0x310,
+            "cluster_04",
+            "rbx",
+            self.BASE_PTR,
+            0x310,
         )
         log = _make_log_file([line, "# some noise", "non-bridge text"])
         try:
@@ -475,7 +476,9 @@ class TestSimulateLogAndParse:
         # Use _encode_log_line directly with exact values (no offset arithmetic)
         x, y, z = self.COORD_X, self.COORD_Y, self.COORD_Z
         line = self._encode_log_line(
-            "cluster_04", "rbx", self.BASE_PTR,
+            "cluster_04",
+            "rbx",
+            self.BASE_PTR,
             {0x310: x, 0x314: y, 0x318: z},
         )
         log = _make_log_file([line])
@@ -519,10 +522,7 @@ class TestSimulateLogAndParse:
 
     def test_base_without_0x_prefix_still_parsed(self) -> None:
         """x64dbg may or may not prefix with 0x; regex handles both."""
-        line = (
-            "[RIFT_BRIDGE] hit=test reg=rbx base=7FF600010000 "
-            "0x310=C3FA0000 0x314=42480000"
-        )
+        line = "[RIFT_BRIDGE] hit=test reg=rbx base=7FF600010000 0x310=C3FA0000 0x314=42480000"
         log = _make_log_file([line])
         try:
             entries = parse_x64dbg_log(log)
@@ -553,16 +553,15 @@ class TestAnalyzeToCandidates:
             cluster=cluster,
             base_address=base_addr,
             base_register=base_reg,
-            offset_values={
-                k: struct.unpack("<I", struct.pack("<f", v))[0]
-                for k, v in offset_values.items()
-            },
+            offset_values={k: struct.unpack("<I", struct.pack("<f", v))[0] for k, v in offset_values.items()},
         )
 
     def test_valid_triple_becomes_candidate(self) -> None:
         """A valid (x,y,z) triple at 0x310/0x314/0x318 → candidate."""
         entry = self._make_entry(
-            "cluster_04", "rbx", self.BASE,
+            "cluster_04",
+            "rbx",
+            self.BASE,
             {0x310: 150.0, 0x314: 25.0, 0x318: -300.0},
         )
         analysis = analyze_log_entries([entry])
@@ -576,7 +575,9 @@ class TestAnalyzeToCandidates:
 
     def test_nan_values_rejected(self) -> None:
         entry = self._make_entry(
-            "test", "rbx", self.BASE,
+            "test",
+            "rbx",
+            self.BASE,
             {0x310: float("nan"), 0x314: 1.0, 0x318: 2.0},
         )
         analysis = analyze_log_entries([entry])
@@ -584,7 +585,9 @@ class TestAnalyzeToCandidates:
 
     def test_all_zero_triple_rejected(self) -> None:
         entry = self._make_entry(
-            "test", "rbx", self.BASE,
+            "test",
+            "rbx",
+            self.BASE,
             {0x310: 0.0, 0x314: 0.0, 0x318: 0.0},
         )
         # analyze_log_entries applies coordinate validation internally
@@ -594,7 +597,9 @@ class TestAnalyzeToCandidates:
 
     def test_out_of_bounds_rejected(self) -> None:
         entry = self._make_entry(
-            "test", "rbx", self.BASE,
+            "test",
+            "rbx",
+            self.BASE,
             {0x310: 99999.0, 0x314: 0.0, 0x318: 99999.0},
         )
         analysis = analyze_log_entries([entry])
@@ -603,10 +608,16 @@ class TestAnalyzeToCandidates:
     def test_multiple_offset_slots_detected(self) -> None:
         """If data has coords at 0x310 and 0x320, both are candidates."""
         entry = self._make_entry(
-            "test", "rbx", self.BASE,
+            "test",
+            "rbx",
+            self.BASE,
             {
-                0x310: 10.0, 0x314: 20.0, 0x318: 30.0,
-                0x320: 100.0, 0x324: 200.0, 0x328: 300.0,
+                0x310: 10.0,
+                0x314: 20.0,
+                0x318: 30.0,
+                0x320: 100.0,
+                0x324: 200.0,
+                0x328: 300.0,
             },
         )
         analysis = analyze_log_entries([entry])
@@ -614,11 +625,15 @@ class TestAnalyzeToCandidates:
 
     def test_cluster_hits_counted(self) -> None:
         e1 = self._make_entry(
-            "cluster_04", "rbx", self.BASE,
+            "cluster_04",
+            "rbx",
+            self.BASE,
             {0x310: 10.0, 0x314: 20.0, 0x318: 30.0},
         )
         e2 = self._make_entry(
-            "cluster_04", "rbx", self.BASE + 0x1000,
+            "cluster_04",
+            "rbx",
+            self.BASE + 0x1000,
             {0x310: 40.0, 0x314: 50.0, 0x318: 60.0},
         )
         analysis = analyze_log_entries([e1, e2])
@@ -627,11 +642,15 @@ class TestAnalyzeToCandidates:
 
     def test_unique_bases_tracked(self) -> None:
         e1 = self._make_entry(
-            "a", "rbx", 0x1000,
+            "a",
+            "rbx",
+            0x1000,
             {0x310: 1.0, 0x314: 2.0, 0x318: 3.0},
         )
         e2 = self._make_entry(
-            "b", "rbx", 0x2000,
+            "b",
+            "rbx",
+            0x2000,
             {0x310: 4.0, 0x314: 5.0, 0x318: 6.0},
         )
         analysis = analyze_log_entries([e1, e2])
@@ -984,9 +1003,7 @@ class TestFullPipeline:
         # bplog rift_x64.exe+DEAD, "[RIFT_BRIDGE] ... {rbx} ... {dword(rbx+0x310)} ..."
         # [^,]+ matches the address without consuming the comma (avoids backtracking)
         template_match = re.search(r'bplog\s+[^,]+,\s+"(.+)"', bplog_line)
-        assert template_match is not None, (
-            f"Could not extract template from bplog line:\n{bplog_line}"
-        )
+        assert template_match is not None, f"Could not extract template from bplog line:\n{bplog_line}"
         template = template_match.group(1)
 
         # Verify the template contains expected x64dbg expression patterns
@@ -1002,9 +1019,9 @@ class TestFullPipeline:
             0x304: 0,
             0x308: 0,
             0x30C: 0,
-            0x310: 0x43FA0000,   # 500.0f
-            0x314: 0x42480000,   # 50.0f
-            0x318: 0xC4480000,   # -800.0f
+            0x310: 0x43FA0000,  # 500.0f
+            0x314: 0x42480000,  # 50.0f
+            0x318: 0xC4480000,  # -800.0f
             0x31C: 0,
             0x320: 0,
             0x324: 0,
@@ -1046,10 +1063,7 @@ class TestFullPipeline:
         log = _make_log_file([filled])
         try:
             entries = parse_x64dbg_log(log)
-            assert len(entries) == 1, (
-                f"Expected 1 entry, got {len(entries)}. "
-                f"Filled line:\n{filled}"
-            )
+            assert len(entries) == 1, f"Expected 1 entry, got {len(entries)}. Filled line:\n{filled}"
             e = entries[0]
 
             # Verify cluster/register/base
@@ -1088,12 +1102,14 @@ class TestFullPipeline:
         def _f32_bytes(*values: float) -> bytes:
             return b"".join(struct.pack("<f", v) for v in values)
 
-        fixture = FixtureProcessReader([
-            (0x10000, _f32_bytes(500.0, 50.0, -800.0), "rw"),
-            (0x20000, _f32_bytes(0.0, 0.0, 0.0), "rw"),
-            (0x30000, _f32_bytes(float("nan"), 1.0, 2.0), "rw"),
-            (0x40000, _f32_bytes(99999.0, 99999.0, 99999.0), "rw"),
-        ])
+        fixture = FixtureProcessReader(
+            [
+                (0x10000, _f32_bytes(500.0, 50.0, -800.0), "rw"),
+                (0x20000, _f32_bytes(0.0, 0.0, 0.0), "rw"),
+                (0x30000, _f32_bytes(float("nan"), 1.0, 2.0), "rw"),
+                (0x40000, _f32_bytes(99999.0, 99999.0, 99999.0), "rw"),
+            ]
+        )
 
         with mock.patch(
             "scripts.live_memory_scanner.WindowsReadOnlyProcessReader",
@@ -1136,9 +1152,11 @@ class TestFullPipeline:
         """Duplicate absolute_address entries are verified only once."""
         from scripts.x64dbg_bridge import verify_coordinate_candidates
 
-        fixture = FixtureProcessReader([
-            (0xAAA00, struct.pack("<fff", 10.0, 20.0, 30.0), "rw"),
-        ])
+        fixture = FixtureProcessReader(
+            [
+                (0xAAA00, struct.pack("<fff", 10.0, 20.0, 30.0), "rw"),
+            ]
+        )
 
         with mock.patch(
             "scripts.live_memory_scanner.WindowsReadOnlyProcessReader",

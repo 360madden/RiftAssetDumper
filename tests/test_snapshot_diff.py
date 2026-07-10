@@ -53,9 +53,7 @@ class TestScanValueSnapshot(unittest.TestCase):
         self.assertEqual(len(snap["Snapshot"]), 0)
 
     def test_nan_exclusion(self):
-        reader = FixtureProcessReader(
-            [_make_region(0x2000, [float("nan"), 1.0, float("nan"), 2.0])]
-        )
+        reader = FixtureProcessReader([_make_region(0x2000, [float("nan"), 1.0, float("nan"), 2.0])])
         snap = scan_value_snapshot(reader, "f32", 0.0, 10.0)
         self.assertEqual(snap["MatchCount"], 2)
         self.assertEqual(sorted(snap["Snapshot"].keys()), ["0x2004", "0x200C"])
@@ -108,16 +106,24 @@ class TestDiffValueSnapshots(unittest.TestCase):
             "SchemaVersion": "live-value-snapshot/v1",
             "ValueType": "f32",
             "Snapshot": {
-                "0x3000": 0.0, "0x3004": 0.0, "0x3008": 0.0,
-                "0x4000": 5.0, "0x4004": 10.0, "0x4008": 15.0,
+                "0x3000": 0.0,
+                "0x3004": 0.0,
+                "0x3008": 0.0,
+                "0x4000": 5.0,
+                "0x4004": 10.0,
+                "0x4008": 15.0,
             },
         }
         snap_b3 = {
             "SchemaVersion": "live-value-snapshot/v1",
             "ValueType": "f32",
             "Snapshot": {
-                "0x3000": 0.0, "0x3004": 0.0, "0x3008": 0.0,
-                "0x4000": 6.0, "0x4004": 11.0, "0x4008": 16.0,
+                "0x3000": 0.0,
+                "0x3004": 0.0,
+                "0x3008": 0.0,
+                "0x4000": 6.0,
+                "0x4004": 11.0,
+                "0x4008": 16.0,
             },
         }
         diff3 = diff_value_snapshots(snap_a3, snap_b3)

@@ -289,9 +289,7 @@ def test_build_manifest_can_borrow_common_candidate_textures_without_promoting_a
         "bbbbbbbbbbbbbbbb": ["shared_diffuse_c.png"],
     }
     entries: list[dict[str, object]] = audit["obj_file_level"]["entries"]  # type: ignore[index]
-    assert common_candidate_texture_names(entries[2], asset_textures) == [
-        "shared_diffuse_c.png"
-    ]
+    assert common_candidate_texture_names(entries[2], asset_textures) == ["shared_diffuse_c.png"]
 
     manifest = build_manifest(
         repo_root=tmp_path,

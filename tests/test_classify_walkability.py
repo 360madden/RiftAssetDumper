@@ -8,6 +8,7 @@ from scripts.classify_walkability import _classify_asset  # noqa: E402
 # _classify_asset unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestClassifyAsset:
     """Exercise every classification branch in _classify_asset."""
 

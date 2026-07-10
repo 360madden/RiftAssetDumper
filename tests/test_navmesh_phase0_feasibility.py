@@ -25,6 +25,7 @@ from scripts.navmesh_phase0_feasibility import (
 # OBJ parser
 # ---------------------------------------------------------------------------
 
+
 class TestParseObj:
     def test_parse_simple_triangle(self) -> None:
         obj = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"
@@ -97,6 +98,7 @@ class TestParseObj:
 # Geometry helpers
 # ---------------------------------------------------------------------------
 
+
 class TestTriangleNormal:
     def test_horizontal_triangle(self) -> None:
         # Winding order (0,0,0)→(0,0,1)→(1,0,0) produces upward normal (0,1,0)
@@ -168,22 +170,31 @@ class TestTriangleXzBounds:
 class TestPointInTriangleXz:
     def test_center_point(self) -> None:
         inside = point_in_triangle_xz(
-            0.33, 0.33,
-            (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0),
+            0.33,
+            0.33,
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0),
         )
         assert inside is True
 
     def test_outside_point(self) -> None:
         inside = point_in_triangle_xz(
-            2.0, 2.0,
-            (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0),
+            2.0,
+            2.0,
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0),
         )
         assert inside is False
 
     def test_vertex_point(self) -> None:
         inside = point_in_triangle_xz(
-            0.0, 0.0,
-            (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0),
+            0.0,
+            0.0,
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0),
         )
         assert inside is True
 
@@ -191,6 +202,7 @@ class TestPointInTriangleXz:
 # ---------------------------------------------------------------------------
 # Grid2D
 # ---------------------------------------------------------------------------
+
 
 class TestGrid2D:
     def test_basic_creation(self) -> None:
@@ -228,7 +240,9 @@ class TestGrid2D:
     def test_rasterize_triangle(self) -> None:
         grid = Grid2D(0.0, 0.0, 10.0, 10.0, 1.0)
         count = grid.rasterize_triangle(
-            (0.0, 0.0, 0.0), (5.0, 0.0, 0.0), (0.0, 0.0, 5.0),
+            (0.0, 0.0, 0.0),
+            (5.0, 0.0, 0.0),
+            (0.0, 0.0, 5.0),
         )
         assert count > 0
         # Center of the triangle should be walkable
@@ -271,6 +285,7 @@ class TestGrid2D:
 # Debug OBJ export
 # ---------------------------------------------------------------------------
 
+
 class TestWriteDebugObj:
     def test_writes_valid_obj(self) -> None:
         walkable = [((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0))]
@@ -293,13 +308,11 @@ class TestWriteDebugObj:
 # Analyze OBJ (integration)
 # ---------------------------------------------------------------------------
 
+
 class TestAnalyzeObj:
     def test_horizontal_plane(self) -> None:
         """A flat horizontal plane should be 100% walkable."""
-        obj = (
-            "v 0 0 0\nv 10 0 0\nv 10 0 10\nv 0 0 10\n"
-            "f 1 2 3\nf 1 3 4\n"
-        )
+        obj = "v 0 0 0\nv 10 0 0\nv 10 0 10\nv 0 0 10\nf 1 2 3\nf 1 3 4\n"
         with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write(obj)
             f.flush()
@@ -314,10 +327,7 @@ class TestAnalyzeObj:
 
     def test_vertical_wall(self) -> None:
         """A vertical wall should have zero walkable faces."""
-        obj = (
-            "v 0 0 0\nv 0 10 0\nv 0 10 1\nv 0 0 1\n"
-            "f 1 2 3\nf 1 3 4\n"
-        )
+        obj = "v 0 0 0\nv 0 10 0\nv 0 10 1\nv 0 0 1\nf 1 2 3\nf 1 3 4\n"
         with tempfile.NamedTemporaryFile(mode="w", suffix=".obj", delete=False) as f:
             f.write(obj)
             f.flush()

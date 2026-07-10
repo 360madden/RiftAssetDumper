@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Smoke + unit tests for the matrix-synth CLI hook in scripts.rift_workflow.
 
 The matrix-synth command is a Phase 47 data-thickness polyfill that emits 3
@@ -18,6 +18,7 @@ These tests lock:
 - Empty Entries[] fails closed (polyfill can never produce empty buckets)
 - A non-existent matrix file raises ValueError with the right hint
 """
+
 from __future__ import annotations
 
 import importlib
@@ -113,12 +114,8 @@ class TestMatrixSynthCommandMap(unittest.TestCase):
         self.assertEqual(command, "matrix-synth")
 
     def test_sentinel_constants_exported(self) -> None:
-        self.assertEqual(
-            self._rift_workflow.MATRIX_SYNTH_POLYFILL_SENTINEL_ARCHIVE_NAME, "synthetic.twad"
-        )
-        self.assertEqual(
-            self._rift_workflow.MATRIX_SYNTH_POLYFILL_SENTINEL_DETECTED_TYPE, "synthetic"
-        )
+        self.assertEqual(self._rift_workflow.MATRIX_SYNTH_POLYFILL_SENTINEL_ARCHIVE_NAME, "synthetic.twad")
+        self.assertEqual(self._rift_workflow.MATRIX_SYNTH_POLYFILL_SENTINEL_DETECTED_TYPE, "synthetic")
         self.assertEqual(
             self._rift_workflow.MATRIX_SYNTH_POLYFILL_SENTINEL_MAGIC_LABEL,
             "synthetic-semantic-polyfill",
@@ -144,13 +141,16 @@ class TestMatrixSynthPolyfillOnlyAssertion(unittest.TestCase):
         from scripts.synthesize_semantic_matrices import (
             MATRIX_FILES as _POLYFILL_MATRIX_FILES,
         )
+
         self.matrix_files = dict(_POLYFILL_MATRIX_FILES)
         self.default_out_dir = _POLYFILL_DEFAULT_OUT_DIR
 
     def tearDown(self) -> None:
         sys.path.pop(0)
 
-    def _write_polyfill_outdir(self, outdir: Path, *, hint_overrides: dict[str, dict[str, object]] | None = None) -> None:
+    def _write_polyfill_outdir(
+        self, outdir: Path, *, hint_overrides: dict[str, dict[str, object]] | None = None
+    ) -> None:
         outdir.mkdir(parents=True, exist_ok=True)
         for hint_tag, fname in self.matrix_files.items():
             entries = [_build_polyfill_entry(hint_tag) for _ in range(2)]

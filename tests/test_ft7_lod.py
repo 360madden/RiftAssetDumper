@@ -24,7 +24,11 @@ import ft7_lod_detector as f7  # noqa: E402
 @pytest.mark.parametrize(
     ("input_value", "expected"),
     [
-        pytest.param({"mesh_size": 280, "note": "resolved via probe lookup pattern (MB=7,"}, "ms=280|note=resolved via probe lookup pattern (MB=7,", id="dict_short_note"),
+        pytest.param(
+            {"mesh_size": 280, "note": "resolved via probe lookup pattern (MB=7,"},
+            "ms=280|note=resolved via probe lookup pattern (MB=7,",
+            id="dict_short_note",
+        ),
         pytest.param({"mesh_size": 305, "note": "a" * 80}, f"ms=305|note={'a' * 40}", id="dict_long_note_truncates"),
         pytest.param("plain_string", "plain_string", id="string"),
         pytest.param("", "", id="empty"),
@@ -161,8 +165,18 @@ def test_meshsize_family_with_duplicates() -> None:
         pytest.param([], id="empty"),
         pytest.param(
             [
-                {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 148, "asset_id": "aaaabbbbccccdddd"},
-                {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 48, "asset_id": "eeeeffffgggghhhh"},
+                {
+                    "sibling_pair": {"mesh_size": 305},
+                    "descriptor": "float32xvec3 (position/normal/UV vertex data)",
+                    "vertex_count": 148,
+                    "asset_id": "aaaabbbbccccdddd",
+                },
+                {
+                    "sibling_pair": {"mesh_size": 305},
+                    "descriptor": "float32xvec3 (position/normal/UV vertex data)",
+                    "vertex_count": 48,
+                    "asset_id": "eeeeffffgggghhhh",
+                },
             ],
             id="no_descriptor_variety",
         ),
@@ -174,8 +188,18 @@ def test_descriptor_lod_returns_empty(entries: list[dict[str, Any]]) -> None:
 
 def test_descriptor_lod_vec3_vec2_siblings() -> None:
     entries: list[dict[str, Any]] = [
-        {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec3 (position/normal/UV vertex data)", "vertex_count": 148, "asset_id": "aaaabbbbccccdddd"},
-        {"sibling_pair": {"mesh_size": 305}, "descriptor": "float32xvec2 (UV coordinates)", "vertex_count": 48, "asset_id": "eeeeffffgggghhhh"},
+        {
+            "sibling_pair": {"mesh_size": 305},
+            "descriptor": "float32xvec3 (position/normal/UV vertex data)",
+            "vertex_count": 148,
+            "asset_id": "aaaabbbbccccdddd",
+        },
+        {
+            "sibling_pair": {"mesh_size": 305},
+            "descriptor": "float32xvec2 (UV coordinates)",
+            "vertex_count": 48,
+            "asset_id": "eeeeffffgggghhhh",
+        },
     ]
     result = f7.detect_descriptor_lod(entries)
     assert len(result) == 1

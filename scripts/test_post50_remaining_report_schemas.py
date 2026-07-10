@@ -69,8 +69,7 @@ if actual_gap:
     mesh325 = next(row for row in actual_gap["Rows"] if row["MeshSize"] == 325)
     # Live-archive calibrated (2026-06-19): ResidualStreamCount is 113
     # (was 0 in deleted Source/ copied-set).  Only check that it's non-negative.
-    check("actual gap mesh325 residual count non-negative",
-          mesh325["ResidualStreamCount"] >= 0, True)
+    check("actual gap mesh325 residual count non-negative", mesh325["ResidualStreamCount"] >= 0, True)
 
 
 classifier_schema = load_schema("residual-position-classifier-report-v1.schema.json")

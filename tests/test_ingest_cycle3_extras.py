@@ -1,4 +1,4 @@
-﻿"""Tests for ``scripts/ingest_cycle3_extras.py`` — idempotency contract locks.
+"""Tests for ``scripts/ingest_cycle3_extras.py`` — idempotency contract locks.
 
 Locks in the v0.2 wire contract after the silent-overwrite bug fix:
 
@@ -61,10 +61,12 @@ class DryRunWritesNothing(unittest.TestCase):
         _write_minimal_obj(src, v_count=4, f_count=2)
         record = _fake_record("03bcfae6561407a1", mesh_block=6, v=4, f=2, src=src)
 
-        with mock.patch.object(ic3, "REPO_ROOT", tmp_root), \
-             mock.patch.object(ic3, "PROBE_DIRS", [probe_root]), \
-             mock.patch.object(ic3, "OBJ_DIR", obj_root), \
-             mock.patch.object(ic3, "EXTRAS_DIR", extras_dir):
+        with (
+            mock.patch.object(ic3, "REPO_ROOT", tmp_root),
+            mock.patch.object(ic3, "PROBE_DIRS", [probe_root]),
+            mock.patch.object(ic3, "OBJ_DIR", obj_root),
+            mock.patch.object(ic3, "EXTRAS_DIR", extras_dir),
+        ):
             summary = ic3.materialize([record], dry_run=True)
 
         # Sanity: summary records what *would* be written
@@ -90,10 +92,12 @@ class AssetIdResolution(unittest.TestCase):
         src = probe_root / "mb11" / "decode-nif-geometry" / "decode-nif-geometry-mesh11.obj"
         _write_minimal_obj(src, v_count=10, f_count=8)
 
-        with mock.patch.object(ic3, "REPO_ROOT", tmp_root), \
-             mock.patch.object(ic3, "PROBE_DIRS", [probe_root]), \
-             mock.patch.object(ic3, "OBJ_DIR", obj_dir), \
-             mock.patch.object(ic3, "EXTRAS_DIR", obj_dir / "extra"):
+        with (
+            mock.patch.object(ic3, "REPO_ROOT", tmp_root),
+            mock.patch.object(ic3, "PROBE_DIRS", [probe_root]),
+            mock.patch.object(ic3, "OBJ_DIR", obj_dir),
+            mock.patch.object(ic3, "EXTRAS_DIR", obj_dir / "extra"),
+        ):
             records = ic3.discover_records()
 
         self.assertEqual(len(records), 1)
@@ -110,16 +114,17 @@ class AssetIdResolution(unittest.TestCase):
         src = probe_root / "9f32d2" / "mb27" / "decode-nif-geometry" / "decode-nif-geometry-mesh27.obj"
         _write_minimal_obj(src, v_count=20, f_count=18)
 
-        with mock.patch.object(ic3, "REPO_ROOT", tmp_root), \
-             mock.patch.object(ic3, "PROBE_DIRS", [probe_root]), \
-             mock.patch.object(ic3, "OBJ_DIR", obj_dir), \
-             mock.patch.object(ic3, "EXTRAS_DIR", obj_dir / "extra"):
+        with (
+            mock.patch.object(ic3, "REPO_ROOT", tmp_root),
+            mock.patch.object(ic3, "PROBE_DIRS", [probe_root]),
+            mock.patch.object(ic3, "OBJ_DIR", obj_dir),
+            mock.patch.object(ic3, "EXTRAS_DIR", obj_dir / "extra"),
+        ):
             records = ic3.discover_records()
 
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].asset_id, "9f32d26c425ed264")
         self.assertEqual(records[0].mesh_block, 27)
-
 
     _tmpd = staticmethod(lambda: str(__import__("tempfile").mkdtemp(prefix="ic3-resolve-")))
 
@@ -130,36 +135,62 @@ class ExtrasAccumulateAdd(unittest.TestCase):
     def test_external_rerun_appends_not_replaces(self) -> None:
         tmp = Path(self._tmpd())
         idx_path = tmp / "flythrough-index.json"
-        idx_path.write_text(json.dumps({
-            "SchemaVersion": "x",
-            "assets": {
-                "03bcfae6561407a1": {
-                    "asset_id": "03bcfae6561407a1",
-                    "obj_path": "03bcfae6561407a1.obj",
-                    "mesh_block": 6,
-                    "vertex_count": 4,
-                    "face_count": 2,
-                    "faced": True,
-                    "linked_textures": ["p.png"],
-                    "world_json": "p.world.json",
-                    "mesh_size": 297,
-                    "extra_blocks": [
-                        {"obj_path": "extra/a__mb001.obj", "mesh_block": 1, "vertex_count": 10, "face_count": 9, "obj_sha1": "1" * 40, "source": "prior"},
-                        {"obj_path": "extra/a__mb002.obj", "mesh_block": 2, "vertex_count": 20, "face_count": 19, "obj_sha1": "2" * 40, "source": "prior"},
-                    ],
-                    "source": "bulk_export_for_flythrough",
+        idx_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "x",
+                    "assets": {
+                        "03bcfae6561407a1": {
+                            "asset_id": "03bcfae6561407a1",
+                            "obj_path": "03bcfae6561407a1.obj",
+                            "mesh_block": 6,
+                            "vertex_count": 4,
+                            "face_count": 2,
+                            "faced": True,
+                            "linked_textures": ["p.png"],
+                            "world_json": "p.world.json",
+                            "mesh_size": 297,
+                            "extra_blocks": [
+                                {
+                                    "obj_path": "extra/a__mb001.obj",
+                                    "mesh_block": 1,
+                                    "vertex_count": 10,
+                                    "face_count": 9,
+                                    "obj_sha1": "1" * 40,
+                                    "source": "prior",
+                                },
+                                {
+                                    "obj_path": "extra/a__mb002.obj",
+                                    "mesh_block": 2,
+                                    "vertex_count": 20,
+                                    "face_count": 19,
+                                    "obj_sha1": "2" * 40,
+                                    "source": "prior",
+                                },
+                            ],
+                            "source": "bulk_export_for_flythrough",
+                        },
+                    },
                 },
-            },
-        }, indent=2), encoding="utf-8")
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
-        summary = {"canonical": [{
-            "asset_id": "03bcfae6561407a1",
-            "dst": "03bcfae6561407a1.obj",
-            "mesh_block": 27,
-            "vertex_count": 100,
-            "face_count": 99,
-            "obj_sha1": "3" * 40,
-        }], "extras": [], "skipped": []}
+        summary = {
+            "canonical": [
+                {
+                    "asset_id": "03bcfae6561407a1",
+                    "dst": "03bcfae6561407a1.obj",
+                    "mesh_block": 27,
+                    "vertex_count": 100,
+                    "face_count": 99,
+                    "obj_sha1": "3" * 40,
+                }
+            ],
+            "extras": [],
+            "skipped": [],
+        }
 
         with mock.patch.object(ic3, "FLYTHROUGH_INDEX", idx_path):
             ic3.update_flythrough_index(summary, dry_run=False)
@@ -183,14 +214,20 @@ class NewEntrySeedsEnrichmentAsEmpty(unittest.TestCase):
         idx_path = tmp / "flythrough-index.json"
         idx_path.write_text(json.dumps({"SchemaVersion": "x", "assets": {}}, indent=2), encoding="utf-8")
 
-        summary = {"canonical": [{
-            "asset_id": "03bcfae6561407a1",
-            "dst": "03bcfae6561407a1.obj",
-            "mesh_block": 6,
-            "vertex_count": 4,
-            "face_count": 2,
-            "obj_sha1": "0" * 40,
-        }], "extras": [], "skipped": []}
+        summary = {
+            "canonical": [
+                {
+                    "asset_id": "03bcfae6561407a1",
+                    "dst": "03bcfae6561407a1.obj",
+                    "mesh_block": 6,
+                    "vertex_count": 4,
+                    "face_count": 2,
+                    "obj_sha1": "0" * 40,
+                }
+            ],
+            "extras": [],
+            "skipped": [],
+        }
 
         with mock.patch.object(ic3, "FLYTHROUGH_INDEX", idx_path):
             rc = ic3.update_flythrough_index(summary, dry_run=False)
@@ -218,34 +255,46 @@ class OwnRerunPreservesEnrichment(unittest.TestCase):
         sentinel_textures = ["sentinel_texture_a.png", "sentinel_texture_b.png"]
         sentinel_world = "sentinel_world.json"
         sentinel_mesh_size = 305
-        idx_path.write_text(json.dumps({
-            "SchemaVersion": "x",
-            "assets": {
-                "03bcfae6561407a1": {
-                    "asset_id": "03bcfae6561407a1",
-                    "obj_path": "03bcfae6561407a1.obj",
-                    "mesh_block": 6,
-                    "vertex_count": 4,
-                    "face_count": 2,
-                    "faced": True,
-                    "linked_textures": list(sentinel_textures),
-                    "world_json": sentinel_world,
-                    "mesh_size": sentinel_mesh_size,
-                    "extra_blocks": [],
-                    "source": "ingest-cycle3-extras",
+        idx_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "x",
+                    "assets": {
+                        "03bcfae6561407a1": {
+                            "asset_id": "03bcfae6561407a1",
+                            "obj_path": "03bcfae6561407a1.obj",
+                            "mesh_block": 6,
+                            "vertex_count": 4,
+                            "face_count": 2,
+                            "faced": True,
+                            "linked_textures": list(sentinel_textures),
+                            "world_json": sentinel_world,
+                            "mesh_size": sentinel_mesh_size,
+                            "extra_blocks": [],
+                            "source": "ingest-cycle3-extras",
+                        },
+                    },
                 },
-            },
-        }, indent=2), encoding="utf-8")
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
         # Re-run with fresh counts (different vertex_count)
-        summary = {"canonical": [{
-            "asset_id": "03bcfae6561407a1",
-            "dst": "03bcfae6561407a1.obj",
-            "mesh_block": 7,
-            "vertex_count": 999,
-            "face_count": 998,
-            "obj_sha1": "f" * 40,
-        }], "extras": [], "skipped": []}
+        summary = {
+            "canonical": [
+                {
+                    "asset_id": "03bcfae6561407a1",
+                    "dst": "03bcfae6561407a1.obj",
+                    "mesh_block": 7,
+                    "vertex_count": 999,
+                    "face_count": 998,
+                    "obj_sha1": "f" * 40,
+                }
+            ],
+            "extras": [],
+            "skipped": [],
+        }
 
         with mock.patch.object(ic3, "FLYTHROUGH_INDEX", idx_path):
             rc = ic3.update_flythrough_index(summary, dry_run=False)
@@ -271,33 +320,45 @@ class ExternalSourcePushesToExtras(unittest.TestCase):
     def test_external_rerun_appends_extra_blocks(self) -> None:
         tmp = Path(self._tmpd())
         idx_path = tmp / "flythrough-index.json"
-        idx_path.write_text(json.dumps({
-            "SchemaVersion": "x",
-            "assets": {
-                "09f32d26c425ed264": {
+        idx_path.write_text(
+            json.dumps(
+                {
+                    "SchemaVersion": "x",
+                    "assets": {
+                        "09f32d26c425ed264": {
+                            "asset_id": "09f32d26c425ed264",
+                            "obj_path": "09f32d26c425ed264.obj",
+                            "mesh_block": 27,
+                            "vertex_count": 12993,
+                            "face_count": 12991,
+                            "faced": True,
+                            "linked_textures": ["prior.png"],
+                            "world_json": "prior.world.json",
+                            "mesh_size": 297,
+                            "extra_blocks": [],
+                            "source": "bulk_export_for_flythrough",
+                        },
+                    },
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        summary = {
+            "canonical": [
+                {
                     "asset_id": "09f32d26c425ed264",
-                    "obj_path": "09f32d26c425ed264.obj",
+                    "dst": "09f32d26c425ed264.obj",
                     "mesh_block": 27,
                     "vertex_count": 12993,
                     "face_count": 12991,
-                    "faced": True,
-                    "linked_textures": ["prior.png"],
-                    "world_json": "prior.world.json",
-                    "mesh_size": 297,
-                    "extra_blocks": [],
-                    "source": "bulk_export_for_flythrough",
-                },
-            },
-        }, indent=2), encoding="utf-8")
-
-        summary = {"canonical": [{
-            "asset_id": "09f32d26c425ed264",
-            "dst": "09f32d26c425ed264.obj",
-            "mesh_block": 27,
-            "vertex_count": 12993,
-            "face_count": 12991,
-            "obj_sha1": "9" * 40,
-        }], "extras": [], "skipped": []}
+                    "obj_sha1": "9" * 40,
+                }
+            ],
+            "extras": [],
+            "skipped": [],
+        }
 
         with mock.patch.object(ic3, "FLYTHROUGH_INDEX", idx_path):
             rc = ic3.update_flythrough_index(summary, dry_run=False)

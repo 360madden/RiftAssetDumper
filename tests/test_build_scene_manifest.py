@@ -45,6 +45,7 @@ NON_ID_IDS = [
 
 # ---------- is_identity_transform ----------
 
+
 def test_is_identity_true_for_exact_identity() -> None:
     t = [0.0, 0.0, 0.0]
     r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
@@ -75,6 +76,7 @@ def test_is_identity_false_for_missing_rotation() -> None:
 
 # ---------- coordinate_system constants ----------
 
+
 def test_coordinate_system_matches_contract() -> None:
     """Lock the coordinate system constants against coordinate-contract.md."""
     assert COORDINATE_SYSTEM["handedness"] == "right"
@@ -89,6 +91,7 @@ def test_coordinate_system_matches_contract() -> None:
 
 # ---------- find_non_id_asset_ids ----------
 
+
 def test_find_non_id_asset_ids_returns_4() -> None:
     ids = find_non_id_asset_ids()
     assert len(ids) == 4
@@ -97,6 +100,7 @@ def test_find_non_id_asset_ids_returns_4() -> None:
 
 
 # ---------- end-to-end: --validate-only --all-non-id ----------
+
 
 @pytest.mark.skipif(
     not all((WORLD_DIR / f"{aid}.world.json").exists() for aid in NON_ID_IDS),
@@ -128,13 +132,30 @@ def test_all_non_id_manifests_validate() -> None:
 
 # ---------- end-to-end: emitted sample manifests validate against the schema ----------
 
+
 @pytest.mark.skipif(
-    not (REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "sample-manifest-07f37c99a80da009.json").exists(),
+    not (
+        REPO_ROOT
+        / "Assets"
+        / "Exports"
+        / "discovery-plan"
+        / "cycle-2"
+        / "stage2"
+        / "sample-manifest-07f37c99a80da009.json"
+    ).exists(),
     reason="sample manifests not yet generated",
 )
 def test_emitted_sample_07f37c99a80da009_validates() -> None:
     """The emitted sample-manifest-07f37c99a80da009.json must pass Draft202012Validator."""
-    sample = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2" / "sample-manifest-07f37c99a80da009.json"
+    sample = (
+        REPO_ROOT
+        / "Assets"
+        / "Exports"
+        / "discovery-plan"
+        / "cycle-2"
+        / "stage2"
+        / "sample-manifest-07f37c99a80da009.json"
+    )
     m = json.loads(sample.read_text(encoding="utf-8-sig"))
     errors = validate_against_schema(m)
     assert errors == [], f"schema errors: {errors}"
@@ -147,6 +168,7 @@ def test_emitted_sample_07f37c99a80da009_validates() -> None:
 
 
 # ---------- consumer_ready gating ----------
+
 
 def test_consumer_ready_false_for_known_unknowns() -> None:
     """A manifest with 0 faces + unknown materials + 0 textures must not be consumer_ready."""
@@ -210,6 +232,7 @@ def test_consumer_ready_true_when_all_known() -> None:
 
 # ---------- schema presence ----------
 
+
 def test_schema_file_exists_and_is_2020_12() -> None:
     assert SCHEMA_PATH.exists(), f"schema not found: {SCHEMA_PATH}"
     s = json.loads(SCHEMA_PATH.read_text(encoding="utf-8-sig"))
@@ -218,9 +241,7 @@ def test_schema_file_exists_and_is_2020_12() -> None:
 
 # ---------- IDENTITY vs NON-ID contrast (C2-2.4 batch) ----------
 
-SAMPLE_DIR = (
-    REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
-)
+SAMPLE_DIR = REPO_ROOT / "Assets" / "Exports" / "discovery-plan" / "cycle-2" / "stage2"
 
 
 def _load_sample(asset_id: str) -> dict[str, Any]:
@@ -251,10 +272,7 @@ def test_find_id_asset_ids_returns_nonzero() -> None:
 
 
 @pytest.mark.skipif(
-    not all(
-        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
-        for aid in NON_ID_IDS + find_id_asset_ids()
-    ),
+    not all((SAMPLE_DIR / f"sample-manifest-{aid}.json").exists() for aid in NON_ID_IDS + find_id_asset_ids()),
     reason="identity + non-id sample batch not yet built",
 )
 def test_identity_manifests_have_identity_transform() -> None:
@@ -265,33 +283,23 @@ def test_identity_manifests_have_identity_transform() -> None:
     """
     for aid in find_id_asset_ids():
         m = _load_sample(aid)
-        assert m["world"]["world_transform_identity"] is True, (
-            f"identity asset {aid} should have identity transform"
-        )
+        assert m["world"]["world_transform_identity"] is True, f"identity asset {aid} should have identity transform"
         assert m["world"]["world_transform_summary"]["translation"] == [0, 0, 0]
 
 
 @pytest.mark.skipif(
-    not all(
-        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
-        for aid in NON_ID_IDS + find_id_asset_ids()
-    ),
+    not all((SAMPLE_DIR / f"sample-manifest-{aid}.json").exists() for aid in NON_ID_IDS + find_id_asset_ids()),
     reason="identity + non-id sample batch not yet built",
 )
 def test_non_id_manifests_have_non_identity_transform() -> None:
     """Non-id cohort must report world_transform_identity=False (locks the v0.3 contrast)."""
     for aid in NON_ID_IDS:
         m = _load_sample(aid)
-        assert m["world"]["world_transform_identity"] is False, (
-            f"non-id asset {aid} should have non-identity transform"
-        )
+        assert m["world"]["world_transform_identity"] is False, f"non-id asset {aid} should have non-identity transform"
 
 
 @pytest.mark.skipif(
-    not all(
-        (SAMPLE_DIR / f"sample-manifest-{aid}.json").exists()
-        for aid in NON_ID_IDS + find_id_asset_ids()
-    ),
+    not all((SAMPLE_DIR / f"sample-manifest-{aid}.json").exists() for aid in NON_ID_IDS + find_id_asset_ids()),
     reason="identity + non-id sample batch not yet built",
 )
 def test_consumer_ready_independent_of_transform_identity() -> None:

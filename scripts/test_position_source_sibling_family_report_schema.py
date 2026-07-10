@@ -100,12 +100,9 @@ if actual_path.exists():
     # Live-archive calibrated (2026-06-19): dynamic families with positive metrics
     if isinstance(families, list) and families:
         top_family = families[0]
-        check("actual top mesh size non-negative",
-              top_family.get("MeshSize", -1) >= 0, True)
-        check("actual top evidence groups positive",
-              top_family.get("EvidenceGroups", 0) > 0, True)
-        check("actual top total stream links positive",
-              top_family.get("TotalStreamLinks", 0) > 0, True)
+        check("actual top mesh size non-negative", top_family.get("MeshSize", -1) >= 0, True)
+        check("actual top evidence groups positive", top_family.get("EvidenceGroups", 0) > 0, True)
+        check("actual top total stream links positive", top_family.get("TotalStreamLinks", 0) > 0, True)
     # GuardedFamilies should have at least one entry (dynamic live-archive guard)
     check("actual guarded families present", len(guarded) > 0, True)
 else:

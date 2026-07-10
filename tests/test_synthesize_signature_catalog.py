@@ -103,9 +103,7 @@ class TestAnchorStructure:
         """UniquenessVerified=False anchors must have a FallbackStrategy."""
         for anchor in catalog["Anchors"]:
             if not anchor["UniquenessVerified"]:
-                assert "FallbackStrategy" in anchor, (
-                    f"{anchor['Name']}: non-unique anchor missing FallbackStrategy"
-                )
+                assert "FallbackStrategy" in anchor, f"{anchor['Name']}: non-unique anchor missing FallbackStrategy"
 
 
 class TestSummaryConsistency:

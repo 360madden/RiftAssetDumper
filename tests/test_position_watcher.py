@@ -357,9 +357,7 @@ class TestFindLatestVerifiedJson:
 
 def _make_verified_json(entries: list[dict]) -> Path:
     """Write entries to a temp .verified.json and return its Path."""
-    f = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".verified.json", delete=False, encoding="utf-8"
-    )
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".verified.json", delete=False, encoding="utf-8")
     json.dump(entries, f)
     f.close()
     return Path(f.name)
@@ -368,15 +366,17 @@ def _make_verified_json(entries: list[dict]) -> Path:
 class TestLoadBestVerifiedAddress:
     def test_single_valid_candidate(self) -> None:
         """Single candidate with valid coords and address."""
-        path = _make_verified_json([
-            {
-                "cluster": "cluster_04",
-                "absolute_address": "0x7FF6A1B2C3D0",
-                "x_verified": 100.0,
-                "y_verified": 50.0,
-                "z_verified": -200.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "cluster_04",
+                    "absolute_address": "0x7FF6A1B2C3D0",
+                    "x_verified": 100.0,
+                    "y_verified": 50.0,
+                    "z_verified": -200.0,
+                }
+            ]
+        )
         try:
             addr, cand = load_best_verified_address(path)
             assert addr == 0x7FF6A1B2C3D0
@@ -387,29 +387,31 @@ class TestLoadBestVerifiedAddress:
 
     def test_picks_highest_magnitude(self) -> None:
         """Multiple candidates — returns one with largest abs(x)+abs(y)+abs(z)."""
-        path = _make_verified_json([
-            {
-                "cluster": "small",
-                "absolute_address": "0x1000",
-                "x_verified": 1.0,
-                "y_verified": 2.0,
-                "z_verified": 3.0,
-            },
-            {
-                "cluster": "big",
-                "absolute_address": "0x2000",
-                "x_verified": 5000.0,
-                "y_verified": -3000.0,
-                "z_verified": 2000.0,
-            },
-            {
-                "cluster": "medium",
-                "absolute_address": "0x3000",
-                "x_verified": 50.0,
-                "y_verified": 50.0,
-                "z_verified": 50.0,
-            },
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "small",
+                    "absolute_address": "0x1000",
+                    "x_verified": 1.0,
+                    "y_verified": 2.0,
+                    "z_verified": 3.0,
+                },
+                {
+                    "cluster": "big",
+                    "absolute_address": "0x2000",
+                    "x_verified": 5000.0,
+                    "y_verified": -3000.0,
+                    "z_verified": 2000.0,
+                },
+                {
+                    "cluster": "medium",
+                    "absolute_address": "0x3000",
+                    "x_verified": 50.0,
+                    "y_verified": 50.0,
+                    "z_verified": 50.0,
+                },
+            ]
+        )
         try:
             addr, cand = load_best_verified_address(path)
             assert addr == 0x2000
@@ -437,15 +439,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_all_zero_coordinates_raises(self) -> None:
         """All candidates have zero magnitude → ValueError."""
-        path = _make_verified_json([
-            {
-                "cluster": "zero",
-                "absolute_address": "0x1000",
-                "x_verified": 0.0,
-                "y_verified": 0.0,
-                "z_verified": 0.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "zero",
+                    "absolute_address": "0x1000",
+                    "x_verified": 0.0,
+                    "y_verified": 0.0,
+                    "z_verified": 0.0,
+                }
+            ]
+        )
         try:
             with pytest.raises(ValueError, match="no candidates with non-zero"):
                 load_best_verified_address(path)
@@ -454,15 +458,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_missing_absolute_address_raises(self) -> None:
         """No absolute_address field → ValueError."""
-        path = _make_verified_json([
-            {
-                "cluster": "no_addr",
-                # missing absolute_address
-                "x_verified": 10.0,
-                "y_verified": 20.0,
-                "z_verified": 30.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "no_addr",
+                    # missing absolute_address
+                    "x_verified": 10.0,
+                    "y_verified": 20.0,
+                    "z_verified": 30.0,
+                }
+            ]
+        )
         try:
             with pytest.raises(ValueError, match="invalid absolute_address"):
                 load_best_verified_address(path)
@@ -471,15 +477,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_invalid_hex_address_raises(self) -> None:
         """absolute_address is not valid hex → ValueError."""
-        path = _make_verified_json([
-            {
-                "cluster": "bad_hex",
-                "absolute_address": "not_a_number",
-                "x_verified": 10.0,
-                "y_verified": 20.0,
-                "z_verified": 30.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "bad_hex",
+                    "absolute_address": "not_a_number",
+                    "x_verified": 10.0,
+                    "y_verified": 20.0,
+                    "z_verified": 30.0,
+                }
+            ]
+        )
         try:
             with pytest.raises(ValueError, match="invalid literal for int"):
                 load_best_verified_address(path)
@@ -488,15 +496,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_address_without_0x_prefix(self) -> None:
         """absolute_address without 0x prefix still works."""
-        path = _make_verified_json([
-            {
-                "cluster": "no_prefix",
-                "absolute_address": "7FF6A1B2C3D0",
-                "x_verified": 10.0,
-                "y_verified": 20.0,
-                "z_verified": 30.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "no_prefix",
+                    "absolute_address": "7FF6A1B2C3D0",
+                    "x_verified": 10.0,
+                    "y_verified": 20.0,
+                    "z_verified": 30.0,
+                }
+            ]
+        )
         try:
             addr, cand = load_best_verified_address(path)
             assert addr == 0x7FF6A1B2C3D0
@@ -506,22 +516,24 @@ class TestLoadBestVerifiedAddress:
 
     def test_none_coordinates_treated_as_zero(self) -> None:
         """None for x_verified/y_verified/z_verified → 0.0."""
-        path = _make_verified_json([
-            {
-                "cluster": "null_coords",
-                "absolute_address": "0x1000",
-                "x_verified": None,
-                "y_verified": None,
-                "z_verified": None,
-            },
-            {
-                "cluster": "valid",
-                "absolute_address": "0x2000",
-                "x_verified": 1.0,
-                "y_verified": 1.0,
-                "z_verified": 1.0,
-            },
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "null_coords",
+                    "absolute_address": "0x1000",
+                    "x_verified": None,
+                    "y_verified": None,
+                    "z_verified": None,
+                },
+                {
+                    "cluster": "valid",
+                    "absolute_address": "0x2000",
+                    "x_verified": 1.0,
+                    "y_verified": 1.0,
+                    "z_verified": 1.0,
+                },
+            ]
+        )
         try:
             # null coords have magnitude 0, valid has magnitude 3 → picks valid
             addr, cand = load_best_verified_address(path)
@@ -532,15 +544,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_none_coordinates_with_only_zero_entry_raises(self) -> None:
         """Only entry has None/null coords → ValueError (all zero)."""
-        path = _make_verified_json([
-            {
-                "cluster": "all_null",
-                "absolute_address": "0x1000",
-                "x_verified": None,
-                "y_verified": None,
-                "z_verified": None,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "all_null",
+                    "absolute_address": "0x1000",
+                    "x_verified": None,
+                    "y_verified": None,
+                    "z_verified": None,
+                }
+            ]
+        )
         try:
             with pytest.raises(ValueError, match="no candidates with non-zero"):
                 load_best_verified_address(path)
@@ -549,18 +563,20 @@ class TestLoadBestVerifiedAddress:
 
     def test_skips_non_dict_entries(self) -> None:
         """Non-dict entries are skipped; valid dict still found."""
-        path = _make_verified_json([
-            "not a dict",  # type: ignore[list-item]
-            42,  # type: ignore[list-item]
-            None,  # type: ignore[list-item]
-            {
-                "cluster": "survivor",
-                "absolute_address": "0xABCD",
-                "x_verified": 100.0,
-                "y_verified": 0.0,
-                "z_verified": 0.0,
-            },
-        ])
+        path = _make_verified_json(
+            [
+                "not a dict",  # type: ignore[list-item]
+                42,  # type: ignore[list-item]
+                None,  # type: ignore[list-item]
+                {
+                    "cluster": "survivor",
+                    "absolute_address": "0xABCD",
+                    "x_verified": 100.0,
+                    "y_verified": 0.0,
+                    "z_verified": 0.0,
+                },
+            ]
+        )
         try:
             addr, cand = load_best_verified_address(path)
             assert addr == 0xABCD
@@ -570,20 +586,22 @@ class TestLoadBestVerifiedAddress:
 
     def test_missing_coordinate_keys_default_to_zero(self) -> None:
         """Entries without x/y/z_verified keys still contribute (as 0.0)."""
-        path = _make_verified_json([
-            {
-                "cluster": "no_coords",
-                "absolute_address": "0x1000",
-                # no x_verified, y_verified, z_verified
-            },
-            {
-                "cluster": "has_coords",
-                "absolute_address": "0x2000",
-                "x_verified": 0.001,
-                "y_verified": 0.0,
-                "z_verified": 0.0,
-            },
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "no_coords",
+                    "absolute_address": "0x1000",
+                    # no x_verified, y_verified, z_verified
+                },
+                {
+                    "cluster": "has_coords",
+                    "absolute_address": "0x2000",
+                    "x_verified": 0.001,
+                    "y_verified": 0.0,
+                    "z_verified": 0.0,
+                },
+            ]
+        )
         try:
             # no_coords → magnitude 0.0, has_coords → 0.001 → picks has_coords
             addr, cand = load_best_verified_address(path)
@@ -594,22 +612,24 @@ class TestLoadBestVerifiedAddress:
 
     def test_negative_coordinates_count_toward_magnitude(self) -> None:
         """Negative coordinates increase magnitude via abs()."""
-        path = _make_verified_json([
-            {
-                "cluster": "neg",
-                "absolute_address": "0xF00D",
-                "x_verified": -1000.0,
-                "y_verified": -2000.0,
-                "z_verified": -3000.0,
-            },
-            {
-                "cluster": "pos",
-                "absolute_address": "0xBEEF",
-                "x_verified": 500.0,
-                "y_verified": 500.0,
-                "z_verified": 500.0,
-            },
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "neg",
+                    "absolute_address": "0xF00D",
+                    "x_verified": -1000.0,
+                    "y_verified": -2000.0,
+                    "z_verified": -3000.0,
+                },
+                {
+                    "cluster": "pos",
+                    "absolute_address": "0xBEEF",
+                    "x_verified": 500.0,
+                    "y_verified": 500.0,
+                    "z_verified": 500.0,
+                },
+            ]
+        )
         try:
             # neg magnitude = 6000, pos magnitude = 1500 → picks neg
             addr, cand = load_best_verified_address(path)
@@ -620,15 +640,17 @@ class TestLoadBestVerifiedAddress:
 
     def test_large_float_coordinates(self) -> None:
         """Very large float coordinates handled correctly."""
-        path = _make_verified_json([
-            {
-                "cluster": "big",
-                "absolute_address": "0xBEEF0000DEAD",
-                "x_verified": 1e30,
-                "y_verified": 0.0,
-                "z_verified": 0.0,
-            }
-        ])
+        path = _make_verified_json(
+            [
+                {
+                    "cluster": "big",
+                    "absolute_address": "0xBEEF0000DEAD",
+                    "x_verified": 1e30,
+                    "y_verified": 0.0,
+                    "z_verified": 0.0,
+                }
+            ]
+        )
         try:
             addr, cand = load_best_verified_address(path)
             assert addr == 0xBEEF0000DEAD

@@ -26,16 +26,19 @@ def _write_bom_corrupted_jsonl(path: Path) -> None:
     # Second line: clean
     # Third line: with leftover mid-stream BOM (mimics second C# concat)
     body = (
-        b"\xef\xbb\xbf" + json.dumps(rec_a).encode("utf-8") + b"\n"
-        + json.dumps(rec_b).encode("utf-8") + b"\n"
-        + b"\xef\xbb\xbf" + json.dumps(rec_c).encode("utf-8") + b"\n"
+        b"\xef\xbb\xbf"
+        + json.dumps(rec_a).encode("utf-8")
+        + b"\n"
+        + json.dumps(rec_b).encode("utf-8")
+        + b"\n"
+        + b"\xef\xbb\xbf"
+        + json.dumps(rec_c).encode("utf-8")
+        + b"\n"
     )
     path.write_bytes(body)
 
 
-def test_load_links_tolerates_leading_and_mid_stream_boms(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_load_links_tolerates_leading_and_mid_stream_boms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """load_links() must return all 3 records even with BOMs at byte 0 and mid-file."""
     from scripts import link_flythrough_textures
 
@@ -47,9 +50,7 @@ def test_load_links_tolerates_leading_and_mid_stream_boms(
 
     links = link_flythrough_textures.load_links()
 
-    assert len(links) == 3, (
-        f"Expected 3 records but got {len(links)} — load_links() did not tolerate BOMs."
-    )
+    assert len(links) == 3, f"Expected 3 records but got {len(links)} — load_links() did not tolerate BOMs."
     refs = sorted(rec["Reference"] for rec in links)
     assert refs == ["alpha.dds", "lighthouse.dds", "shrub.dds"], (
         f"Parsed references not in expected order/decode: {refs}"

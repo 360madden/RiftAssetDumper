@@ -28,11 +28,7 @@ import jsonschema
 
 ic4 = importlib.import_module("scripts.cycle4_lod_metadata")
 
-SCENE_MANIFEST_SCHEMA = json.loads(
-    Path("docs/schemas/scene-manifest-v1.schema.json").read_text(
-        encoding="utf-8-sig"
-    )
-)
+SCENE_MANIFEST_SCHEMA = json.loads(Path("docs/schemas/scene-manifest-v1.schema.json").read_text(encoding="utf-8-sig"))
 
 
 def _make_flythrough_entry(aid: str, vertex_count: int, mesh_size: int | None = None) -> dict:
@@ -109,8 +105,7 @@ class AbsoluteTierFallback(unittest.TestCase):
         self.assertEqual(result[lowest_aid]["lod_type"], "low")
         # Cycle 4 v0.2 wire format: reason_class is 'absolute' (not the full lod_reason string).
         for aid, meta in result.items():
-            self.assertEqual(meta["reason_class"], "absolute",
-                             f"{aid} reason_class={meta['reason_class']}")
+            self.assertEqual(meta["reason_class"], "absolute", f"{aid} reason_class={meta['reason_class']}")
 
 
 class PatchStage6Manifest(unittest.TestCase):
@@ -131,9 +126,7 @@ class PatchStage6Manifest(unittest.TestCase):
         manifest_path.write_text(json.dumps(original, indent=2), encoding="utf-8")
 
         lod_meta: dict[str, Any] = {"lod_index": 0, "lod_type": "singleton", "family_size": 1}
-        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(
-            ic4, "STAGE6_DIR", stage6_dir
-        ):
+        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(ic4, "STAGE6_DIR", stage6_dir):
             ok, err = ic4.patch_stage6_manifest("000000000000aaa1", lod_meta)
         self.assertTrue(ok, f"unexpected error: {err}")
         patched = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -160,9 +153,7 @@ class PatchStage6Manifest(unittest.TestCase):
         }
         manifest_path.write_text(json.dumps(original, indent=2), encoding="utf-8")
         lod_meta: dict[str, Any] = {"lod_index": 0, "lod_type": "low", "family_size": 1}
-        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(
-            ic4, "STAGE6_DIR", stage6_dir
-        ):
+        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(ic4, "STAGE6_DIR", stage6_dir):
             ic4.patch_stage6_manifest("000000000000aaa2", lod_meta)
 
         leftover = list(stage6_dir.glob("*.tmp"))
@@ -186,9 +177,7 @@ class PatchStage6Manifest(unittest.TestCase):
             encoding="utf-8",
         )
         lod_meta: dict[str, Any] = {"lod_index": 0, "lod_type": "medium", "family_size": 1}
-        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(
-            ic4, "STAGE6_DIR", stage6_dir
-        ):
+        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(ic4, "STAGE6_DIR", stage6_dir):
             ic4.patch_stage6_manifest("000000000000aaa3", lod_meta)
             first = json.loads(manifest_path.read_text(encoding="utf-8"))
             ic4.patch_stage6_manifest("000000000000aaa3", lod_meta)
@@ -277,9 +266,7 @@ class PatchStage6Manifest(unittest.TestCase):
             "lod_type": "singleton",
             "family_size": 1,
         }
-        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(
-            ic4, "STAGE6_DIR", stage6_dir
-        ):
+        with mock.patch.object(ic4, "REPO_ROOT", Path(tmp)), mock.patch.object(ic4, "STAGE6_DIR", stage6_dir):
             ok, err = ic4.patch_stage6_manifest("000000000000aaa4", lod_meta)
         self.assertTrue(ok, f"unexpected patch error: {err}")
         patched = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -369,10 +356,14 @@ class BuildEvidenceReasonClassPipeline(unittest.TestCase):
         # Per-class counts:
         self.assertEqual(by_reason.get("mesh"), 3, f"mesh={by_reason.get('mesh')} (want 3)")
         self.assertEqual(
-            by_reason.get("singleton"), 1, f"singleton={by_reason.get('singleton')} (want 1)",
+            by_reason.get("singleton"),
+            1,
+            f"singleton={by_reason.get('singleton')} (want 1)",
         )
         self.assertEqual(
-            by_reason.get("absolute"), 2, f"absolute={by_reason.get('absolute')} (want 2)",
+            by_reason.get("absolute"),
+            2,
+            f"absolute={by_reason.get('absolute')} (want 2)",
         )
         # Total = 6 (all newly classified).
         self.assertEqual(sum(by_reason.values()), 6)

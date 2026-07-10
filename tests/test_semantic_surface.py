@@ -232,20 +232,14 @@ class TestBuildSemanticBlockContract(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (matrix_dir / "semantic-nif-map-zone.json").write_text(
-                json.dumps({"Entries": []}), encoding="utf-8"
-            )
-            (matrix_dir / "semantic-nif-waypoint-poi.json").write_text(
-                json.dumps({"Entries": []}), encoding="utf-8"
-            )
+            (matrix_dir / "semantic-nif-map-zone.json").write_text(json.dumps({"Entries": []}), encoding="utf-8")
+            (matrix_dir / "semantic-nif-waypoint-poi.json").write_text(json.dumps({"Entries": []}), encoding="utf-8")
             block = build_semantic_block("abc1234567890abc", matrix_dir)
             self.assertEqual(block["categories"], ["hint:actor-object"])
             # Source paths are basenames (filename only) so manifests stay
             # portable; the strings are unambiguous because one file maps to
             # each hint slot.
-            self.assertEqual(
-                block["sources"]["hint:actor-object"], "semantic-nif-actor-object.json"
-            )
+            self.assertEqual(block["sources"]["hint:actor-object"], "semantic-nif-actor-object.json")
             # Empty-but-existing files still emit their basename (NOT ABSENT_MARKER).
             self.assertEqual(block["sources"]["hint:map-zone"], "semantic-nif-map-zone.json")
             self.assertEqual(block["sources"]["hint:waypoint-poi"], "semantic-nif-waypoint-poi.json")
@@ -304,7 +298,9 @@ class TestSceneManifestSemanticInjection(unittest.TestCase):
             # The block must also satisfy the empty case against the same schema.
             empty_block = build_semantic_block("ffffffffffffffff", matrix_dir)
             empty_errors = list(validator.iter_errors(empty_block))
-            self.assertEqual(empty_errors, [], f"empty semantic block non-conforming: {[e.message for e in empty_errors]}")
+            self.assertEqual(
+                empty_errors, [], f"empty semantic block non-conforming: {[e.message for e in empty_errors]}"
+            )
 
 
 # --------------------------------------------------------------------------
