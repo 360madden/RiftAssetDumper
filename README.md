@@ -27,6 +27,32 @@ Current stage terminology: the historical geometry/export pipeline is **Phase 49
 
 Promotion-readiness checklist: `docs/nidatastream-promotion-readiness-checklist.md`.
 
+## Development setup
+
+Create and activate a Python virtual environment, then install the development dependencies:
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -e ".[dev]"
+```
+
+Install the pre-commit hooks so lint/type checks run before each commit:
+
+```
+..\Tools\pre-commit\pre-commit.cmd install
+```
+
+Run all hooks manually against every file:
+
+```
+..\Tools\pre-commit\pre-commit.cmd run --all-files
+```
+
+The installed hooks run `ruff`, `ruff-format`, `mypy (scripts/)`, `gitleaks`, `markdownlint-cli2`, `dotnet format`, and the generated-output guard.
+
+> **Note:** The `mypy` hook runs as a `system` hook and uses the Python interpreter from your active environment. Activate the `.venv` before committing, or the hook will fail to find `mypy` and the project's dependencies.
+
 Optionized workflow helper:
 
 ```powershell
