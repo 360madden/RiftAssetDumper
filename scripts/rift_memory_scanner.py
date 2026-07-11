@@ -23,6 +23,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# LocalPlayer struct offsets (stable for rift_x64.exe per binary-signature pipeline).
+# ImageBase 0x140000000 + RVA 0x32EBC80 -> LocalPlayer pointer.
+# Then [LocalPlayer + 0x320] is pos_x, +0x324 is pos_y, +0x328 is pos_z.
+LOCAL_PLAYER_OFFSET = 0x32EBC80
+PLAYER_FIELD_OFFSETS = {
+    "pos_x": 0x320,
+    "pos_y": 0x324,
+    "pos_z": 0x328,
+}
+
 # Windows API constants
 PROCESS_VM_READ = 0x0010
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -200,6 +210,39 @@ class RIFTMemoryScanner:
         if data and len(data) == 4:
             return struct.unpack("<f", data)[0]
         return None
+
+    def get_position(self) -> tuple[float, float, float]:
+        """Read the current player (pos_x, pos_y, pos_z) from live memory.
+
+        Combines the canonical LocalPlayer pointer dereference at module_base
+        + 0x32EBC80 with reading the three position floats at the documented
+        offsets (pos_x=+0x320, pos_y=+0x324, pos_z=+0x328). This is the
+        single source-of-truth helper for player position; other code (e.g.
+        scripts.navmesh_state.LiveMemoryPositionSource,
+        scripts.navmesh_calibration_capture._read_live_position) should
+        derive from this tuple rather than re-doing the pointer chase inline.
+
+        Returns:
+            Tuple of (pos_x, pos_y, pos_z) in live memory coordinates.
+
+        Raises:
+            RuntimeError: if module_base is unknown (find_module() not yet
+                called), the LocalPlayer pointer cannot be read, or any of
+                the position floats cannot be read.
+        """
+        if self.module_base is None:
+            raise RuntimeError("Module base unknown; call find_module() first")
+        addr = self.module_base + LOCAL_PLAYER_OFFSET
+        ptr = self.read_pointer(addr)
+        if ptr is None:
+            raise RuntimeError("Failed to read LocalPlayer pointer at +0x32EBC80")
+        pos: list[float] = []
+        for name, offset in PLAYER_FIELD_OFFSETS.items():
+            val = self.read_float(ptr + offset)
+            if val is None:
+                raise RuntimeError(f"Failed to read player {name} at +0x{offset:X}")
+            pos.append(val)
+        return (pos[0], pos[1], pos[2])
 
     def scan_pattern(self, pattern: bytes, start: int = None, size: int = None) -> list:
         """Scan memory for a byte pattern."""
