@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rift-assets.local/schemas/navmesh-index-v1.schema.json",
+  "title": "Navmesh Index v1",
+  "description": "Per-zone navmesh build index produced by NM-6 M6.1 (scripts/build_all_navmeshes.py). Covers M6.1 status/M6.2 adjacency/M6.3 cross-zone routing.",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "summary", "zones"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "navmesh-index-v1",
+      "description": "Discriminator pinning this index to the v1 schema."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO-8601 timestamp at which the index was written."
+    },
+    "summary": {
+      "type": "object",
+      "description": "Roll-up counts across the batch.",
+      "required": ["eligible_zones", "built_zones", "failed_zones", "skipped_zones", "walkable_labels"],
+      "additionalProperties": false,
+      "properties": {
+        "eligible_zones": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zone tuples passing the walkable-asset >=5 filter (pre-flight)."
+        },
+        "built_zones": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zones whose navmesh-build pipeline (extract+build+validate) completed successfully."
+        },
+        "failed_zones": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zones whose pipeline raised or whose validation report was invalid."
+        },
+        "skipped_zones": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zone tuples present in the index that did not meet eligibility (>=5 walkable assets)."
+        },
+        "walkable_labels": {
+          "type": "array",
+          "description": "Walkable label set used for the eligibility count (locked for forward compat).",
+          "items": {
+            "type": "string",
+            "enum": [
+              "walkable_structure",
+              "walkable_terrain",
+              "walkable_floor",
+              "walkable_platform",
+              "potentially_walkable"
+            ]
+          }
+        },
+        "min_walkable_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Eligibility threshold. Zones with fewer walkable assets are recorded as skipped."
+        }
+      }
+    },
+    "zones": {
+      "type": "object",
+      "description": "Keys are zone.tuple values from flythrough-index.json (e.g., 'ep1.world_objects.dungeons'). Order is alphabetical for stable diffs.",
+      "additionalProperties": { "$ref": "#/definitions/navmesh_zone_entry" }
+    }
+  },
+  "definitions": {
+    "bounds": {
+      "type": "object",
+      "description": "World-space AABB (Y-up, units=game-internal ~meters) of the extracted OBJ / final log.",
+      "required": ["bmin", "bmax"],
+      "additionalProperties": false,
+      "properties": {
+        "bmin": {
+          "type": "array",
+          "description": "Minimum corner [x, y, z].",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number" }
+        },
+        "bmax": {
+          "type": "array",
+          "description": "Maximum corner [x, y, z].",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number" }
+        }
+      }
+    },
+    "navmesh_stats": {
+      "type": "object",
+      "description": "M6.1 polys/verts from build_navmesh + validate summary.",
+      "required": ["poly_count", "walkable_polys"],
+      "additionalProperties": false,
+      "properties": {
+        "poly_count": { "type": "integer", "minimum": 0 },
+        "walkable_polys": { "type": "integer", "minimum": 0 },
+        "vert_count": { "type": "integer", "minimum": 0 },
+        "isolated_polys": { "type": "integer", "minimum": 0 },
+        "connected_components": { "type": "integer", "minimum": 0 },
+        "max_edge_length": { "type": "number", "minimum": 0 }
+      }
+    },
+    "navmesh_zone_entry": {
+      "type": "object",
+      "description": "Per-zone entry. status='built' cover all build fields (with nullable sub-blocks); status='failed' carries the failure context.",
+      "required": ["status", "slug", "walkable_asset_count", "total_asset_count"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["built", "failed", "skipped"],
+          "description": "Build outcome. 'skipped' = below eligibility threshold; 'failed' = pipeline raised OR validation invalid."
+        },
+        "slug": {
+          "type": "string",
+          "description": "Filesystem slug (used for directory naming). e.g., 'ep1-world_objects-dungeons'."
+        },
+        "skip_reason": {
+          "type": "string",
+          "enum": ["low_walkable_count", "no_walkable_assets", "not_in_flythrough_index"],
+          "description": "Why a zone is 'skipped'. Enum-locked so the on-disk shape is forward-compatible with M6.2 re-evaluation."
+        },
+        "walkable_asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of assets in this zone carrying one of summary.walkable_labels."
+        },
+        "total_asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total assets in this zone.tuple (irrespective of walkability)."
+        },
+        "navmesh_json_path": {
+          "type": "string",
+          "description": "Relative path (from REPO_ROOT) to the navmesh-build.json emitted by build_navmesh.py."
+        },
+        "validation_path": {
+          "type": "string",
+          "description": "Relative path to validate_navmesh.py output JSON."
+        },
+        "obj_path": {
+          "type": "string",
+          "description": "Relative path to the zone-filtered OBJ emitted by extract_zone_geometry.py."
+        },
+        "stats": { "$ref": "#/definitions/navmesh_stats" },
+        "bounds": { "$ref": "#/definitions/bounds" },
+        "connected_zones": {
+          "type": "array",
+          "description": "M6.2 hook. Adjacent zone.tuples reachable via boundary-poly overlap or known connection points. Empty in M6.1; each entry must match a sibling key under top-level `zones`.",
+          "default": [],
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+            "description": "A zone.tuple like 'ep2.world_objects.architecture' -- matches the flythrough-index zone.tuple shape."
+          }
+        },
+        "failure": {
+          "type": "object",
+          "description": "Required when status='failed'. Captures the stage (extract|build|validate|preflight) and message + last 30 lines of subprocess stdout/stderr to aid debugging.",
+          "required": ["stage", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "stage": {
+              "type": "string",
+              "enum": ["extract", "build", "validate", "preflight"]
+            },
+            "message": { "type": "string" },
+            "returncode": { "type": "integer" },
+            "stdout_tail": {
+              "type": "string",
+              "description": "Last 30 non-empty lines of the failing subprocess's stdout (NULL when unavailable)."
+            },
+            "stderr_tail": {
+              "type": "string",
+              "description": "Last 30 non-empty lines of the failing subprocess's stderr (NULL when unavailable)."
+            }
+          }
+        }
+      }
+    }
+  }
+}
