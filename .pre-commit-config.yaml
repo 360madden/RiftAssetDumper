@@ -17,17 +17,19 @@ repos:
   # Local system hook: pre-commit's isolated venv cannot see project
   # dependencies or the `scripts.*` package layout. Run the activated
   # venv's mypy so pyproject.toml config and pythonpath are respected.
-  # Only checks `scripts/` to match CI (`mypy scripts/ --no-error-summary`).
-  # `pass_filenames: true` limits checks to staged files for speed; full
-  # project coverage remains enforced in CI.
+  # Runs on the whole `scripts/` directory so the `[[tool.mypy.overrides]]`
+  # for `module = "scripts.*"` is honored — feeding individual file paths
+  # (pass_filenames: true) causes mypy to treat them as top-level modules
+  # and bypasses the per-package overrides, which is what broke the CI
+  # pre-commit job on its first run.
   - repo: local
     hooks:
       - id: mypy
         name: mypy (scripts/)
-        entry: python -m mypy --no-error-summary
+        entry: python -m mypy --no-error-summary scripts/
         language: system
         files: ^scripts/.*\.py$
-        pass_filenames: true
+        pass_filenames: false
 
   # ── Secrets & path leak scanning ────────────────────────────────
   - repo: local

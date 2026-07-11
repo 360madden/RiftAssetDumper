@@ -8,7 +8,7 @@ The team follows an **Aggressive Evidence Workflow** (see `docs/aggressive-disco
 
 **Consumer app**: `C:\RIFT MODDING\RiftFlythrough` (sibling project, v1.35.0, Phase 21/50 of its own roadmap) consumes this Assets repo's output (merged.obj + PNG textures). The **Flythrough Bridge Plan** (`docs/roadmap/flythrough-bridge-plan.md`, FT-1..FT-8) is **COMPLETE** — all 7 phases delivered, FT-8 skipped (mod-injection contradicts read-only mandate).
 
-**New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. Phase 0 (feasibility) in progress — walkability classification complete (239 assets, 161 potentially walkable), pure-Python feasibility analyzer built, awaiting flythrough pipeline rebuild for full geometry input.
+**New lane — Navmesh Navigation** (`docs/roadmap/navmesh-navigation-roadmap.md`): generative pathfinding from extracted NIF geometry using Recast/Detour. **Phase 0 ✅ COMPLETE** (feasibility confirmed, walkability classified, 161/239 assets walkable). **Phase 1 ✅ COMPLETE** — zone-filtered geometry extractor + recast4j navmesh build pipeline + validation suite shipped. Pilot zone (ep1.world_objects.dungeons) produced **9 walkable polygons** from 14 faced assets (661 vertices, 633 faces) with auto-calibrated Recast parameters. Scripts: `extract_zone_geometry.py`, `build_navmesh.py`, `validate_navmesh.py` + 50 tests. Handoff: `docs/handoffs/2026-07-10-navmesh-phase1-pipeline.md`.
 
 **New lane — Binary Signature Discovery** (`docs/roadmap/binary-signature-roadmap.md`): stable byte-signature extraction from `rift_x64.exe` for RiftReader pattern-scanning. **Phases 2 + 3 + 4 + 5 + 6 SHIPPED** (2026-07-07). Phase 5 emits the unified `rift-x64-signature-database.json` merging Phase 2 anchors + Phase 3 struct layouts (LocalPlayer, 8 fields including `unknown_float_31c`); schema extensions additive (structField ModRMHitCount/Notes; anchor.StructLayout BaseRegisters/TotalModRMHits; Provenance CrossCheckerVersion/Phase2/Phase3 paths; enum-locked GhidraFindings to 4 documented keys; Summary AttachedStructCount). Phase 6 ships pipeline orchestrator (`extract_binary_signatures.py`) + 17-category diff tool (`compare_signature_databases.py`) with `field-name-changed`, `modrm-shake`, `binary-version-changed` etc. Phase 2 baseline: 9 anchors (all 9 unique; #7+#8 recovered via binary byte-dump analysis, Session 5). Phase 3 correction: Ghidra decompilation proved both `0x1408b39d0` and `0x140da8870` are UI handlers (AATree dialog + PetBar), NOT coordinate readers. Pipeline scripts: `signature_match.py`, `synthesize_signature_catalog.py`, `cross_validate_signatures.py`, `synthesize_struct_layout.py`, `synthesize_unified_signature_db.py`, `extract_binary_signatures.py`, `compare_signature_databases.py`. Handoffs: `docs/handoffs/2026-07-07-binary-phase2-exit.md`, `docs/handoffs/2026-07-07-binary-phase3-struct-layout.md`, `docs/handoffs/2026-07-07-binary-phase5-6-exit.md`. **Open follow-ups**: M6.3 entry-point wiring in `rift_workflow.py::COMMAND_MAP`; M3.2 secondary structs (Camera, ZoneInfo, EntityList).
 
@@ -196,16 +196,16 @@ Supports `--quick` (reuse inventory) and `--skip-build`. Single command runs all
 
 | Phase | Topic | Status |
 |-------|-------|:---:|
-| NM-0 | Recast feasibility, geometry audit, walkability classification | ⬜ IN PROGRESS (M0.1–M0.2 done; NM=NavMesh prefix) |
-| NM-1 | Single-zone navmesh pipeline (Recast build) | ⬜ |
-| NM-2 | Coordinate system alignment (OBJ↔memory) | ⬜ |
-| NM-3 | Pathfinding integration (Detour A*) | ⬜ |
+| NM-0 | Recast feasibility, geometry audit, walkability classification | ✅ DONE |
+| NM-1 | Single-zone navmesh pipeline (Recast build) | ✅ DONE (9 polys, ep1 dungeons pilot) |
+| NM-2 | Coordinate system alignment (OBJ↔memory) | ✅ DONE |
+| NM-3 | Pathfinding integration (Detour A*) | ✅ DONE |
 | NM-4 | Runtime bridge (live position → navmesh) | ⬜ |
-| NM-5 | Visualization (RiftFlythrough overlay) | ⬜ |
+| NM-5 | Visualization (RiftFlythrough overlay) | ✅ DONE |
 | NM-6 | Scale-out & multi-zone navigation | ⬜ |
 | NM-7 | Navigation agent (optional, safety-gated) | ⬜ |
 
-**Phase 0 progress**: Walkability classification complete — 239 assets classified, 161 potentially walkable (43 walkable_structure + 118 potentially_walkable). Pure-Python feasibility analyzer confirms geometry can support navmesh on single-OBJ smoke test. Blocked on flythrough pipeline rebuild for full 217-asset geometry input.
+**Phase 0 progress**: Walkability classification complete — 239 assets classified, 161 potentially walkable (43 walkable_structure + 118 potentially_walkable). Pure-Python feasibility analyzer confirms geometry can support navmesh on single-OBJ smoke test. **Phase 1 complete**: Zone-filtered geometry extractor + recast4j navmesh build pipeline + validation suite shipped. Pilot zone (ep1.world_objects.dungeons) produced 9 walkable polygons from 14 faced assets with auto-calibrated Recast parameters.
 
 **Key scripts**: `scripts/navmesh_phase0_feasibility.py`, `scripts/classify_walkability.py`
 

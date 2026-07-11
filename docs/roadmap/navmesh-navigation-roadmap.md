@@ -617,12 +617,12 @@ end-state: an agent that can actually walk from A to B.
 
 | Phase | Topic | Key Artifact | Status |
 |-------|-------|-------------|:------:|
-| 0 | Recast feasibility & geometry audit | Go/No-Go decision | ⬜ |
-| 1 | Single-zone navmesh pipeline | `zone-<name>.nav`, build scripts | ⬜ |
-| 2 | Coordinate system alignment | `coord-transform.json` | ⬜ |
-| 3 | Pathfinding integration (Detour) | `navmesh_pathfind.py` | ⬜ |
+| 0 | Recast feasibility & geometry audit | Go/No-Go decision | ✅ |
+| 1 | Single-zone navmesh pipeline | `zone-<name>.nav`, build scripts | ✅ |
+| 2 | Coordinate system alignment | `coord-transform.json` | ✅ |
+| 3 | Pathfinding integration (Detour) | `navmesh_pathfind.py` | ✅ |
 | 4 | Runtime bridge (live position) | `navmesh_state.py` | ⬜ |
-| 5 | Visualization (RiftFlythrough) | Navmesh overlay + path rendering | ⬜ |
+| 5 | Visualization (RiftFlythrough) | Navmesh overlay + path rendering | ✅ |
 | 6 | Scale-out & multi-zone | `navmesh-index.json`, cross-zone paths | ⬜ |
 | 7 | Navigation agent (optional) | Bot movement controller | ⬜ |
 

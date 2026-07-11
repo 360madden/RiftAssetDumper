@@ -3,7 +3,7 @@
 [![CI](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml/badge.svg)](https://github.com/360madden/RiftAssetDumper/actions)
 
 Read-only RIFT asset archive research workspace.
-> ⛒ **Contribution path:** Open a PR, wait for all 5 CI jobs (`Docs Lint`, `.NET Build & Test`, `Python Lint & Test`, `Orphan Guard Regression`, `Summary`) to go green, then `gh pr merge --squash --delete-branch`. Direct-push to `main` is a documented fallback.
+> ⛒ **Contribution path:** Open a PR, wait for the **6 CI checks** (5 leaf jobs — `Docs Lint`, `.NET Build & Test`, `Python Lint & Test`, `Orphan Guard Regression`, `Pre-commit Checks` — plus the `Summary` aggregator) to go green, then `gh pr merge --squash --delete-branch`. Direct-push to `main` is a documented fallback.
 
 ## Operating mode 🚀
 

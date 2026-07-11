@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: rift-asset-dumper
+Version: 0.0.0
+Requires-Python: >=3.14
+Requires-Dist: pefile>=2024.8.26
