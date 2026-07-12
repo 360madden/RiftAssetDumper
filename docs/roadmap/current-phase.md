@@ -1,20 +1,27 @@
 # Current Active Phase & Milestone
 
-**Last Updated**: 2026-07-09 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
+**Last Updated**: 2026-07-12 — all non-safety-gated roadmaps are complete at
+their current autonomous scope.
 
-> **1. `docs/roadmap/semantic-discovery-roadmap.md`** — Semantic Asset Discovery for Live-Memory Validation
+> **Latest completion: `docs/roadmap/navmesh-navigation-roadmap.md` — Phase 6,
+> Scale-Out & Multi-Zone Navigation**
 >
-> Mines the live archive for ground-truth semantic data (zone names, waypoints, actor references, UI strings, audio catalogs) following the 5 priority lanes in `docs/asset-guided-runtime-reacquisition-strategy.md`. Output is compact JSON vocabulary artifacts in `Exports/semantic-phaseN/`.
+> M6.1-M6.4 are implemented. The authoritative full-scope index records four
+> eligible cohorts and all four now build. M6.2 uses actual navmesh-vertex
+> proximity and produces a 4-node/2-edge graph. M6.3 projects transitions onto
+> both adjacent Detour meshes and concatenates per-zone segments. M6.4 validates
+> three reachable pairs below 1 ms and explicitly reports three disconnected
+> pairs involving the isolated nature cohort.
 >
-> **Current phase**: ✅ **COMPLETE** — All 6 phases delivered (zone, POI, actor, UI, audio vocabularies + unified index)
->
-> **2. `docs/roadmap/binary-signature-roadmap.md`** — Binary Signature Discovery for Stable Offset Anchors
->
-> Uses Ghidra static analysis on `rift_x64.exe` to extract stable byte signatures and struct layout maps so RiftReader can pattern-scan for memory anchors instead of hardcoding offsets that break on game patches. Output is `rift-x64-signature-database.json` in `Exports/binary-phaseN/`.
->
-> **Current phase**: ✅ **COMPLETE** — All 8 phases delivered (signatures, layouts, stability, Lua API tracing, unit registry, integration contract, final database)
->
-> These roadmaps are **independent** — work on one does not block the other. They use different tooling (C# semantic indexer vs. Ghidra headless), different inputs (TWAD archive entries vs. rift_x64.exe), and produce different outputs (vocabulary artifacts vs. byte signature database).
+> **Next boundary**: NM-7 is optional and safety-gated. Do not implement
+> movement injection without an explicit safety review.
+
+| Roadmap | Current status |
+|---|---|
+| `project-roadmap.md` | ✅ Complete at autonomous scope |
+| `semantic-discovery-roadmap.md` | ✅ All 6 phases delivered |
+| `binary-signature-roadmap.md` | ✅ All 8 phases delivered; secondary-struct field maps remain an optional follow-up |
+| `navmesh-navigation-roadmap.md` | ✅ Phases 0-6 complete; NM-7 optional and safety-gated |
 
 ---
 

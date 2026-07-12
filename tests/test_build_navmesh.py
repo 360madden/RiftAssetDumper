@@ -152,6 +152,13 @@ class TestComputeWalkableRatio:
 class TestAdaptiveParams:
     """Test adaptive parameter calibration based on walkable face ratio."""
 
+    def test_normalized_small_geometry_avoids_total_erosion(self) -> None:
+        verts = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (2.0, 0.0, 2.0), (0.0, 0.0, 2.0)]
+        result = _adaptive_params(verts, [[0, 1, 2], [0, 2, 3]])
+        assert result["walkable_profile"] == "normalized_small"
+        assert result["agent_radius"] == 0.05
+        assert result["region_min_size"] == 1
+
     def test_high_walkable_ratio_standard_params(self) -> None:
         """High walkable ratio (>=30%) → standard params, no reduction."""
         # Flat plane: 100% walkable

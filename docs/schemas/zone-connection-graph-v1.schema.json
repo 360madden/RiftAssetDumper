@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rift-assets.local/schemas/zone-connection-graph-v1.schema.json",
+  "title": "Zone Connection Graph v1",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "source_index_generated_at", "parameters", "nodes", "edges", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "zone-connection-graph-v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "source_index_generated_at": { "type": "string" },
+    "parameters": {
+      "type": "object",
+      "required": ["max_horizontal_gap", "max_vertical_gap"],
+      "additionalProperties": false,
+      "properties": {
+        "max_horizontal_gap": { "type": "number", "minimum": 0 },
+        "max_vertical_gap": { "type": "number", "minimum": 0 }
+      }
+    },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["bounds", "connected_zones"],
+        "additionalProperties": false,
+        "properties": {
+          "bounds": { "$ref": "#/definitions/bounds" },
+          "connected_zones": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["a", "b", "distance", "connection_point", "method"],
+        "additionalProperties": false,
+        "properties": {
+          "a": { "type": "string" },
+          "b": { "type": "string" },
+          "distance": { "type": "number", "minimum": 0 },
+          "connection_point": { "$ref": "#/definitions/point" },
+          "method": { "type": "string", "enum": ["bounds-proximity", "navmesh-vertex-proximity"] }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["node_count", "edge_count"],
+      "additionalProperties": false,
+      "properties": {
+        "node_count": { "type": "integer", "minimum": 0 },
+        "edge_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "definitions": {
+    "point": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } },
+    "bounds": {
+      "type": "object",
+      "required": ["bmin", "bmax"],
+      "additionalProperties": false,
+      "properties": { "bmin": { "$ref": "#/definitions/point" }, "bmax": { "$ref": "#/definitions/point" } }
+    }
+  }
+}

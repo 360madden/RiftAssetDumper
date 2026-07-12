@@ -490,7 +490,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Phase 3 Detour A* pathfinding on a navmesh",
     )
-    parser.add_argument("--obj", required=True, help="Path to OBJ file (zone-filtered)")
+    parser.add_argument("--obj", help="Path to OBJ file (zone-filtered); required unless --cross-zone")
     parser.add_argument("--from", dest="start", required=True, help="Start position: x,y,z")
     parser.add_argument("--to", dest="goal", required=True, help="Goal position: x,y,z")
     parser.add_argument(
@@ -519,6 +519,12 @@ def main() -> None:
         help="When used with --debug-obj, also include the navmesh in the debug OBJ",
     )
     parser.add_argument("--debug-edges", action="store_true", help="Include navmesh boundary edges in the debug OBJ")
+    parser.add_argument("--cross-zone", action="store_true", help="Use the NM-6 M6.2 graph for cross-zone A* routing")
+    parser.add_argument("--graph", default="Exports/navmesh-phase6/zone-connection-graph.json")
+    parser.add_argument("--from-zone")
+    parser.add_argument("--to-zone")
+    parser.add_argument("--index", default="Exports/navmesh-phase6/navmesh-index.json")
+    parser.add_argument("--detour-segments", action="store_true")
     args = parser.parse_args()
 
     # Parse coordinates
@@ -529,6 +535,28 @@ def main() -> None:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if args.cross_zone:
+        if not args.from_zone or not args.to_zone:
+            print("ERROR: --cross-zone requires --from-zone and --to-zone", file=sys.stderr)
+            sys.exit(1)
+        from scripts.cross_zone_pathfind import add_detour_segments, build_cross_zone_route
+
+        graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
+        result = build_cross_zone_route(graph, args.from_zone, args.to_zone, list(start), list(goal))
+        if args.detour_segments:
+            index = json.loads(Path(args.index).read_text(encoding="utf-8"))
+            result = add_detour_segments(result, index)
+        text = json.dumps(result, indent=2)
+        if args.out:
+            out_path = Path(args.out)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(text + "\n", encoding="utf-8")
+        print(text)
+        sys.exit(0 if result.get("success") else 1)
+
+    if not args.obj:
+        print("ERROR: --obj is required unless --cross-zone is used", file=sys.stderr)
+        sys.exit(1)
     obj_path = Path(args.obj)
     if not obj_path.exists():
         print(f"ERROR: OBJ not found: {obj_path}", file=sys.stderr)

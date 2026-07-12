@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rift-assets.local/schemas/navmesh-cross-zone-route-v1.schema.json",
+  "title": "Navmesh Cross-Zone Route v1",
+  "type": "object",
+  "required": ["schema_version", "success"],
+  "properties": {
+    "schema_version": { "const": "navmesh-cross-zone-route-v1" },
+    "success": { "type": "boolean" },
+    "error": { "type": "string" },
+    "start_zone": { "type": "string" },
+    "goal_zone": { "type": "string" },
+    "zones": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "transitions": { "type": "array", "items": { "$ref": "#/definitions/transition" } },
+    "waypoints": { "type": "array", "minItems": 2, "items": { "$ref": "#/definitions/point" } },
+    "total_length": { "type": "number", "minimum": 0 },
+    "detour_segments": { "type": "array", "items": { "type": "object" } },
+    "detour_success": { "type": "boolean" },
+    "transition_validation": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "point": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } },
+    "transition": {
+      "type": "object",
+      "required": ["from_zone", "to_zone", "connection_point"],
+      "additionalProperties": false,
+      "properties": {
+        "from_zone": { "type": "string" },
+        "to_zone": { "type": "string" },
+        "connection_point": { "$ref": "#/definitions/point" }
+      }
+    }
+  }
+}

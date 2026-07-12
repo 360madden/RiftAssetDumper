@@ -68,6 +68,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+      - name: Pytest regression suite
+        run: python -m pytest tests/ -q
+
   lint-docs:
     name: Docs Lint
     runs-on: ubuntu-latest
