@@ -27,7 +27,7 @@ uses a 0.05 radius and now produces 9 validated polygons.
 - `docs/schemas/zone-connection-graph-v1.schema.json`
 - `docs/schemas/navmesh-cross-zone-route-v1.schema.json`
 - `scripts/export_navigation_debug_obj.py`
-- `.github/workflows/ci.yml` (full `pytest tests/` gate)
+- `.github/workflows/ci.yml` (broad fresh-checkout pytest gate; generated/live-local modules explicitly excluded)
 
 Generated evidence remains gitignored under `Exports/navmesh-phase6/`.
 
