@@ -51,6 +51,8 @@ python_version = "3.14"
 exclude = [
     "scripts/Invoke-RiftAssetWorkflow.ps1",
     "scripts/Invoke-RiftWorkflow.ps1",
+    "scripts/build_world_placed_merge.py",
+    "scripts/build_flythrough_obj_texture_manifest.py",
 ]
 ignore_missing_imports = true
 warn_unused_ignores = true
