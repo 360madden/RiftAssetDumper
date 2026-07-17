@@ -13,16 +13,16 @@ their current autonomous scope.
 > three reachable pairs below 1 ms and explicitly reports three disconnected
 > pairs involving the isolated nature cohort.
 >
-> **Next boundary**: NM-7 skipped (movement injection contradicts read-only
-> mandate — matches FT-8 precedent). The navmesh roadmap is complete at
-> Phase 6.
+> **Next boundary**: NM-7 delivered as observer-only agent
+> (``scripts/navmesh_observer.py``) — read-only path watcher, no movement
+> injection. The navmesh roadmap is complete.
 
 | Roadmap | Current status |
 |---|---|
 | `project-roadmap.md` | ✅ Complete at autonomous scope |
 | `semantic-discovery-roadmap.md` | ✅ All 6 phases delivered |
 | `binary-signature-roadmap.md` | ✅ All 8 phases delivered; secondary-struct field maps remain an optional follow-up |
-| `navmesh-navigation-roadmap.md` | ✅ COMPLETE — Phases 0-6 done, NM-7 skipped |
+| `navmesh-navigation-roadmap.md` | ✅ COMPLETE — Phases 0-7 done (NM-7 observer-only) |
 
 ---
 

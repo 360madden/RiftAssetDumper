@@ -2,7 +2,7 @@
 
 **Created**: 2026-06-30
 **Repo**: `RiftAssetDumper` (Assets repo only — no cross-repo edits)
-**Status**: ✅ **COMPLETE** — Phases 0-6 done, NM-7 skipped (see rationale below)
+**Status**: Phases 0-6 complete; Phase 7 delivered as observer-only agent
 **Parallel to**: `docs/roadmap/semantic-discovery-roadmap.md` and `docs/roadmap/binary-signature-roadmap.md` (independent lane, but consumes artifacts from both)
 
 ---
@@ -573,35 +573,66 @@ navmesh, and implement cross-zone pathfinding.
 
 ---
 
-## Phase 7: Navigation Agent (Optional — Bot Movement Controller)
+## Phase 7: Observer-Only Agent (Read-Only Path Watcher)
 
-> **⏭️ SKIPPED** — see rationale below.
+> **✅ DELIVERED** — `scripts/navmesh_observer.py`
 
-### NM-7 skip rationale
+### Design
 
-The NM-7 bot movement controller involves issuing movement commands to the
-live game process via either:
+NM-7 was originally scoped as a bot movement controller (path following +
+input injection + state machine).  That design conflicts with the read-only
+mandate.  Instead, NM-7 delivers an **observer-only** agent: a CLI tool that
+watches the player's live position, computes a path to a goal via the
+navmesh, and reports waypoints and progress — but never writes to the game.
 
-- **Memory writes** to player position or movement state, or
-- **Input simulation** (keyboard/mouse injection)
+### What it does
 
-Both strategies **directly violate** the project's core read-only mandate
-(`docs/live-memory-readonly-safety-boundary.md`), which hard-prohibits:
-write process memory, inject DLLs, send input to the game, patch code,
-install hooks, or suspend/resume game threads.
+| Feature | How |
+|---|---|
+| Live position tracking | ``RIFTMemoryScanner.get_position()`` (read-only) |
+| Path computation | Detour A* via ``navmesh_pathfind.find_path()`` |
+| Waypoint reporting | Prints OBJ + memory-coordinate waypoints |
+| Progress monitoring | Tracks waypoint arrival, remaining distance |
+| Off-path detection | Per-segment perpendicular distance check |
+| Auto-replan | Recomputes path when deviation persists |
+| Continuous watch | ``--watch`` mode polls at configurable interval |
 
-This is the same pattern as FT-8 (mod-replacement bridge), which was also
-skipped because archive re-packing contradicts the read-only mandate. The
-navmesh pipeline already delivers everything a read-only consumer needs:
-build, pathfind, cross-zone route, live position projection, and
-visualization. A bot controller crosses the read-only line.
+### Safety
 
-**Decision**: Skip NM-7. The original milestone design (M7.1 path-following
-controller, M7.2 movement command emission, M7.3 navigation state machine)
-is preserved in git history and can be resurrected if the safety boundary is
-ever relaxed, but no implementation should proceed without an explicit
-safety review that amends the
-`live-memory-readonly-safety-boundary.md`.
+The observer stays within ``docs/live-memory-readonly-safety-boundary.md``:
+
+- ✅ Reads player position (proven safe via ``RIFTMemoryScanner``)
+- ✅ Uses existing navmesh pathfinding (no new C# code)
+- ✅ Outputs to stdout / JSON only
+- ❌ No memory writes
+- ❌ No input injection
+- ❌ No DLL injection
+- ❌ No thread suspension
+
+### CLI
+
+```bash
+# One-shot: compute path, print waypoints, exit
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --once
+
+# Watch mode: continuous progress reporting
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --watch
+
+# With dry-run for testing (no live game needed)
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --once --dry-run
+```
+
+### Entry point
+
+``scripts/navmesh_observer.py`` — standalone script, not registered in
+``rift_workflow.py`` or ``rift_read_only.py`` (run directly).
+
+### Original design (preserved for reference)
+
+The original M7.1-M7.3 movement-injection design (path-following controller,
+keyboard/mouse simulation, navigation state machine) is preserved in git
+history.  It can be resurrected if the safety boundary is ever amended, but
+requires an explicit safety review.
 
 ---
 
@@ -616,7 +647,7 @@ safety review that amends the
 | 4 | Runtime bridge (live position) | `navmesh_state.py` | ✅ |
 | 5 | Visualization (RiftFlythrough) | Navmesh overlay + path rendering | ✅ |
 | 6 | Scale-out & multi-zone | `navmesh-index.json`, cross-zone paths | ✅ |
-| 7 | Navigation agent (optional) | Bot movement controller | ⏭️ SKIPPED |
+| 7 | Observer-only agent | ``navmesh_observer.py`` — path watcher | ✅ |
 
 ---
 
