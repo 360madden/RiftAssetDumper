@@ -246,16 +246,19 @@ class TestMissingPhase3:
         jsonschema = pytest.importorskip("jsonschema")
         jsonschema.validate(db, schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER)
 
-    def test_missing_phase3_keeps_phase2_struct_layout(self, tmp_path: Path, phase2_catalog: dict) -> None:
+    def test_missing_phase3_keeps_phase2_state(self, tmp_path: Path, phase2_catalog: dict) -> None:
         p2, _ = _write_catalog(tmp_path, phase2_catalog, phase3=None)
         db = synth.synthesize_database(
             phase2_catalog_path=p2,
             phase3_catalog_path=tmp_path / "missing.json",
         )
         vtable = next(a for a in db["Anchors"] if a["Name"] == "vtable-dispatch")
-        # Without Phase 3, we preserve whatever the Phase 2 embed happened to carry.
-        assert vtable.get("StructLayout") is not None
-        assert len(vtable["StructLayout"]["Fields"]) >= 1
+        # Without Phase 3, anchors are preserved exactly as Phase 2 carries them.
+        # The current Phase 2 catalog does not embed a StructLayout; the synth
+        # must not fabricate one.
+        assert "StructLayout" not in vtable
+        assert "SignatureHex" in vtable
+        assert "UniquenessVerified" in vtable
 
 
 # ---------------------------------------------------------------------------

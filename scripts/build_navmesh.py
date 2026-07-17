@@ -219,7 +219,20 @@ def _adaptive_params(
     cell_size = base_cell_size
     profile = "high_walkable"
 
-    if ratio < 0.10 or (aggressive and ratio < 0.30):
+    # Some extracted cohorts are normalized to an approximately 2x2x2 local
+    # cube. A world-scale agent radius (0.54) erodes every span even when the
+    # slope analysis reports substantial walkable area. Use the proven
+    # small-geometry profile before ratio-based selection.
+    extents = [max(axis) - min(axis) for axis in zip(*vertices, strict=True)] if vertices else []
+    normalized_small = bool(extents) and max(extents) <= 3.0
+
+    if normalized_small:
+        agent_radius = 0.05
+        agent_max_slope = 60.0
+        region_min_size = 1
+        cell_size = 0.05
+        profile = "normalized_small"
+    elif ratio < 0.10 or (aggressive and ratio < 0.30):
         # Very low walkable ratio (or aggressive mode on mid ratio):
         # geometry is mostly walls/steep surfaces.
         # Use minimal erosion, wider slope, tiny regions, and finest cell resolution.

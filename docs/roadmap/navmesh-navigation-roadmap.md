@@ -2,7 +2,7 @@
 
 **Created**: 2026-06-30
 **Repo**: `RiftAssetDumper` (Assets repo only — no cross-repo edits)
-**Status**: Proposed roadmap; not yet started
+**Status**: Phases 0-6 complete; Phase 7 delivered as observer-only agent
 **Parallel to**: `docs/roadmap/semantic-discovery-roadmap.md` and `docs/roadmap/binary-signature-roadmap.md` (independent lane, but consumes artifacts from both)
 
 ---
@@ -36,8 +36,8 @@ geometry we already extract.
 | `world.json` per asset | ✅ 217/217 with Scale→Rotate→Translate transforms | Correct spatial placement |
 | Zone attribution | ✅ 217 assets with zone confidence (179 high / 27 medium / 23 low) | Per-zone navmesh partitioning |
 | Live player position | ✅ `rift_x64.exe + 0x32EBC80` → pos_x (+0x320), pos_z (+0x328) | Runtime start/goal positions for pathfinding |
-| Binary signature catalog | ⚠️ Phase 2 in-progress (1,337 code sites mapped, 8 unique signatures) | Survivable player position reads across patches |
-| Semantic zone vocabulary | ⚠️ Phase 0 not yet externally validated | Zone names/labels for navmesh partitioning |
+| Binary signature catalog | ✅ All 8 phases delivered; final database and consumer contract shipped | Survivable player position reads across patches |
+| Semantic zone vocabulary | ✅ All 6 phases delivered; unified semantic index available | Zone names/labels for navmesh partitioning |
 | `hint:actor-object` classification | ✅ 212 assets classified | Distinguishing structures from creatures |
 | MeshSize families | ✅ 30 families, 100% coverage | Grouping assets by structural complexity |
 
@@ -520,7 +520,7 @@ navmesh, and implement cross-zone pathfinding.
 
 **Key Milestones**:
 
-1. **M6.1**: Batch navmesh generation
+1. **M6.1**: Batch navmesh generation — **COMPLETE**
    - Script: `scripts/build_all_navmeshes.py`
    - For each zone with ≥5 walkable assets:
      - Extract zone geometry (Phase 1)
@@ -529,20 +529,28 @@ navmesh, and implement cross-zone pathfinding.
      - Export
    - Skip zones with insufficient walkable geometry
    - Output summary: `Exports/navmesh-phase6/navmesh-index.json`
+   - Post-ship correction (2026-07-12): the canonical index was written by a
+     restricted single-zone smoke run. Current inputs have four zones meeting
+     the default threshold, but the stored index contains only
+     `ep1.world_objects.dungeons` from that selected cohort.
+   - Resolved: selected runs default to a separate index; scope and SHA-256
+     provenance are recorded; full pytest runs in CI; 29/29 M6.1 tests pass.
+   - Full batch: 4 eligible, 4 built, 0 failed, 10 skipped. A normalized-small
+     adaptive profile prevents world-scale agent erosion on housing geometry.
 
-2. **M6.2**: Zone connection graph
+2. **M6.2**: Zone connection graph — **COMPLETE**
    - Identify off-mesh connections between zones:
      - Boundary polys that are close to polys in adjacent zones
      - Known connection points (bridges, portals, zone lines)
    - Build a zone-level graph: nodes=zones, edges=connections
    - Output: `Exports/navmesh-phase6/zone-connection-graph.json`
 
-3. **M6.3**: Cross-zone pathfinding
+3. **M6.3**: Cross-zone pathfinding — **COMPLETE**
    - Extend `navmesh_pathfind.py` with `--cross-zone` flag
    - Algorithm: A* at zone level → per-zone navmesh paths → concatenate
    - Handle: zone-unloading, disconnected zones, long-distance fallback
 
-4. **M6.4**: Multi-zone validation
+4. **M6.4**: Multi-zone validation — **COMPLETE**
    - Test paths crossing 2, 3, 5+ zones
    - Verify: path continuity at zone boundaries (no gaps)
    - Verify: total path length is reasonable (not circuitous)
@@ -565,51 +573,66 @@ navmesh, and implement cross-zone pathfinding.
 
 ---
 
-## Phase 7: Navigation Agent (Optional — Bot Movement Controller)
+## Phase 7: Observer-Only Agent (Read-Only Path Watcher)
 
-**Objective**: Build a simple navigation agent that follows a computed path
-by issuing movement commands. This is the "working navmesh **navigation**"
-end-state: an agent that can actually walk from A to B.
+> **✅ DELIVERED** — `scripts/navmesh_observer.py`
 
-**Entry Criteria**:
+### Design
 
-- Phase 4 exit: runtime bridge functional
-- Phase 6 exit: multi-zone navmesh and cross-zone pathfinding
-- RiftReader can write to process memory (movement injection) OR an external
-  input simulation mechanism exists
+NM-7 was originally scoped as a bot movement controller (path following +
+input injection + state machine).  That design conflicts with the read-only
+mandate.  Instead, NM-7 delivers an **observer-only** agent: a CLI tool that
+watches the player's live position, computes a path to a goal via the
+navmesh, and reports waypoints and progress — but never writes to the game.
 
-**Key Milestones**:
+### What it does
 
-1. **M7.1**: Path following controller
-   - Given a path (list of waypoints), steer toward the next waypoint
-   - Steering behaviors: seek next waypoint, arrive at final waypoint, avoid
-     obstacles
+| Feature | How |
+|---|---|
+| Live position tracking | ``RIFTMemoryScanner.get_position()`` (read-only) |
+| Path computation | Detour A* via ``navmesh_pathfind.find_path()`` |
+| Waypoint reporting | Prints OBJ + memory-coordinate waypoints |
+| Progress monitoring | Tracks waypoint arrival, remaining distance |
+| Off-path detection | Per-segment perpendicular distance check |
+| Auto-replan | Recomputes path when deviation persists |
+| Continuous watch | ``--watch`` mode polls at configurable interval |
 
-   - Re-project onto navmesh each frame to detect deviation
-   - Replan if deviation exceeds threshold
+### Safety
 
-2. **M7.2**: Movement command emission
-   - Map desired velocity → game input commands (keyboard/mouse simulation,
-     or memory writes to movement state)
+The observer stays within ``docs/live-memory-readonly-safety-boundary.md``:
 
-   - **Safety gate**: movement injection is a high-risk operation — this
-     milestone is gated on explicit safety review
+- ✅ Reads player position (proven safe via ``RIFTMemoryScanner``)
+- ✅ Uses existing navmesh pathfinding (no new C# code)
+- ✅ Outputs to stdout / JSON only
+- ❌ No memory writes
+- ❌ No input injection
+- ❌ No DLL injection
+- ❌ No thread suspension
 
-   - Do NOT implement memory-write movement injection without documented
-     safety boundaries
+### CLI
 
-3. **M7.3**: Navigation state machine
-   - States: idle, moving, replanning, stuck, arrived
-   - Stuck detection: position hasn't changed in N seconds despite movement
-     commands
+```bash
+# One-shot: compute path, print waypoints, exit
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --once
 
-   - Recovery: replan path, or mark current poly as temporarily blocked
+# Watch mode: continuous progress reporting
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --watch
 
-**Exit Criteria** (gated on safety review):
+# With dry-run for testing (no live game needed)
+python scripts/navmesh_observer.py --zone-obj <zone-walkable.obj> --goal 1234,56,789 --once --dry-run
+```
 
-- Agent follows a path from A to B without manual intervention
-- Stuck detection and recovery functional
-- Safety boundaries documented
+### Entry point
+
+``scripts/navmesh_observer.py`` — standalone script, not registered in
+``rift_workflow.py`` or ``rift_read_only.py`` (run directly).
+
+### Original design (preserved for reference)
+
+The original M7.1-M7.3 movement-injection design (path-following controller,
+keyboard/mouse simulation, navigation state machine) is preserved in git
+history.  It can be resurrected if the safety boundary is ever amended, but
+requires an explicit safety review.
 
 ---
 
@@ -623,8 +646,8 @@ end-state: an agent that can actually walk from A to B.
 | 3 | Pathfinding integration (Detour) | `navmesh_pathfind.py` | ✅ |
 | 4 | Runtime bridge (live position) | `navmesh_state.py` | ✅ |
 | 5 | Visualization (RiftFlythrough) | Navmesh overlay + path rendering | ✅ |
-| 6 | Scale-out & multi-zone | `navmesh-index.json`, cross-zone paths | ⬜ |
-| 7 | Navigation agent (optional) | Bot movement controller | ⬜ |
+| 6 | Scale-out & multi-zone | `navmesh-index.json`, cross-zone paths | ✅ |
+| 7 | Observer-only agent | ``navmesh_observer.py`` — path watcher | ✅ |
 
 ---
 
@@ -687,8 +710,8 @@ Semantic-Discovery Roadmap          Binary-Signature Roadmap
 
 ## Anti-Drift Rules (All Phases)
 
-1. **This repo only.** No cross-repo edits. Navmesh output goes to
-   `Exports/navmesh/` (gitignored).
+1. **This repo only.** No cross-repo edits. Navmesh output goes to the
+   phase-specific `Exports/navmesh-phase*/` roots (gitignored).
 2. **Recast/Detour is the engine.** No custom mesh or pathfinding algorithms.
    Use the standard library.
 3. **Navmesh data is generative.** It is built from geometry, not decoded

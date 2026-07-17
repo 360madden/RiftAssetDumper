@@ -17,6 +17,26 @@
       "format": "date-time",
       "description": "UTC ISO-8601 timestamp at which the index was written."
     },
+    "run": {
+      "type": "object",
+      "required": ["scope", "requested_zones", "preflight_eligible_zones", "selected_eligible_zones"],
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "type": "string", "enum": ["full", "selected"] },
+        "requested_zones": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "preflight_eligible_zones": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "selected_eligible_zones": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "required": ["flythrough_index", "walkability"],
+      "additionalProperties": false,
+      "properties": {
+        "flythrough_index": { "$ref": "#/definitions/source_provenance" },
+        "walkability": { "$ref": "#/definitions/source_provenance" }
+      }
+    },
     "summary": {
       "type": "object",
       "description": "Roll-up counts across the batch.",
@@ -27,6 +47,11 @@
           "type": "integer",
           "minimum": 0,
           "description": "Zone tuples passing the walkable-asset >=5 filter (pre-flight)."
+        },
+        "preflight_eligible_zones": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "All zones passing the threshold before an optional --zones selection."
         },
         "built_zones": {
           "type": "integer",
@@ -72,6 +97,17 @@
     }
   },
   "definitions": {
+    "source_provenance": {
+      "type": "object",
+      "required": ["path", "sha256", "size_bytes"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "modified_at": { "type": "string", "format": "date-time" }
+      }
+    },
     "bounds": {
       "type": "object",
       "description": "World-space AABB (Y-up, units=game-internal ~meters) of the extracted OBJ / final log.",
@@ -141,6 +177,10 @@
         "navmesh_json_path": {
           "type": "string",
           "description": "Relative path (from REPO_ROOT) to the navmesh-build.json emitted by build_navmesh.py."
+        },
+        "debug_navmesh_path": {
+          "type": "string",
+          "description": "Relative path to the generated navmesh debug OBJ used for M6.2 transition discovery."
         },
         "validation_path": {
           "type": "string",

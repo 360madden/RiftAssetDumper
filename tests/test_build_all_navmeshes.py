@@ -206,32 +206,26 @@ def test_load_walkability_empty_on_missing_file(tmp_path: Path, monkeypatch: pyt
     assert bam.load_walkability(tmp_path / "nope.json") == {}
 
 
-@pytest.mark.skip(
-    reason="M6.1 known followup: pytest capsys.readouterr() captures the buffer at the moment of the call; the warn-emitter runs inside load_walkability(). Fix in next testing pass - production code is correct (proven by real-batch run on ep1.world_objects.dungeons)."
-)
 def test_load_walkability_empty_on_malformed_logs_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     bad = tmp_path / "bad.json"
     bad.write_text("{not json", encoding="utf-8")
     monkeypatch.setattr(bam, "WALK_PATH", bad)
-    captured = capsys.readouterr()
     # Pass path explicitly so the test is robust.
     assert bam.load_walkability(bad) == {}
+    captured = capsys.readouterr()
     assert "WARN" in captured.err and "malformed" in captured.err
 
 
-@pytest.mark.skip(
-    reason="M6.1 known followup: pytest capsys.readouterr() captures the buffer at the moment of the call; the warn-emitter runs inside load_walkability(). Fix in next testing pass - production code is correct (proven by real-batch run on ep1.world_objects.dungeons)."
-)
 def test_load_walkability_empty_on_missing_classifications_key_logs_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     p = tmp_path / "no-key.json"
     p.write_text(json.dumps({"schema": "x", "summary": {}}), encoding="utf-8")
     monkeypatch.setattr(bam, "WALK_PATH", p)
-    captured = capsys.readouterr()
     assert bam.load_walkability(p) == {}
+    captured = capsys.readouterr()
     assert "WARN" in captured.err and "'classifications'" in captured.err
 
 
@@ -626,6 +620,7 @@ def test_main_run_writes_index_with_expected_shape(
     monkeypatch.setattr(bam, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(bam, "PHASE6_DIR", tmp_path / "phase6")
     monkeypatch.setattr(bam, "INDEX_PATH", tmp_path / "phase6" / "navmesh-index.json")
+    monkeypatch.setattr(bam, "SELECTED_INDEX_PATH", tmp_path / "phase6" / "navmesh-index.selected.json")
 
     build_payload = {
         "success": True,
@@ -657,7 +652,9 @@ def test_main_run_writes_index_with_expected_shape(
 
     rc = bam.main(["run", "--zones", zone])
     assert rc == 0
-    written = json.loads((tmp_path / "phase6" / "navmesh-index.json").read_text())
+    assert not bam.INDEX_PATH.exists(), "selected run must not overwrite the canonical index"
+    written = json.loads(bam.SELECTED_INDEX_PATH.read_text())
+    assert written["run"]["scope"] == "selected"
     assert written["schema_version"] == bam.SCHEMA_VERSION
     assert written["summary"]["eligible_zones"] == 1
     assert written["summary"]["built_zones"] == 1
@@ -666,9 +663,6 @@ def test_main_run_writes_index_with_expected_shape(
     assert written["zones"][zone]["stats"]["poly_count"] == 9
 
 
-@pytest.mark.skip(
-    reason="M6.1 known followup: bam.main() empty-cohort path; production real-batch run proves the happy path. Tracked in NM-6 M6.1 handoff doc."
-)
 def test_main_run_no_eligible_zones_writes_empty_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fly_index_path = tmp_path / "flythrough-index.json"
     walk_path = tmp_path / "walk.json"
@@ -731,7 +725,7 @@ def test_main_run_with_unknown_zones_surfaces_them_as_skipped(tmp_path: Path, mo
     monkeypatch.setattr(bam, "PHASE6_DIR", tmp_path / "phase6")
     monkeypatch.setattr(bam, "INDEX_PATH", tmp_path / "phase6" / "navmesh-index.json")
     unknown_zone = "ep9.never_seen_in_wild"
-    rc = bam.main(["run", "--zones", known_zone, unknown_zone])
+    rc = bam.main(["run", "--zones", known_zone, unknown_zone, "--out", str(bam.INDEX_PATH)])
     assert rc == 0
     written = json.loads((tmp_path / "phase6" / "navmesh-index.json").read_text())
     assert unknown_zone in written["zones"], "requested-but-missing zone must surface in index"
@@ -743,6 +737,14 @@ def test_main_run_with_unknown_zones_surfaces_them_as_skipped(tmp_path: Path, mo
 def test_main_status_returns_1_when_index_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bam, "INDEX_PATH", tmp_path / "does-not-exist.json")
     assert bam.main(["status"]) == 1
+
+
+def test_status_returns_2_for_stale_source(tmp_path: Path) -> None:
+    idx = tmp_path / "index.json"
+    doc = bam.build_index_doc(eligible=[], skipped=Counter(), built_entries={}, min_walkable=5)
+    doc["sources"]["flythrough_index"]["path"] = str(tmp_path / "missing.json")
+    idx.write_text(json.dumps(doc), encoding="utf-8")
+    assert bam._print_status(idx) == 2
 
 
 def test_main_check_schema_returns_0_on_valid_on_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

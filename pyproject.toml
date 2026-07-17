@@ -13,6 +13,8 @@ name = "rift-asset-dumper"
 version = "0.0.0"
 requires-python = ">=3.14"
 dependencies = [
+    "JPype1>=1.7.1",
+    "jsonschema>=4.25.1",
     "pefile>=2024.8.26",
 ]
 
@@ -49,6 +51,8 @@ python_version = "3.14"
 exclude = [
     "scripts/Invoke-RiftAssetWorkflow.ps1",
     "scripts/Invoke-RiftWorkflow.ps1",
+    "scripts/build_world_placed_merge.py",
+    "scripts/build_flythrough_obj_texture_manifest.py",
 ]
 ignore_missing_imports = true
 warn_unused_ignores = true

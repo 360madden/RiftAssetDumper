@@ -24,7 +24,7 @@ Usage:
   python scripts/build_all_navmeshes.py status                    # print index summary
   python scripts/build_all_navmeshes.py run --zones ep1.world_objects.dungeons
   python scripts/build_all_navmeshes.py run --min-walkable 3      # override threshold
-  python scripts/build_all_navmeshes.py run --validate-schema     # jsonschema check
+  python scripts/build_all_navmeshes.py check-schema              # Draft-07 validation
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ __all__ = [
     # Public constants -- paths and locked schema values
     "FLY_INDEX",
     "INDEX_PATH",
+    "SELECTED_INDEX_PATH",
     "PHASE6_DIR",
     "SCHEMA_VERSION",
     "WALK_PATH",
@@ -61,6 +62,7 @@ __all__ = [
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import subprocess
@@ -82,6 +84,8 @@ WALK_PATH = REPO_ROOT / "Exports" / "navmesh-phase0" / "walkability-classificati
 PHASE6_DIR = REPO_ROOT / "Exports" / "navmesh-phase6"
 ZONES_SUBDIR = "zones"
 INDEX_PATH = PHASE6_DIR / "navmesh-index.json"
+SELECTED_INDEX_PATH = PHASE6_DIR / "navmesh-index.selected.json"
+SCHEMA_PATH = REPO_ROOT / "docs" / "schemas" / "navmesh-index-v1.schema.json"
 
 # Walkable labels used for eligibility + downstream filter (locked in schema).
 WALKABLE_LABELS: frozenset[str] = frozenset(
@@ -115,15 +119,17 @@ def _zone_dir(slug: str) -> Path:
     return PHASE6_DIR / ZONES_SUBDIR / slug
 
 
-def load_flythrough_index(path: Path = FLY_INDEX) -> dict[str, Any]:
+def load_flythrough_index(path: Path | None = None) -> dict[str, Any]:
     """Read flythrough-index.json; raise FileNotFoundError if missing."""
+    path = FLY_INDEX if path is None else path
     if not path.exists():
         raise FileNotFoundError(f"flythrough-index.json not found: {path}")
     return load_json_report(path)
 
 
-def load_walkability(path: Path = WALK_PATH) -> dict[str, str]:
+def load_walkability(path: Path | None = None) -> dict[str, str]:
     """Return asset_id -> label. Returns {} if the file is missing or malformed."""
+    path = WALK_PATH if path is None else path
     if not path.exists():
         return {}
     try:
@@ -234,6 +240,21 @@ def _tail(text: str, n: int = _STDOUT_TAIL_LINES) -> str:
     return "\n".join(lines[-n:])
 
 
+def _source_provenance(path: Path) -> dict[str, Any]:
+    """Return stable input provenance for downstream stale-data checks."""
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        relative = str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+    except ValueError:
+        relative = str(path)
+    return {
+        "path": relative,
+        "sha256": digest,
+        "size_bytes": path.stat().st_size,
+        "modified_at": dt.datetime.fromtimestamp(path.stat().st_mtime, dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
 def build_one_zone(
     zone_tuple: str,
     *,
@@ -255,6 +276,7 @@ def build_one_zone(
     obj_path = zdir / "input.obj"
     meta_path = zdir / "input.metadata.json"
     build_path = zdir / "navmesh-build.json"
+    debug_navmesh_path = zdir / "navmesh-debug.obj"
     val_path = zdir / "navmesh-validation.json"
 
     walkable = walkable_counts.get(zone_tuple, 0) if walkable_counts else 0
@@ -315,6 +337,8 @@ def build_one_zone(
         "--auto-agent-params",
         "--out",
         str(build_path),
+        "--debug-obj",
+        str(debug_navmesh_path),
     ]
     rc, stdout, stderr = _run_step(build_args, timeout_s=timeout_s)
     if rc != 0 or not build_path.exists():
@@ -328,6 +352,7 @@ def build_one_zone(
         return entry
 
     entry["navmesh_json_path"] = str(build_path.relative_to(REPO_ROOT))
+    entry["debug_navmesh_path"] = str(debug_navmesh_path.relative_to(REPO_ROOT))
 
     # --- Stage 3: validate_navmesh ---
     val_args = [
@@ -429,6 +454,9 @@ def build_index_doc(
     min_walkable: int,
     skipped_reasons: dict[str, str] | None = None,
     total_counts: dict[str, int] | None = None,
+    preflight_eligible: list[str] | None = None,
+    requested_zones: list[str] | None = None,
+    sources: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the navmesh-index.json shape, sorted for stable diffs.
 
@@ -447,6 +475,9 @@ def build_index_doc(
     failed_zones = 0
     reasons = skipped_reasons or {}
     totals = total_counts or {}
+    preflight = sorted(preflight_eligible if preflight_eligible is not None else eligible)
+    requested = sorted(requested_zones or [])
+    run_scope = "selected" if requested else "full"
 
     # Eligible zones: ordered alphabetically; built entries first.
     for zt in sorted(eligible):
@@ -480,8 +511,20 @@ def build_index_doc(
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "run": {
+            "scope": run_scope,
+            "requested_zones": requested,
+            "preflight_eligible_zones": preflight,
+            "selected_eligible_zones": sorted(eligible),
+        },
+        "sources": sources
+        or {
+            "flythrough_index": {"path": "unknown", "sha256": "0" * 64, "size_bytes": 0},
+            "walkability": {"path": "unknown", "sha256": "0" * 64, "size_bytes": 0},
+        },
         "summary": {
             "eligible_zones": len(eligible),
+            "preflight_eligible_zones": len(preflight),
             "built_zones": built_zones,
             "failed_zones": failed_zones,
             "skipped_zones": len(skipped),
@@ -544,6 +587,14 @@ def _print_status(index_path: Path) -> int:
     )
     print(f"  Walkable labels: {', '.join(summary.get('walkable_labels', []))}")
     print(f"  Min walkable threshold: {summary.get('min_walkable_assets', '?')}")
+    stale: list[str] = []
+    for label, source in data.get("sources", {}).items():
+        source_path = Path(source.get("path", ""))
+        if not source_path.is_absolute():
+            source_path = REPO_ROOT / source_path
+        if not source_path.exists() or _source_provenance(source_path)["sha256"] != source.get("sha256"):
+            stale.append(label)
+    print(f"  Source freshness: {'STALE (' + ', '.join(stale) + ')' if stale else 'fresh'}")
     print()
     print("Zones:")
     for zt in sorted(data.get("zones", {}).keys()):
@@ -559,17 +610,11 @@ def _print_status(index_path: Path) -> int:
         else:
             reason = ent.get("skip_reason", "")
             print(f"  [SKIPPED] {zt:45s} walkable={walk:3d} {reason}")
-    return 0
+    return 2 if stale else 0
 
 
 def _validate_against_schema(index_path: Path) -> int:
-    """Lightweight self-check vs the on-disk JSON Schema (no jsonschema dep).
-
-    We do the cheapest gates — required top-level keys + per-zone required
-    fields + enum bindings — so CI does not need a `jsonschema` runtime dep
-    just for an index-doc validator. If a richer check is ever required,
-    swap in `jsonschema.validate(instance, schema)`.
-    """
+    """Validate the schema and instance with jsonschema Draft 7."""
     if not index_path.exists():
         print(f"ERROR: index not found at {index_path}", file=sys.stderr)
         return 1
@@ -579,7 +624,22 @@ def _validate_against_schema(index_path: Path) -> int:
         print(f"ERROR: invalid JSON: {e}", file=sys.stderr)
         return 1
 
-    errs: list[str] = []
+    try:
+        from jsonschema import Draft7Validator, FormatChecker
+        from jsonschema.exceptions import SchemaError
+
+        schema = load_json_report(SCHEMA_PATH)
+        Draft7Validator.check_schema(schema)
+        validator = Draft7Validator(schema, format_checker=FormatChecker())
+        validation_errors = sorted(validator.iter_errors(data), key=lambda error: list(error.absolute_path))
+    except (ImportError, SchemaError, OSError, ValueError, json.JSONDecodeError) as e:
+        print(f"ERROR: schema validation unavailable/invalid: {e}", file=sys.stderr)
+        return 1
+
+    errs = [
+        f"{'.'.join(str(part) for part in error.absolute_path) or '<root>'}: {error.message}"
+        for error in validation_errors
+    ]
     if data.get("schema_version") != SCHEMA_VERSION:
         errs.append(f"schema_version={data.get('schema_version')!r} != {SCHEMA_VERSION!r}")
     for key in ("generated_at", "summary", "zones"):
@@ -671,6 +731,12 @@ def main(argv: list[str] | None = None) -> int:
         help="If set, restrict the batch to these specific zone.tuple values (still subject to eligibility).",
     )
     p_run.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Index output path. Selected runs default to navmesh-index.selected.json; full runs use canonical index.",
+    )
+    p_run.add_argument(
         "--min-walkable",
         type=int,
         default=DEFAULT_MIN_WALKABLE,
@@ -683,15 +749,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Per-zone subprocess timeout in seconds (default: 600).",
     )
 
-    sub.add_parser("status", help="Print a summary of the on-disk index")
-    sub.add_parser("check-schema", help="Validate the on-disk index against the v1 schema gates")
+    p_status = sub.add_parser("status", help="Print a summary of the on-disk index")
+    p_status.add_argument("--index", type=Path, default=INDEX_PATH)
+    p_schema = sub.add_parser("check-schema", help="Validate the on-disk index against the Draft-07 schema")
+    p_schema.add_argument("--index", type=Path, default=INDEX_PATH)
 
     args = parser.parse_args(argv)
 
     if args.cmd == "status":
-        return _print_status(INDEX_PATH)
+        return _print_status(args.index)
     if args.cmd == "check-schema":
-        return _validate_against_schema(INDEX_PATH)
+        return _validate_against_schema(args.index)
 
     # cmd == 'run' ------------------------------------------------------------
     fly_index = load_flythrough_index()
@@ -763,15 +831,22 @@ def main(argv: list[str] | None = None) -> int:
         built_entries=built_entries,
         min_walkable=args.min_walkable,
         total_counts=dict(total_counts),
+        preflight_eligible=preflight_eligible,
+        requested_zones=args.zones,
+        sources={
+            "flythrough_index": _source_provenance(FLY_INDEX),
+            "walkability": _source_provenance(WALK_PATH),
+        },
     )
 
-    INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(INDEX_PATH, "w", encoding="utf-8") as f:
+    output_path = args.out or (SELECTED_INDEX_PATH if args.zones else INDEX_PATH)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(index_doc, f, indent=2, default=str, sort_keys=False)
 
     s = index_doc["summary"]
     print(
-        f"[M6.1] DONE — index at {INDEX_PATH}: eligible={s['eligible_zones']} "
+        f"[M6.1] DONE — index at {output_path}: eligible={s['eligible_zones']} "
         f"built={s['built_zones']} failed={s['failed_zones']} skipped={s['skipped_zones']}"
     )
     return 0
