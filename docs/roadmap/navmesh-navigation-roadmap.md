@@ -2,7 +2,7 @@
 
 **Created**: 2026-06-30
 **Repo**: `RiftAssetDumper` (Assets repo only — no cross-repo edits)
-**Status**: Phases 0-6 complete; Phase 7 optional and safety-gated
+**Status**: ✅ **COMPLETE** — Phases 0-6 done, NM-7 skipped (see rationale below)
 **Parallel to**: `docs/roadmap/semantic-discovery-roadmap.md` and `docs/roadmap/binary-signature-roadmap.md` (independent lane, but consumes artifacts from both)
 
 ---
@@ -575,49 +575,33 @@ navmesh, and implement cross-zone pathfinding.
 
 ## Phase 7: Navigation Agent (Optional — Bot Movement Controller)
 
-**Objective**: Build a simple navigation agent that follows a computed path
-by issuing movement commands. This is the "working navmesh **navigation**"
-end-state: an agent that can actually walk from A to B.
+> **⏭️ SKIPPED** — see rationale below.
 
-**Entry Criteria**:
+### NM-7 skip rationale
 
-- Phase 4 exit: runtime bridge functional
-- Phase 6 exit: multi-zone navmesh and cross-zone pathfinding
-- RiftReader can write to process memory (movement injection) OR an external
-  input simulation mechanism exists
+The NM-7 bot movement controller involves issuing movement commands to the
+live game process via either:
 
-**Key Milestones**:
+- **Memory writes** to player position or movement state, or
+- **Input simulation** (keyboard/mouse injection)
 
-1. **M7.1**: Path following controller
-   - Given a path (list of waypoints), steer toward the next waypoint
-   - Steering behaviors: seek next waypoint, arrive at final waypoint, avoid
-     obstacles
+Both strategies **directly violate** the project's core read-only mandate
+(`docs/live-memory-readonly-safety-boundary.md`), which hard-prohibits:
+write process memory, inject DLLs, send input to the game, patch code,
+install hooks, or suspend/resume game threads.
 
-   - Re-project onto navmesh each frame to detect deviation
-   - Replan if deviation exceeds threshold
+This is the same pattern as FT-8 (mod-replacement bridge), which was also
+skipped because archive re-packing contradicts the read-only mandate. The
+navmesh pipeline already delivers everything a read-only consumer needs:
+build, pathfind, cross-zone route, live position projection, and
+visualization. A bot controller crosses the read-only line.
 
-2. **M7.2**: Movement command emission
-   - Map desired velocity → game input commands (keyboard/mouse simulation,
-     or memory writes to movement state)
-
-   - **Safety gate**: movement injection is a high-risk operation — this
-     milestone is gated on explicit safety review
-
-   - Do NOT implement memory-write movement injection without documented
-     safety boundaries
-
-3. **M7.3**: Navigation state machine
-   - States: idle, moving, replanning, stuck, arrived
-   - Stuck detection: position hasn't changed in N seconds despite movement
-     commands
-
-   - Recovery: replan path, or mark current poly as temporarily blocked
-
-**Exit Criteria** (gated on safety review):
-
-- Agent follows a path from A to B without manual intervention
-- Stuck detection and recovery functional
-- Safety boundaries documented
+**Decision**: Skip NM-7. The original milestone design (M7.1 path-following
+controller, M7.2 movement command emission, M7.3 navigation state machine)
+is preserved in git history and can be resurrected if the safety boundary is
+ever relaxed, but no implementation should proceed without an explicit
+safety review that amends the
+`live-memory-readonly-safety-boundary.md`.
 
 ---
 
@@ -632,7 +616,7 @@ end-state: an agent that can actually walk from A to B.
 | 4 | Runtime bridge (live position) | `navmesh_state.py` | ✅ |
 | 5 | Visualization (RiftFlythrough) | Navmesh overlay + path rendering | ✅ |
 | 6 | Scale-out & multi-zone | `navmesh-index.json`, cross-zone paths | ✅ |
-| 7 | Navigation agent (optional) | Bot movement controller | ⬜ |
+| 7 | Navigation agent (optional) | Bot movement controller | ⏭️ SKIPPED |
 
 ---
 
