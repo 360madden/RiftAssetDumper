@@ -6,8 +6,8 @@
 **Remote:** `https://github.com/360madden/RiftAssetDumper`  
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
-**Current phase:** **RA-0 — Re-establish a reproducible development and source-data baseline**  
-**Status:** Roadmap authored; implementation phases have not started.
+**Current phase:** **RA-1 — Bounded, real archive/source-provenance audit**
+**Status:** RA-0 environment/source access qualified; historical full-suite artifact-dependent tests remain blocked. See [RA-0 handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
 ## Decision and scope
 
@@ -37,7 +37,7 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 
 | Priority | Milestone | Deliverable | Exit gate |
 | --- | --- | --- | --- |
-| P0 | **RA-0: restore baseline** | Working isolated Python environment, compatible .NET runtime/test environment, source-data inventory, clean Git baseline report | Focused Python tests and .NET tests actually run; known missing source/artifacts recorded |
+| Done (with data debt) | **RA-0: restore baseline** | Isolated Python environment, process-local .NET test compatibility, 244 actual game archive chunks, focused regression fixes, detailed handoff | Focused Python 65 passed / 5 skipped; .NET 56 passed; 17 historical full-suite data failures retained as blockers, not hidden |
 | P1 | **RA-1: audit real asset coverage** | Reproducible, bounded manifest/NIF/texture/scene-source coverage report, with missing and unsupported classes | Sample IDs map to archive+entry+hash; counts and limitations verified against real accessible inputs |
 | P1 | **RA-2: stabilize consumer source contract** | Versioned deterministic source manifest or adapter that **reuses** existing index/schema contracts wherever possible | Schema, repeatability and corruption/negative tests; source IDs, hashes, transforms and unknowns explicit |
 | P2 | **RA-3: qualify highest-value gaps** | Narrow source-evidence packets for concrete RiftWorld needs: missing mesh/texture/material links, CDR placement joins or linked HKX resource identity | At least one previously unsupported/ambiguous source relationship becomes tested or is closed negative |

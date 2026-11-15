@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -250,21 +251,70 @@ class TestBuildProbeModrmLeadsPlan(unittest.TestCase):
         self.assertIn("missing-explicit---pid", plan["RefusalReasons"])
 
     def test_live_read_allowed_with_all_gates(self):
-        plan = build_probe_modrm_leads_plan(
-            repo_root=REPO_ROOT,
-            modrm_scan_path="Exports/binary-phase1/modrm-memory-access-scan.json",
-            pid=12345,
-            process_name="rift_x64.exe",
-            execute_live_read=True,
-            experimental_live=True,
-            confirm_live_read=True,
-            max_scan_bytes=1024,
-            max_matches=3,
-            max_regions=2,
-            timeout_seconds=5,
-            top_clusters=3,
-        )
-        self.assertTrue(plan["ExecutionAllowed"])
+        # Plan construction must not require a historical, ignored Exports/ report.
+        # A synthetic scan validates the gating contract without opening a process.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            scan_rel = "Exports/binary-phase1/modrm-memory-access-scan.json"
+            scan_path = repo_root / scan_rel
+            scan_path.parent.mkdir(parents=True, exist_ok=True)
+            scan_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "modrm-memory-access-scan/v1",
+                        "candidate_only": True,
+                        "total_matches": 1,
+                        "top_clusters": [
+                            {
+                                "rank": 1,
+                                "hit_count": 1,
+                                "first_rva": "0x1000",
+                                "base_register_counts": {"RBX": 1},
+                                "target_offset_counts": {"0x320": 1},
+                                "candidate_signature": {"valid": True, "sig_hex": "48 8B ??"},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            plan = build_probe_modrm_leads_plan(
+                repo_root=repo_root,
+                modrm_scan_path=scan_rel,
+                pid=12345,
+                process_name="rift_x64.exe",
+                execute_live_read=True,
+                experimental_live=True,
+                confirm_live_read=True,
+                max_scan_bytes=1024,
+                max_matches=3,
+                max_regions=2,
+                timeout_seconds=5,
+                top_clusters=3,
+            )
+            self.assertTrue(plan["ExecutionAllowed"], plan["RefusalReasons"])
+            self.assertFalse(plan["LiveProcessReadExecuted"])
+            self.assertEqual(plan["ClustersExtracted"], 1)
+
+    def test_live_read_plan_refuses_missing_scan_even_with_other_gates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = build_probe_modrm_leads_plan(
+                repo_root=Path(tmp),
+                modrm_scan_path="Exports/binary-phase1/modrm-memory-access-scan.json",
+                pid=12345,
+                process_name="rift_x64.exe",
+                execute_live_read=True,
+                experimental_live=True,
+                confirm_live_read=True,
+                max_scan_bytes=1024,
+                max_matches=3,
+                max_regions=2,
+                timeout_seconds=5,
+                top_clusters=3,
+            )
+            self.assertFalse(plan["ExecutionAllowed"])
+            self.assertFalse(plan["LiveProcessReadExecuted"])
+            self.assertTrue(any(reason.startswith("modrm-scan-not-found:") for reason in plan["RefusalReasons"]))
 
     def test_wrong_process_name_refused(self):
         plan = build_probe_modrm_leads_plan(

@@ -378,8 +378,10 @@ def build_manifest(
 ) -> dict[str, Any]:
     """Build a 350-row downstream OBJ texture manifest."""
 
-    audit = audit or build_audit(repo_root=repo_root)
-    converted_texture_paths = converted_texture_paths or load_converted_texture_paths(repo_root=repo_root)
+    if audit is None:
+        audit = build_audit(repo_root=repo_root)
+    if converted_texture_paths is None:
+        converted_texture_paths = load_converted_texture_paths(repo_root=repo_root)
     asset_textures = asset_texture_names_by_id(audit)
     bundle_rel = repo_relative_path(bundle_root, repo_root)
 

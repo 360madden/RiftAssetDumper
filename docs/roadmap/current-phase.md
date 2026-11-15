@@ -1,10 +1,10 @@
 # Current Active Phase & Milestone
 
-## Current: November 15, 2026 — RA-0 re-entry
+## Current: November 15, 2026 — RA-1 bounded source-provenance audit
 
-**Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). Restore the AMD-DESKTOP test/source baseline, audit asset-source provenance, and define a narrow data contract for RiftWorld. Assets owns archive/NIF/texture extraction; RiftWorld owns world assembly, HKX collision and navigation; RR2 owns live movement. **Do not start duplicate M6.2/M6.3 navigation development without a demonstrated consumer gap.**
+**Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
-**Verified re-entry:** Fresh clone at `C:\RIFT MODDING\Assets`, base `7e1d5a8`; `dotnet build` passes; Python `pytest` and .NET 9 test runtime must be installed locally; ignored historical `Exports/` products are absent. See the re-entry roadmap for exact gates and boundaries.
+**Current actionable milestone:** RA-1 — validate a small set of real archive/manifest asset IDs and entry hashes and map them into a reusable provenance matrix for RiftWorld. Assets owns archive/NIF/texture extraction; RiftWorld owns world assembly, HKX collision and navigation; RR2 owns live movement. **Do not start duplicate M6.2/M6.3 navigation development without a demonstrated consumer gap.**
 
 ---
 

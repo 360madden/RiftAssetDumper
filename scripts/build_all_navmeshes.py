@@ -115,15 +115,17 @@ def _zone_dir(slug: str) -> Path:
     return PHASE6_DIR / ZONES_SUBDIR / slug
 
 
-def load_flythrough_index(path: Path = FLY_INDEX) -> dict[str, Any]:
+def load_flythrough_index(path: Path | None = None) -> dict[str, Any]:
     """Read flythrough-index.json; raise FileNotFoundError if missing."""
+    path = FLY_INDEX if path is None else path
     if not path.exists():
         raise FileNotFoundError(f"flythrough-index.json not found: {path}")
     return load_json_report(path)
 
 
-def load_walkability(path: Path = WALK_PATH) -> dict[str, str]:
+def load_walkability(path: Path | None = None) -> dict[str, str]:
     """Return asset_id -> label. Returns {} if the file is missing or malformed."""
+    path = WALK_PATH if path is None else path
     if not path.exists():
         return {}
     try:

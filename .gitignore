@@ -26,6 +26,7 @@ coverage/
 
 # local environment/secrets
 .env
+.venv/
 
 # tool caches
 .pre-commit-hooks.yaml

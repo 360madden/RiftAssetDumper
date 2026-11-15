@@ -666,9 +666,6 @@ def test_main_run_writes_index_with_expected_shape(
     assert written["zones"][zone]["stats"]["poly_count"] == 9
 
 
-@pytest.mark.skip(
-    reason="M6.1 known followup: bam.main() empty-cohort path; production real-batch run proves the happy path. Tracked in NM-6 M6.1 handoff doc."
-)
 def test_main_run_no_eligible_zones_writes_empty_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fly_index_path = tmp_path / "flythrough-index.json"
     walk_path = tmp_path / "walk.json"
