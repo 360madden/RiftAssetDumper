@@ -7,7 +7,7 @@
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
 **Current phase:** **RA-1 — Bounded, real archive/source-provenance audit**
-**Status:** RA-0 environment/source access qualified; RA-1.1 TWAD source sampling and RA-1.2 primary-manifest ID joins shipped locally. Full-suite historical artifact-dependent tests remain blocked (17). See [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), and [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md).
+**Status:** RA-0 toolchain restored; RA-1.1 TWAD sampling, RA-1.2 manifest-ID join, and RA-1.3 decoded hash/type verification shipped locally. Full-suite historical artifact-dependent failures remain (17). See [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md), and [RA-1.3](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md).
 
 ## Decision and scope
 
@@ -58,7 +58,7 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 
 ### RA-1 — source inventory, not broad speculative discovery
 
-**Progress checkpoint (2026-11-15):** RA-1.1 confirmed archive-table and packed-byte provenance for 3 live TWAD files/12 samples. RA-1.2 matched 3 real archive IDs to exactly one row each in primary assets64.manifest, mapping manifest PAK-path candidates. Stored SHA-1 and compressed-size fields do not agree, so decoded payload identity and source-format equivalence remain unqualified. Next RA-1.3: independently probe one bounded sample's decoded payload and document the exact source representation; do not infer a NIF or walkable surface from a PAK path name.
+**Progress checkpoint (2026-11-15):** RA-1.1 qualified three TWAD source archives and 12 packed-byte samples. RA-1.2 matched three exact archive IDs to one primary-manifest row each with PAK paths. RA-1.3 independently verified three decoded payloads (one terrain-related NIF with 25 parsed blocks, two DDS): source table SHA-1 equals packed SHA-1; first eight bytes of decoded SHA-1 equals archive ID; decoded length equals manifest Size. These are sample-level findings, not a universal guarantee. Manifest Hash and CompressedSize semantics remain unresolved. Next RA-1.4: test additional compression/type controls and trace exact NIF-linked DDS asset identities, then plan a bounded producer-to-RiftWorld contract.
 
 - Inventory existing producers: `build_live_archive_index.py`, NIF probe/extraction paths, `flythrough-index` builders, material/texture linking, semantic coverage, and CDR/resource reference paths.
 - Reuse existing commands and schema definitions. Build a **coverage matrix**, not a second framework: sampled asset ID, archive file, manifest/entry index, byte and content hashes, asset type, model/mesh availability, linked textures, source coordinate frame and transforms, evidence status, and missing-reason code.

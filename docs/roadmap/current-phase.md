@@ -6,9 +6,11 @@
 
 **RA-1.1 completed:** [Bounded live archive provenance](../handoffs/2026-11-15-ra1-twad-source-provenance.md) — 3 real TWAD archives, 12 packed samples, hash-bound ignored report, tests and lightweight table-only reader.
 
-**RA-1.2 completed:** [Primary-manifest candidate ID join](../handoffs/2026-11-15-ra1-2-manifest-id-join.md) — existing C# list-entries now supports exact --id, three live archive IDs matched one manifest row each with PAK paths; hash/size differences remain unexplained. No payload-type or placement promotion. Full Python suite still has 17 historical generated-data failures.
+**RA-1.2 completed:** [Primary-manifest candidate ID join](../handoffs/2026-11-15-ra1-2-manifest-id-join.md) — existing C# list-entries supports exact --id; three archive IDs matched one manifest row each with PAK paths. This ID join alone did not qualify bytes or placement.
 
-**Next actionable milestone:** RA-1.3 — narrow decoded-payload type/source proof on one real archive + manifest sample, starting with assets.100 / world2geometry_48. Assets owns source extraction; RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement. **Do not duplicate M6.2/M6.3 navigation without a demonstrated consumer gap.**
+**RA-1.3 completed:** [Packed/decoded SHA-1 source-format proof](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md) — three independently verified samples (one valid 25-block Gamebryo terrain-related NIF, two DDS textures). Archive-table SHA-1 = packed-payload SHA-1; archive ID = first 8 bytes of decoded-payload SHA-1; manifest Size = decoded length, for this bounded cohort. Manifest Hash and PAK CompressedSize remain unqualified. Full Python suite: 1,183 passed, 17 historical-data failures, 70 skipped.
+
+**Next actionable milestone:** RA-1.4 — test independent compression/type controls and investigate the terrain NIF's exact linked DDS source identities; avoid speculative placement. Assets owns source extraction; RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement. **Do not duplicate M6.2/M6.3 navigation without a demonstrated consumer gap.**
 
 ---
 
