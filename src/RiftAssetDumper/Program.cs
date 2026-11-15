@@ -827,8 +827,13 @@ internal static class Program
   {
     var rootDirectory = Path.GetFullPath(options.RootDirectory);
     var manifestPath = ResolveManifestPath(rootDirectory, options.ManifestPath);
+    var idFilter = string.IsNullOrWhiteSpace(options.IdFilter) ? null : NormalizeIdPrefix(options.IdFilter);
     var lookup = ReadManifestLookup(manifestPath);
-    var records = options.Limit > 0 ? lookup.Entries.Take(options.Limit) : lookup.Entries;
+    IEnumerable<ManifestEntryBrief> matching = idFilter is null
+        ? lookup.Entries
+        : lookup.Entries.Where(entry => string.Equals(entry.IdPrefix, idFilter, StringComparison.OrdinalIgnoreCase));
+    var matchingCount = idFilter is null ? lookup.Entries.Count : matching.Count();
+    var records = options.Limit > 0 ? matching.Take(options.Limit) : matching;
     var outPath = ResolveOutputPath(
         rootDirectory,
         options.OutDirectory,
@@ -839,7 +844,11 @@ internal static class Program
 
     Console.WriteLine($"Manifest: {DisplayPath(options, manifestPath)}");
     Console.WriteLine($"Entry rows: {lookup.Entries.Count:N0}");
-    Console.WriteLine($"Written: {(options.Limit > 0 ? Math.Min(options.Limit, lookup.Entries.Count) : lookup.Entries.Count):N0}");
+    if (idFilter is not null)
+    {
+      Console.WriteLine($"Matching ID rows ({idFilter}): {matchingCount:N0}");
+    }
+    Console.WriteLine($"Written: {(options.Limit > 0 ? Math.Min(options.Limit, matchingCount) : matchingCount):N0}");
     Console.WriteLine($"Output: {DisplayPath(options, outPath)}");
     return 0;
   }
@@ -14506,7 +14515,7 @@ internal static class Program
     Console.WriteLine("  --limit <n>     Maximum records for list-paks/list-entries; default is all");
     Console.WriteLine("  --archive <n|assets.nnn>");
     Console.WriteLine("                  Only process one copied archive chunk");
-    Console.WriteLine("  --id <16hex>    Only extract one asset ID prefix");
+    Console.WriteLine("  --id <16hex>    Filter list-entries to exact ID (or extract only that asset ID)");
     Console.WriteLine("  --mesh-block <n>");
     Console.WriteLine("  --experimental"); Console.WriteLine("                  Enable experimental geometry decode features"); Console.WriteLine("  --experimental-position-source"); Console.WriteLine("                  Use linked-stream position-source probe when no attribute sets found");
     Console.WriteLine("  --write-obj"); Console.WriteLine("                  Write decoded geometry to Wavefront OBJ file"); Console.WriteLine("                  Optional NiMesh block index filter for probe-nif-streams");

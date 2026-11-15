@@ -4,7 +4,11 @@
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
-**Current actionable milestone:** RA-1 — validate a small set of real archive/manifest asset IDs and entry hashes and map them into a reusable provenance matrix for RiftWorld. Assets owns archive/NIF/texture extraction; RiftWorld owns world assembly, HKX collision and navigation; RR2 owns live movement. **Do not start duplicate M6.2/M6.3 navigation development without a demonstrated consumer gap.**
+**RA-1.1 completed:** [Bounded live archive provenance](../handoffs/2026-11-15-ra1-twad-source-provenance.md) — 3 real TWAD archives, 12 packed samples, hash-bound ignored report, tests and lightweight table-only reader.
+
+**RA-1.2 completed:** [Primary-manifest candidate ID join](../handoffs/2026-11-15-ra1-2-manifest-id-join.md) — existing C# list-entries now supports exact --id, three live archive IDs matched one manifest row each with PAK paths; hash/size differences remain unexplained. No payload-type or placement promotion. Full Python suite still has 17 historical generated-data failures.
+
+**Next actionable milestone:** RA-1.3 — narrow decoded-payload type/source proof on one real archive + manifest sample, starting with assets.100 / world2geometry_48. Assets owns source extraction; RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement. **Do not duplicate M6.2/M6.3 navigation without a demonstrated consumer gap.**
 
 ---
 

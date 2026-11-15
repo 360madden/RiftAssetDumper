@@ -7,7 +7,7 @@
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
 **Current phase:** **RA-1 — Bounded, real archive/source-provenance audit**
-**Status:** RA-0 environment/source access qualified; historical full-suite artifact-dependent tests remain blocked. See [RA-0 handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
+**Status:** RA-0 environment/source access qualified; RA-1.1 TWAD source sampling and RA-1.2 primary-manifest ID joins shipped locally. Full-suite historical artifact-dependent tests remain blocked (17). See [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), and [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md).
 
 ## Decision and scope
 
@@ -57,6 +57,8 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 **RA-0 go/no-go:** source archive samples available and tests reproducible -> RA-1. If source is absent -> prioritize locating source/acquisition inputs, not inventing generated reports.
 
 ### RA-1 — source inventory, not broad speculative discovery
+
+**Progress checkpoint (2026-11-15):** RA-1.1 confirmed archive-table and packed-byte provenance for 3 live TWAD files/12 samples. RA-1.2 matched 3 real archive IDs to exactly one row each in primary assets64.manifest, mapping manifest PAK-path candidates. Stored SHA-1 and compressed-size fields do not agree, so decoded payload identity and source-format equivalence remain unqualified. Next RA-1.3: independently probe one bounded sample's decoded payload and document the exact source representation; do not infer a NIF or walkable surface from a PAK path name.
 
 - Inventory existing producers: `build_live_archive_index.py`, NIF probe/extraction paths, `flythrough-index` builders, material/texture linking, semantic coverage, and CDR/resource reference paths.
 - Reuse existing commands and schema definitions. Build a **coverage matrix**, not a second framework: sampled asset ID, archive file, manifest/entry index, byte and content hashes, asset type, model/mesh availability, linked textures, source coordinate frame and transforms, evidence status, and missing-reason code.
