@@ -97,6 +97,33 @@ def is_nif_magic(data: bytes) -> bool:
     return False
 
 
+def read_archive_table_streaming(archive_path: str) -> list[dict]:
+    """Read TWAD header and entry table without loading the payload into memory.
+
+    Intended for index/provenance sweeps across large live archives. Rejects
+    truncated, unsupported, or implausibly large metadata tables rather than
+    emitting partial or misleading provenance rows.
+    """
+    max_table_entries = 65_536
+    with open(archive_path, "rb") as f:
+        header = f.read(ARCHIVE_HEADER_SIZE)
+        if len(header) != ARCHIVE_HEADER_SIZE or header[:4] != b"TWAD":
+            raise ValueError(f"invalid TWAD header: {os.path.basename(archive_path)}")
+        version, header_size, max_entries, _first_linked = struct.unpack_from("<IIII", header, 4)
+        if version != 1 or header_size < ARCHIVE_HEADER_SIZE or max_entries > max_table_entries:
+            raise ValueError(f"unsupported TWAD metadata: {os.path.basename(archive_path)}")
+        f.seek(0, os.SEEK_END)
+        file_size = f.tell()
+        table_bytes = max_entries * ARCHIVE_ENTRY_SIZE
+        if header_size + table_bytes > file_size:
+            raise ValueError(f"truncated TWAD entry table: {os.path.basename(archive_path)}")
+        f.seek(header_size)
+        table = f.read(table_bytes)
+        if len(table) != table_bytes:
+            raise ValueError(f"short TWAD entry table read: {os.path.basename(archive_path)}")
+    return [read_archive_entry(table, i * ARCHIVE_ENTRY_SIZE, i) for i in range(max_entries)]
+
+
 def read_archive(archive_path: str) -> list[dict]:
     """Read all entries from a TWAD archive file."""
     with open(archive_path, "rb") as f:

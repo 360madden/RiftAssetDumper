@@ -49,7 +49,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.extract_live_nifs import LIVE_ROOT, read_archive  # noqa: E402
+from scripts.extract_live_nifs import LIVE_ROOT, read_archive_table_streaming  # noqa: E402
 
 FLYTHROUGH_INDEX = REPO_ROOT / "Assets" / "build" / "flythrough" / "flythrough-index.json"
 DEFAULT_OUT_PATH = REPO_ROOT / "Exports" / "discovery-plan" / "live-nif-archive-index.json"
@@ -94,7 +94,7 @@ def list_archive_files(live_root: Path) -> list[Path]:
 def extract_rows(
     archive_files: list[Path],
     cohort_hashes: set[str],
-    read_archive_fn: Callable[[str], list[dict[str, Any]]] = read_archive,
+    read_archive_fn: Callable[[str], list[dict[str, Any]]] = read_archive_table_streaming,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Scan each archive and emit rows for matching cohort hashes.
 
@@ -102,7 +102,7 @@ def extract_rows(
         archive_files: list of TWAD archive paths to scan.
         cohort_hashes: lowercased 16-hex flythrough asset IDs to intersect.
         read_archive_fn: optional injection point for unit tests (defaults
-            to ``scripts.extract_live_nifs.read_archive``).
+            to ``scripts.extract_live_nifs.read_archive_table_streaming``).
 
     Returns:
         (rows, stats) where rows is the unsorted union of matches and
