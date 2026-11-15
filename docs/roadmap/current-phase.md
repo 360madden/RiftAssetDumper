@@ -1,5 +1,15 @@
 # Current Active Phase & Milestone
 
+## Current: November 15, 2026 — RA-0 re-entry
+
+**Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). Restore the AMD-DESKTOP test/source baseline, audit asset-source provenance, and define a narrow data contract for RiftWorld. Assets owns archive/NIF/texture extraction; RiftWorld owns world assembly, HKX collision and navigation; RR2 owns live movement. **Do not start duplicate M6.2/M6.3 navigation development without a demonstrated consumer gap.**
+
+**Verified re-entry:** Fresh clone at `C:\RIFT MODDING\Assets`, base `7e1d5a8`; `dotnet build` passes; Python `pytest` and .NET 9 test runtime must be installed locally; ignored historical `Exports/` products are absent. See the re-entry roadmap for exact gates and boundaries.
+
+---
+
+## Historical July 2026 pointer (preserved below)
+
 **Last Updated**: 2026-07-09 — **TWO ACTIVE ROADMAPS**: The NIF geometry discovery pipeline (`project-roadmap.md`) is COMPLETE. Two independent roadmaps are now active:
 
 > **1. `docs/roadmap/semantic-discovery-roadmap.md`** — Semantic Asset Discovery for Live-Memory Validation

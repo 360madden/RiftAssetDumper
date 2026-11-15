@@ -3,6 +3,9 @@
 [![CI](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml/badge.svg)](https://github.com/360madden/RiftAssetDumper/actions)
 
 Read-only RIFT asset archive research workspace.
+
+**Current (2026-11-15):** Resume from [the AMD-DESKTOP re-entry roadmap](docs/roadmap/2026-11-15-assets-reentry-roadmap.md) and [current phase pointer](docs/roadmap/current-phase.md). The original checkout was absent and has been freshly cloned; local generated archives/exports were not recovered. The older phase notes below are historical until revalidated. Prioritize tested asset-source provenance and compatibility with RiftWorld, not a second navigation system.
+
 > ⛒ **Contribution path:** Open a PR, wait for the **6 CI checks** (5 leaf jobs — `Docs Lint`, `.NET Build & Test`, `Python Lint & Test`, `Orphan Guard Regression`, `Pre-commit Checks` — plus the `Summary` aggregator) to go green, then `gh pr merge --squash --delete-branch`. Direct-push to `main` is a documented fallback.
 
 ## Operating mode 🚀
