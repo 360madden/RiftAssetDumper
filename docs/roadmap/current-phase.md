@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-1.4b terrain DDS source-reference audit
+## Current: November 16, 2026 — RA-1.5 exact manifest-row provenance
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -12,7 +12,9 @@
 
 **RA-1.4a completed:** [Independent code-0 archive controls](../handoffs/2026-11-16-ra1-4a-uncompressed-controls.md) — all 244 TWAD tables inventoried (22,422 code-0; 241,764 code-1; no code-2 entries). Two code-0 source SHA-1 controls passed; one exact manifest ID unique and one ID ambiguous across two PAKs. The latter is a 112-block binary-extra-data NIF, not a verified world mesh. Full Python suite: 1,187 passed, 17 historical-data failures, 70 skipped.
 
-**Next actionable milestone:** RA-1.4b — verify the RA-1.3 terrain NIF's embedded DDS name references against existing filename hash and texture-linking tools. Keep candidate names distinct from confirmed asset identity. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
+**RA-1.4b completed:** [13 terrain NIF DDS source link proofs](../handoffs/2026-11-16-ra1-4b-terrain-dds-links.md) — all 13 exact embedded DDS references mapped to unique filename FNV+length rows, one live TWAD archive entry per ID, independently decoded DDS bytes, and .NET type/size agreement. Three content IDs have multiple manifest rows (3, 2, and 31,324); the highly reused baked DDS is independently proven 128×128 uniform black. No renderer-slot or world-position promotion.
+
+**Next actionable milestone:** RA-1.5 — make primary-manifest row identity explicit in `ResolveTargetEntry` / `probe-binary` so an ID-only first-match never impersonates a name-specific PAK record. Validate with synthetic duplicate IDs and real bounded controls. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
 
 ---
 
