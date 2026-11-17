@@ -93,6 +93,37 @@ public class ManifestTargetSelectionTests
     });
   }
 
+  [Fact]
+  public void ProbeBinary_RequireUniqueRefusesDuplicateIdWithoutExactIndex()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      var output = Path.Combine(root, "strict-ambiguous.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--require-unique",
+           "--out", output]);
+      Assert.NotEqual(0, rc);
+      Assert.False(File.Exists(output));
+    });
+  }
+
+  [Fact]
+  public void ProbeBinary_RequireUniqueAllowsExactRowForDuplicateId()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      var output = Path.Combine(root, "strict-exact.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--manifest-index", "2",
+           "--require-unique", "--out", output]);
+      Assert.Equal(0, rc);
+      using var report = JsonDocument.Parse(File.ReadAllText(output));
+      Assert.Equal(2, report.RootElement.GetProperty("Source").GetProperty("ManifestEntryIndex").GetInt32());
+    });
+  }
+
   private static void WithFixture(Action<string, string, string> action)
   {
     var root = Path.Combine(Path.GetTempPath(), $"rad-manifest-select-{Guid.NewGuid():N}");

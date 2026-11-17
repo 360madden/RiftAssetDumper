@@ -13220,6 +13220,12 @@ internal static class Program
       var id = NormalizeIdPrefix(options.IdFilter);
       if (lookup.Table1ById.TryGetValue(id, out var byId))
       {
+        if (options.RequireUnique &&
+            lookup.Entries.Where(e => string.Equals(e.IdPrefix, id, StringComparison.OrdinalIgnoreCase)).Take(2).Count() > 1)
+        {
+          throw new InvalidOperationException($"Content ID {id} matches multiple manifest rows; supply an exact --manifest-index to select the intended filename/PAK.");
+        }
+
         return byId;
       }
 
@@ -14561,7 +14567,7 @@ internal static class Program
     Console.WriteLine("  --only-length-match");
     Console.WriteLine("                  Only keep name matches where byte length matches manifest");
     Console.WriteLine("  --require-unique");
-    Console.WriteLine("                  Only keep name matches whose hash maps to one manifest row");
+    Console.WriteLine("                  Reject duplicate manifest IDs on ID-only probes or FNV collisions in match-names");
     Console.WriteLine("  --min-confidence <0-100>");
     Console.WriteLine("                  Minimum match confidence; default 0 for matching, 80 for recovered extraction");
     Console.WriteLine("  --use-recovered-names <jsonl>");

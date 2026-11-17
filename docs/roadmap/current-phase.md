@@ -16,7 +16,9 @@
 
 **RA-1.5a completed:** [Exact manifest-row selection](../handoffs/2026-11-16-ra1-5a-exact-manifest-selection.md) — fixed `ResolveTargetEntry` to honor `--manifest-index` before ID-only lookup and reject conflicting `--id` or `--fnv`. Five red-to-green synthetic tests, all 66 .NET tests and formatting passed. Real `map_ec_sand_01.dds` exact row 179255/Pak 1190 verified; conflicting ID/index correctly rejected.
 
-**Next actionable milestone:** RA-1.5b — opt-in fail-closed `--require-unique` on ambiguous ID-only probes, preserving default behavior and explicit manifest row selection. The 31,324-row baked DDS content ID is a real negative control. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
+**RA-1.5b completed:** [Opt-in duplicate-ID probe refusal](../handoffs/2026-11-16-ra1-5b-opt-in-unique-id-probes.md) — `--require-unique` now refuses repeated content IDs on ID-only probes, while explicit matching `--manifest-index` remains permitted. Synthetic tests red-to-green; all 68 .NET tests passed. The real 31,324-row shared DDS correctly refused strict bare ID and accepted exact row 386332/PAK 1719.
+
+**Next actionable milestone:** RA-1.5c — ensure a jointly supplied `--id` and `--fnv` is checked as one exact manifest row instead of silently ignoring the FNV. Keep legacy bare-ID behavior and explicit-index checks; then evaluate the smallest Assets-to-RiftWorld source contract. RiftWorld owns collision/navigation; RR2 owns live movement.
 
 ---
 
