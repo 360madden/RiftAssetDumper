@@ -13215,6 +13215,32 @@ internal static class Program
       return byIndex;
     }
 
+    if (!string.IsNullOrWhiteSpace(options.IdFilter) && options.FnvFilter is not null)
+    {
+      var id = NormalizeIdPrefix(options.IdFilter);
+      var fnv = options.FnvFilter.Value;
+      if (!lookup.EntriesByFnv.TryGetValue(fnv, out var fnvRows))
+      {
+        throw new InvalidOperationException($"No manifest row matches --id {id} and --fnv 0x{fnv:x8}.");
+      }
+
+      var matches = fnvRows
+          .Where(e => string.Equals(e.IdPrefix, id, StringComparison.OrdinalIgnoreCase))
+          .Take(2)
+          .ToArray();
+      if (matches.Length == 0)
+      {
+        throw new InvalidOperationException($"No manifest row matches --id {id} and --fnv 0x{fnv:x8}.");
+      }
+      if (matches.Length > 1)
+      {
+        throw new InvalidOperationException($"--id {id} and --fnv 0x{fnv:x8} match multiple manifest rows; supply an exact --manifest-index.");
+      }
+
+      // A unique joint ID+FNV row is explicit, even when content ID is shared.
+      return matches[0];
+    }
+
     if (!string.IsNullOrWhiteSpace(options.IdFilter))
     {
       var id = NormalizeIdPrefix(options.IdFilter);

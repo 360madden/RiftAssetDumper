@@ -18,7 +18,9 @@
 
 **RA-1.5b completed:** [Opt-in duplicate-ID probe refusal](../handoffs/2026-11-16-ra1-5b-opt-in-unique-id-probes.md) — `--require-unique` now refuses repeated content IDs on ID-only probes, while explicit matching `--manifest-index` remains permitted. Synthetic tests red-to-green; all 68 .NET tests passed. The real 31,324-row shared DDS correctly refused strict bare ID and accepted exact row 386332/PAK 1719.
 
-**Next actionable milestone:** RA-1.5c — ensure a jointly supplied `--id` and `--fnv` is checked as one exact manifest row instead of silently ignoring the FNV. Keep legacy bare-ID behavior and explicit-index checks; then evaluate the smallest Assets-to-RiftWorld source contract. RiftWorld owns collision/navigation; RR2 owns live movement.
+**RA-1.5c completed:** [Joint content-ID and filename-FNV selection](../handoffs/2026-11-16-ra1-5c-joint-content-name-selector.md) — `--id` plus `--fnv` now requires one matching primary-manifest row, rejecting mismatches and duplicate joint matches. Four red-to-green synthetic tests, full 72/72 .NET tests, and a real baked-DDS control selecting name-specific row 386332/PAK 1719 passed. Bare-ID default remains unchanged.
+
+**Next actionable milestone:** RA-2a contract-readiness audit — read-only comparison of existing RiftWorld model/scene/patch source contracts to qualified Assets manifest/TWAD/texture fields, then one narrow producer-side fixture and mapping. RA-1 coverage is not universally complete; full Python tests still have 17 historical missing-artifact failures. Keep RiftWorld/RR2 untouched.
 
 ---
 

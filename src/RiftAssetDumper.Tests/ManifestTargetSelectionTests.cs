@@ -124,6 +124,74 @@ public class ManifestTargetSelectionTests
     });
   }
 
+  [Fact]
+  public void ProbeBinary_IdAndFnvSelectsNamedRowForSharedContentId()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      var output = Path.Combine(root, "joint-selected.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--fnv", "0xEEFF",
+           "--out", output]);
+      Assert.Equal(0, rc);
+      using var report = JsonDocument.Parse(File.ReadAllText(output));
+      var source = report.RootElement.GetProperty("Source");
+      Assert.Equal(2, source.GetProperty("ManifestEntryIndex").GetInt32());
+      Assert.Equal(9, source.GetProperty("PakIndex").GetInt32());
+    });
+  }
+
+  [Fact]
+  public void ProbeBinary_IdAndFnvMismatchRefusesBeforeOutput()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      var output = Path.Combine(root, "joint-mismatch.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--fnv", "0x12345678",
+           "--out", output]);
+      Assert.NotEqual(0, rc);
+      Assert.False(File.Exists(output));
+    });
+  }
+
+  [Fact]
+  public void ProbeBinary_IdAndFnvWithRequireUniqueAllowsDistinctFilenameForSharedContent()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      var output = Path.Combine(root, "joint-strict.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--fnv", "0xEEFF",
+           "--require-unique", "--out", output]);
+      Assert.Equal(0, rc);
+      using var report = JsonDocument.Parse(File.ReadAllText(output));
+      Assert.Equal(2, report.RootElement.GetProperty("Source").GetProperty("ManifestEntryIndex").GetInt32());
+    });
+  }
+
+  [Fact]
+  public void ProbeBinary_IdAndFnvRefusesNonUniqueJointPair()
+  {
+    WithFixture((root, manifest, id) =>
+    {
+      // Make both manifest rows carrying this content ID share the same FNV.
+      var bytes = File.ReadAllBytes(manifest);
+      BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x50 + 8, 4), 0xEEFF);
+      File.WriteAllBytes(manifest, bytes);
+      var output = Path.Combine(root, "joint-duplicate.json");
+      var rc = global::Program.Main(
+          ["probe-binary", "--root", root, "--manifest", manifest,
+           "--archive", "assets.001", "--id", id, "--fnv", "0xEEFF",
+           "--out", output]);
+      Assert.NotEqual(0, rc);
+      Assert.False(File.Exists(output));
+    });
+  }
+
   private static void WithFixture(Action<string, string, string> action)
   {
     var root = Path.Combine(Path.GetTempPath(), $"rad-manifest-select-{Guid.NewGuid():N}");
