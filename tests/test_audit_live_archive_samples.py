@@ -59,6 +59,27 @@ def test_sample_selection_skips_oversized_payloads_without_promotion(tmp_path: P
     assert record["oversized_before_sample_limit"] == 1
 
 
+def test_compression_filter_targets_raw_entries_without_changing_default(tmp_path: Path) -> None:
+    root, _data = _sample_root(tmp_path)
+    all_entries = audit.audit_archive(root, "assets.001", samples=2)
+    filtered = audit.audit_archive(root, "assets.001", samples=2, compression_code=0)
+    assert [row["entry_index"] for row in all_entries["samples"]] == [0, 1]
+    assert "selected_compression_code" not in all_entries
+    assert filtered["selected_compression_code"] == 0
+    assert [row["entry_index"] for row in filtered["samples"]] == [1]
+    assert filtered["samples"][0]["compression_code"] == 0
+    missing = audit.build_report(root, ["assets.001"], compression_code=2)
+    assert missing["sample_count"] == 0
+    assert missing["archives"][0]["selected_compression_code"] == 2
+
+
+@pytest.mark.parametrize("bad", [-1, 65536])
+def test_compression_filter_rejects_out_of_range_codes(tmp_path: Path, bad: int) -> None:
+    root, _data = _sample_root(tmp_path)
+    with pytest.raises(ValueError, match="compression_code"):
+        audit.audit_archive(root, "assets.001", compression_code=bad)
+
+
 def test_report_is_repeatable_and_archive_order_is_deterministic(tmp_path: Path) -> None:
     root, _data = _sample_root(tmp_path, "assets.002")
     other = root / "Assets" / "assets.001"
@@ -124,6 +145,19 @@ def test_cli_dry_run_emits_json_without_writing(
     assert parsed["archive_count"] == 1
     assert parsed["sample_count"] == 1
     assert not (audit.REPO_ROOT / "Exports" / "ra1" / "live-archive-samples.json").exists()
+
+
+def test_cli_filters_code_zero_in_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root, _data = _sample_root(tmp_path)
+    rc = audit.main([
+        "--live-root", str(root), "--archive", "assets.001",
+        "--compression-code", "0", "--samples", "1", "--dry-run",
+    ])
+    assert rc == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["sample_count"] == 1
+    assert output["archives"][0]["selected_compression_code"] == 0
+    assert output["archives"][0]["samples"][0]["entry_index"] == 1
 
 
 @pytest.mark.parametrize("samples,limit", [(0, 1024), (51, 1024), (1, 0), (1, 8 * 1024 * 1024 + 1)])

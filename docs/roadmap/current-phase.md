@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 15, 2026 — RA-1 bounded source-provenance audit
+## Current: November 16, 2026 — RA-1.4b terrain DDS source-reference audit
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -10,7 +10,9 @@
 
 **RA-1.3 completed:** [Packed/decoded SHA-1 source-format proof](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md) — three independently verified samples (one valid 25-block Gamebryo terrain-related NIF, two DDS textures). Archive-table SHA-1 = packed-payload SHA-1; archive ID = first 8 bytes of decoded-payload SHA-1; manifest Size = decoded length, for this bounded cohort. Manifest Hash and PAK CompressedSize remain unqualified. Full Python suite: 1,183 passed, 17 historical-data failures, 70 skipped.
 
-**Next actionable milestone:** RA-1.4 — test independent compression/type controls and investigate the terrain NIF's exact linked DDS source identities; avoid speculative placement. Assets owns source extraction; RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement. **Do not duplicate M6.2/M6.3 navigation without a demonstrated consumer gap.**
+**RA-1.4a completed:** [Independent code-0 archive controls](../handoffs/2026-11-16-ra1-4a-uncompressed-controls.md) — all 244 TWAD tables inventoried (22,422 code-0; 241,764 code-1; no code-2 entries). Two code-0 source SHA-1 controls passed; one exact manifest ID unique and one ID ambiguous across two PAKs. The latter is a 112-block binary-extra-data NIF, not a verified world mesh. Full Python suite: 1,187 passed, 17 historical-data failures, 70 skipped.
+
+**Next actionable milestone:** RA-1.4b — verify the RA-1.3 terrain NIF's embedded DDS name references against existing filename hash and texture-linking tools. Keep candidate names distinct from confirmed asset identity. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
 
 ---
 

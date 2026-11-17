@@ -55,12 +55,15 @@ def audit_archive(
     *,
     samples: int = 4,
     max_packed_bytes: int = 1024 * 1024,
+    compression_code: int | None = None,
 ) -> dict[str, Any]:
     """Join raw TWAD table identity with bounded packed-byte SHA256 evidence."""
     if not ARCHIVE_NAME_RE.fullmatch(archive_name):
         raise ValueError(f"invalid archive name: {archive_name!r}")
     if not 1 <= samples <= 50 or not 1 <= max_packed_bytes <= 8 * 1024 * 1024:
         raise ValueError("samples or max_packed_bytes is outside the bounded range")
+    if compression_code is not None and not 0 <= compression_code <= 65535:
+        raise ValueError("compression_code must be an unsigned 16-bit integer")
 
     path = live_root / "Assets" / archive_name
     if not path.is_file():
@@ -97,6 +100,8 @@ def audit_archive(
         for entry in non_null:
             if len(sample_rows) >= samples:
                 break
+            if compression_code is not None and entry["compression"] != compression_code:
+                continue
             packed_size = int(entry["size"])
             if packed_size > max_packed_bytes:
                 oversized += 1
@@ -134,6 +139,7 @@ def audit_archive(
         },
         "table_entries": len(entries),
         "non_null_entries": len(non_null),
+        **({"selected_compression_code": compression_code} if compression_code is not None else {}),
         "oversized_before_sample_limit": oversized,
         "samples": sample_rows,
         "evidence": {
@@ -154,13 +160,14 @@ def build_report(
     *,
     samples: int = 4,
     max_packed_bytes: int = 1024 * 1024,
+    compression_code: int | None = None,
 ) -> dict[str, Any]:
     """Stable archive selection/order; never include absolute host paths in reports."""
     names = sorted(set(archives))
     if not names or len(names) > MAX_ARCHIVES:
         raise ValueError(f"select 1..{MAX_ARCHIVES} archives")
     rows = [
-        audit_archive(live_root, name, samples=samples, max_packed_bytes=max_packed_bytes)
+        audit_archive(live_root, name, samples=samples, max_packed_bytes=max_packed_bytes, compression_code=compression_code)
         for name in names
     ]
     return {
@@ -194,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--archive", action="append", dest="archives", default=None)
     parser.add_argument("--samples", type=int, default=4)
     parser.add_argument("--max-packed-bytes", type=int, default=1024 * 1024)
+    parser.add_argument("--compression-code", type=int, default=None, help="Only sample TWAD entries with this compression code")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -204,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
             args.archives or ["assets.001"],
             samples=args.samples,
             max_packed_bytes=args.max_packed_bytes,
+            compression_code=args.compression_code,
         )
         if args.dry_run:
             print(json.dumps(report, indent=2, sort_keys=True))

@@ -58,6 +58,8 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 
 ### RA-1 — source inventory, not broad speculative discovery
 
+**2026-11-16 RA-1.4a checkpoint:** The bounded sampler now supports an optional compression-code filter without changing the unfiltered output. Scanning 244 live TWAD metadata tables found 22,422 code-0 and 241,764 code-1 entries (no other codes). Two independent code-0 payloads satisfy SHA-1 prefix and archive-table hash relationships, but the Gamebryo NIF ID occurs in two distinct primary-manifest PAK rows. Preserve the ambiguous join, the variable manifest Hash semantics, and the distinction between extra-data-only NIF and a mesh. [Proof handoff](../handoffs/2026-11-16-ra1-4a-uncompressed-controls.md). **Next:** RA-1.4b terrain NIF DDS-name source matching; no navmesh duplication.
+
 **Progress checkpoint (2026-11-15):** RA-1.1 qualified three TWAD source archives and 12 packed-byte samples. RA-1.2 matched three exact archive IDs to one primary-manifest row each with PAK paths. RA-1.3 independently verified three decoded payloads (one terrain-related NIF with 25 parsed blocks, two DDS): source table SHA-1 equals packed SHA-1; first eight bytes of decoded SHA-1 equals archive ID; decoded length equals manifest Size. These are sample-level findings, not a universal guarantee. Manifest Hash and CompressedSize semantics remain unresolved. Next RA-1.4: test additional compression/type controls and trace exact NIF-linked DDS asset identities, then plan a bounded producer-to-RiftWorld contract.
 
 - Inventory existing producers: `build_live_archive_index.py`, NIF probe/extraction paths, `flythrough-index` builders, material/texture linking, semantic coverage, and CDR/resource reference paths.
