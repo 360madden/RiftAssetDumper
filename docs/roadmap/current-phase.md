@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-2b bounded model-root geometry qualification
+## Current: November 16, 2026 — RA-2c constrained NiMesh stream-reference repair
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -22,7 +22,9 @@
 
 **RA-2a completed:** [RiftWorld contract audit and source-only receipt](../handoffs/2026-11-16-ra2a-riftworld-source-contract.md) — read-only review confirmed RiftWorld model/scene/patch require validated mesh geometry, source transforms, placement and geometry hashes unavailable from current Assets evidence. New `riftassetdumper.source-evidence/1` producer packet binds one verified NIF, 13 decoded DDS references and three manifest content-ID ambiguities. All downstream readiness remains false. Synthetic fixture, strict JSON Schema and 25 targeted tests passed; full Python suite 1,212 passed, 17 historical generated-data failures, 70 skipped.
 
-**Next actionable milestone:** RA-2b — bounded offline read-only probe of the verified 25-block NIF's existing NiMesh/stream decoding. Qualify model-root vertices, topology and node-transform provenance before proposing any RiftWorld model geometry; preserve unknown coordinates and never touch RiftWorld/RR2.
+**RA-2b completed:** [Source-bound 129×129 terrain position/normal/UV proof](../handoffs/2026-11-16-ra2b-terrain-grid-source-evidence.md) — independently verified 16,641 XYZ points, normals and UV pairs. All 16,129 interior normal comparisons align with derived slopes (mean dot 0.99999815). Existing C# scanner detects only one of five likely NiMesh stream references because it increments by four bytes, while source references are 21 bytes apart. Naive big-endian u16 index triplets are **rejected**: 2 invalid references, 7,477 degenerate triplets. 11 focused tests passed; full Python suite 1,223 passed, 17 historical missing-artifact failures, 70 skipped. No geometry or world-placement promotion.
+
+**Next actionable milestone:** RA-2c — narrowly repair C# NiMesh stream-reference discovery for 21-byte-spaced records with synthetic negative controls and the known NIF as acceptance. Keep all unverified topology, transform, collision, and RiftWorld model/scene/patch readiness unpromoted.
 
 ---
 
