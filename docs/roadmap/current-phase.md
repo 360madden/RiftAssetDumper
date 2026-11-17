@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-2g NiMesh record-format and independent source controls
+## Current: November 16, 2026 — RA-2h source INDEX encoding and terrain-normal convention
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -32,7 +32,9 @@
 
 **RA-2f completed:** [Four native index-format hypotheses audited](../handoffs/2026-11-16-ra2f-native-index-hypothesis-audit.md) — tested direct BE/LE uint16 triangle lists and continuous strips against the SHA-qualified terrain grid/normals; all four interpretations rejected because of out-of-range indices, degeneracy and/or winding inconsistencies. Eleven new synthetic tests passed; full Python suite 1,241 passed, 17 historical missing-artifact failures, 70 skipped. No native triangles were promoted or exported.
 
-**Next actionable milestone:** RA-2g — bounded offline decoding of the NiMesh 21-byte stream-binding descriptor fields and a second independently source-hash-qualified terrain NIF control. Preserve original native topology, world frames and RiftWorld model/scene/patch readiness as unqualified.
+**RA-2g completed:** [Two independent NIFs and five semantic NiMesh bindings](../handoffs/2026-11-16-ra2g-nimesh-semantic-two-tiles.md) — decoded 21-byte binding profiles in two SHA-verified terrain files with exact INDEX/POSITION/NORMAL/COLOR/TEXCOORD name indices and identical binding records. INDEX and TEXCOORD source streams are byte-identical across two neighboring tiles (source node Z translation differs by 256). Second tile validates node hierarchy and source bindings, but its strict RA-2b gradient-normal gate fails in localized steep terrain; do not weaken it. 11 focused tests, Ruff and mypy passed; full Python 1,252 passed, 17 historical artifact failures, 70 skipped.
+
+**Next actionable milestone:** RA-2h — bounded offline investigation of the repeated INDEX stream's true encoding/ordering, plus the steep-gradient normal discrepancy. Preserve failed direct-list/strip controls, unknown record-field semantics, and unqualified world placement, topology and RiftWorld model/scene/patch readiness.
 
 ---
 
