@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-2c constrained NiMesh stream-reference repair
+## Current: November 16, 2026 — RA-2d native index/transform qualification
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -24,7 +24,9 @@
 
 **RA-2b completed:** [Source-bound 129×129 terrain position/normal/UV proof](../handoffs/2026-11-16-ra2b-terrain-grid-source-evidence.md) — independently verified 16,641 XYZ points, normals and UV pairs. All 16,129 interior normal comparisons align with derived slopes (mean dot 0.99999815). Existing C# scanner detects only one of five likely NiMesh stream references because it increments by four bytes, while source references are 21 bytes apart. Naive big-endian u16 index triplets are **rejected**: 2 invalid references, 7,477 degenerate triplets. 11 focused tests passed; full Python suite 1,223 passed, 17 historical missing-artifact failures, 70 skipped. No geometry or world-placement promotion.
 
-**Next actionable milestone:** RA-2c — narrowly repair C# NiMesh stream-reference discovery for 21-byte-spaced records with synthetic negative controls and the known NIF as acceptance. Keep all unverified topology, transform, collision, and RiftWorld model/scene/patch readiness unpromoted.
+**RA-2c completed:** [Constrained 21-byte NiMesh stream-reference recovery](../handoffs/2026-11-16-ra2c-structured-nimesh-reference-recovery.md) — the C# scanner now discovers five validated NiDataStream references rather than only one, with bounded, NiMesh-only 21-byte-stride sequence detection and four synthetic negative tests. The known NIF now yields one complete 16,641-vertex position/normal/UV attribute set, up from zero. All 76 .NET tests/build/format pass. The low-confidence index stream remains unqualified.
+
+**Next actionable milestone:** RA-2d — resolve #20 native index encoding/order and verify source NiTerrainNode/NiMesh transform details in bounded offline passes. No WorldPatch or model geometry promotion without valid triangles and transform evidence.
 
 ---
 

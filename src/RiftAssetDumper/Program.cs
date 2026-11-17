@@ -8505,7 +8505,7 @@ internal static class Program
           Float32Prefix: ReadFloat32Prefix(payload, maxValues: 8),
           StringIndexCandidates: stringIndexCandidates.Take(32).ToList(),
           StringSamples: stringSamples,
-          DataStreamReferenceCandidates: FindNifDataStreamReferenceCandidates(data, payload, blockOffsets, blockTypeIndices, blockSizes, blockTypeNames, strings).Take(32).ToList()));
+          DataStreamReferenceCandidates: FindNifDataStreamReferenceCandidates(data, payload, blockOffsets, blockTypeIndices, blockSizes, blockTypeNames, strings, isNiMesh: string.Equals(typeName, "NiMesh", StringComparison.OrdinalIgnoreCase)).Take(32).ToList()));
       offset += checked((int)Math.Min(size, int.MaxValue));
       if (offset > data.Length)
       {
@@ -8516,6 +8516,47 @@ internal static class Program
     return blocks;
   }
 
+  /// <summary>
+  /// Recover only a repeated, distinct NiMesh stream-ref sequence at 21-byte
+  /// spacing. Arbitrary unaligned 32-bit integers are not accepted as refs.
+  /// </summary>
+  internal static List<(int Offset, int TargetIndex)> FindConstrainedNiMeshStreamReferences(
+      ReadOnlySpan<byte> payload, IReadOnlySet<int> eligibleStreamIds)
+  {
+    const int spacing = 21;
+    const int minimumRefs = 3;
+    const int maximumRefs = 32;
+    const int maximumNiMeshBytes = 16 * 1024;
+    var best = new List<(int Offset, int TargetIndex)>();
+    if (payload.Length > maximumNiMeshBytes || eligibleStreamIds.Count < minimumRefs)
+    {
+      return best;
+    }
+
+    for (var offset = 0; offset + 4 + (minimumRefs - 1) * spacing <= payload.Length; offset++)
+    {
+      var run = new List<(int Offset, int TargetIndex)>();
+      var seenTargets = new HashSet<int>();
+      for (var cursor = offset; cursor + 4 <= payload.Length && run.Count < maximumRefs; cursor += spacing)
+      {
+        var target = BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(cursor, 4));
+        if (!eligibleStreamIds.Contains(target) || !seenTargets.Add(target))
+        {
+          break;
+        }
+
+        run.Add((cursor, target));
+      }
+
+      if (run.Count > best.Count)
+      {
+        best = run;
+      }
+    }
+
+    return best.Count >= minimumRefs ? best : [];
+  }
+
   private static List<NifBlockReferenceCandidate> FindNifDataStreamReferenceCandidates(
       ReadOnlySpan<byte> data,
       ReadOnlySpan<byte> payload,
@@ -8523,12 +8564,52 @@ internal static class Program
       List<int> blockTypeIndices,
       List<uint> blockSizes,
       List<NifBlockTypeNameInfo> blockTypeNames,
-      List<NifStringInfo> strings)
+      List<NifStringInfo> strings,
+      bool isNiMesh)
   {
     var candidates = new List<NifBlockReferenceCandidate>();
     var seen = new HashSet<(int Offset, int Target)>();
     var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
+    var scanOffsets = new SortedSet<int>();
     for (var offset = 0; offset + 4 <= payload.Length; offset += 4)
+    {
+      scanOffsets.Add(offset);
+    }
+
+    if (isNiMesh)
+    {
+      // Only bounded, complete stream payloads may participate in an unaligned
+      // sequence. Other NIF blocks retain their original aligned-only behavior.
+      var eligible = new HashSet<int>();
+      for (var i = 0; i < blockCount && i < blockOffsets.Count; i++)
+      {
+        var type = blockTypeIndices[i];
+        if (type < 0 || type >= blockTypeNames.Count ||
+            !blockTypeNames[type].NormalizedName.StartsWith("NiDataStream", StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        var streamOffset = blockOffsets[i];
+        var streamSize = checked((int)Math.Min(blockSizes[i], int.MaxValue));
+        if (streamSize < 29 || streamOffset < 0 || streamOffset > data.Length - streamSize)
+        {
+          continue;
+        }
+
+        if (BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(streamOffset, 4)) == streamSize - 29)
+        {
+          eligible.Add(i);
+        }
+      }
+
+      foreach (var (offset, _) in FindConstrainedNiMeshStreamReferences(payload, eligible))
+      {
+        scanOffsets.Add(offset);
+      }
+    }
+
+    foreach (var offset in scanOffsets)
     {
       var targetBlockIndex = BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset, 4));
       if (targetBlockIndex < 0 || targetBlockIndex >= blockCount || !seen.Add((offset, targetBlockIndex)))
