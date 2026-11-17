@@ -14,7 +14,9 @@
 
 **RA-1.4b completed:** [13 terrain NIF DDS source link proofs](../handoffs/2026-11-16-ra1-4b-terrain-dds-links.md) — all 13 exact embedded DDS references mapped to unique filename FNV+length rows, one live TWAD archive entry per ID, independently decoded DDS bytes, and .NET type/size agreement. Three content IDs have multiple manifest rows (3, 2, and 31,324); the highly reused baked DDS is independently proven 128×128 uniform black. No renderer-slot or world-position promotion.
 
-**Next actionable milestone:** RA-1.5 — make primary-manifest row identity explicit in `ResolveTargetEntry` / `probe-binary` so an ID-only first-match never impersonates a name-specific PAK record. Validate with synthetic duplicate IDs and real bounded controls. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
+**RA-1.5a completed:** [Exact manifest-row selection](../handoffs/2026-11-16-ra1-5a-exact-manifest-selection.md) — fixed `ResolveTargetEntry` to honor `--manifest-index` before ID-only lookup and reject conflicting `--id` or `--fnv`. Five red-to-green synthetic tests, all 66 .NET tests and formatting passed. Real `map_ec_sand_01.dds` exact row 179255/Pak 1190 verified; conflicting ID/index correctly rejected.
+
+**Next actionable milestone:** RA-1.5b — opt-in fail-closed `--require-unique` on ambiguous ID-only probes, preserving default behavior and explicit manifest row selection. The 31,324-row baked DDS content ID is a real negative control. RiftWorld owns assembly, HKX collision and navigation; RR2 owns live movement.
 
 ---
 

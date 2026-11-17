@@ -13188,6 +13188,33 @@ internal static class Program
 
   private static ManifestEntryBrief ResolveTargetEntry(AppOptions options, ManifestLookup lookup)
   {
+    if (options.ManifestIndexFilter is not null)
+    {
+      var byIndex = lookup.Entries.FirstOrDefault(e => e.Index == options.ManifestIndexFilter.Value);
+      if (byIndex is null)
+      {
+        throw new InvalidOperationException($"No manifest entry exists at index {options.ManifestIndexFilter.Value}.");
+      }
+
+      // A content ID may occur in many manifest rows with different names/PAKs.
+      // An explicit row must be authoritative, but all supplied selectors must agree.
+      if (!string.IsNullOrWhiteSpace(options.IdFilter))
+      {
+        var id = NormalizeIdPrefix(options.IdFilter);
+        if (!string.Equals(byIndex.IdPrefix, id, StringComparison.OrdinalIgnoreCase))
+        {
+          throw new InvalidOperationException($"--manifest-index {byIndex.Index} has ID {byIndex.IdPrefix}, conflicting with --id {id}.");
+        }
+      }
+
+      if (options.FnvFilter is not null && byIndex.FilenameFnv1Hash != options.FnvFilter.Value)
+      {
+        throw new InvalidOperationException($"--manifest-index {byIndex.Index} has FNV 0x{byIndex.FilenameFnv1Hash:x8}, conflicting with --fnv 0x{options.FnvFilter.Value:x8}.");
+      }
+
+      return byIndex;
+    }
+
     if (!string.IsNullOrWhiteSpace(options.IdFilter))
     {
       var id = NormalizeIdPrefix(options.IdFilter);
@@ -13197,12 +13224,6 @@ internal static class Program
       }
 
       throw new InvalidOperationException($"No manifest entry matched ID {id}.");
-    }
-
-    if (options.ManifestIndexFilter is not null)
-    {
-      var byIndex = lookup.Entries.FirstOrDefault(e => e.Index == options.ManifestIndexFilter.Value);
-      return byIndex ?? throw new InvalidOperationException($"No manifest entry exists at index {options.ManifestIndexFilter.Value}.");
     }
 
     if (options.FnvFilter is not null)
