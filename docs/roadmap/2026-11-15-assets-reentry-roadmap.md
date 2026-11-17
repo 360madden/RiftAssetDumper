@@ -6,8 +6,8 @@
 **Remote:** `https://github.com/360madden/RiftAssetDumper`  
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
-**Current phase:** **RA-1 — Bounded, real archive/source-provenance audit**
-**Status:** RA-0 toolchain restored; RA-1.1 TWAD sampling, RA-1.2 manifest-ID join, and RA-1.3 decoded hash/type verification shipped locally. Full-suite historical artifact-dependent failures remain (17). See [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md), and [RA-1.3](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md).
+**Current phase:** **RA-2 — Source-only contract compatibility and bounded model-root geometry proof**
+**Status:** RA-0 toolchain restored; RA-1.1–1.5 source/hash/manifest/texture qualifications delivered for bounded samples; RA-2a source-only receipt/fixture and JSON Schema passed (25 focused tests). No RiftWorld model/scene/patch readiness or geometry promotion; 17 historical generated-artifact failures remain. See [RA-2a](../handoffs/2026-11-16-ra2a-riftworld-source-contract.md), [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md), and [RA-1.3](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md).
 
 ## Decision and scope
 
@@ -77,6 +77,8 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 - Exit with a ranked **top five concrete extraction gaps** and one selected to fix first.
 
 ### RA-2 — useful versioned consumer output
+
+**2026-11-16 RA-2a checkpoint:** Read-only inspection of RiftWorld `riftworld.model/1`, `riftworld.scene/1`, `riftworld.patch/1` and external model-import receipt establishes that source NIF hashes and named DDS references are not model-root geometry, source matrices or qualified scene placement. Added an Assets-owned `riftassetdumper.source-evidence/1` packet with hash-bound NIF locator, 13 independently evidenced DDS links, explicit duplicate-manifest identity, and false downstream readiness. Synthetic fixture and Draft 2020-12 JSON Schema, 25 focused pytest tests, full Ruff/mypy pass and deterministic live-packet SHA-256 verified. Full suite: 1,210 passed, 17 historical artifact failures, 70 skipped. [Review and handoff](../handoffs/2026-11-16-ra2a-riftworld-source-contract.md). **Next RA-2b:** limited NiMesh stream/mesh geometry and transform provenance probe; do not generate a WorldPatch or infer gameplay collision.
 
 - First compare `RiftWorld`'s existing `riftworld.model/1`, `riftworld.scene/1`, and `riftworld.patch/1` source contracts against Assets manifests. Prefer an adapter over new redundant schemas.
 - Define exact boundaries: archive/member identity, raw file hash, original NIF resource path, model geometry hash, decoded material/texture references, local-to-world matrix and frame, provenance/evidence classification and extraction version.

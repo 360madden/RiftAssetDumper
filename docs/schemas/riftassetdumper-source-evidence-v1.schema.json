@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:riftassetdumper:source-evidence:v1",
+  "title": "Assets source-only evidence packet, not a RiftWorld model/scene/patch descriptor",
+  "description": "Strict source provenance interface. Does not establish model-root geometry, placement, collision, navigation or traversal.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "riftassetdumper.source-evidence/1"
+    },
+    "kind": {
+      "const": "producer-source-evidence-only"
+    },
+    "fixtureStatus": {
+      "enum": [
+        "synthetic",
+        "retained-local-source-evidence"
+      ]
+    },
+    "inputReports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "archiveReportSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "ddsLinkReportSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "const": "assets64.manifest"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "path",
+            "sha256"
+          ]
+        }
+      },
+      "required": [
+        "archiveReportSha256",
+        "ddsLinkReportSha256",
+        "manifest"
+      ]
+    },
+    "sourceModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "twad-entry"
+            },
+            "archive": {
+              "type": "string",
+              "pattern": "^Assets/assets\\.[0-9]{3}$"
+            },
+            "archiveSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "entryIndex": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "contentIdPrefix": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{16}$"
+            },
+            "packedSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "packedSha1": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "packedBytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "compressionCode": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          "required": [
+            "kind",
+            "archive",
+            "archiveSha256",
+            "entryIndex",
+            "contentIdPrefix",
+            "packedSha256",
+            "packedSha1",
+            "packedBytes",
+            "compressionCode"
+          ]
+        },
+        "decodedFileType": {
+          "const": "nif"
+        },
+        "rawSourceSha1": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "rawSourceSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceGeometryStatus": {
+          "const": "unavailable"
+        }
+      },
+      "required": [
+        "locator",
+        "decodedFileType",
+        "rawSourceSha1",
+        "rawSourceSha256",
+        "sourceGeometryStatus"
+      ]
+    },
+    "textures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nifStringIndex": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "filenameCandidate": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.-]+\\.dds$"
+          },
+          "decodedContentIdPrefix": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{16}$"
+          },
+          "decodedSha1": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{40}$"
+          },
+          "decodedSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "decodedBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "twad": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "archive": {
+                "type": "string",
+                "pattern": "^Assets/assets\\.[0-9]{3}$"
+              },
+              "archiveSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "entryIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "packedSha1": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "packedBytes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "archive",
+              "archiveSha256",
+              "entryIndex",
+              "packedSha1",
+              "packedBytes"
+            ]
+          },
+          "manifestRecord": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "filenameFnv1": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "pakIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pakPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "contentIdManifestRowCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "contentIdIsManifestUnique": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "index",
+              "filenameFnv1",
+              "pakIndex",
+              "pakPath",
+              "contentIdManifestRowCount",
+              "contentIdIsManifestUnique"
+            ]
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "nifStringPresent": {
+                "const": true
+              },
+              "filenameFnvAndLengthUnique": {
+                "const": true
+              },
+              "twadEntryIdUniqueInScannedArchives": {
+                "const": true
+              },
+              "packedSha1AndDecodedSha1VerifiedInRetainedReports": {
+                "const": true
+              },
+              "decodedType": {
+                "const": "dds"
+              },
+              "renderMaterialSlot": {
+                "const": "unqualified"
+              },
+              "pakPayloadEquivalence": {
+                "const": "unqualified"
+              }
+            },
+            "required": [
+              "nifStringPresent",
+              "filenameFnvAndLengthUnique",
+              "twadEntryIdUniqueInScannedArchives",
+              "packedSha1AndDecodedSha1VerifiedInRetainedReports",
+              "decodedType",
+              "renderMaterialSlot",
+              "pakPayloadEquivalence"
+            ]
+          }
+        },
+        "required": [
+          "nifStringIndex",
+          "filenameCandidate",
+          "decodedContentIdPrefix",
+          "decodedSha1",
+          "decodedSha256",
+          "decodedBytes",
+          "twad",
+          "manifestRecord",
+          "evidence"
+        ]
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verifiedSourceReferences": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "ambiguousManifestContentIds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "verifiedSourceReferences",
+        "ambiguousManifestContentIds"
+      ]
+    },
+    "consumerBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetContracts": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {
+              "const": "riftworld.model/1"
+            },
+            {
+              "const": "riftworld.scene/1"
+            },
+            {
+              "const": "riftworld.patch/1"
+            }
+          ],
+          "items": false
+        },
+        "modelGeometryId": {
+          "type": "null"
+        },
+        "modelLocalGeometrySha256": {
+          "type": "null"
+        },
+        "modelNodeTransforms": {
+          "type": "null"
+        },
+        "sourceWorld": {
+          "type": "null"
+        },
+        "sourcePlacementMatrix": {
+          "type": "null"
+        },
+        "sceneId": {
+          "type": "null"
+        },
+        "patchId": {
+          "type": "null"
+        },
+        "readiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "const": false
+            },
+            "scene": {
+              "const": false
+            },
+            "patch": {
+              "const": false
+            },
+            "navigation": {
+              "const": false
+            },
+            "traversal": {
+              "const": false
+            }
+          },
+          "required": [
+            "model",
+            "scene",
+            "patch",
+            "navigation",
+            "traversal"
+          ]
+        },
+        "qualification": {
+          "type": "string",
+          "minLength": 20
+        }
+      },
+      "required": [
+        "targetContracts",
+        "modelGeometryId",
+        "modelLocalGeometrySha256",
+        "modelNodeTransforms",
+        "sourceWorld",
+        "sourcePlacementMatrix",
+        "sceneId",
+        "patchId",
+        "readiness",
+        "qualification"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "fixtureStatus",
+    "inputReports",
+    "sourceModel",
+    "textures",
+    "counts",
+    "consumerBoundary"
+  ]
+}

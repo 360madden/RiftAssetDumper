@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-1.5 exact manifest-row provenance
+## Current: November 16, 2026 — RA-2b bounded model-root geometry qualification
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -20,7 +20,9 @@
 
 **RA-1.5c completed:** [Joint content-ID and filename-FNV selection](../handoffs/2026-11-16-ra1-5c-joint-content-name-selector.md) — `--id` plus `--fnv` now requires one matching primary-manifest row, rejecting mismatches and duplicate joint matches. Four red-to-green synthetic tests, full 72/72 .NET tests, and a real baked-DDS control selecting name-specific row 386332/PAK 1719 passed. Bare-ID default remains unchanged.
 
-**Next actionable milestone:** RA-2a contract-readiness audit — read-only comparison of existing RiftWorld model/scene/patch source contracts to qualified Assets manifest/TWAD/texture fields, then one narrow producer-side fixture and mapping. RA-1 coverage is not universally complete; full Python tests still have 17 historical missing-artifact failures. Keep RiftWorld/RR2 untouched.
+**RA-2a completed:** [RiftWorld contract audit and source-only receipt](../handoffs/2026-11-16-ra2a-riftworld-source-contract.md) — read-only review confirmed RiftWorld model/scene/patch require validated mesh geometry, source transforms, placement and geometry hashes unavailable from current Assets evidence. New `riftassetdumper.source-evidence/1` producer packet binds one verified NIF, 13 decoded DDS references and three manifest content-ID ambiguities. All downstream readiness remains false. Synthetic fixture, strict JSON Schema and 25 targeted tests passed; full Python suite 1,212 passed, 17 historical generated-data failures, 70 skipped.
+
+**Next actionable milestone:** RA-2b — bounded offline read-only probe of the verified 25-block NIF's existing NiMesh/stream decoding. Qualify model-root vertices, topology and node-transform provenance before proposing any RiftWorld model geometry; preserve unknown coordinates and never touch RiftWorld/RR2.
 
 ---
 

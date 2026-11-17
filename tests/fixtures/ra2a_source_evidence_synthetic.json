@@ -1,0 +1,69 @@
+{
+  "syntheticFixture": true,
+  "nifSha1": "aaaaaaaaaaaaaaaa000000000000000000000000",
+  "nifSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "manifestSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "archiveReportSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "linkReportSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "sourceReport": {
+    "schema": "ra1-live-archive-samples/v1",
+    "archives": [
+      {
+        "source_path": "Assets/assets.001",
+        "archive_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "samples": [
+          {
+            "entry_index": 2,
+            "id_prefix": "aaaaaaaaaaaaaaaa",
+            "packed_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "stored_sha1_field": "3333333333333333333333333333333333333333",
+            "packed_size": 113,
+            "compression_code": 1
+          }
+        ]
+      }
+    ]
+  },
+  "linkProof": {
+    "schema": "ra1-terrain-nif-dds-link-proof/v1",
+    "source_nif_id": "aaaaaaaaaaaaaaaa",
+    "source_nif_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "manifest_source_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "pak_paths_are_manifest_metadata_not_verified_payload_locations": true,
+    "nif_reference_count": 1,
+    "verified_dds_count": 1,
+    "ambiguous_manifest_id_count": 1,
+    "links": [
+      {
+        "name": "synthetic_albedo.dds",
+        "nif_string_index": 2,
+        "content_id": "bbbbbbbbbbbbbbbb",
+        "archive": "assets.002",
+        "archive_entry": 7,
+        "archive_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "packed_sha1": "7777777777777777777777777777777777777777",
+        "packed_bytes": 84,
+        "decoded_bytes": 128,
+        "decoded_sha1": "bbbbbbbbbbbbbbbb888888888888888888888888",
+        "decoded_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "filename_manifest_index": 19,
+        "filename_fnv1": 1234567,
+        "filename_manifest_pak_index": 3,
+        "filename_manifest_pak_path": "assets/texture/synthetic.pak",
+        "manifest_id_rows": 2,
+        "evidence": {
+          "nif_string_reference": true,
+          "unique_filename_fnv_and_length": true,
+          "unique_archive_source_id": true,
+          "packed_sha1_matches_archive_table": true,
+          "decoded_sha1_prefix_matches_id": true,
+          "dds_magic_and_decoded_size": true,
+          "dotnet_probe_agrees": true,
+          "render_material_slot": false,
+          "pak_payload_equivalence": false,
+          "world_or_collision": false
+        }
+      }
+    ]
+  }
+}
