@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-2e bounded C# NiTerrainNode scene-graph repair
+## Current: November 16, 2026 — RA-2f source index-format investigation
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -28,7 +28,9 @@
 
 **RA-2d completed:** [Source NiTerrainNode → NiMesh hierarchy and transform qualification](../handoffs/2026-11-16-ra2d-terrain-node-transform-proof.md) — independently decoded parent translation (8960,0,6400), identity rotation/scale, property/collision fields, one actual NiMesh #2 child, and mesh-local identity transform. Stream count 5 matches RA-2c. A bounded Python validator and seven synthetic negative tests passed; full Python suite 1,230 passed, 17 historical generated-artifact failures, 70 skipped. No authoritative RiftWorld source-world coordinates or native triangles promoted.
 
-**Next actionable milestone:** RA-2e — repair existing C# scene-graph parser to recognize NiTerrainNode and correctly account for NiAVObject properties/collision object before child references. Validate with source-hash-bound real NIF and synthetic corrupt-layout cases; keep model/world/collision readiness false.
+**RA-2e completed:** [Native C# NiTerrainNode / NiMesh scene graph](../handoffs/2026-11-16-ra2e-native-scenegraph-hierarchy.md) — fixed bounded NiAVObject parsing to include properties, collision, children, optional effects and NiTerrainNode type. Removed guessed first-parent attachment fallback. Synthetic red-to-green and 7 targeted tests; all 83 .NET tests/build/format passed. Real verified NIF now reports one terrain node and one explicitly attached NiMesh, compared with zero before. Source/world/collision readiness remains unqualified.
+
+**Next actionable milestone:** RA-2f — bounded offline native NiDataStream #20 index-encoding hypothesis tests, plus independent second-NIF control when available. Do not generate original topology, world model or navigation from invalid candidate triangles.
 
 ---
 

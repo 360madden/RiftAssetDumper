@@ -2029,8 +2029,120 @@ internal static class Program
   }
 
   /// <summary>
-  /// Extracts the scene graph from a NIF by parsing NiNode blocks for transforms
-  /// and parent-child hierarchy. Outputs a JSON report with the full tree.
+  /// Read the common NiObjectNET/NiAVObject layout and the following NiNode
+  /// hierarchy. Bounds, finite transforms and list caps are checked before
+  /// any scene attachment can be reported.
+  /// </summary>
+  internal static NifSceneGraphParsedNode ParseNifSceneGraphNodePayload(ReadOnlySpan<byte> payload)
+  {
+    var offset = 0;
+
+    static ReadOnlySpan<byte> Take(ReadOnlySpan<byte> source, ref int position, int count)
+    {
+      if (count < 0 || position < 0 || position > source.Length - count)
+      {
+        throw new InvalidDataException("Truncated NIF NiAVObject scene node layout.");
+      }
+
+      var bytes = source.Slice(position, count);
+      position += count;
+      return bytes;
+    }
+
+    var nameIndex = BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4));
+    var extraCount = BinaryPrimitives.ReadUInt32LittleEndian(Take(payload, ref offset, 4));
+    if (extraCount > 32)
+    {
+      throw new InvalidDataException("NiAVObject has an unbounded extra-data count.");
+    }
+
+    var extras = new List<int>();
+    for (var i = 0; i < extraCount; i++)
+    {
+      extras.Add(BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4)));
+    }
+
+    var controller = BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4));
+    var flags = BinaryPrimitives.ReadUInt16LittleEndian(Take(payload, ref offset, 2));
+    var translation = new float[3];
+    for (var i = 0; i < translation.Length; i++)
+    {
+      translation[i] = BinaryPrimitives.ReadSingleLittleEndian(Take(payload, ref offset, 4));
+    }
+
+    var rotation = new float[9];
+    for (var i = 0; i < rotation.Length; i++)
+    {
+      rotation[i] = BinaryPrimitives.ReadSingleLittleEndian(Take(payload, ref offset, 4));
+    }
+
+    var scale = BinaryPrimitives.ReadSingleLittleEndian(Take(payload, ref offset, 4));
+    if (!translation.All(float.IsFinite) || !rotation.All(float.IsFinite) ||
+        !float.IsFinite(scale) || scale <= 0)
+    {
+      throw new InvalidDataException("NiAVObject transform is non-finite or has invalid scale.");
+    }
+
+    // Properties and collision belong to NiAVObject; the NiNode child list
+    // begins AFTER these fields, not directly after the scale.
+    var propertyCount = BinaryPrimitives.ReadUInt32LittleEndian(Take(payload, ref offset, 4));
+    if (propertyCount > 32)
+    {
+      throw new InvalidDataException("NiAVObject has an unbounded property count.");
+    }
+
+    var properties = new List<int>();
+    for (var i = 0; i < propertyCount; i++)
+    {
+      properties.Add(BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4)));
+    }
+
+    var collisionIndex = BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4));
+    var childCount = BinaryPrimitives.ReadUInt32LittleEndian(Take(payload, ref offset, 4));
+    if (childCount > 128)
+    {
+      throw new InvalidDataException("NiNode has an unbounded child count.");
+    }
+
+    var children = new List<int>();
+    for (var i = 0; i < childCount; i++)
+    {
+      children.Add(BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4)));
+    }
+
+    // Some retained nodes include a -1 sentinel before the effect count.
+    if (offset <= payload.Length - 4 &&
+        BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset, 4)) == -1)
+    {
+      offset += 4;
+    }
+
+    var effects = new List<int>();
+    // Preserve compatibility with retained NiNode layouts that terminate
+    // after the child list. A partial effect-count field still fails closed.
+    if (offset < payload.Length)
+    {
+      var effectCount = BinaryPrimitives.ReadUInt32LittleEndian(Take(payload, ref offset, 4));
+      if (effectCount > 128)
+      {
+        throw new InvalidDataException("NiNode has an unbounded effect count.");
+      }
+
+      for (var i = 0; i < effectCount; i++)
+      {
+        effects.Add(BinaryPrimitives.ReadInt32LittleEndian(Take(payload, ref offset, 4)));
+      }
+    }
+
+    // Derived NiTerrainNode suffix fields remain unparsed and unpromoted.
+    return new NifSceneGraphParsedNode(
+        nameIndex, extras, controller, flags, translation, rotation, scale,
+        properties, collisionIndex, children, effects, offset);
+  }
+
+  /// <summary>
+  /// Extracts the scene graph from supported NiNode and NiTerrainNode source
+  /// blocks with explicit parent-child references.
   /// </summary>
   private static int ProbeNifSceneGraph(AppOptions options)
   {
@@ -2046,141 +2158,68 @@ internal static class Program
     var header = ParseNifHeader(payload);
     var nodeInfos = new List<NifSceneGraphNodeInfo>();
 
-    // Find all NiNode blocks
-    var niNodeBlocks = header.Blocks
-        .Where(static b => string.Equals(b.TypeName, "NiNode", StringComparison.OrdinalIgnoreCase))
+    // NiTerrainNode derives from NiNode's AVObject layout but has a distinct
+    // block type name. Limit this parser to the two verified node forms.
+    var sceneNodeBlocks = header.Blocks
+        .Where(static b => b.TypeName is "NiNode" or "NiTerrainNode")
         .OrderBy(static b => b.Index)
         .ToList();
 
-    // Find all NiMesh blocks for attachment reference
     var niMeshBlocks = header.Blocks
         .Where(static b => string.Equals(b.TypeName, "NiMesh", StringComparison.OrdinalIgnoreCase))
         .OrderBy(static b => b.Index)
         .ToList();
 
-    // Resolve string references
     var stringTable = header.Strings.Select(static s => s.Value).ToList();
-
-    foreach (var nodeBlock in niNodeBlocks)
+    foreach (var nodeBlock in sceneNodeBlocks)
     {
       var nodePayload = SliceNifBlockPayload(payload, nodeBlock);
-      // Minimum NiNode size: Name(4) + NumExtraData(4) + Controller(4) +
-      //   Flags(2) + Translation(12) + Rotation(36) + Scale(4) + NumChildren(4) = 70 bytes
-      if (nodePayload.Length < 0x40)
+      var parsed = ParseNifSceneGraphNodePayload(nodePayload);
+      var name = parsed.NameIndex >= 0 && parsed.NameIndex < stringTable.Count
+          ? stringTable[parsed.NameIndex]
+          : null;
+
+      // Out-of-range references cannot be evidence of a parent/child hierarchy.
+      foreach (var reference in parsed.ExtraData.Concat(parsed.Properties)
+                   .Append(parsed.CollisionIndex)
+                   .Concat(parsed.Children)
+                   .Concat(parsed.Effects))
       {
-        Console.Error.WriteLine($"WARNING: NiNode #{nodeBlock.Index} payload too short ({nodePayload.Length} bytes), skipping.");
-        continue;
-      }
-
-      // Parse NiObjectNET fields (dynamically, since ExtraData list is variable-length)
-      var nameStrIdx = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload[..4]);
-      var numExtraData = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(4, 4));
-
-      // Resolve name via string table (nameStrIdx is a string table index)
-      string? nodeName = null;
-      if (nameStrIdx < stringTable.Count)
-      {
-        nodeName = stringTable[checked((int)nameStrIdx)];
-      }
-
-      // Parse extra data refs (variable-length list starts at +0x08)
-      var extraDataRefs = new List<int>();
-      var offset = 8;
-      for (var i = 0; i < (int)Math.Min(numExtraData, 32) && offset + 4 <= nodePayload.Length; i++)
-      {
-        var edRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
-        extraDataRefs.Add(edRef);
-        offset += 4;
-      }
-
-      // Controller (4 bytes, int32, -1 = no controller)
-      var controller = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
-      offset += 4;
-
-      // Flags (2 bytes, uint16 — NOT 4 bytes, which was the root cause of the 2-byte offset shift)
-      // Skip past flags (we don't decode them currently)
-      offset += 2;
-
-      // Translation (12 bytes = 3 × float32 LE)
-      var tx = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset, 4));
-      var ty = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + 4, 4));
-      var tz = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + 8, 4));
-      offset += 12;
-
-      // Rotation (36 bytes = 9 × float32 LE, 3×3 row-major matrix)
-      var rotation = new float[9];
-      for (var r = 0; r < 9; r++)
-      {
-        rotation[r] = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset + r * 4, 4));
-      }
-      offset += 36;
-
-      // Scale (4 bytes = 1 × float32 LE)
-      var scale = BinaryPrimitives.ReadSingleLittleEndian(nodePayload.Slice(offset, 4));
-      offset += 4;
-
-      // Parse children list (starts after scale)
-      var numChildren = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(offset, 4));
-      offset += 4;
-      var childrenRefs = new List<int>();
-      for (var i = 0; i < (int)Math.Min(numChildren, 128) && offset + 4 <= nodePayload.Length; i++)
-      {
-        var childRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
-        childrenRefs.Add(childRef);
-        offset += 4;
-      }
-
-      // Parse effects list (after children + sentinel -1)
-      var effectsRefs = new List<int>();
-      // Skip sentinel (-1 = 0xFFFFFFFF) if present
-      if (offset + 4 <= nodePayload.Length)
-      {
-        var sentinel = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
-        if (sentinel == -1)
+        if (reference < -1 || reference >= header.Blocks.Count)
         {
-          offset += 4;
+          throw new InvalidDataException($"NIF scene node #{nodeBlock.Index} references invalid block #{reference}.");
         }
       }
 
-      // Read num effects
-      if (offset + 4 <= nodePayload.Length)
-      {
-        var numEffects = BinaryPrimitives.ReadUInt32LittleEndian(nodePayload.Slice(offset, 4));
-        offset += 4;
-        for (var i = 0; i < (int)Math.Min(numEffects, 128) && offset + 4 <= nodePayload.Length; i++)
-        {
-          var effectRef = BinaryPrimitives.ReadInt32LittleEndian(nodePayload.Slice(offset, 4));
-          effectsRefs.Add(effectRef);
-          offset += 4;
-        }
-      }
-
-      // Build child node info by resolving block indices to types
       var childNodes = new List<NifSceneGraphChildInfo>();
-      foreach (var childIdx in childrenRefs.Concat(effectsRefs))
+      foreach (var childIndex in parsed.Children.Concat(parsed.Effects))
       {
-        if (childIdx < 0 || childIdx >= header.Blocks.Count)
+        if (childIndex < 0)
         {
           continue;
         }
 
-        var childBlock = header.Blocks[childIdx];
+        var childBlock = header.Blocks[childIndex];
         childNodes.Add(new NifSceneGraphChildInfo(
-            childIdx, childBlock.TypeName, childBlock.Size));
+            childIndex, childBlock.TypeName, childBlock.Size));
       }
 
       nodeInfos.Add(new NifSceneGraphNodeInfo(
           BlockIndex: nodeBlock.Index,
-          Name: nodeName,
-          Translation: new[] { tx, ty, tz },
-          Rotation: rotation,
-          Scale: scale,
-          ExtraData: extraDataRefs,
-          Controller: controller,
-          Children: childrenRefs,
-          Effects: effectsRefs,
+          Name: name,
+          Translation: parsed.Translation,
+          Rotation: parsed.Rotation,
+          Scale: parsed.Scale,
+          ExtraData: parsed.ExtraData,
+          Controller: parsed.Controller,
+          Children: parsed.Children,
+          Effects: parsed.Effects,
           ChildNodes: childNodes,
-          NodeSize: nodeBlock.Size));
+          NodeSize: nodeBlock.Size,
+          NodeTypeName: nodeBlock.TypeName,
+          Properties: parsed.Properties,
+          CollisionIndex: parsed.CollisionIndex,
+          Flags: parsed.Flags));
     }
 
     // Build mesh attachment map: which NiNode each NiMesh belongs to
@@ -2209,14 +2248,7 @@ internal static class Program
           ParentNiNodeIndex: parentNode));
     }
 
-    // Fallback: if mesh has no explicit parent, attach to first NiNode
-    for (var i = 0; i < meshAttachments.Count; i++)
-    {
-      if (meshAttachments[i].ParentNiNodeIndex is null && nodeInfos.Count > 0)
-      {
-        meshAttachments[i] = meshAttachments[i] with { ParentNiNodeIndex = nodeInfos[0].BlockIndex };
-      }
-    }
+    // No implicit first-node fallback: a missing parent is unknown evidence.
 
     var report = new NifSceneGraphReport(
         NifVersion: header.VersionText,
@@ -2231,7 +2263,7 @@ internal static class Program
     File.WriteAllText(outPath, JsonSerializer.Serialize(report, JsonOptions(options.RedactPaths)) + Environment.NewLine, Encoding.UTF8);
 
     Console.WriteLine($"NIF scene graph: version={header.VersionText}");
-    Console.WriteLine($"NiNode blocks: {nodeInfos.Count}");
+    Console.WriteLine($"NiNode/NiTerrainNode blocks: {nodeInfos.Count}");
     Console.WriteLine($"NiMesh blocks: {niMeshBlocks.Count}");
     Console.WriteLine($"Meshes attached: {meshAttachments.Count(static m => m.ParentNiNodeIndex is not null)}");
     Console.WriteLine();
@@ -16073,6 +16105,20 @@ internal sealed record NifSceneGraphReport(
     List<NifSceneGraphNodeInfo> Nodes,
     List<NifSceneGraphMeshInfo> Meshes);
 
+internal sealed record NifSceneGraphParsedNode(
+    int NameIndex,
+    List<int> ExtraData,
+    int Controller,
+    ushort Flags,
+    float[] Translation,
+    float[] Rotation,
+    float Scale,
+    List<int> Properties,
+    int CollisionIndex,
+    List<int> Children,
+    List<int> Effects,
+    int BytesParsed);
+
 internal sealed record NifSceneGraphNodeInfo(
     int BlockIndex,
     string? Name,
@@ -16084,7 +16130,11 @@ internal sealed record NifSceneGraphNodeInfo(
     List<int> Children,
     List<int> Effects,
     List<NifSceneGraphChildInfo> ChildNodes,
-    uint NodeSize);
+    uint NodeSize,
+    string? NodeTypeName = null,
+    List<int>? Properties = null,
+    int? CollisionIndex = null,
+    ushort? Flags = null);
 
 internal sealed record NifSceneGraphChildInfo(
     int BlockIndex,
