@@ -1842,7 +1842,9 @@ internal static class Program
                 ? FindWholeBlockStrideCandidates(checked((int)declaredPayloadBytes.Value))
                 : [],
             MaybeStringIndex: candidate.MaybeStringIndex,
-            StringValue: candidate.StringValue));
+            StringValue: candidate.StringValue,
+            SemanticNameStringIndex: candidate.SemanticNameStringIndex,
+            SemanticName: candidate.SemanticName));
       }
 
       meshes.Add(new NifMeshStreamProbe(
@@ -1874,7 +1876,7 @@ internal static class Program
     Console.WriteLine($"NIF stream probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0}");
     foreach (var mesh in meshes.Take(8))
     {
-      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.StreamCandidates.Take(8).Select(static c => $"@{c.MeshPayloadOffset}->#{c.TargetBlockIndex}{(c.MaybeStringIndex ? "?" : string.Empty)} size={c.TargetSize:N0}"))}");
+      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.StreamCandidates.Take(8).Select(static c => $"@{c.MeshPayloadOffset}->#{c.TargetBlockIndex}{(c.SemanticName is not null ? $":{c.SemanticName}" : c.MaybeStringIndex ? "?" : string.Empty)} size={c.TargetSize:N0}"))}");
       foreach (var stream in mesh.StreamCandidates.Take(4))
       {
         var strideHint = stream.BodyStrideCandidates.FirstOrDefault();
@@ -1976,7 +1978,7 @@ internal static class Program
     Console.WriteLine($"NIF mesh probe: version={header.VersionText} meshes={report.MeshBlockCount:N0} emitted={report.MeshesEmitted:N0} candidateLinks={report.CandidateLinks:N0} pairings={report.Pairings:N0} ghidraPairings={report.GhidraPairings:N0} attributeSets={report.AttributeSets:N0}");
     foreach (var mesh in meshes.Take(8))
     {
-      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}{FormatNifDescriptorClassificationInline(s.DescriptorClassification)}"))}");
+      Console.WriteLine($"Mesh #{mesh.MeshBlockIndex} size={mesh.MeshSize:N0} refs={string.Join(", ", mesh.Streams.Take(8).Select(static s => $"@{s.MeshPayloadOffset}->#{s.TargetBlockIndex}{(s.SemanticName is not null ? $":{s.SemanticName}" : s.MaybeStringIndex ? "?" : string.Empty)}{FormatNifDataStreamUsageAccessInline(s.DataStreamUsage, s.DataStreamAccess)} payload={s.DeclaredPayloadBytes} role={s.RoleStats.PrimaryRole} c={s.RoleStats.Confidence}{FormatNifDescriptorClassificationInline(s.DescriptorClassification)}"))}");
       foreach (var stream in mesh.Streams)
       {
         var warning = CheckDescriptorRoleConsistency(stream.RoleStats.PrimaryRole, stream.DescriptorClassification, stream.DataStreamUsage, stream.DataStreamAccess);
@@ -8589,6 +8591,51 @@ internal static class Program
     return best.Count >= minimumRefs ? best : [];
   }
 
+  /// <summary>
+  /// Bind the known five-record terrain NiMesh profile to actual string-table
+  /// indices at record byte +13. The block target is NOT the string index.
+  /// Unknown layouts remain unqualified, rather than guessed from target IDs.
+  /// </summary>
+  internal static List<NifMeshSemanticBinding> ResolveConstrainedNiMeshSemanticBindings(
+      ReadOnlySpan<byte> payload,
+      IReadOnlyList<(int Offset, int TargetIndex)> references,
+      IReadOnlyList<NifStringInfo> strings)
+  {
+    string[] semantics = ["INDEX", "POSITION", "NORMAL", "COLOR", "TEXCOORD"];
+    if (references.Count != semantics.Length)
+    {
+      return [];
+    }
+
+    var bindings = new List<NifMeshSemanticBinding>(semantics.Length);
+    for (var index = 0; index < references.Count; index++)
+    {
+      var (offset, target) = references[index];
+      if (offset < 0 || payload.Length - offset < 21 ||
+          (index > 0 && offset != references[index - 1].Offset + 21) ||
+          BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset, 4)) != target ||
+          payload[offset + 4] != 0 ||
+          BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(offset + 5, 4)) != 1 ||
+          BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(offset + 9, 4)) != 1 ||
+          BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(offset + 17, 4)) != 0)
+      {
+        return [];
+      }
+
+      var nameIndex = BinaryPrimitives.ReadInt32LittleEndian(payload.Slice(offset + 13, 4));
+      if (nameIndex < 0 || nameIndex >= strings.Count ||
+          strings[nameIndex].Index != nameIndex ||
+          !string.Equals(strings[nameIndex].Value, semantics[index], StringComparison.Ordinal))
+      {
+        return [];
+      }
+
+      bindings.Add(new NifMeshSemanticBinding(offset, target, nameIndex, semantics[index]));
+    }
+
+    return bindings;
+  }
+
   private static List<NifBlockReferenceCandidate> FindNifDataStreamReferenceCandidates(
       ReadOnlySpan<byte> data,
       ReadOnlySpan<byte> payload,
@@ -8603,6 +8650,7 @@ internal static class Program
     var seen = new HashSet<(int Offset, int Target)>();
     var blockCount = Math.Min(blockTypeIndices.Count, blockSizes.Count);
     var scanOffsets = new SortedSet<int>();
+    var semanticByOffset = new Dictionary<int, NifMeshSemanticBinding>();
     for (var offset = 0; offset + 4 <= payload.Length; offset += 4)
     {
       scanOffsets.Add(offset);
@@ -8635,9 +8683,15 @@ internal static class Program
         }
       }
 
-      foreach (var (offset, _) in FindConstrainedNiMeshStreamReferences(payload, eligible))
+      var constrained = FindConstrainedNiMeshStreamReferences(payload, eligible);
+      foreach (var (offset, _) in constrained)
       {
         scanOffsets.Add(offset);
+      }
+
+      foreach (var binding in ResolveConstrainedNiMeshSemanticBindings(payload, constrained, strings))
+      {
+        semanticByOffset.Add(binding.MeshPayloadOffset, binding);
       }
     }
 
@@ -8666,6 +8720,7 @@ internal static class Program
       var targetPayload = safeTargetSize > 0 ? data.Slice(targetOffset, safeTargetSize) : ReadOnlySpan<byte>.Empty;
       var targetFirst16 = ToHex(targetPayload[..Math.Min(16, targetPayload.Length)]);
       var maybeStringIndex = targetBlockIndex >= 0 && targetBlockIndex < strings.Count;
+      semanticByOffset.TryGetValue(offset, out var semantic);
       candidates.Add(new NifBlockReferenceCandidate(
           PayloadOffset: offset,
           TargetBlockIndex: targetBlockIndex,
@@ -8674,8 +8729,12 @@ internal static class Program
           TargetDataStreamAccess: targetTypeInfo?.DataStreamAccess,
           TargetSize: blockSizes[targetBlockIndex],
           TargetFirst16: targetFirst16,
-          MaybeStringIndex: maybeStringIndex,
-          StringValue: maybeStringIndex ? strings[targetBlockIndex].Value : null));
+          // Once the actual record's semantic name is proven, suppress the
+          // obsolete target-ID-as-string heuristic (e.g. #20 == TEXCOORD).
+          MaybeStringIndex: semantic is null && maybeStringIndex,
+          StringValue: semantic is null && maybeStringIndex ? strings[targetBlockIndex].Value : null,
+          SemanticNameStringIndex: semantic?.SemanticStringIndex,
+          SemanticName: semantic?.SemanticName));
     }
 
     return candidates;
@@ -11850,7 +11909,9 @@ internal static class Program
           GhidraRoleStats: ghidraRoleStats,
           DescriptorBytes: layout.DescriptorBytes,
           DescriptorClassification: ClassifyNifDescriptor(layout.DescriptorBytes),
-          DescriptorGuidedRole: ClassifyNifDescriptorRole(layout.DescriptorBytes)));
+          DescriptorGuidedRole: ClassifyNifDescriptorRole(layout.DescriptorBytes),
+          SemanticNameStringIndex: candidate.SemanticNameStringIndex,
+          SemanticName: candidate.SemanticName));
     }
 
     return streamSummaries;
@@ -15536,7 +15597,9 @@ internal sealed record NifStreamTargetProbe(
     int? DeclaredPayloadOffset,
     List<StrideCandidate> DeclaredPayloadStrideCandidates,
     bool MaybeStringIndex,
-    string? StringValue);
+    string? StringValue,
+    int? SemanticNameStringIndex = null,
+    string? SemanticName = null);
 
 internal sealed record NifMeshProbeReport(
     BinaryAssetSource Source,
@@ -16080,6 +16143,9 @@ internal sealed record NifBlockInfo(
     List<string> StringSamples,
     List<NifBlockReferenceCandidate> DataStreamReferenceCandidates);
 
+internal sealed record NifMeshSemanticBinding(
+    int MeshPayloadOffset, int TargetBlockIndex, int SemanticStringIndex, string SemanticName);
+
 internal sealed record NifBlockReferenceCandidate(
     int PayloadOffset,
     int TargetBlockIndex,
@@ -16089,7 +16155,9 @@ internal sealed record NifBlockReferenceCandidate(
     uint TargetSize,
     string TargetFirst16,
     bool MaybeStringIndex,
-    string? StringValue);
+    string? StringValue,
+    int? SemanticNameStringIndex = null,
+    string? SemanticName = null);
 
 internal sealed record NifStringInfo(int Index, string Value);
 
@@ -17286,7 +17354,9 @@ internal sealed record NifMeshBoundStreamSummary(
     NifMeshStreamRoleStats? GhidraRoleStats,
     string? DescriptorBytes,
     string? DescriptorClassification,
-    string? DescriptorGuidedRole);
+    string? DescriptorGuidedRole,
+    int? SemanticNameStringIndex = null,
+    string? SemanticName = null);
 
 internal sealed record NifMeshBindingPairingSample(
     string ArchiveName,
