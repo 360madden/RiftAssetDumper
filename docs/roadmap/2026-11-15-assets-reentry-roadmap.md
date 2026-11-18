@@ -7,7 +7,7 @@
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
 **Current phase:** **RA-2 — Source-only contract compatibility and bounded model-root geometry proof**
-**Status:** RA-0 environment restored; RA-1.1–1.5 and RA-2a–RA-2i delivered bounded source and terrain diagnostics. The November 17 build-1179 patch was requalified for two archived terrain NIFs using Update Helper SHA-256 evidence and current-manifest C# probes. .NET 91/91 pass; full Python 1,264 passed/17 existing generated-artifact failures/70 skipped. Original INDEX topology, world frame and RiftWorld model/scene/patch readiness remain unqualified. See [RA-2i](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md) and [RA-2h](../handoffs/2026-11-16-ra2h-native-semantic-name-report.md).
+**Status:** RA-0 environment restored; RA-1.1–1.5 and RA-2a–RA-2j delivered bounded source and terrain diagnostics. Build 1179 source requalification stands. RA-2j evaluated six non-promotional native INDEX triplet offset/byte-order controls on two distinct NIFs sharing an INDEX stream, with no qualifying interpretation. Prior .NET tests 91/91 passed; current full Python 1,274 passed/17 existing generated-artifact failures/70 skipped. Original INDEX topology, world frame and RiftWorld model/scene/patch readiness remain unqualified. See [RA-2j](../handoffs/2026-11-18-ra2j-index-triplet-phase-controls.md) and [RA-2i](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md).
 
 ## Decision and scope
 
@@ -77,6 +77,8 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 - Exit with a ranked **top five concrete extraction gaps** and one selected to fix first.
 
 ### RA-2 — useful versioned consumer output
+
+**2026-11-18 RA-2j checkpoint:** Six source-hash-bound fixed-triplet interpretations (BE/LE × leading word offsets 0/1/2) independently scored on two NIFs sharing the same raw INDEX bytes. For BE offset 2, duplicate/zero-area candidate groups drop to zero and local-neighbor groups increase to 14,952, but 2 out-of-range groups and ~16.2k negative-normal groups remain on each tile. Because shifted windows omit edge words and have inconsistent winding, original triangles are still unqualified. Ten new tests, 33 focused tests total, Ruff/mypy and two ignored real-source receipts passed; full Python 1,274 passed, 17 old generated-artifact failures, 70 skipped. [Handoff](../handoffs/2026-11-18-ra2j-index-triplet-phase-controls.md). **Next RA-2k:** bounded window/segment/polarity study with a distinct INDEX stream as independent control before any topology promotion.
 
 **2026-11-18 RA-2i checkpoint:** Postpatch build 1179 confirmed through shared Update Helper evidence, unchanged terrain archive hashes, unique manifest joins and successful existing NIF probes. New SHA-bound INDEX structure inventory on two NIFs reports 98,304 words, exact six words per grid cell, big-endian two outliers (16765/16767), one missing vertex ID (16640) and 7,477 degenerate fixed triplets. Two real receipts + 12 new synthetic tests pass; no original topology promotion. [Handoff](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md). **Next RA-2j:** bounded index ordering hypothesis with negative controls, no parser/export promotion.
 

@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 16, 2026 — RA-2i shared native INDEX source-format analysis
+## Current: November 18, 2026 — RA-2j completed; RA-2k next
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -36,7 +36,11 @@
 
 **RA-2h completed:** [Native C# NiMesh semantic-name correction](../handoffs/2026-11-16-ra2h-native-semantic-name-report.md) — C# source probes now expose actual semantic string-table indices from qualified 21-byte NiMesh records. Eliminated the old target-block-ID-as-string false positive (#20 had appeared as TEXCOORD instead of INDEX). Eight new synthetic/negative tests, full 91/91 .NET suite, build/format passed; both independently SHA-verified terrain NIFs returned the same correct five semantic roles. Original native triangles remain unqualified.
 
-**Next actionable milestone:** RA-2i — bounded offline investigation of the shared INDEX stream's actual encoding/ordering using existing tooling and source-based negative controls. Keep steep-region normal mismatch and source-world frame separate; do not create native triangles or RiftWorld model/scene/patch readiness from guesses.
+**RA-2i completed:** [Postpatch INDEX source inventory](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md) — build 1179 checked against Update Helper file hashes, manifest joins and two source NIFs. BE/LE word inventory and negative controls delivered; no topology promotion.
+
+**RA-2j completed:** [Triplet phase diagnostic](../handoffs/2026-11-18-ra2j-index-triplet-phase-controls.md) — six byte-order/word-offset interpretations tested on both NIFs sharing identical INDEX bytes. BE offset 2 eliminates duplicate and zero-area candidate groups but leaves two invalid references, many inconsistent normal orientations and dropped edge words. Ten new tests; full Python 1,274 passed, 17 historical failures, 70 skipped; Ruff/mypy pass. Original topology remains unqualified.
+
+**Next actionable milestone:** RA-2k — bounded windowed winding/segment-order analysis and a genuinely distinct INDEX-body control; preserve native geometry, source-world and RiftWorld model/patch refusal until proved.
 
 ---
 
