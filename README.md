@@ -1,12 +1,77 @@
-# RiftAssetDumper workspace
+# RiftAssetDumper
 
-[![CI](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml/badge.svg)](https://github.com/360madden/RiftAssetDumper/actions)
+**Evidence-first tooling for RIFT Live x64 archives, manifests, NIF geometry and source provenance.**
 
-Read-only RIFT asset archive research workspace.
+[![Main branch CI](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/360madden/RiftAssetDumper/actions/workflows/ci.yml)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776ab)](pyproject.toml)
+[![.NET 9 target](https://img.shields.io/badge/.NET-target%20net9.0-512bd4)](src/RiftAssetDumper/RiftAssetDumper.csproj)
+[![Research status](https://img.shields.io/badge/status-source--only%20research-e5a50a)](docs/roadmap/current-phase.md)
 
-**Current (2026-11-15):** Resume from [the AMD-DESKTOP re-entry roadmap](docs/roadmap/2026-11-15-assets-reentry-roadmap.md) and [current phase pointer](docs/roadmap/current-phase.md). The original checkout was absent and has been freshly cloned; local generated archives/exports were not recovered. The older phase notes below are historical until revalidated. Prioritize tested asset-source provenance and compatibility with RiftWorld, not a second navigation system.
+> **Research boundary:** Evidence is not the same as a decoded game mesh. Native INDEX topology, authoritative world placement, collision and RiftWorld model/patch readiness remain **unqualified** for the November terrain samples.
 
-> ⛒ **Contribution path:** Open a PR, wait for the **6 CI checks** (5 leaf jobs — `Docs Lint`, `.NET Build & Test`, `Python Lint & Test`, `Orphan Guard Regression`, `Pre-commit Checks` — plus the `Summary` aggregator) to go green, then `gh pr merge --squash --delete-branch`. Direct-push to `main` is a documented fallback.
+## 🧭 November 2026 — current development
+
+**Last verified:** November 18, 2026, on **AMD-DESKTOP**. The active work is **RA-2 source compatibility and terrain evidence**; **RA-2k is complete, RA-2l is next**.
+
+| Area | Verified status | Boundary |
+| --- | --- | --- |
+| Archive/manifest provenance | 🟢 Bounded TWAD samples, content hashes and exact manifest-row checks | Not a claim that every archive or ID is qualified |
+| NiMesh/NiDataStream | 🟢 Five named stream roles and source terrain hierarchy on two SHA-verified NIFs | Remaining native primitive fields are unresolved |
+| Terrain source grid | 🟢 129 × 129 position, normal and UV records in selected samples | Secondary tile has a localized steep-normal discrepancy |
+| Native INDEX interpretation | 🟡 Six grouping controls plus a source-observed eight-group winding-sign motif | Not original triangles; two out-of-range references persist |
+| RiftWorld delivery | 🟡 Versioned **source-only** evidence receipt and strict schema | Model, scene, collision and WorldPatch readiness stay false |
+
+**Start here:** [Active phase](docs/roadmap/current-phase.md) · [November roadmap](docs/roadmap/2026-11-15-assets-reentry-roadmap.md) · [RA-2k technical handoff](docs/handoffs/2026-11-18-ra2k-periodic-winding-controls.md) · [Source-evidence schema](docs/schemas/riftassetdumper-source-evidence-v1.schema.json)
+
+### November 17 game update: recovery verified
+
+RIFT Live moved from `STABLE-1-1177-a-1256632` to `STABLE-1-1179-a-1256672`. The independent **Update Helper** repo owns the before/after file comparison; Assets independently rechecked the relevant installed files and source parsers.
+
+- **7 modified, 2 removed, 265 unchanged** in the compared installation record. `assets.242` and `assets64.manifest` changed; `assets.100` and `assets.200` retained their pre-update SHA-256 values.
+- Two terrain NIFs from unchanged `assets.100` were requalified by SHA-256, current-manifest lookup and existing C# source probes. The two NIFs are distinct, but their INDEX stream is **byte-identical**—not an independent index-format confirmation.
+- RA-2i inventories the shared INDEX words; RA-2j tests three big-/little-endian triplet offsets; RA-2k finds an **observed** `+++----+` winding-sign cycle with region-local reversals. At 128-group windows it predicts held-out strong signs in **240/256 windows on each terrain sample**, while uniform and alternating controls predict none at the same 90% threshold. The remaining windows and invalid indices still prohibit topology promotion.
+
+Details: [Postpatch evidence (RA-2i)](docs/handoffs/2026-11-18-ra2i-postpatch-index-structure.md) · [Phase-offset controls (RA-2j)](docs/handoffs/2026-11-18-ra2j-index-triplet-phase-controls.md) · [Periodic winding controls (RA-2k)](docs/handoffs/2026-11-18-ra2k-periodic-winding-controls.md).
+
+### 🧪 Reproduce the current checks (Windows)
+
+Run these commands in a terminal **from the repository root**, `C:\RIFT MODDING\Assets`. Install dependencies into the repo-local virtual environment; no global Python package changes are needed.
+
+```text
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest tests/test_audit_nif_index_periodic_winding.py tests/test_audit_nif_index_phase_controls.py -q
+.\.venv\Scripts\python.exe -m ruff check scripts/ tests/
+.\.venv\Scripts\python.exe -m mypy scripts/
+dotnet build RiftAssetDumper.slnx --nologo
+```
+
+**Last local results (November 18):**
+
+| Check | Result |
+| --- | --- |
+| RA-2k + RA-2j focused Python | 🟢 34 passed (24 new RA-2k cases) |
+| Ruff, formatting and mypy | 🟢 Passed |
+| Full Python suite | 🟡 **1,298 passed, 17 failed, 70 skipped** (+3 subtests) |
+| Full .NET suite, last run at RA-2i | 🟢 91 passed under process-local major roll-forward |
+
+The 17 Python failures are **pre-existing tests requiring historical ignored/generated artifacts**. A fresh clone is not full-suite green; do not suppress those failures or treat the main-branch CI badge as proof that the November branch has passed. The project targets `net9.0`; AMD-DESKTOP currently uses .NET 10 with **process-local** major roll-forward for those tests, not a global retarget. See the [RA-2i validation handoff](docs/handoffs/2026-11-18-ra2i-postpatch-index-structure.md).
+
+### 🔗 Ownership and contribution
+
+| Project | Owns |
+| --- | --- |
+| **RiftAssetDumper (this repo)** | Archive/NIF/texture decoding, hash-bound source metadata and candidate-only geometry research |
+| **RiftWorld** | World assembly, model/scene qualification, collision and offline navigation |
+| **RiftReader2 (RR2)** | Live client identity, execution and runtime feedback |
+
+Do not commit `Source/`, `Extracted/`, `Exports/`, game payloads or copied binaries. Open a pull request from the development branch, review the **actual branch CI** and promotion guards, then merge only after the required checks and source-proof decisions pass. The older navigation/export notes below are retained for historical context; they are **not** a November readiness claim.
+
+---
+
+## Historical workflows and CLI reference
+
+The sections below document earlier research phases and existing command surfaces. Some paths, source counts and "current" labels describe **historical local data**, not the verified November build-1179 environment. For active decisions, use the [current phase](docs/roadmap/current-phase.md).
 
 ## Operating mode 🚀
 
@@ -24,9 +89,9 @@ docs\task-routing-safety-policy.md
 
 Short version: keep high/extra-high reasoning for truth, proof, schema, runtime, guard, cross-repo, live-game, exporter, and commit/push decisions. Use lower-intelligence execution only for reversible mechanical work after safety is practically guaranteed and the main high-reasoning lane reviews the result.
 
-Current geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
+Historical geometry priority: prove `NiMesh` → `NiDataStream` bindings, assign stream roles, validate `maxIndex < vertexCount`, and down-rank sentinel/mask side streams before any experimental OBJ/model export.
 
-Current stage terminology: the historical geometry/export pipeline is **Phase 49 complete** (350 OBJs, 0 unknowns). Active work is the **post-Stage-18 Ghidra/NiDataStream proof-guard lane** — all 7 promotion gates CLEARED, both flags true. Ghidra evidence stays candidate-only and does not drive parser/export behavior changes.
+Historical stage terminology (June/July): the geometry/export pipeline reached **Phase 49 complete** (350 OBJs, 0 unknowns). The then-active lane was post-Stage-18 Ghidra/NiDataStream proof guards with seven cleared gates. Those historical flags do **not** qualify November terrain models or patches.
 
 Promotion-readiness checklist: `docs/nidatastream-promotion-readiness-checklist.md`.
 
@@ -90,7 +155,7 @@ Prefer adding options/modes to this helper before creating new one-off helper ap
 
 ## Grok AI sessions (memory enabled)
 
-Grok is the primary coding/research agent in this workspace. Cross-session memory is enabled for persistent recall of discovery state, proofs, and conventions.
+Historical Grok tooling: prior sessions used the memory-enabled launcher below. This is preserved as a tool reference, not an assertion about the agent currently working on this repo.
 
 - Recommended launcher (from this directory): `python grok-here.py`
 - Full setup & commands: `docs/grok-memory-and-context.md`
@@ -186,7 +251,7 @@ Source\Assets\assets.###
 
 `Source` is local copied game data. Do not commit it.
 
-Current local sample set has 27 copied `Source\Assets\assets.###` archive chunks.
+Historical copied-source sample inventory contained 27 `Source\Assets\assets.###` archive chunks; this is not a November 2026 live-source count.
 
 ## Probe headers and manifest tables
 
@@ -347,7 +412,7 @@ Full live install scan, read-only:
 dotnet run --project "C:\RIFT MODDING\Assets\src\RiftAssetDumper\RiftAssetDumper.csproj" -- scan-compression --root "C:\RIFT MODDING\Assets\Source" --live-root "C:\Program Files (x86)\Glyph\Games\RIFT\Live" --out "C:\RIFT MODDING\Assets\Exports\live-compression-scan.json"
 ```
 
-Current live-install truth:
+Historical live-install inventory at the time of that capture:
 
 ```text
 Live TWAD archive files scanned: 244
@@ -358,7 +423,7 @@ Manifest PAK compression: 0=736, 2=1340
 
 Important conclusion: compression `2` has now been confirmed in manifest Table 0 logical PAK rows, but not in copied or full-live `TWAD` archive entries. The LZMA2 path should therefore focus on logical PAK/manifest layer reconstruction, not ordinary `assets.###` entry extraction.
 
-## Current validated status
+## Historical archive and parser status (pre-November)
 
 - The copied manifests are valid `TWAM` files.
 - The copied archives are valid `TWAD` files.
