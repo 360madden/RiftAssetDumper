@@ -1,6 +1,6 @@
 # Current Active Phase & Milestone
 
-## Current: November 18, 2026 — RA-2j completed; RA-2k next
+## Current: November 18, 2026 — RA-2k completed; RA-2l next
 
 **Active roadmap:** [2026-11-15-assets-reentry-roadmap.md](2026-11-15-assets-reentry-roadmap.md). RA-0 environment/source access is qualified: Python 3.14 isolated `.venv` ready; existing net9.0 tests run under process-only .NET 10 major roll-forward; 244 installed live RIFT archive chunks accessible. **Historical full-suite data tests are not green**: 1,144 passed, 17 failed due to missing generated sources, 70 skipped. Exact evidence: [RA-0 baseline handoff](../handoffs/2026-11-15-ra0-development-and-source-baseline.md).
 
@@ -40,7 +40,9 @@
 
 **RA-2j completed:** [Triplet phase diagnostic](../handoffs/2026-11-18-ra2j-index-triplet-phase-controls.md) — six byte-order/word-offset interpretations tested on both NIFs sharing identical INDEX bytes. BE offset 2 eliminates duplicate and zero-area candidate groups but leaves two invalid references, many inconsistent normal orientations and dropped edge words. Ten new tests; full Python 1,274 passed, 17 historical failures, 70 skipped; Ruff/mypy pass. Original topology remains unqualified.
 
-**Next actionable milestone:** RA-2k — bounded windowed winding/segment-order analysis and a genuinely distinct INDEX-body control; preserve native geometry, source-world and RiftWorld model/patch refusal until proved.
+**RA-2k completed:** [Held-out eight-group winding candidate](../handoffs/2026-11-18-ra2k-periodic-winding-controls.md) — an observed +++----+ sign motif with region-local inversion predicts held-out strong normal signs in 240/256 128-triplet windows on each distinct NIF. Uniform/alternating controls predict none at >=90%. Six SHA-bound ignored reports, 24 new tests, focused 34 passed; full Python 1,298 passed/17 historical artifact failures/70 skipped; Ruff/mypy pass. Identical INDEX bytes, two invalid references and unmodeled regions prohibit native topology promotion.
+
+**Next actionable milestone:** RA-2l — locate a SHA-qualified, genuinely different terrain INDEX body and inspect source primitive descriptors before trying to explain periodic sign transitions. Keep model, world frame, collision and RiftWorld patch readiness blocked.
 
 ---
 
