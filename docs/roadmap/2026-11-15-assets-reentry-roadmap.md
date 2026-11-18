@@ -1,13 +1,13 @@
 # RiftAssetDumper — November 2026 Re-entry Roadmap
 
-**As of:** 2026-11-15 (America/New_York)  
+**As of:** 2026-11-18 (America/New_York)\
 **Owner/host:** AMD-DESKTOP  
 **Local checkout:** `C:\RIFT MODDING\Assets`  
 **Remote:** `https://github.com/360madden/RiftAssetDumper`  
 **Planning branch:** `docs/assets-reentry-2026-11`  
 **Git baseline:** `7e1d5a8699545b16bb4649d90f7d082cd55e1881` (`main`, 2026-07-11)  
 **Current phase:** **RA-2 — Source-only contract compatibility and bounded model-root geometry proof**
-**Status:** RA-0 toolchain restored; RA-1.1–1.5 source/hash/manifest/texture qualifications delivered for bounded samples; RA-2a source-only receipt/fixture and JSON Schema passed (25 focused tests). No RiftWorld model/scene/patch readiness or geometry promotion; 17 historical generated-artifact failures remain. See [RA-2a](../handoffs/2026-11-16-ra2a-riftworld-source-contract.md), [RA-0](../handoffs/2026-11-15-ra0-development-and-source-baseline.md), [RA-1.1](../handoffs/2026-11-15-ra1-twad-source-provenance.md), [RA-1.2](../handoffs/2026-11-15-ra1-2-manifest-id-join.md), and [RA-1.3](../handoffs/2026-11-15-ra1-3-decoded-payload-hash-proof.md).
+**Status:** RA-0 environment restored; RA-1.1–1.5 and RA-2a–RA-2i delivered bounded source and terrain diagnostics. The November 17 build-1179 patch was requalified for two archived terrain NIFs using Update Helper SHA-256 evidence and current-manifest C# probes. .NET 91/91 pass; full Python 1,264 passed/17 existing generated-artifact failures/70 skipped. Original INDEX topology, world frame and RiftWorld model/scene/patch readiness remain unqualified. See [RA-2i](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md) and [RA-2h](../handoffs/2026-11-16-ra2h-native-semantic-name-report.md).
 
 ## Decision and scope
 
@@ -77,6 +77,8 @@ Do **not** claim the original `Source/`, `Extracted/`, `Exports/`, asset payload
 - Exit with a ranked **top five concrete extraction gaps** and one selected to fix first.
 
 ### RA-2 — useful versioned consumer output
+
+**2026-11-18 RA-2i checkpoint:** Postpatch build 1179 confirmed through shared Update Helper evidence, unchanged terrain archive hashes, unique manifest joins and successful existing NIF probes. New SHA-bound INDEX structure inventory on two NIFs reports 98,304 words, exact six words per grid cell, big-endian two outliers (16765/16767), one missing vertex ID (16640) and 7,477 degenerate fixed triplets. Two real receipts + 12 new synthetic tests pass; no original topology promotion. [Handoff](../handoffs/2026-11-18-ra2i-postpatch-index-structure.md). **Next RA-2j:** bounded index ordering hypothesis with negative controls, no parser/export promotion.
 
 **2026-11-16 RA-2h checkpoint:** Fixed C# NiMesh stream/mesh reporting to use the semantic string-index at byte +13 of the qualified 21-byte record instead of heuristically treating stream block IDs as string indexes. Two SHA-verified source NIFs now report INDEX, POSITION, NORMAL, COLOR, TEXCOORD for streams #20–#24 with string indexes 16–20; the former false TEXCOORD string for block #20 is suppressed. Eight synthetic tests, 91/91 full .NET tests, build/format and real NIF receipts passed. No topology/world-placement promotion. [Handoff](../handoffs/2026-11-16-ra2h-native-semantic-name-report.md). **Next RA-2i:** bounded shared INDEX stream format/ordering investigation, existing negative controls intact.
 
